@@ -1,0 +1,34 @@
+# Smoke test for specialist strategy (routes dimensions to claude or codex).
+# Code-heavy dimensions go to codex, reasoning-heavy to claude.
+
+research:
+  topic: "What are three pros and cons of Python?"
+  goal: "A bullet-point list in under 100 words"
+
+  dimensions:
+    - "Developer experience"
+
+  scoring:
+    min_dimensions_per_iteration: 1
+    target_dimensions_total: 1
+    evidence_types:
+      - trade_off_analysis
+
+  execution:
+    max_iterations: 1
+    compress_every: 99
+    allowed_tools: ""
+    max_turns: 2
+    backend: claude
+    model: sonnet
+    max_budget_per_call: 1.00
+    timeout_seconds: 120
+
+    strategy: specialist
+    backends:
+      primary: claude
+      research:
+        - claude
+        - codex
+      judge: claude
+      utility: claude
