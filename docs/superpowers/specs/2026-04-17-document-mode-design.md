@@ -25,7 +25,7 @@ auto-research/
 ├── src/
 │   ├── document_refiner.py    # DocumentRefiner — sibling to AutoResearcher
 │   ├── document_loop.py       # run_cycle(), CycleContext, CycleState
-│   └── strategy.py            # ConvergeStrategy added
+│   └── document_strategy.py   # ConvergeStrategy — standalone, NOT in strategy.py
 │
 ├── prompts/
 │   ├── prd_builder.md
@@ -34,14 +34,17 @@ auto-research/
 │   ├── prd_arbitrate.md
 │   ├── prd_persona_architect.md
 │   ├── prd_persona_scrum_master.md
-│   └── prd_persona_product_owner.md
+│   ├── prd_persona_product_owner.md
+│   ├── generate_readme.md
+│   └── generate_docs_index.md
 │
 ├── configs/
 │   └── prd_template.yaml
 │
 └── tests/
     ├── test_document_loop.py
-    └── test_document_refiner.py
+    ├── test_document_refiner.py
+    └── test_document_strategy.py
 ```
 
 ### 2.2 Unchanged files
@@ -52,9 +55,9 @@ auto-research/
 
 | File | Change |
 |---|---|
-| `src/config.py` | Add `PersonaConfig`, `DocumentConfig`, `document` field on `ResearchConfig` |
-| `src/strategy.py` | Add `ConvergeStrategy`, register in `_STRATEGY_REGISTRY` |
-| `src/cli.py` | Add `refine` subcommand, route to `DocumentRefiner` when `strategy: converge` |
+| `src/config.py` | Add `PersonaConfig`, `ArtifactConfig`, `DocumentConfig` — loaded independently by `refine` subcommand, no changes to `ResearchConfig` |
+| `src/cli.py` | Add `refine` subcommand; routes to `DocumentRefiner` when `document:` key is present in config. Does NOT route through strategy factory. |
+| `src/run_state.py` | Extract `BaseContext` — shared callback base for both `LoopContext` and `CycleContext` |
 
 ---
 
@@ -73,7 +76,7 @@ Issue registry   → updated with lifecycle state per critique
 Convergence check → clean cycle? increment counter. any VALID critique? reset to 0.
 ```
 
-**Termination:** when `consecutive_clean_cycles >= config.document.convergence_cycles` (default: 1). Also terminates on `max_cycles` if set.
+**Termination:** when `consecutive_clean_cycles >= config.convergence_cycles` (default: 1). Also terminates on `max_cycles` if set.
 
 ---
 
@@ -81,11 +84,13 @@ Convergence check → clean cycle? increment counter. any VALID critique? reset 
 
 ### 4.1 `CycleState`
 
+`prd_path` derives from `DocumentConfig.primary_artifact` — not hardcoded.
+
 ```python
 @dataclass
 class CycleState:
     prd: str = ""
-    prd_path: Path = Path("PRD.md")
+    prd_path: Path = field(default_factory=lambda: Path("PRD.md"))  # set from config.primary_artifact
     prd_versions: list[str] = field(default_factory=list)
     cycle: int = 0
     issue_registry: list[Issue] = field(default_factory=list)
@@ -93,7 +98,7 @@ class CycleState:
     total_cost: float = 0.0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
-    results_path: Path = Path("results.tsv")
+    results_path: Path = field(default_factory=lambda: Path("results.tsv"))
 ```
 
 ### 4.2 `Issue`
@@ -111,22 +116,38 @@ class Issue:
     patch_applied: bool = False
 ```
 
-### 4.3 `CycleContext`
+### 4.3 `BaseContext` and `CycleContext`
 
-Mirrors `LoopContext`. Carries:
-- `call_with`, `invoke_for_strategy`, `track_usage`, `track_cost` — shared with research mode
-- `read_prd_section(ref: str) -> str` — reads current PRD at the referenced section
-- `update_issue_registry(issues: list[Issue]) -> None`
+`BaseContext` holds the 4 callbacks shared with the research loop. `CycleContext` extends it with 2 document-specific callbacks. When the orchestrator changes cost tracking, only `BaseContext` changes — both loops stay in sync automatically.
+
+```python
+@dataclass
+class BaseContext:
+    """Shared callback bundle — used by both LoopContext and CycleContext."""
+    call_with: Callable[..., AgentResponse]
+    invoke_for_strategy: Callable[..., AgentResponse]
+    track_usage: Callable[[AgentResponse, str], None]
+    track_cost: Callable[[float, str], None]
+
+@dataclass
+class CycleContext(BaseContext):
+    """Document-loop additions."""
+    config: DocumentConfig
+    read_prd_section: Callable[[str], str]
+    update_issue_registry: Callable[[list[Issue]], None]
+```
+
+`LoopContext` in `research_loop.py` also extends `BaseContext` — replacing its current 4 duplicated fields.
 
 ---
 
 ## 5. `ConvergeStrategy`
 
-Extends `Strategy`. Adds five dedicated methods called by `document_loop.run_cycle()`:
+**Standalone class — does NOT extend `Strategy` and is NOT registered in `_STRATEGY_REGISTRY`.** Lives in `src/document_strategy.py`. Used exclusively by `DocumentRefiner`, which instantiates it directly. The research loop and strategy factory are uninvolved. The `converge` value in the YAML `execution.strategy` field is handled by the CLI routing to `DocumentRefiner` — it never reaches `get_strategy()`.
 
 ```python
-class ConvergeStrategy(Strategy):
-    name = "converge"
+class ConvergeStrategy:
+    """Standalone strategy for document convergence. Not a Strategy subclass."""
 
     def run_builder(self, prd: str, patches: list[Patch], invoke) -> str:
         # Cycle 1: generate initial PRD from source material
@@ -182,58 +203,61 @@ Each persona name maps to a prompt file: `prompts/prd_persona_{name}.md`. Adding
 
 ### 6.1 New dataclasses in `config.py`
 
+`DocumentConfig` is a top-level config loaded independently by the `refine` CLI subcommand. It does NOT extend or nest inside `ResearchConfig` — research-mode fields (`dimensions`, `scoring`, `evaluation`, `methodology`) are irrelevant to document runs and must not bleed through.
+
 ```python
 @dataclass(frozen=True)
 class PersonaConfig:
     name: str
-    prompt_file: str = ""    # defaults to prd_persona_{name}.md
+    prompt_file: str = ""    # defaults to prompts/prd_persona_{name}.md
 
 @dataclass(frozen=True)
 class ArtifactConfig:
-    name: str                  # filename, e.g. "V1_ALPHA_VERTICAL_SLICE.md"
+    name: str                  # output filename, e.g. "V1_ALPHA_VERTICAL_SLICE.md"
     layer: str                 # "execution" | "companion"
-    prompt_file: str = ""      # defaults to artifact_{name}.md (without .md extension)
-    review: bool = True        # if True: Challenger + Persona + Verifier pass before finalizing
+    prompt_file: str = ""      # defaults to prompts/artifact_{stem}.md ({stem} = name without .md)
+    review: bool = True        # if True: one Challenger + Persona + Verifier pass before finalizing
 
 @dataclass(frozen=True)
 class DocumentConfig:
-    source_material: str = ""
+    topic: str                          # what the primary artifact is about
+    goal: str                           # desired deliverable description
+    primary_artifact: str = "PRD.md"   # filename of the primary convergence target
+    source_material: str = ""           # initial context fed to Builder on cycle 1
     convergence_cycles: int = 1
     max_cycles: int = 0
-    persona_mode: str = "parallel"    # "parallel" | "serial"
+    persona_mode: str = "parallel"      # "parallel" | "serial"
     personas: tuple[PersonaConfig, ...] = (
         PersonaConfig("architect"),
         PersonaConfig("scrum_master"),
         PersonaConfig("product_owner"),
     )
-    artifacts: tuple[ArtifactConfig, ...] = ()   # execution/companion docs to generate after PRD converges
-```
+    artifacts: tuple[ArtifactConfig, ...] = ()
+    backends: BackendsConfig = field(default_factory=BackendsConfig)
+    strategy_config: StrategyConfig = field(default_factory=StrategyConfig)
 
-`ResearchConfig` gains: `document: DocumentConfig = field(default_factory=DocumentConfig)`
+    @classmethod
+    def from_yaml(cls, path: Path) -> DocumentConfig: ...
+```
 
 ### 6.2 Example YAML
 
+`document:` is a top-level key — not nested under `research:`. The `refine` subcommand loads it directly into `DocumentConfig`. No `dimensions`, `scoring`, or `evaluation` keys appear.
+
 ```yaml
-research:
+document:
   topic: "Iris — engineering intelligence platform PRD"
   goal: "Produce an execution-ready product requirements document"
-  dimensions:
-    - scope discipline
-    - release framing
-    - use case prioritization
-    - acceptance criteria coverage
-    - internal consistency
-
-  document:
-    source_material: "path/to/raw_notes.md"
-    convergence_cycles: 1
-    max_cycles: 0
-    persona_mode: parallel
-    personas:
-      - name: architect
-      - name: scrum_master
-      - name: product_owner
-    artifacts:
+  primary_artifact: PRD.md
+  source_material: "path/to/raw_notes.md"
+  convergence_cycles: 1
+  max_cycles: 0
+  persona_mode: parallel
+  personas:
+    - name: architect
+    - name: scrum_master
+    - name: product_owner
+  artifacts:
       # execution artifacts
       - name: V1_ALPHA_VERTICAL_SLICE.md
         layer: execution
@@ -261,15 +285,13 @@ research:
         layer: companion
         review: false
 
-  execution:
-    strategy: converge
-    backends:
-      primary: codex            # Builder (research[0])
-      research: [codex, claude] # research[0]=Builder, research[1]=Challenger
-      judge: gemini             # Arbitrator
-      utility: claude           # Verifier
-    strategy_config:
-      critique_depth: thorough
+  backends:
+    primary: codex            # Builder (research[0])
+    research: [codex, claude] # research[0]=Builder, research[1]=Challenger
+    judge: gemini             # Arbitrator
+    utility: claude           # Verifier
+  strategy_config:
+    critique_depth: thorough
 ```
 
 ---
@@ -305,7 +327,9 @@ output/my-prd-run/
 └── README.md
 ```
 
-All artifact names, layers, and review flags are **declared in the YAML** (see Section 6.3). The list above reflects the Iris session output. Archive files (draft PRD history) are never generated — they belong in `.run/` as audit trail only.
+All artifact names, layers, and review flags are **declared in the YAML** (see Section 6.2). The list above reflects the Iris session output. Archive files (draft PRD history) are never generated — they belong in `.run/` as audit trail only.
+
+**Artifact prompt convention:** each artifact's generation prompt lives at `prompts/artifact_{stem}.md` where `{stem}` is the artifact filename without `.md` (e.g. `prompts/artifact_V1_ALPHA_VERTICAL_SLICE.md`). The Builder receives: the converged primary artifact, the artifact's prompt, and any already-generated artifacts of `layer: companion` as additional context. A custom `prompt_file` in `ArtifactConfig` overrides the default path.
 
 ### 7.2 Run artifacts (machine-readable)
 
@@ -335,7 +359,16 @@ The run executes in three sequential phases:
 | **2 — Expansion** | Execution artifacts generated from the converged PRD, each optionally reviewed | Named execution artifacts |
 | **3 — Indexing** | `DOCS_INDEX.md` and `README.md` auto-generated from the declared package | `DOCS_INDEX.md`, `README.md` |
 
-Execution artifacts declared with `review: true` in the YAML go through one Challenger + Persona + Verifier pass before being written as final. Artifacts declared with `review: false` are generated directly from the PRD by the Builder and written immediately.
+Execution artifacts declared with `review: true` in the YAML go through one Challenger + Persona + Verifier pass before being written as final. Artifacts declared with `review: false` are generated directly from the converged PRD by the Builder and written immediately.
+
+**Phase 3 prompts — always run, not configurable:**
+
+| Prompt | Inputs | Output |
+|---|---|---|
+| `prompts/generate_readme.md` | artifact manifest (names + layers), `topic`, `goal`, `primary_artifact` name | `README.md` — entry point with quick-start links by audience |
+| `prompts/generate_docs_index.md` | full artifact manifest with layers + review flags, personas list, PRD section summary (§1 Executive Summary + §2 Problem Statement) | `DOCS_INDEX.md` — audience-based reading orders with time estimates, status table, archive description |
+
+Phase 3 always regenerates both files from final artifact state. The Builder backend runs both calls.
 
 ---
 
@@ -376,8 +409,9 @@ The CLI routes to `DocumentRefiner` when `strategy: converge` is set. Both subco
 ## 10. Testing Strategy
 
 - `tests/test_document_loop.py` — unit tests for `run_cycle()`, convergence logic, issue registry updates. Uses JSONL backend (no real LLM calls).
-- `tests/test_document_refiner.py` — integration tests for setup, teardown, artifact writing.
-- `tests/test_strategy.py` — extended with `ConvergeStrategy` cases.
+- `tests/test_document_refiner.py` — integration tests for setup, teardown, artifact writing, Phase 2 expansion, Phase 3 indexing.
+- `tests/test_document_strategy.py` — unit tests for `ConvergeStrategy` (all 5 methods), backend role resolution, persona parallel/serial execution.
+- `tests/test_strategy.py` — untouched. `ConvergeStrategy` is not a `Strategy` subclass and requires no changes here.
 - Existing test suite untouched — research mode has zero regression risk.
 
 ---
