@@ -162,7 +162,17 @@ class ConvergeStrategy(Strategy):
 
 **Serial:** personas run sequentially. Each persona sees the PRD but NOT the previous persona's critique — prevents cross-contamination of failure models. Results concatenated before the Verifier step.
 
-### 5.2 Persona routing
+### 5.2 Backend role convention for `ConvergeStrategy`
+
+| Role | BackendsConfig field | Fallback |
+|---|---|---|
+| Builder | `research[0]` | `primary` |
+| Challenger | `research[1]` | `primary` |
+| Personas | `primary` (all persona calls use the same backend; identity comes from the prompt) | — |
+| Verifier | `utility` | `primary` |
+| Arbitrator | `judge` | `primary` |
+
+### 5.3 Persona routing
 
 Each persona name maps to a prompt file: `prompts/prd_persona_{name}.md`. Adding a custom persona requires only a new prompt file + YAML entry. No code change.
 
@@ -219,10 +229,10 @@ research:
   execution:
     strategy: converge
     backends:
-      primary: codex       # Builder
-      research: [codex]
-      judge: gemini        # Arbitrator
-      utility: claude      # Verifier
+      primary: codex            # Builder (research[0])
+      research: [codex, claude] # research[0]=Builder, research[1]=Challenger
+      judge: gemini             # Arbitrator
+      utility: claude           # Verifier
     strategy_config:
       critique_depth: thorough
 ```
