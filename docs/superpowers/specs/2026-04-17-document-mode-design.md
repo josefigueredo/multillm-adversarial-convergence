@@ -234,6 +234,7 @@ research:
       - name: scrum_master
       - name: product_owner
     artifacts:
+      # execution artifacts
       - name: V1_ALPHA_VERTICAL_SLICE.md
         layer: execution
         review: true
@@ -248,6 +249,16 @@ research:
         review: true
       - name: MANAGER_AHA_MOMENT.md
         layer: execution
+        review: false
+      # companion specs — generated flat at root, no subfolder
+      - name: CORPUS_ARCHITECTURE.md
+        layer: companion
+        review: false
+      - name: REVIEWER_EXPERIENCE_PRINCIPLES.md
+        layer: companion
+        review: true
+      - name: ONBOARDING_NARRATIVE_DAY1_DAY7_DAY30.md
+        layer: companion
         review: false
 
   execution:
@@ -265,27 +276,36 @@ research:
 
 ## 7. Output Artifacts
 
-The run produces a clean, layered document package. No process/workspace directories (no `CODEX/`, no `COPILOT/`). Only structured output.
+The run produces a clean, flat document package. All files land at the run root — no agent-named subdirectories (`CODEX/`, `COPILOT/`), no archive folder. Only structured output.
 
 ### 7.1 Document package (user-facing)
 
 ```
 output/my-prd-run/
-├── PRD.md                              # canonical document (converged)
-├── V1_ALPHA_VERTICAL_SLICE.md          # execution artifact
-├── ACCEPTANCE_CRITERIA_V1.md           # execution artifact
-├── PLATFORM_DECISIONS_REQUIRED.md      # execution artifact
+├── PRD.md                              # canonical (converged)
+│
+│   # execution artifacts (layer: execution)
+├── V1_ALPHA_VERTICAL_SLICE.md
+├── ACCEPTANCE_CRITERIA_V1.md
+├── PLATFORM_DECISIONS_REQUIRED.md
 ├── MINIMUM_CREDIBLE_INSIGHT_STANDARD.md
 ├── ONBOARDING_AND_COLD_START_STRATEGY.md
 ├── EPICS_AND_MILESTONES.md
 ├── IA_AND_KEY_SCREENS.md
 ├── REVIEW_QUEUE_SPEC.md
 ├── MANAGER_AHA_MOMENT.md
-├── DOCS_INDEX.md                       # auto-generated — maps the package by audience
-└── README.md                           # auto-generated — entry point
+│
+│   # companion specs (layer: companion) — flat, no subfolder
+├── CORPUS_ARCHITECTURE.md
+├── REVIEWER_EXPERIENCE_PRINCIPLES.md
+├── ONBOARDING_NARRATIVE_DAY1_DAY7_DAY30.md
+│
+│   # auto-generated
+├── DOCS_INDEX.md
+└── README.md
 ```
 
-Which execution artifacts are produced is **declared in the YAML** (see Section 6.3). The list above reflects the Iris session output; different runs will declare different artifacts.
+All artifact names, layers, and review flags are **declared in the YAML** (see Section 6.3). The list above reflects the Iris session output. Archive files (draft PRD history) are never generated — they belong in `.run/` as audit trail only.
 
 ### 7.2 Run artifacts (machine-readable)
 
@@ -368,7 +388,8 @@ The CLI routes to `DocumentRefiner` when `strategy: converge` is set. Both subco
 - Scope inflation warnings (Must-Have count tracking per cycle)
 - Portfolio support for document runs
 - Diagrams generation (`.mmd` / `.png` — the Iris session produced these manually)
-- `CODEX/` and `COPILOT/` process directories — these were manual session artifacts, not automated output
+- Agent-named subdirectories (`CODEX/`, `COPILOT/`) — all artifacts generate flat at root
+- Archive folder — draft PRD history lives in `.run/` as audit trail, never in the output package
 - Per-artifact adversarial convergence (Phase 2 artifacts get at most one review pass in v1, not a full cycle loop)
 
 These belong in v2.
