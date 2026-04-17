@@ -189,6 +189,13 @@ class PersonaConfig:
     prompt_file: str = ""    # defaults to prd_persona_{name}.md
 
 @dataclass(frozen=True)
+class ArtifactConfig:
+    name: str                  # filename, e.g. "V1_ALPHA_VERTICAL_SLICE.md"
+    layer: str                 # "execution" | "companion"
+    prompt_file: str = ""      # defaults to artifact_{name}.md (without .md extension)
+    review: bool = True        # if True: Challenger + Persona + Verifier pass before finalizing
+
+@dataclass(frozen=True)
 class DocumentConfig:
     source_material: str = ""
     convergence_cycles: int = 1
@@ -199,6 +206,7 @@ class DocumentConfig:
         PersonaConfig("scrum_master"),
         PersonaConfig("product_owner"),
     )
+    artifacts: tuple[ArtifactConfig, ...] = ()   # execution/companion docs to generate after PRD converges
 ```
 
 `ResearchConfig` gains: `document: DocumentConfig = field(default_factory=DocumentConfig)`
@@ -225,6 +233,22 @@ research:
       - name: architect
       - name: scrum_master
       - name: product_owner
+    artifacts:
+      - name: V1_ALPHA_VERTICAL_SLICE.md
+        layer: execution
+        review: true
+      - name: ACCEPTANCE_CRITERIA_V1.md
+        layer: execution
+        review: true
+      - name: PLATFORM_DECISIONS_REQUIRED.md
+        layer: execution
+        review: false
+      - name: EPICS_AND_MILESTONES.md
+        layer: execution
+        review: true
+      - name: MANAGER_AHA_MOMENT.md
+        layer: execution
+        review: false
 
   execution:
     strategy: converge
@@ -241,10 +265,33 @@ research:
 
 ## 7. Output Artifacts
 
+The run produces a clean, layered document package. No process/workspace directories (no `CODEX/`, no `COPILOT/`). Only structured output.
+
+### 7.1 Document package (user-facing)
+
 ```
 output/my-prd-run/
-├── PRD.md                    # current canonical document
-├── PRD_v1.md, PRD_v2.md...   # one version per cycle (audit trail)
+├── PRD.md                              # canonical document (converged)
+├── V1_ALPHA_VERTICAL_SLICE.md          # execution artifact
+├── ACCEPTANCE_CRITERIA_V1.md           # execution artifact
+├── PLATFORM_DECISIONS_REQUIRED.md      # execution artifact
+├── MINIMUM_CREDIBLE_INSIGHT_STANDARD.md
+├── ONBOARDING_AND_COLD_START_STRATEGY.md
+├── EPICS_AND_MILESTONES.md
+├── IA_AND_KEY_SCREENS.md
+├── REVIEW_QUEUE_SPEC.md
+├── MANAGER_AHA_MOMENT.md
+├── DOCS_INDEX.md                       # auto-generated — maps the package by audience
+└── README.md                           # auto-generated — entry point
+```
+
+Which execution artifacts are produced is **declared in the YAML** (see Section 6.3). The list above reflects the Iris session output; different runs will declare different artifacts.
+
+### 7.2 Run artifacts (machine-readable)
+
+```
+output/my-prd-run/.run/
+├── PRD_v1.md, PRD_v2.md...   # one PRD snapshot per cycle (audit trail)
 ├── issue_registry.json       # full Issue log with lifecycle state
 ├── critiques_N.json          # raw critiques per cycle (Challenger + Personas)
 ├── patches_N.json            # patch proposals from Arbitrator per cycle
@@ -256,7 +303,19 @@ output/my-prd-run/
 └── report.html
 ```
 
-`issue_registry.json` is the single audit trail for a run — every critique raised, its verification outcome, and whether a patch was applied.
+Run artifacts live in `.run/` to keep the document package clean. `issue_registry.json` is the single audit trail — every critique raised, its verification outcome, and whether a patch was applied.
+
+### 7.3 Workflow phases
+
+The run executes in three sequential phases:
+
+| Phase | What happens | Output |
+|---|---|---|
+| **1 — Convergence** | PRD.md refined through adversarial cycles until clean | `PRD.md` (converged) |
+| **2 — Expansion** | Execution artifacts generated from the converged PRD, each optionally reviewed | Named execution artifacts |
+| **3 — Indexing** | `DOCS_INDEX.md` and `README.md` auto-generated from the declared package | `DOCS_INDEX.md`, `README.md` |
+
+Execution artifacts declared with `review: true` in the YAML go through one Challenger + Persona + Verifier pass before being written as final. Artifacts declared with `review: false` are generated directly from the PRD by the Builder and written immediately.
 
 ---
 
@@ -305,9 +364,11 @@ The CLI routes to `DocumentRefiner` when `strategy: converge` is set. Both subco
 
 ## 11. Out of scope (v1)
 
-- Cross-document consistency checks (same concept appearing with different values in different companion docs)
+- Cross-document consistency checks (same concept with different values across multiple execution artifacts)
 - Scope inflation warnings (Must-Have count tracking per cycle)
-- Automatic artifact layer classification (canonical / companion / execution / archive)
 - Portfolio support for document runs
+- Diagrams generation (`.mmd` / `.png` — the Iris session produced these manually)
+- `CODEX/` and `COPILOT/` process directories — these were manual session artifacts, not automated output
+- Per-artifact adversarial convergence (Phase 2 artifacts get at most one review pass in v1, not a full cycle loop)
 
-These are captured in the protocol as high-complexity automations. They belong in v2.
+These belong in v2.
