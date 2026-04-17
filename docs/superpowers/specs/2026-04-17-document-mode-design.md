@@ -25,7 +25,8 @@ auto-research/
 ├── src/
 │   ├── document_refiner.py    # DocumentRefiner — sibling to AutoResearcher
 │   ├── document_loop.py       # run_cycle(), CycleContext, CycleState
-│   └── document_strategy.py   # ConvergeStrategy — standalone, NOT in strategy.py
+│   ├── document_strategy.py   # ConvergeStrategy — standalone, NOT in strategy.py
+│   └── hitl.py                # HumanInputRequest, HumanDecision, interactive + async collection
 │
 ├── prompts/
 │   ├── prd_builder.md
@@ -66,14 +67,17 @@ auto-research/
 Each document cycle runs five steps in sequence:
 
 ```
-Builder          → produces PRD.md (cycle 1) or applies validated patches (cycle N+)
+Builder          → produces primary artifact (cycle 1) or applies validated patches (cycle N+)
 Challenger       → internal consistency critique with mandatory section references
 Personas         → stakeholder critique (parallel or serial per config)
-Verifier         → reads PRD.md at each referenced section → VALID / STALE / DEFER
+Verifier         → reads artifact at each section_ref → VALID / STALE / DEFER(reason)
+                     DEFER reasons: out_of_scope | needs_research | human_required
+Human gate       → if any human_required deferrals: pause and collect answers (interactive
+                   or async). Inject decisions into CycleContext before continuing.
 Arbitrator       → generates patch proposals for VALID critiques only
-Builder          → applies patches, writes new PRD.md version
-Issue registry   → updated with lifecycle state per critique
-Convergence check → clean cycle? increment counter. any VALID critique? reset to 0.
+Builder          → applies patches, writes new artifact version
+Issue registry   → updated with lifecycle state and defer_reason per critique
+Convergence check → clean only when: zero VALID AND zero human_required
 ```
 
 **Termination:** when `consecutive_clean_cycles >= config.convergence_cycles` (default: 1). Also terminates on `max_cycles` if set.
@@ -95,6 +99,8 @@ class CycleState:
     cycle: int = 0
     issue_registry: list[Issue] = field(default_factory=list)
     consecutive_clean_cycles: int = 0
+    pending_human_inputs: list[HumanInputRequest] = field(default_factory=list)
+    human_decisions: list[HumanDecision] = field(default_factory=list)
     total_cost: float = 0.0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
@@ -112,8 +118,34 @@ class Issue:
     cycle: int
     section_ref: str             # PRD section reference (required)
     status: str                  # "open" | "valid" | "stale" | "deferred" | "resolved"
+    defer_reason: str | None = None   # "out_of_scope" | "needs_research" | "human_required"
     verified_cycle: int | None = None
     patch_applied: bool = False
+```
+
+### 4.4 HITL data structures
+
+```python
+class DeferReason:
+    OUT_OF_SCOPE    = "out_of_scope"     # skip — does not block convergence
+    NEEDS_RESEARCH  = "needs_research"   # pipeline can resolve — does not block convergence
+    HUMAN_REQUIRED  = "human_required"   # BLOCKS convergence until answered
+
+@dataclass
+class HumanInputRequest:
+    issue_id: str           # links back to Issue.id
+    question: str           # what the human must answer — written by the Verifier
+    context: str            # PRD section text + critique that raised this
+    suggested_answer: str   # Verifier's best guess — shown for fast confirmation
+    cycle: int
+
+@dataclass
+class HumanDecision:
+    issue_id: str
+    question: str
+    answer: str             # human-provided or confirmed suggested answer
+    answered_at: str        # ISO timestamp
+    answered_by: str        # "human" | "auto-confirmed" (human accepted suggestion)
 ```
 
 ### 4.3 `BaseContext` and `CycleContext`
@@ -135,6 +167,7 @@ class CycleContext(BaseContext):
     config: DocumentConfig
     read_prd_section: Callable[[str], str]
     update_issue_registry: Callable[[list[Issue]], None]
+    human_decisions: list[HumanDecision]   # injected before each cycle — Builder reads as ground truth
 ```
 
 `LoopContext` in `research_loop.py` also extends `BaseContext` — replacing its current 4 duplicated fields.
@@ -166,7 +199,8 @@ class ConvergeStrategy:
 
     def run_verifier(self, prd: str, critiques: list[RawCritique], invoke) -> list[VerifiedCritique]:
         # Utility backend reads PRD at each section_ref
-        # Classifies: VALID / STALE / DEFER
+        # Classifies: VALID | STALE | DEFER(out_of_scope) | DEFER(needs_research) | DEFER(human_required)
+        # For human_required: also produces HumanInputRequest with question + suggested_answer
         # Does NOT generate patches — classification only
         ...
 
@@ -349,6 +383,15 @@ output/my-prd-run/.run/
 
 Run artifacts live in `.run/` to keep the document package clean. `issue_registry.json` is the single audit trail — every critique raised, its verification outcome, and whether a patch was applied.
 
+```
+output/my-prd-run/.run/
+├── ...
+├── pending_questions.json    # written when human_required deferrals exist — overwritten each cycle
+└── human_decisions.json      # append-only — full audit trail of every human decision across cycles
+```
+
+`pending_questions.json` is overwritten each time new `human_required` questions arise. `human_decisions.json` is append-only — it persists across `--resume` invocations and is the audit trail for all human input.
+
 ### 7.3 Workflow phases
 
 The run executes in three sequential phases:
@@ -380,37 +423,103 @@ def _should_stop(state: CycleState, config: DocumentConfig) -> bool:
         return True
     return state.consecutive_clean_cycles >= config.convergence_cycles
 
-def _update_convergence(state: CycleState, valid_critique_count: int) -> None:
-    if valid_critique_count == 0:
+def _update_convergence(state: CycleState, valid_count: int, human_required_count: int) -> None:
+    if valid_count == 0 and human_required_count == 0:
         state.consecutive_clean_cycles += 1
     else:
         state.consecutive_clean_cycles = 0
 ```
 
-A cycle is clean when the Verifier returns zero VALID critiques. STALE and DEFER do not reset the counter.
+A cycle is clean only when: **zero VALID critiques AND zero `human_required` deferrals.**
+
+`DEFER(out_of_scope)` and `DEFER(needs_research)` do NOT reset the counter — they are non-blocking. Only unresolved human questions block convergence. This means a run with good source material and no ambiguous decisions can converge without any human interaction at all.
 
 ---
 
-## 9. CLI
+## 9. CLI and Human-in-the-Loop
+
+### 9.1 Commands
 
 ```bash
 # Research mode (unchanged)
 auto-research run --config configs/my_topic.yaml
 
-# Document mode (new)
-auto-research refine --config configs/my_prd.yaml
-auto-research refine --config configs/my_prd.yaml --resume
+# Document mode
+auto-research refine --config configs/my_prd.yaml                    # interactive (default)
+auto-research refine --config configs/my_prd.yaml --no-interactive   # async/CI mode
+auto-research refine --config configs/my_prd.yaml --resume           # continue after answering
 ```
 
-The CLI routes to `DocumentRefiner` when `strategy: converge` is set. Both subcommands share the same config loading path.
+The CLI routes to `DocumentRefiner` when the config contains a top-level `document:` key. Both subcommands share the same config loading path.
+
+### 9.2 Interactive mode (default)
+
+When `human_required` deferrals are found, the cycle pauses and the terminal prompts the operator. The Verifier's `suggested_answer` is shown — operator hits Enter to confirm or types an override:
+
+```
+[refine] Cycle 2 — 2 questions require your input before proceeding.
+
+──────────────────────────────────────
+Question 1 of 2  [I-04]
+──────────────────────────────────────
+Context: §15.1 Open Questions — Regulated account topology
+Issue: "The document states regulated tenants require dedicated
+        infrastructure but does not specify whether example-org and
+        casa-de-bolsa share one AWS account or have separate accounts."
+
+Suggested answer: "One account per regulated tenant (maximum isolation)"
+
+Press Enter to accept, or type your answer:
+> each bank gets its own account — legal confirmed this
+
+──────────────────────────────────────
+Question 2 of 2  [I-07]
+──────────────────────────────────────
+...
+
+[refine] Answers recorded. Resuming cycle 2.
+```
+
+### 9.3 Async mode (`--no-interactive`)
+
+For CI pipelines or unattended runs. When `human_required` deferrals are found:
+
+1. Writes `.run/pending_questions.json` with all `HumanInputRequest` records
+2. Prints a summary of what is blocked
+3. Exits with a non-zero code
+
+Operator fills in the `answer` field per question in `pending_questions.json`, then re-runs with `--resume`. Answers are loaded from `human_decisions.json`, injected into `CycleContext`, and the cycle continues.
+
+### 9.4 How answers feed back into the document
+
+Human decisions are injected into every subsequent Builder call as a ground-truth block **before** the PRD content. The Builder rewrites the relevant sections using the answer as a constraint — decisions propagate through the normal patch cycle, not as direct text injection:
+
+```
+--- HUMAN DECISIONS (ground truth — do not contradict) ---
+
+[I-04] Regulated account topology:
+  Answer: Each regulated tenant (example-org, casa-de-bolsa) gets its own
+          dedicated AWS account. This is a legal/compliance requirement.
+
+[I-07] Jira auth for on-premise tenants:
+  Answer: API token only — no OAuth for Jira Data Center deployments.
+
+---
+```
+
+### 9.5 What HITL is NOT
+
+- Not a free-form chat — questions are structured, scoped, Verifier-generated
+- Not a bypass of the adversarial cycle — human answers become source-of-truth constraints that still go through the Builder → Challenger → Verifier pipeline
+- Not mandatory — if source material is complete, `human_required` deferrals should be zero and the run converges without human interaction
 
 ---
 
 ## 10. Testing Strategy
 
-- `tests/test_document_loop.py` — unit tests for `run_cycle()`, convergence logic, issue registry updates. Uses JSONL backend (no real LLM calls).
-- `tests/test_document_refiner.py` — integration tests for setup, teardown, artifact writing, Phase 2 expansion, Phase 3 indexing.
-- `tests/test_document_strategy.py` — unit tests for `ConvergeStrategy` (all 5 methods), backend role resolution, persona parallel/serial execution.
+- `tests/test_document_loop.py` — unit tests for `run_cycle()`, convergence logic (`valid=0,human=0` → clean; `human>0` → not clean), issue registry updates, HITL pause/resume flow.
+- `tests/test_document_refiner.py` — integration tests for setup, teardown, artifact writing, Phase 2 expansion, Phase 3 indexing, `--no-interactive` exit behavior.
+- `tests/test_document_strategy.py` — unit tests for `ConvergeStrategy` (all 5 methods), backend role resolution, persona parallel/serial execution, `run_verifier` DEFER reason classification.
 - `tests/test_strategy.py` — untouched. `ConvergeStrategy` is not a `Strategy` subclass and requires no changes here.
 - Existing test suite untouched — research mode has zero regression risk.
 
