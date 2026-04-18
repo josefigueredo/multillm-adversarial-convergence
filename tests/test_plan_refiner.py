@@ -1,0 +1,167 @@
+"""Tests for PlanRefiner — plan convergence orchestrator."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.backends.types import AgentResponse
+from src.config import ArtifactConfig, BackendsConfig, PlanConfig
+from src.plan_loop import PlanCycleState
+from src.plan_refiner import EXIT_HUMAN_REQUIRED, PlanRefiner
+
+
+def _make_config(**kwargs) -> PlanConfig:
+    defaults = dict(
+        topic="Test Plan",
+        goal="Test goal",
+        primary_artifact="PLAN.md",
+        convergence_cycles=1,
+        max_cycles=5,
+        backends=BackendsConfig(primary="claude", research=["claude", "gemini"]),
+    )
+    defaults.update(kwargs)
+    return PlanConfig(**defaults)
+
+
+def _make_backend(text: str = "# Generated Plan") -> MagicMock:
+    backend = MagicMock()
+    backend.run.return_value = AgentResponse(
+        text=text, cost_usd=0.01, is_error=False,
+        input_tokens=100, output_tokens=50,
+    )
+    return backend
+
+
+def _make_backends(text: str = "# Generated Plan") -> dict:
+    return {
+        "claude": _make_backend(text),
+        "gemini": _make_backend(text),
+    }
+
+
+def _converged_state() -> PlanCycleState:
+    state = PlanCycleState(plan="# Plan\n\nContent.")
+    state.consecutive_clean_cycles = 1
+    state.cycle = 1
+    return state
+
+
+class TestPhase1Convergence:
+    def test_run_returns_zero_on_success(self, tmp_path):
+        config = _make_config()
+        refiner = PlanRefiner(config, tmp_path, _make_backends())
+
+        with (
+            patch("src.plan_refiner.PlanStrategy"),
+            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+        ):
+            code = refiner.run(interactive=True)
+
+        assert code == 0
+
+    def test_primary_artifact_written_after_convergence(self, tmp_path):
+        config = _make_config()
+        refiner = PlanRefiner(config, tmp_path, _make_backends())
+
+        with (
+            patch("src.plan_refiner.PlanStrategy") as mock_strat_cls,
+            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+        ):
+            mock_strat = mock_strat_cls.return_value
+            mock_strat.run_builder.return_value = "# Final Plan"
+            refiner._state = _converged_state()
+            refiner._state.plan = "# Final Plan"
+            refiner.run(interactive=True)
+
+        plan_path = tmp_path / "PLAN.md"
+        assert plan_path.exists()
+
+    def test_run_returns_2_on_hitl_pause_non_interactive(self, tmp_path):
+        from src.hitl import HumanInputRequest
+        config = _make_config()
+        refiner = PlanRefiner(config, tmp_path, _make_backends())
+
+        def _cycle_with_hitl(state, ctx, strategy, *, interactive):
+            state.pending_human_inputs = [
+                HumanInputRequest(
+                    issue_id="I-01", question="Q?", context="Task 1",
+                    suggested_answer="A", cycle=1,
+                )
+            ]
+            return (0, 0, 1)
+
+        with (
+            patch("src.plan_refiner.PlanStrategy"),
+            patch("src.plan_refiner.run_plan_cycle", side_effect=_cycle_with_hitl),
+            patch("src.plan_refiner._plan_should_stop", return_value=False),
+        ):
+            code = refiner.run(interactive=False)
+
+        assert code == EXIT_HUMAN_REQUIRED
+
+    def test_run_manifest_written(self, tmp_path):
+        config = _make_config()
+        refiner = PlanRefiner(config, tmp_path, _make_backends())
+
+        with (
+            patch("src.plan_refiner.PlanStrategy"),
+            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+        ):
+            refiner.run(interactive=True)
+
+        manifest_path = tmp_path / ".run" / "run_manifest.json"
+        assert manifest_path.exists()
+        data = json.loads(manifest_path.read_text())
+        assert data["topic"] == "Test Plan"
+        assert "cycles" in data
+        assert "finished_at" in data
+
+
+class TestPhase2Expansion:
+    def test_phase2_writes_artifact(self, tmp_path):
+        config = _make_config(
+            artifacts=(ArtifactConfig(name="RISK_REGISTER.md", layer="companion", review=False),)
+        )
+        refiner = PlanRefiner(config, tmp_path, _make_backends("# Risk Register"))
+
+        def _side_effect(prompt_file, **kwargs):
+            if prompt_file in ("generate_readme.md", "generate_docs_index.md"):
+                return "# Index"
+            if prompt_file == "artifact_risk_register.md":
+                raise FileNotFoundError(prompt_file)
+            return "content"
+
+        with (
+            patch("src.plan_refiner.PlanStrategy"),
+            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.plan_refiner.render", side_effect=_side_effect),
+        ):
+            refiner.run(interactive=True)
+
+        artifact = tmp_path / "RISK_REGISTER.md"
+        assert artifact.exists()
+
+
+class TestPhase3Indexing:
+    def test_phase3_writes_readme_and_docs_index(self, tmp_path):
+        config = _make_config()
+        refiner = PlanRefiner(config, tmp_path, _make_backends())
+
+        with (
+            patch("src.plan_refiner.PlanStrategy"),
+            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.plan_refiner.render", return_value="# Generated"),
+        ):
+            refiner.run(interactive=True)
+
+        assert (tmp_path / "README.md").exists()
+        assert (tmp_path / "DOCS_INDEX.md").exists()
