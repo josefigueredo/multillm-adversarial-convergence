@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -331,7 +332,6 @@ def test_source_block_excludes_files_not_matching_role(tmp_path):
 
 
 def test_source_block_warns_and_skips_unreadable_file(tmp_path, caplog):
-    import logging
     f = tmp_path / "gone.md"
     f.write_text("content")
     cfg = DocumentConfig(

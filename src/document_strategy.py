@@ -14,12 +14,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-log = logging.getLogger("autoresearch")
-
 from .backends import AgentResponse, Backend, CallOptions
 from .config import DocumentConfig
 from .hitl import DeferReason, HumanDecision, HumanInputRequest
 from .prompts import render
+
+log = logging.getLogger("autoresearch")
 
 # (prompt, backend_obj, backend_name) -> AgentResponse
 InvokeFn = Callable[[str, Backend, str], AgentResponse]
