@@ -93,7 +93,19 @@ class ConvergeStrategy:
     # ── Source file injection ────────────────────────────────────────────────
 
     def _source_block(self, role: str) -> str:
-        """Return formatted Markdown block of source files visible to `role`."""
+        """Return a formatted Markdown block of source files visible to *role*.
+
+        Files are read lazily on each call (no caching), so changes on disk
+        between cycles are picked up automatically.
+
+        Returns an empty string when no files match *role* — callers can inject
+        this directly into prompt templates without checking for emptiness first.
+        The ``## Reference Files`` heading is included in the return value only
+        when at least one file is readable, preventing empty sections in prompts.
+
+        Unreadable files (permission errors, deleted between config load and
+        invocation) are logged as warnings and skipped rather than aborting the run.
+        """
         matching = [sf for sf in self._config.source_files if role in sf.roles]
         if not matching:
             return ""
