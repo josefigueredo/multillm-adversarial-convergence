@@ -18,7 +18,7 @@ research:
     max_iterations: 1
     compress_every: 99
     allowed_tools: ""
-    max_turns: 2
+    max_turns: 5
     backend: claude
     model: sonnet
     max_budget_per_call: 1.00

@@ -101,20 +101,21 @@ class ClaudeBackend(Backend):
     def _try_salvage_response(self, stdout: str) -> AgentResponse | None:
         """Try to extract a usable result from a failed CLI call.
 
-        The CLI returns rc=1 on budget exceeded but the JSON output may
-        still contain a partial result that is usable.
+        The CLI returns rc=1 on budget exceeded or max_turns reached, but the
+        JSON output may still contain a partial result that is usable.
+        Handles both the single-dict format (max_turns) and the array-of-events
+        format (budget exceeded, streaming).
         """
         if not stdout:
             return None
         try:
             payload = json.loads(stdout)
-            if not isinstance(payload, list):
-                return None
-            for event in reversed(payload):
+            events = payload if isinstance(payload, list) else [payload]
+            for event in reversed(events):
                 if isinstance(event, dict) and event.get("type") == "result":
                     text = event.get("result", "")
                     if text:
-                        cost = event.get("total_cost_usd", 0.0)
+                        cost = event.get("total_cost_usd", event.get("cost_usd", 0.0))
                         usage = event.get("usage", {})
                         in_tok = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
                         out_tok = usage.get("output_tokens", 0)
