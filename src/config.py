@@ -422,3 +422,137 @@ class ResearchConfig:
             scoring=scoring,
             execution=execution,
         )
+
+
+# ---------------------------------------------------------------------------
+# Document-mode configuration (loaded by `refine` subcommand)
+# ---------------------------------------------------------------------------
+
+VALID_PERSONA_MODES = ("parallel", "serial")
+
+
+@dataclass(frozen=True)
+class PersonaConfig:
+    """A single reviewer persona for the document convergence loop."""
+
+    name: str
+    prompt_file: str = ""
+
+
+@dataclass(frozen=True)
+class ArtifactConfig:
+    """A secondary artifact generated in Phase 2 (Expansion)."""
+
+    name: str
+    layer: str
+    prompt_file: str = ""
+    review: bool = True
+
+
+@dataclass(frozen=True)
+class DocumentConfig:
+    """Top-level configuration for a document refinement run.
+
+    Loaded from a YAML file with a top-level ``document:`` key.
+    Independent of ``ResearchConfig``.
+    """
+
+    topic: str
+    goal: str
+    primary_artifact: str = "PRD.md"
+    source_material: str = ""
+    convergence_cycles: int = 1
+    max_cycles: int = 0
+    persona_mode: str = "parallel"
+    personas: tuple[PersonaConfig, ...] = (
+        PersonaConfig("architect"),
+        PersonaConfig("scrum_master"),
+        PersonaConfig("product_owner"),
+    )
+    artifacts: tuple[ArtifactConfig, ...] = ()
+    backends: BackendsConfig = field(default_factory=BackendsConfig)
+    strategy_config: StrategyConfig = field(default_factory=StrategyConfig)
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> "DocumentConfig":
+        """Load a document config from a YAML file with a top-level ``document:`` key.
+
+        Raises:
+            FileNotFoundError: If *path* does not exist.
+            ValueError: If the YAML is malformed or missing required fields.
+        """
+        with open(path, encoding="utf-8") as f:
+            try:
+                raw: Any = yaml.safe_load(f)
+            except yaml.YAMLError as exc:
+                raise ValueError(f"Invalid YAML in {path}: {exc}") from exc
+
+        if not isinstance(raw, dict):
+            raise ValueError(f"Config must be a YAML mapping, got {type(raw).__name__}")
+
+        if "document" not in raw:
+            raise ValueError("Config must contain a top-level 'document' key")
+
+        doc: dict[str, Any] = raw["document"]
+
+        if "topic" not in doc:
+            raise ValueError("'document' section must contain a 'topic' field")
+
+        persona_mode = doc.get("persona_mode", "parallel")
+        if persona_mode not in VALID_PERSONA_MODES:
+            raise ValueError(
+                f"Invalid persona_mode '{persona_mode}'. Must be one of: {', '.join(VALID_PERSONA_MODES)}"
+            )
+
+        raw_personas = doc.get("personas", [])
+        personas = tuple(
+            PersonaConfig(name=p["name"], prompt_file=p.get("prompt_file", ""))
+            for p in raw_personas
+        ) if raw_personas else (
+            PersonaConfig("architect"),
+            PersonaConfig("scrum_master"),
+            PersonaConfig("product_owner"),
+        )
+
+        artifacts = tuple(
+            ArtifactConfig(
+                name=a["name"],
+                layer=a["layer"],
+                prompt_file=a.get("prompt_file", ""),
+                review=a.get("review", True),
+            )
+            for a in doc.get("artifacts", [])
+        )
+
+        backends_raw: dict[str, Any] = doc.get("backends", {})
+        if backends_raw:
+            research_val = backends_raw.get("research", [backends_raw.get("primary", "claude")])
+            if isinstance(research_val, str):
+                research_val = [research_val]
+            backends_cfg = BackendsConfig(
+                primary=backends_raw.get("primary", "claude"),
+                research=tuple(research_val),
+                judge=backends_raw.get("judge", ""),
+                utility=backends_raw.get("utility", ""),
+            )
+        else:
+            backends_cfg = BackendsConfig()
+
+        strat_raw: dict[str, Any] = doc.get("strategy_config", {})
+        strategy_cfg = StrategyConfig(
+            critique_depth=strat_raw.get("critique_depth", "standard"),
+        )
+
+        return cls(
+            topic=doc["topic"],
+            goal=doc.get("goal", doc["topic"]),
+            primary_artifact=doc.get("primary_artifact", "PRD.md"),
+            source_material=doc.get("source_material", ""),
+            convergence_cycles=doc.get("convergence_cycles", 1),
+            max_cycles=doc.get("max_cycles", 0),
+            persona_mode=persona_mode,
+            personas=personas,
+            artifacts=artifacts,
+            backends=backends_cfg,
+            strategy_config=strategy_cfg,
+        )
