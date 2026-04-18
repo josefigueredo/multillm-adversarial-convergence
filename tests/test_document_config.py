@@ -222,3 +222,25 @@ def test_source_file_config_multiple_roles(tmp_path):
     """)
     cfg = DocumentConfig.from_yaml(cfg_path)
     assert set(cfg.source_files[0].roles) == {"builder", "architect"}
+
+
+def test_source_file_config_absolute_glob(tmp_path):
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "a.md").write_text("A")
+    (sub / "b.md").write_text("B")
+    # Use absolute glob pattern
+    pattern = str(sub / "*.md")
+    cfg_path = _write_yaml(tmp_path, f"""
+        document:
+          topic: "T"
+          goal: "G"
+          source_files:
+            - path: "{pattern}"
+              roles: [builder]
+    """)
+    cfg = DocumentConfig.from_yaml(cfg_path)
+    assert len(cfg.source_files) == 2
+    paths = {sf.path for sf in cfg.source_files}
+    assert str(sub / "a.md") in paths
+    assert str(sub / "b.md") in paths

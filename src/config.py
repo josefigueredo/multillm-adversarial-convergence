@@ -463,7 +463,6 @@ def _parse_source_files(
     persona_names: set[str],
 ) -> tuple[SourceFileConfig, ...]:
     """Resolve glob patterns and expand 'all' roles into concrete SourceFileConfig entries."""
-    _log = logging.getLogger("autoresearch")
     all_roles = {"builder", "challenger"} | persona_names
     result: list[SourceFileConfig] = []
 
@@ -482,17 +481,21 @@ def _parse_source_files(
         is_absolute = Path(pattern).is_absolute()
         has_glob = any(c in pattern for c in "*?[")
 
-        if is_absolute:
+        if has_glob:
+            if is_absolute:
+                p = Path(pattern)
+                matched = sorted(p.parent.glob(p.name))
+            else:
+                matched = sorted(config_dir.glob(pattern))
+            if not matched:
+                log.warning("source_files glob '%s' matched no files — skipping", pattern)
+            for m in matched:
+                result.append(SourceFileConfig(path=str(m), roles=roles_tuple))
+        elif is_absolute:
             p = Path(pattern)
             if not p.exists():
                 raise ValueError(f"source_files path not found: {p}")
             result.append(SourceFileConfig(path=str(p), roles=roles_tuple))
-        elif has_glob:
-            matched = sorted(config_dir.glob(pattern))
-            if not matched:
-                _log.warning("source_files glob '%s' matched no files — skipping", pattern)
-            for m in matched:
-                result.append(SourceFileConfig(path=str(m), roles=roles_tuple))
         else:
             p = config_dir / pattern
             if not p.exists():
