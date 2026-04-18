@@ -484,7 +484,7 @@ def _parse_source_files(
         if has_glob:
             if is_absolute:
                 p = Path(pattern)
-                matched = sorted(p.parent.glob(p.name))
+                matched = sorted(Path('/').glob(str(p.relative_to('/'))))
             else:
                 matched = sorted(config_dir.glob(pattern))
             if not matched:

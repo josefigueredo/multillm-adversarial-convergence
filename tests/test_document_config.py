@@ -244,3 +244,25 @@ def test_source_file_config_absolute_glob(tmp_path):
     paths = {sf.path for sf in cfg.source_files}
     assert str(sub / "a.md") in paths
     assert str(sub / "b.md") in paths
+
+
+def test_source_file_config_absolute_recursive_glob(tmp_path):
+    sub = tmp_path / "docs" / "adr"
+    sub.mkdir(parents=True)
+    (sub / "adr-001.md").write_text("ADR 1")
+    (sub / "adr-002.md").write_text("ADR 2")
+    # Absolute recursive glob pattern
+    pattern = str(tmp_path / "docs" / "**" / "*.md")
+    cfg_path = _write_yaml(tmp_path, f"""
+        document:
+          topic: "T"
+          goal: "G"
+          source_files:
+            - path: "{pattern}"
+              roles: [builder]
+    """)
+    cfg = DocumentConfig.from_yaml(cfg_path)
+    assert len(cfg.source_files) == 2
+    paths = {sf.path for sf in cfg.source_files}
+    assert str(sub / "adr-001.md") in paths
+    assert str(sub / "adr-002.md") in paths
