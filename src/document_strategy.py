@@ -7,10 +7,14 @@ Used exclusively by DocumentRefiner.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
+
+log = logging.getLogger("autoresearch")
 
 from .backends import AgentResponse, Backend, CallOptions
 from .config import DocumentConfig
@@ -86,6 +90,23 @@ class ConvergeStrategy:
         self._arbitrator, self._arbitrator_name = _get(arbitrator_name)
         self._persona_backend, self._persona_name = backends[primary], primary
 
+    # ── Source file injection ────────────────────────────────────────────────
+
+    def _source_block(self, role: str) -> str:
+        """Return formatted Markdown block of source files visible to `role`."""
+        matching = [sf for sf in self._config.source_files if role in sf.roles]
+        if not matching:
+            return ""
+        parts = []
+        for sf in matching:
+            try:
+                content = Path(sf.path).read_text(encoding="utf-8")
+            except OSError:
+                log.warning("source_files: could not read %s — skipping", sf.path)
+                continue
+            parts.append(f"### {sf.path}\n\n{content}")
+        return "\n\n---\n\n".join(parts)
+
     # ── Builder ─────────────────────────────────────────────────────────────
 
     def run_builder(
@@ -104,6 +125,7 @@ class ConvergeStrategy:
             topic=self._config.topic,
             goal=self._config.goal,
             source_material=self._config.source_material,
+            source_files=self._source_block("builder"),
             current_prd=prd,
             patches=patches_block,
             human_decisions=human_block,
@@ -115,7 +137,12 @@ class ConvergeStrategy:
 
     def run_challenger(self, prd: str, invoke: InvokeFn) -> list[RawCritique]:
         """Run internal consistency critique. Returns list of raw critiques."""
-        prompt = render("prd_challenger.md", prd=prd, topic=self._config.topic)
+        prompt = render(
+            "prd_challenger.md",
+            prd=prd,
+            topic=self._config.topic,
+            source_files=self._source_block("challenger"),
+        )
         resp = invoke(prompt, self._challenger, self._challenger_name)
         return _parse_raw_critiques(resp.text, default_raised_by="challenger")
 
@@ -146,7 +173,12 @@ class ConvergeStrategy:
 
     def _invoke_persona(self, persona: Any, prd: str, invoke: InvokeFn) -> list[RawCritique]:
         prompt_file = persona.prompt_file or f"prd_persona_{persona.name}.md"
-        prompt = render(prompt_file, prd=prd, topic=self._config.topic)
+        prompt = render(
+            prompt_file,
+            prd=prd,
+            topic=self._config.topic,
+            source_files=self._source_block(persona.name),
+        )
         resp = invoke(prompt, self._persona_backend, self._persona_name)
         return _parse_raw_critiques(resp.text, default_raised_by=persona.name)
 

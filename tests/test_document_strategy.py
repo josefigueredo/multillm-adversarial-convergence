@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.backends.types import AgentResponse
-from src.config import BackendsConfig, DocumentConfig
+from src.config import BackendsConfig, DocumentConfig, PersonaConfig, SourceFileConfig
 from src.document_strategy import (
     ConvergeStrategy,
     Patch,
@@ -295,3 +296,108 @@ def test_format_patches_with_entries():
     result = _format_patches([p])
     assert "§3" in result
     assert "new text" in result
+
+
+# ── _source_block ────────────────────────────────────────────────────────────
+
+def test_source_block_empty_when_no_source_files():
+    s = _make_strategy()
+    assert s._source_block("builder") == ""
+
+
+def test_source_block_returns_content_for_matching_role(tmp_path):
+    f = tmp_path / "arch.md"
+    f.write_text("# Architecture\n\nContent here.")
+    cfg = DocumentConfig(
+        topic="T", goal="G",
+        source_files=(SourceFileConfig(path=str(f), roles=("builder",)),),
+    )
+    s = ConvergeStrategy(cfg, {"claude": _make_backend()})
+    block = s._source_block("builder")
+    assert "arch.md" in block
+    assert "# Architecture" in block
+
+
+def test_source_block_excludes_files_not_matching_role(tmp_path):
+    f = tmp_path / "file.md"
+    f.write_text("secret content")
+    cfg = DocumentConfig(
+        topic="T", goal="G",
+        source_files=(SourceFileConfig(path=str(f), roles=("architect",)),),
+    )
+    s = ConvergeStrategy(cfg, {"claude": _make_backend()})
+    assert s._source_block("builder") == ""
+    assert "secret content" in s._source_block("architect")
+
+
+def test_source_block_warns_and_skips_unreadable_file(tmp_path, caplog):
+    import logging
+    f = tmp_path / "gone.md"
+    f.write_text("content")
+    cfg = DocumentConfig(
+        topic="T", goal="G",
+        source_files=(SourceFileConfig(path=str(f), roles=("builder",)),),
+    )
+    s = ConvergeStrategy(cfg, {"claude": _make_backend()})
+    f.unlink()
+    with caplog.at_level(logging.WARNING):
+        block = s._source_block("builder")
+    assert block == ""
+    assert "gone.md" in caplog.text
+
+
+def test_run_builder_injects_source_files(tmp_path):
+    f = tmp_path / "ref.md"
+    f.write_text("# Reference Doc")
+    cfg = DocumentConfig(
+        topic="T", goal="G",
+        source_files=(SourceFileConfig(path=str(f), roles=("builder",)),),
+    )
+    s = ConvergeStrategy(cfg, {"claude": _make_backend("# PRD Output")})
+    with patch("src.document_strategy.render", return_value="prompt") as mock_render:
+        s.run_builder("", [], _call_with, human_decisions=[])
+    _, kwargs = mock_render.call_args
+    assert "# Reference Doc" in kwargs["source_files"]
+
+
+def test_run_challenger_injects_source_files(tmp_path):
+    f = tmp_path / "ref.md"
+    f.write_text("# Challenger Ref")
+    cfg = DocumentConfig(
+        topic="T", goal="G",
+        source_files=(SourceFileConfig(path=str(f), roles=("challenger",)),),
+    )
+    s = ConvergeStrategy(cfg, {"claude": _make_backend("[]")})
+    with patch("src.document_strategy.render", return_value="[]") as mock_render:
+        s.run_challenger("prd text", _call_with)
+    _, kwargs = mock_render.call_args
+    assert "# Challenger Ref" in kwargs["source_files"]
+
+
+def test_invoke_persona_injects_source_files(tmp_path):
+    f = tmp_path / "ref.md"
+    f.write_text("# Architect Ref")
+    cfg = DocumentConfig(
+        topic="T", goal="G",
+        personas=(PersonaConfig("architect"),),
+        source_files=(SourceFileConfig(path=str(f), roles=("architect",)),),
+    )
+    s = ConvergeStrategy(cfg, {"claude": _make_backend("[]")})
+    with patch("src.document_strategy.render", return_value="[]") as mock_render:
+        s._invoke_persona(cfg.personas[0], "prd", _call_with)
+    _, kwargs = mock_render.call_args
+    assert "# Architect Ref" in kwargs["source_files"]
+
+
+def test_run_builder_source_files_empty_when_no_match(tmp_path):
+    f = tmp_path / "ref.md"
+    f.write_text("# Persona Only")
+    cfg = DocumentConfig(
+        topic="T", goal="G",
+        source_files=(SourceFileConfig(path=str(f), roles=("architect",)),),
+    )
+    s = ConvergeStrategy(cfg, {"claude": _make_backend("# PRD")})
+    with patch("src.document_strategy.render", return_value="prompt") as mock_render:
+        s.run_builder("", [], _call_with, human_decisions=[])
+    _, kwargs = mock_render.call_args
+    assert kwargs["source_files"] == ""
