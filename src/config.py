@@ -450,6 +450,59 @@ class ArtifactConfig:
 
 
 @dataclass(frozen=True)
+class SourceFileConfig:
+    """A source file injected into agent prompts during document convergence."""
+
+    path: str                   # resolved absolute path (one file per entry)
+    roles: tuple[str, ...]      # which agents receive this file's content
+
+
+def _parse_source_files(
+    raw_entries: list[dict[str, Any]],
+    config_dir: Path,
+    persona_names: set[str],
+) -> tuple[SourceFileConfig, ...]:
+    """Resolve glob patterns and expand 'all' roles into concrete SourceFileConfig entries."""
+    _log = logging.getLogger("autoresearch")
+    all_roles = {"builder", "challenger"} | persona_names
+    result: list[SourceFileConfig] = []
+
+    for entry in raw_entries:
+        pattern: str = entry["path"]
+        raw_roles: list[str] = entry.get("roles", ["builder"])
+
+        roles: set[str] = set()
+        for r in raw_roles:
+            if r == "all":
+                roles |= all_roles
+            else:
+                roles.add(r)
+        roles_tuple = tuple(sorted(roles))
+
+        is_absolute = Path(pattern).is_absolute()
+        has_glob = any(c in pattern for c in "*?[")
+
+        if is_absolute:
+            p = Path(pattern)
+            if not p.exists():
+                raise ValueError(f"source_files path not found: {p}")
+            result.append(SourceFileConfig(path=str(p), roles=roles_tuple))
+        elif has_glob:
+            matched = sorted(config_dir.glob(pattern))
+            if not matched:
+                _log.warning("source_files glob '%s' matched no files — skipping", pattern)
+            for m in matched:
+                result.append(SourceFileConfig(path=str(m), roles=roles_tuple))
+        else:
+            p = config_dir / pattern
+            if not p.exists():
+                raise ValueError(f"source_files path not found: {p}")
+            result.append(SourceFileConfig(path=str(p), roles=roles_tuple))
+
+    return tuple(result)
+
+
+@dataclass(frozen=True)
 class DocumentConfig:
     """Top-level configuration for a document refinement run.
 
@@ -470,6 +523,7 @@ class DocumentConfig:
         PersonaConfig("product_owner"),
     )
     artifacts: tuple[ArtifactConfig, ...] = ()
+    source_files: tuple[SourceFileConfig, ...] = ()
     backends: BackendsConfig = field(default_factory=BackendsConfig)
     strategy_config: StrategyConfig = field(default_factory=StrategyConfig)
 
@@ -514,6 +568,12 @@ class DocumentConfig:
             PersonaConfig("product_owner"),
         )
 
+        config_dir = path.parent
+        persona_names = {p.name for p in personas}
+        source_files = _parse_source_files(
+            doc.get("source_files", []), config_dir, persona_names
+        )
+
         artifacts = tuple(
             ArtifactConfig(
                 name=a["name"],
@@ -553,6 +613,7 @@ class DocumentConfig:
             persona_mode=persona_mode,
             personas=personas,
             artifacts=artifacts,
+            source_files=source_files,
             backends=backends_cfg,
             strategy_config=strategy_cfg,
         )
