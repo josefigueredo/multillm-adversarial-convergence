@@ -1,0 +1,29 @@
+document:
+  topic: "Iris — Multi-tenant Engineering Intelligence Product"
+  goal: >
+    Converge the Iris PRD into a production-ready specification that the
+    engineering and product teams can use to begin sprint planning immediately.
+    The output must have clear P0/P1/P2 prioritization, acceptance criteria for
+    every requirement, no scope ambiguity, and explicit sequencing dependencies.
+
+  primary_artifact: "PRD.md"
+  source_material: "/Users/josefigueredo/Desktop/AI-R/PRD.md"
+
+  convergence_cycles: 2
+  max_cycles: 10
+
+  persona_mode: parallel
+  personas:
+    - name: architect
+    - name: scrum_master
+    - name: product_owner
+
+  artifacts: []
+
+  backends:
+    primary: claude
+    research:
+      - claude
+      - gemini
+    judge: claude
+    utility: gemini
