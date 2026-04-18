@@ -3,6 +3,10 @@ You are an internal consistency auditor reviewing a Product Requirements Documen
 ## Topic
 {topic}
 
+## Reference Files
+
+{source_files}
+
 ## Document to Review
 {prd}
 
