@@ -1,4 +1,4 @@
-# Autoresearch
+# Multi LLM Adversarial Convergence Framework
 
 Multi-LLM autonomous research and document convergence framework.
 Adapts [Karpathy's autoresearch pattern](https://github.com/karpathy/autoresearch) — replacing GPU training runs with LLM agent calls for deep, iterative research and document convergence on any topic.
