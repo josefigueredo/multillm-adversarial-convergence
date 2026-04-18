@@ -3,8 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 from src.backends.types import AgentResponse
 from src.config import BackendsConfig, PlanConfig
 from src.document_loop import Issue
@@ -141,6 +139,47 @@ def test_run_plan_cycle_returns_counts():
     assert v == 1
     assert s == 1
     assert d == 1
+
+
+def test_run_plan_cycle_collects_human_decisions_interactively():
+    from src.document_strategy import VerifiedCritique
+    from unittest.mock import patch
+
+    cfg = _make_config()
+    state = PlanCycleState(plan="# Plan")
+    ctx = _make_ctx(cfg)
+
+    deferred_human = VerifiedCritique(
+        description="needs human",
+        section_ref="Task 1",
+        raised_by="qa_engineer",
+        status="deferred",
+        defer_reason=DeferReason.HUMAN_REQUIRED,
+        question="Should we add rollback?",
+        suggested_answer="Yes",
+    )
+
+    strategy = MagicMock()
+    strategy.run_builder.return_value = "# Plan v2"
+    strategy.run_challenger.return_value = []
+    strategy.run_personas.return_value = []
+    strategy.run_verifier.return_value = [deferred_human]
+    strategy.run_arbitrator.return_value = []
+
+    fake_decision = HumanDecision(
+        issue_id="I-001",
+        question="Should we add rollback?",
+        answer="Yes",
+        answered_at="2026-04-18T00:00:00+00:00",
+        answered_by="human",
+    )
+
+    with patch("src.hitl.collect_interactive", return_value=[fake_decision]):
+        run_plan_cycle(state, ctx, strategy, interactive=True)
+
+    assert len(state.human_decisions) == 1
+    assert state.human_decisions[0].answer == "Yes"
+    assert len(state.pending_human_inputs) == 0  # cleared after collection
 
 
 def test_run_plan_cycle_updates_plan_text():

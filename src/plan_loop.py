@@ -131,6 +131,8 @@ def run_plan_cycle(
     state.pending_patches = new_patches
 
     # 8. Update issue registry
+    # _register_issues only accesses state.issue_registry and state.cycle —
+    # PlanCycleState is structurally compatible even though it is not a CycleState.
     _register_issues(state, verified)
 
     # 9. Update convergence counter
