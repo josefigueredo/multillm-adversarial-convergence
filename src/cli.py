@@ -1,7 +1,7 @@
 """Entry point for the autoresearch-claude framework.
 
 Parses CLI arguments, validates the config, checks for the selected
-backend CLI, and launches the research loop, synthesis, or document refinement.
+backend CLI, and launches the research loop, synthesis, document refinement, or plan refinement.
 """
 
 from __future__ import annotations
@@ -287,7 +287,7 @@ def _run_plan(args: argparse.Namespace, log: logging.Logger) -> int:
     try:
         return refiner.run(interactive=not args.no_interactive)
     except Exception as exc:
-        log.error("Unexpected error: %s", exc, exc_info=getattr(args, "verbose", False))
+        log.error("Unexpected error: %s", exc, exc_info=args.verbose)
         return 1
 
 

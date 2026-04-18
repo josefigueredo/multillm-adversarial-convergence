@@ -401,3 +401,18 @@ class TestPlanSubcommand:
 
         _, kwargs = mock_refiner_cls.call_args
         assert kwargs["output_dir"] == custom.resolve()
+
+    @patch("src.cli.get_backends")
+    @patch("src.cli.PlanRefiner")
+    def test_plan_exit_code_2_propagated(self, mock_refiner_cls, mock_get_backends, plan_config_file):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude"
+        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = 2
+        mock_refiner_cls.return_value = mock_instance
+
+        result = main(["plan", "--config", str(plan_config_file), "--no-interactive"])
+
+        assert result == 2
