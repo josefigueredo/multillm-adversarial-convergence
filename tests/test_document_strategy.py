@@ -304,6 +304,7 @@ def test_format_patches_with_entries():
 def test_source_block_empty_when_no_source_files():
     s = _make_strategy()
     assert s._source_block("builder") == ""
+    assert "## Reference Files" not in s._source_block("builder")
 
 
 def test_source_block_returns_content_for_matching_role(tmp_path):
@@ -317,6 +318,7 @@ def test_source_block_returns_content_for_matching_role(tmp_path):
     block = s._source_block("builder")
     assert "arch.md" in block
     assert "# Architecture" in block
+    assert "## Reference Files" in block
 
 
 def test_source_block_excludes_files_not_matching_role(tmp_path):

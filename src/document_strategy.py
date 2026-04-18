@@ -105,7 +105,9 @@ class ConvergeStrategy:
                 log.warning("source_files: could not read %s — skipping", sf.path)
                 continue
             parts.append(f"### {sf.path}\n\n{content}")
-        return "\n\n---\n\n".join(parts)
+        if not parts:
+            return ""
+        return "## Reference Files\n\n" + "\n\n---\n\n".join(parts)
 
     # ── Builder ─────────────────────────────────────────────────────────────
 

@@ -10,8 +10,6 @@ or refining a Product Requirements Document (PRD).
 ## Source Material
 {source_material}
 
-## Reference Files
-
 {source_files}
 
 {human_decisions}
