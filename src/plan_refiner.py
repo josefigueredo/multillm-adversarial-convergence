@@ -11,12 +11,10 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from .backends import AgentResponse, Backend, CallOptions
 from .config import ArtifactConfig, PlanConfig
 from .hitl import (
-    append_human_decisions,
     load_human_decisions,
     write_pending_questions,
 )
