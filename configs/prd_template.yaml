@@ -16,6 +16,19 @@ document:
   # The Builder reads this as initial content for cycle 0.
   source_material: ""
 
+  # Optional: companion files injected into agent prompts.
+  # Paths are relative to this config file's directory. Globs supported.
+  # Roles: builder, challenger, any persona name, or "all".
+  source_files: []
+  # Example:
+  # source_files:
+  #   - path: docs/**/*.md
+  #     roles: [builder, architect]
+  #   - path: docs/product/*.md
+  #     roles: [all]
+  #   - path: /absolute/path/to/file.md
+  #     roles: [builder, product_owner]
+
   # ── Convergence settings ────────────────────────────────────────────────────
   # How many consecutive clean cycles are required before stopping.
   convergence_cycles: 2

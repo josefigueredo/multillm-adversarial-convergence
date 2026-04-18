@@ -7,7 +7,34 @@ document:
     every requirement, no scope ambiguity, and explicit sequencing dependencies.
 
   primary_artifact: "PRD.md"
-  source_material: "/Users/josefigueredo/Desktop/AI-R/PRD.md"
+  source_material: ""
+
+  source_files:
+    # Primary PRD — builder sees it as seed material
+    - path: /Users/josefigueredo/Desktop/AI-R/PRD.md
+      roles: [builder]
+
+    # Architecture decisions — architect and builder need them
+    - path: /Users/josefigueredo/Desktop/AI-R/docs/architecture/adr/*.md
+      roles: [builder, architect]
+    - path: /Users/josefigueredo/Desktop/AI-R/docs/architecture/PLATFORM_ARCH.md
+      roles: [builder, architect]
+    - path: /Users/josefigueredo/Desktop/AI-R/docs/architecture/strategy/*.md
+      roles: [builder, architect]
+
+    # Product docs — product_owner and scrum_master
+    - path: /Users/josefigueredo/Desktop/AI-R/docs/product/*.md
+      roles: [builder, product_owner, scrum_master]
+
+    # Design docs — product_owner
+    - path: /Users/josefigueredo/Desktop/AI-R/docs/design/*.md
+      roles: [builder, product_owner]
+
+    # Reference and companion
+    - path: /Users/josefigueredo/Desktop/AI-R/docs/reference/*.md
+      roles: [builder]
+    - path: /Users/josefigueredo/Desktop/AI-R/docs/companion/*.md
+      roles: [builder, architect]
 
   convergence_cycles: 2
   max_cycles: 10
