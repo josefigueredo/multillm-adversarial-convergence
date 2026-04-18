@@ -151,7 +151,11 @@ class PlanStrategy:
                 for persona in self._config.personas
             }
             for future in as_completed(futures):
-                results.extend(future.result())
+                try:
+                    results.extend(future.result())
+                except Exception as exc:
+                    persona = futures[future]
+                    log.warning("plan_strategy: persona '%s' raised an error — skipping: %s", persona.name, exc)
         return results
 
     def _run_personas_serial(self, plan: str, invoke: InvokeFn) -> list[RawCritique]:
@@ -162,12 +166,16 @@ class PlanStrategy:
 
     def _invoke_persona(self, persona: Any, plan: str, invoke: InvokeFn) -> list[RawCritique]:
         prompt_file = persona.prompt_file or f"plan_persona_{persona.name}.md"
-        prompt = render(
-            prompt_file,
-            plan=plan,
-            topic=self._config.topic,
-            source_files=self._source_block(persona.name),
-        )
+        try:
+            prompt = render(
+                prompt_file,
+                plan=plan,
+                topic=self._config.topic,
+                source_files=self._source_block(persona.name),
+            )
+        except FileNotFoundError:
+            log.warning("plan_strategy: prompt file not found for persona '%s' — skipping", persona.name)
+            return []
         resp = invoke(prompt, self._persona_backend, self._persona_name)
         return _parse_raw_critiques(resp.text, default_raised_by=persona.name)
 

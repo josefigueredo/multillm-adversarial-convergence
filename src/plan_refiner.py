@@ -15,6 +15,7 @@ from pathlib import Path
 from .backends import AgentResponse, Backend, CallOptions
 from .config import ArtifactConfig, PlanConfig
 from .hitl import (
+    append_human_decisions,
     load_human_decisions,
     write_pending_questions,
 )
@@ -87,6 +88,10 @@ class PlanRefiner:
             )
             self._write_cycle_snapshot(state)
             self._write_issue_registry(state)
+
+            if state.human_decisions:
+                decisions_path = self._run_dir / "human_decisions.json"
+                append_human_decisions(state.human_decisions, decisions_path)
 
             if state.pending_human_inputs and not interactive:
                 self._handle_hitl_pause(state)
