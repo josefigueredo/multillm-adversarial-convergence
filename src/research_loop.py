@@ -18,7 +18,7 @@ from .backends import AgentResponse
 from .config import ResearchConfig
 from .prompts import render as _render
 from .run_io import append_result_row, build_result_row, write_iteration_markdown
-from .run_state import maybe_exhaust_dimension, merge_findings
+from .run_state import BaseContext, maybe_exhaust_dimension, merge_findings
 from .scorer import (
     IterationScore,
     combine_scores,
@@ -34,20 +34,15 @@ _MAX_FINDINGS_CHARS = 60_000
 
 
 @dataclass
-class LoopContext:
+class LoopContext(BaseContext):
     """Immutable bundle of callbacks and config for the research loop.
 
-    Created once per run by the orchestrator, threading through the backend
-    invocation and state-tracking functions the loop needs without importing
-    orchestrator internals.
+    Extends ``BaseContext`` which provides: ``call_with``,
+    ``invoke_for_strategy``, ``track_usage``, ``track_cost``.
     """
 
     config: ResearchConfig
     strategy: Any
-    call_with: Callable[..., AgentResponse]
-    invoke_for_strategy: Callable[..., AgentResponse]
-    track_usage: Callable[[AgentResponse, str], None]
-    track_cost: Callable[[float, str], None]
     track_candidate_usage: Callable[[ResearchCandidate], None]
     collect_provenance: Callable[..., None]
     methodology_summary: Callable[[], str]

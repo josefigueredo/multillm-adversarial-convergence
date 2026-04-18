@@ -6,10 +6,25 @@ import csv
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .backends import AgentResponse
 from .strategy import ResearchCandidate
+
+
+@dataclass
+class BaseContext:
+    """Shared callback bundle for research and document loops.
+
+    Both ``LoopContext`` (research mode) and ``CycleContext`` (document mode)
+    extend this class. When orchestrator callback signatures change, only
+    ``BaseContext`` needs updating.
+    """
+
+    call_with: Callable[..., AgentResponse]
+    invoke_for_strategy: Callable[..., AgentResponse]
+    track_usage: Callable[..., None]
+    track_cost: Callable[..., None]
 
 
 @dataclass
