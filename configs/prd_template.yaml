@@ -1,0 +1,62 @@
+# DocumentRefiner configuration template.
+# Copy this file and fill in your topic, goal, and output artifact name.
+# Run with: autoresearch refine --config configs/your_copy.yaml
+
+document:
+  topic: "Your feature or product area here"
+  goal: >
+    Describe what the final PRD should deliver and who will consume it —
+    e.g. "A production-ready PRD that lets a team of 5 engineers begin
+    sprint planning immediately, with clear P0/P1/P2 tiers and acceptance criteria."
+
+  # Primary artifact produced by Phase 1 (convergence).
+  primary_artifact: "PRD.md"
+
+  # Optional: path or URL to seed material (existing doc, RFC, notes).
+  # The Builder reads this as initial content for cycle 0.
+  source_material: ""
+
+  # ── Convergence settings ────────────────────────────────────────────────────
+  # How many consecutive clean cycles are required before stopping.
+  convergence_cycles: 2
+
+  # Hard cap on total cycles (0 = no cap, rely on convergence_cycles alone).
+  max_cycles: 10
+
+  # ── Review personas ─────────────────────────────────────────────────────────
+  # Each persona runs its own critique pass per cycle.
+  # Built-in personas: architect, scrum_master, product_owner.
+  # Omit this section to use all three defaults.
+  persona_mode: parallel   # "parallel" (concurrent) or "serial" (sequential)
+
+  personas:
+    - name: architect
+    - name: scrum_master
+    - name: product_owner
+
+  # ── Phase 2 artifacts (optional) ────────────────────────────────────────────
+  # Generated from the converged PRD after Phase 1 completes.
+  # Each artifact can optionally run its own adversarial review cycle (review: true).
+  artifacts: []
+  # Example:
+  # artifacts:
+  #   - name: ARCHITECTURE.md
+  #     layer: execution        # "execution" | "companion"
+  #     prompt_file: artifact_architecture.md   # omit to auto-derive from name
+  #     review: true            # run challenger + verifier + arbitrator on this artifact
+  #   - name: SPRINT_PLAN.md
+  #     layer: execution
+  #     review: false
+
+  # ── Backend configuration ───────────────────────────────────────────────────
+  backends:
+    primary: claude        # Personas, synthesis
+    research:
+      - claude             # Builder (research[0])
+      - gemini             # Challenger (research[1])
+    judge: claude          # Arbitrator — resolves conflicting critiques
+    utility: gemini        # Verifier — cheap, fast verification pass
+
+  # ── Strategy tuning (optional) ──────────────────────────────────────────────
+  # strategy_config:
+  #   critique_depth: standard   # light | standard | thorough
