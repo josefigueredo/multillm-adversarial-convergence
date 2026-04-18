@@ -34,19 +34,22 @@ validated scientific research engine.
 uv sync
 
 # Single backend (Claude)
-uv run python -m src.cli --config configs/aws_api_gateway.yaml
+uv run python -m src.cli run --config configs/aws_api_gateway.yaml
 
 # Multi-backend adversarial (codex researches, claude critiques)
-uv run python -m src.cli --config configs/localstack_alternatives.yaml
+uv run python -m src.cli run --config configs/localstack_alternatives.yaml
 
 # Resume a previous session
-uv run python -m src.cli --config configs/aws_api_gateway.yaml --resume
+uv run python -m src.cli run --config configs/aws_api_gateway.yaml --resume
 
 # Generate synthesis from existing iterations
-uv run python -m src.cli --config configs/aws_api_gateway.yaml --synthesize
+uv run python -m src.cli run --config configs/aws_api_gateway.yaml --synthesize
 ```
 
 Copy `configs/_template.yaml` to create a new research topic.
+
+For iterative document refinement (PRDs, architecture specs, technical proposals), see
+[Document Refinement](#document-refinement) below.
 
 ## The Pattern
 
@@ -289,39 +292,44 @@ for details.
 
 ```plaintext
 src/
-    cli.py              Entry point
-    config.py           YAML config loader
-    orchestrator.py     AutoResearcher -- setup, synthesis, artifact wiring
-    research_loop.py    Core iteration loop (hypothesis -> research -> score -> decide)
-    scorer.py           Heuristic scoring, LLM-as-judge, inter-rater agreement
-    strategy.py         Multi-backend strategies
-    provenance.py       Claim/citation extraction, evidence linking, rubric
-    comparison.py       Benchmark/reference-run comparison
-    semantic_eval.py    Semantic review and calibration
-    constraints.py      Goal-shape enforcement, lightweight mode
-    artifacts.py        Artifact payload builders, writers, env helpers
-    run_state.py        Runtime state helpers (usage tracking, merge, resume)
-    run_io.py           Iteration/results filesystem persistence
-    reporting.py        HTML report renderer
-    pdf_report.py       PDF renderer
-    portfolio.py        Cross-run portfolio aggregation
-    prompts.py          Prompt template loading
+    cli.py                  Entry point (run + refine subcommands)
+    config.py               YAML config loader (ResearchConfig + DocumentConfig)
+    orchestrator.py         AutoResearcher -- setup, synthesis, artifact wiring
+    research_loop.py        Core iteration loop (hypothesis -> research -> score -> decide)
+    scorer.py               Heuristic scoring, LLM-as-judge, inter-rater agreement
+    strategy.py             Multi-backend strategies (single/ensemble/adversarial/…)
+    provenance.py           Claim/citation extraction, evidence linking, rubric
+    comparison.py           Benchmark/reference-run comparison
+    semantic_eval.py        Semantic review and calibration
+    constraints.py          Goal-shape enforcement, lightweight mode
+    artifacts.py            Artifact payload builders, writers, env helpers
+    run_state.py            Runtime state helpers (usage tracking, merge, resume)
+    run_io.py               Iteration/results filesystem persistence
+    reporting.py            HTML report renderer
+    pdf_report.py           PDF renderer
+    portfolio.py            Cross-run portfolio aggregation
+    prompts.py              Prompt template loading
+    document_refiner.py     Document mode — Phase 1/2/3 orchestrator
+    document_strategy.py    Document mode — ConvergeStrategy (5-step cycle)
+    document_loop.py        Document mode — CycleState, run_cycle, stop condition
+    hitl.py                 Document mode — human-in-the-loop deferral
     backends/
-        base.py         Backend ABC, subprocess management
-        claude.py       ClaudeBackend (rate limits, budget caps)
-        codex.py        CodexBackend
-        gemini.py       GeminiBackend
-        copilot.py      CopilotBackend
-        types.py        Shared types (CallOptions, AgentResponse, etc.)
-        registry.py     Backend discovery
-    templates/          HTML report templates and CSS
+        base.py             Backend ABC, subprocess management
+        claude.py           ClaudeBackend (rate limits, budget caps)
+        codex.py            CodexBackend
+        gemini.py           GeminiBackend
+        copilot.py          CopilotBackend
+        types.py            Shared types (CallOptions, AgentResponse, etc.)
+        registry.py         Backend discovery
+    templates/              HTML report templates and CSS
 configs/
-    _template.yaml      Copy this for new topics (full reference)
-    smoke_test_*.yaml   Per-backend and per-strategy smoke tests
-prompts/                Prompt templates for each phase
-benchmarks/             Reusable benchmark definitions
-docs/design/            Architecture decision records
-tests/                  283 tests across all modules
+    _template.yaml          Research mode config reference
+    prd_template.yaml       Document refinement config reference
+    smoke_test_*.yaml       Per-backend and per-strategy smoke tests
+prompts/                    Prompt templates for each phase (research + document mode)
+benchmarks/                 Reusable benchmark definitions
+docs/design/                Architecture decision records
+tests/                      382 tests across all modules
 ```
 
 ## Resilience
@@ -355,6 +363,282 @@ uv run pytest tests/ -v
 
 - `docs/design/evaluation-architecture.md` -- evaluation pipeline rationale, module boundaries, data flow
 - `docs/design/scientific-rigor-roadmap.md` -- PRISMA/GRADE-informed roadmap toward scientific rigor
+
+---
+
+## Document Refinement
+
+The `refine` subcommand runs a **multi-LLM convergence loop** on a document —
+a PRD, architecture spec, or any structured technical proposal — until no
+agent can find a new valid issue with it.
+See also [Plan Refinement](#plan-refinement) for implementation-plan-specific review.
+
+```bash
+# Refine a document interactively (human-in-the-loop enabled)
+uv run python -m src.cli refine --config configs/prd_template.yaml
+
+# Non-interactive (fails fast if human input is required)
+uv run python -m src.cli refine --config configs/my_prd.yaml --no-interactive
+
+# Resume after answering deferred questions
+uv run python -m src.cli refine --config configs/my_prd.yaml --resume
+
+# Write output to a custom directory
+uv run python -m src.cli refine --config configs/my_prd.yaml --output ./docs/output
+```
+
+Copy `configs/prd_template.yaml` to create a new document refinement config.
+
+### How It Works
+
+Refinement runs in three sequential phases:
+
+**Phase 1 — Convergence:** The primary document is revised cycle-by-cycle until
+`convergence_cycles` consecutive clean cycles pass (no valid critiques remain).
+
+**Phase 2 — Expansion:** Companion artifacts (architecture docs, sprint plans, etc.)
+are derived from the converged document. Each artifact can optionally run its own
+review pass.
+
+**Phase 3 — Indexing:** `README.md` and `DOCS_INDEX.md` are auto-generated to
+orient readers in the output directory.
+
+```mermaid
+flowchart TD
+    START([refine --config topic.yaml]) --> INIT[Load DocumentConfig\ncheck backends]
+    INIT --> P1
+
+    subgraph P1 ["Phase 1 — Convergence"]
+        BUILDER[Builder\nApply patches → revised PRD]
+        BUILDER --> CHALLENGER[Challenger\nFind internal inconsistencies]
+        CHALLENGER --> PERSONAS[Personas\narchitect · scrum_master · product_owner]
+        PERSONAS --> VERIFIER[Verifier\nClassify each critique:\nvalid · stale · deferred]
+        VERIFIER --> ARBITRATOR[Arbitrator\nResolve conflicts → patch list]
+        ARBITRATOR --> CLEAN{All critiques\nstale or deferred?}
+        CLEAN -->|No| BUILDER
+        CLEAN -->|Yes, streak++| STREAK{consecutive_clean\n≥ convergence_cycles?}
+        STREAK -->|No| BUILDER
+        STREAK -->|Yes| CONVERGED([PRD converged])
+    end
+
+    CONVERGED --> P2
+
+    subgraph P2 ["Phase 2 — Expansion"]
+        GEN[Generate each artifact\nfrom converged PRD]
+        GEN --> REV{artifact.review?}
+        REV -->|Yes| ARTREV[Challenger + Verifier\n+ Arbitrator pass]
+        REV -->|No| WRITE[Write artifact file]
+        ARTREV --> WRITE
+    end
+
+    P2 --> P3
+
+    subgraph P3 ["Phase 3 — Indexing"]
+        README[Generate README.md]
+        DOCSIDX[Generate DOCS_INDEX.md]
+    end
+
+    P3 --> DONE([Output directory complete])
+
+    style CONVERGED fill:#22c55e,color:#000
+    style DONE fill:#3b82f6,color:#fff
+    style BUILDER fill:#8b5cf6,color:#fff
+    style CHALLENGER fill:#f59e0b,color:#000
+    style VERIFIER fill:#94a3b8,color:#000
+    style ARBITRATOR fill:#ef4444,color:#fff
+```
+
+### Per-Cycle Steps
+
+Each convergence cycle runs five agents in sequence:
+
+| Step | Agent | Backend role | What it does |
+|------|-------|-------------|--------------|
+| 1 | **Builder** | `research[0]` | Applies the previous cycle's patches; produces the revised document |
+| 2 | **Challenger** | `research[1]` | Finds internal inconsistencies and gaps (not subject-matter critique) |
+| 3 | **Personas** | `primary` | Each persona (architect, scrum_master, product_owner) reviews from its domain perspective |
+| 4 | **Verifier** | `utility` | Classifies each critique as `valid`, `stale`, or `deferred` |
+| 5 | **Arbitrator** | `judge` | Merges valid critiques into a concrete patch list for the next Builder call |
+
+Personas run in parallel by default (`persona_mode: parallel`).
+Set `persona_mode: serial` to run them sequentially in declaration order.
+
+### Configuration
+
+```yaml
+document:
+  topic: "Iris Platform"
+  goal: >
+    A production-ready PRD that lets a team of 5 engineers begin sprint
+    planning immediately, with clear P0/P1/P2 tiers and acceptance criteria.
+
+  primary_artifact: "PRD.md"
+  source_material: ""          # optional seed content for cycle 0
+
+  convergence_cycles: 2        # consecutive clean cycles before stopping
+  max_cycles: 10               # hard cap (0 = unlimited)
+  persona_mode: parallel       # parallel | serial
+
+  personas:
+    - name: architect
+    - name: scrum_master
+    - name: product_owner
+
+  artifacts:
+    - name: ARCHITECTURE.md
+      layer: execution
+      review: true             # runs challenger + verifier + arbitrator on this artifact
+    - name: SPRINT_PLAN.md
+      layer: execution
+      review: false
+
+  backends:
+    primary: claude            # personas, synthesis
+    research:
+      - claude                 # Builder (research[0])
+      - gemini                 # Challenger (research[1])
+    judge: claude              # Arbitrator
+    utility: gemini            # Verifier (cheap, fast classification)
+```
+
+See `configs/prd_template.yaml` for the full annotated reference.
+
+### Companion Files (`source_files`)
+
+`source_files` lets you inject existing documents — architecture decision records,
+design specs, API contracts, existing RFCs — as structured context into agent
+prompts. Each file targets specific roles so only the relevant agents see it.
+
+```yaml
+source_files:
+  - path: docs/architecture/**/*.md   # glob, expanded at load time
+    roles: [builder, architect]
+
+  - path: docs/product/roadmap.md     # single file, relative to config dir
+    roles: [builder, product_owner, scrum_master]
+
+  - path: /absolute/path/to/spec.md  # absolute path
+    roles: [all]                      # expands to builder + challenger + all personas
+```
+
+**Valid roles:**
+
+| Role | Who receives the file |
+|------|-----------------------|
+| `builder` | The PRD Builder (applies patches each cycle) |
+| `challenger` | The internal-consistency Challenger |
+| `architect` | The architect persona reviewer |
+| `scrum_master` | The scrum master persona reviewer |
+| `product_owner` | The product owner persona reviewer |
+| any custom persona name | The persona declared with that name |
+| `all` | Every role above — builder + challenger + all personas |
+
+**Path resolution:**
+
+| Pattern type | Example | Behavior |
+|---|---|---|
+| Relative glob | `docs/**/*.md` | Expanded relative to the config file's directory |
+| Absolute glob | `/workspace/docs/**/*.md` | Expanded from filesystem root |
+| Relative literal | `docs/spec.md` | Resolved relative to config file; error if missing |
+| Absolute literal | `/abs/path/spec.md` | Used as-is; error if missing |
+
+A glob that matches nothing logs a warning and is silently skipped.
+A literal path that does not exist raises a `ValueError` at load time.
+
+### Output Artifacts
+
+Each refinement run writes to `output/<config-name>/` (or `--output <dir>`):
+
+| File | Description |
+|------|-------------|
+| `PRD.md` (or `primary_artifact`) | The converged primary document |
+| `ARCHITECTURE.md`, `SPRINT_PLAN.md`, … | Phase 2 companion artifacts (as configured) |
+| `README.md` | Auto-generated orientation guide for the output directory |
+| `DOCS_INDEX.md` | Auto-generated index of all artifacts with descriptions |
+| `.run/run_manifest.json` | Reproducibility metadata (cycles, cost, token counts) |
+| `.run/issue_registry.json` | All critiques from every cycle with their final status |
+| `.run/cycles/cycle_NNN.md` | Per-cycle snapshot (valid issues, clean streak, PRD excerpt) |
+| `.run/PRD_vN.md` | Full PRD snapshot after each cycle |
+| `.run/pending_questions.json` | Deferred human-input questions (when HITL is triggered) |
+
+### Human-in-the-Loop (HITL)
+
+When a persona raises a question that requires human judgement (scope decisions,
+external constraints, strategic trade-offs), the cycle pauses and writes the
+pending questions to `.run/pending_questions.json`.
+
+In interactive mode (`--interactive`, the default), the CLI prompts you inline.
+In non-interactive mode (`--no-interactive`), the run exits with code `2` and
+prints the path to the pending questions file. Fill in your answers, then resume:
+
+```bash
+# After filling in .run/pending_questions.json
+uv run python -m src.cli refine --config configs/my_prd.yaml --resume
+```
+
+### Project Structure (Document Mode)
+
+```plaintext
+src/
+    document_refiner.py     DocumentRefiner — Phase 1/2/3 orchestrator
+    document_strategy.py    ConvergeStrategy — 5-step cycle (Builder→Challenger→Personas→Verifier→Arbitrator)
+    document_loop.py        CycleState, run_cycle, convergence stop condition
+    hitl.py                 Human-in-the-loop deferral, question serialization, decision loading
+configs/
+    prd_template.yaml       Annotated config reference for document mode
+prompts/
+    prd_builder.md          Builder prompt (applies patches, writes revised PRD)
+    prd_challenger.md       Challenger prompt (finds inconsistencies)
+    prd_persona_*.md        Per-persona review prompts
+    prd_verify.md           Verifier prompt (classifies critiques)
+    prd_arbitrate.md        Arbitrator prompt (produces patch list)
+    artifact_*.md           Per-artifact generation prompts (Phase 2)
+    generate_readme.md      README generation prompt (Phase 3)
+    generate_docs_index.md  DOCS_INDEX generation prompt (Phase 3)
+```
+
+---
+
+## Plan Refinement
+
+The `plan` subcommand runs the same multi-LLM convergence loop as `refine`, but
+targets implementation plans — PLAN.md files generated by the `writing-plans`
+skill or any LLM. Seven domain-specific reviewers critique the plan from distinct
+angles until no valid issues remain.
+
+```bash
+# Refine a plan interactively
+uv run python -m src.cli plan --config configs/plan_template.yaml
+
+# Non-interactive (exit code 2 if human input needed)
+uv run python -m src.cli plan --config configs/my_plan.yaml --no-interactive
+
+# Resume after answering deferred questions
+uv run python -m src.cli plan --config configs/my_plan.yaml --resume
+```
+
+Copy `configs/plan_template.yaml` to create a new plan refinement config.
+
+### Reviewer Personas
+
+| Persona | What it looks for |
+|---|---|
+| **Architect** | File boundaries, coupling between tasks, missing abstraction layers |
+| **Tech Lead** | Task sizing, dependency order, commit granularity, naming consistency |
+| **QA Engineer** | TDD discipline (test before implementation), edge cases, flaky setups |
+| **AI Engineer** | LLM output validation, model selection rationale, non-determinism handling |
+| **Data Engineer** | Data flow order, schema migration sequencing, rollback steps |
+| **Security Engineer** | Input validation, injection surfaces, secrets handling |
+| **Devil's Advocate** | Hidden assumptions, failure scenarios, "obvious" missing steps |
+
+The **Challenger** (distinct from personas) finds structural gaps: missing tasks,
+wrong task order, vague steps, steps that reference undefined symbols.
+
+See [Document Refinement](#document-refinement) for the full convergence loop
+architecture, HITL flow, and output artifact descriptions — `plan` uses the
+same three-phase pipeline.
+
+---
 
 ## Related Projects
 

@@ -1,0 +1,72 @@
+# Plan Refiner configuration template.
+# Copy this file and fill in your topic, goal, and primary_artifact.
+# Run with: autoresearch plan --config configs/your_copy.yaml
+
+plan:
+  topic: "Your feature or component here"
+  goal: >
+    Describe what the finished plan should enable — e.g. "A complete,
+    unambiguous implementation plan that a senior engineer can execute
+    task-by-task without clarifying questions."
+
+  # Primary artifact produced by Phase 1 (convergence).
+  primary_artifact: "PLAN.md"
+
+  # Optional: path or raw text to seed the Builder in cycle 0.
+  # Use this to provide an existing draft plan.
+  source_material: ""
+
+  # ── Convergence settings ────────────────────────────────────────────────────
+  # How many consecutive clean cycles are required before stopping.
+  convergence_cycles: 2
+
+  # Hard cap on total cycles (0 = no cap, rely on convergence_cycles alone).
+  max_cycles: 10
+
+  # ── Review personas ─────────────────────────────────────────────────────────
+  # Each persona runs its own critique pass per cycle.
+  # Omit this section to use all seven defaults.
+  persona_mode: parallel   # "parallel" (concurrent) or "serial" (sequential)
+
+  personas:
+    - name: architect         # File boundaries, coupling, abstraction layers
+    - name: tech_lead         # Task sizing, dependency order, commit granularity
+    - name: qa_engineer       # TDD discipline, edge cases, test completeness
+    - name: ai_engineer       # LLM output validation, model selection, evaluation
+    - name: data_engineer     # Data flows, schema migrations, ETL sequencing
+    - name: security_engineer # Input validation, injection risks, secrets handling
+    - name: devils_advocate   # Hidden assumptions, failure scenarios, missing steps
+
+  # ── Companion source files ──────────────────────────────────────────────────
+  # Files injected as structured context into agent prompts.
+  # Paths are relative to this config file's directory. Globs supported.
+  # Roles: builder, challenger, any persona name, or "all".
+  source_files: []
+  # Example:
+  # source_files:
+  #   - path: docs/superpowers/specs/**/*.md
+  #     roles: [builder, architect, tech_lead]
+  #   - path: PRD.md
+  #     roles: [all]
+
+  # ── Phase 2 artifacts (optional) ────────────────────────────────────────────
+  # Generated from the converged plan after Phase 1 completes.
+  artifacts: []
+  # Example:
+  # artifacts:
+  #   - name: RISK_REGISTER.md
+  #     layer: companion
+  #     review: false
+
+  # ── Backend configuration ───────────────────────────────────────────────────
+  backends:
+    primary: claude        # Personas, synthesis
+    research:
+      - claude             # Builder (research[0])
+      - gemini             # Challenger (research[1])
+    judge: claude          # Arbitrator — resolves conflicting critiques
+    utility: gemini        # Verifier — cheap, fast verification pass
+
+  # ── Strategy tuning (optional) ──────────────────────────────────────────────
+  # strategy_config:
+  #   critique_depth: standard   # light | standard | thorough

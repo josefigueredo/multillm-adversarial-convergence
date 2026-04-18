@@ -299,3 +299,105 @@ class TestRefineSubcommand:
 
         _, kwargs = mock_refiner_cls.call_args
         assert kwargs["output_dir"] == custom.resolve()
+
+
+# ---------------------------------------------------------------------------
+# plan subcommand
+# ---------------------------------------------------------------------------
+
+class TestPlanSubcommand:
+    @pytest.fixture
+    def plan_config_file(self, tmp_path: Path) -> Path:
+        p = tmp_path / "plan.yaml"
+        p.write_text(textwrap.dedent("""\
+            plan:
+              topic: "Test Plan"
+              goal: "Build something"
+              backends:
+                primary: claude
+                research:
+                  - claude
+                  - gemini
+        """), encoding="utf-8")
+        return p
+
+    def test_missing_config_returns_1(self, tmp_path):
+        result = main(["plan", "--config", str(tmp_path / "nonexistent.yaml")])
+        assert result == 1
+
+    @patch("src.cli.get_backends")
+    @patch("src.cli.PlanRefiner")
+    def test_plan_calls_refiner_run(self, mock_refiner_cls, mock_get_backends, plan_config_file):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude"
+        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = 0
+        mock_refiner_cls.return_value = mock_instance
+
+        result = main(["plan", "--config", str(plan_config_file)])
+
+        assert result == 0
+        mock_instance.run.assert_called_once_with(interactive=True)
+
+    @patch("src.cli.get_backends")
+    @patch("src.cli.PlanRefiner")
+    def test_plan_no_interactive_flag(self, mock_refiner_cls, mock_get_backends, plan_config_file):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude"
+        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = 0
+        mock_refiner_cls.return_value = mock_instance
+
+        main(["plan", "--config", str(plan_config_file), "--no-interactive"])
+
+        mock_instance.run.assert_called_once_with(interactive=False)
+
+    @patch("src.cli.get_backends")
+    @patch("src.cli.PlanRefiner")
+    def test_plan_resume_flag(self, mock_refiner_cls, mock_get_backends, plan_config_file):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude"
+        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = 0
+        mock_refiner_cls.return_value = mock_instance
+
+        main(["plan", "--config", str(plan_config_file), "--resume"])
+
+        _, kwargs = mock_refiner_cls.call_args
+        assert kwargs["resume"] is True
+
+    @patch("src.cli.get_backends")
+    @patch("src.cli.PlanRefiner")
+    def test_plan_backend_unavailable_returns_1(self, mock_refiner_cls, mock_get_backends, plan_config_file):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = False
+        mock_be.cli_executable.return_value = "claude"
+        mock_get_backends.return_value = {"claude": mock_be}
+
+        result = main(["plan", "--config", str(plan_config_file)])
+
+        assert result == 1
+        mock_refiner_cls.assert_not_called()
+
+    @patch("src.cli.get_backends")
+    @patch("src.cli.PlanRefiner")
+    def test_plan_custom_output_dir(self, mock_refiner_cls, mock_get_backends, plan_config_file, tmp_path):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude"
+        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = 0
+        mock_refiner_cls.return_value = mock_instance
+
+        custom = tmp_path / "my_output"
+        main(["plan", "--config", str(plan_config_file), "--output", str(custom)])
+
+        _, kwargs = mock_refiner_cls.call_args
+        assert kwargs["output_dir"] == custom.resolve()

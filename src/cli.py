@@ -12,9 +12,10 @@ import sys
 from pathlib import Path
 
 from .backends import VALID_BACKENDS, get_backend, get_backends
-from .config import VALID_STRATEGIES, DocumentConfig, ResearchConfig
+from .config import VALID_STRATEGIES, DocumentConfig, PlanConfig, ResearchConfig
 from .document_refiner import DocumentRefiner
 from .orchestrator import AutoResearcher
+from .plan_refiner import PlanRefiner
 from .strategy import get_strategy
 
 
@@ -101,6 +102,35 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Load existing human decisions and continue a paused run.",
     )
     refine_p.add_argument(
+        "--no-interactive",
+        dest="no_interactive",
+        action="store_true",
+        help="Disable interactive HITL prompts. Exit with code 2 when human input is needed.",
+    )
+
+    # ── plan subcommand ──────────────────────────────────────────────────────
+    plan_p = subparsers.add_parser(
+        "plan",
+        help="Refine an implementation plan through adversarial convergence cycles.",
+    )
+    plan_p.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a plan config YAML (see configs/plan_template.yaml).",
+    )
+    plan_p.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output directory. Defaults to output/<config-stem>/.",
+    )
+    plan_p.add_argument(
+        "--resume",
+        action="store_true",
+        help="Load existing human decisions and continue a paused run.",
+    )
+    plan_p.add_argument(
         "--no-interactive",
         dest="no_interactive",
         action="store_true",
@@ -221,6 +251,46 @@ def _run_refine(args: argparse.Namespace, log: logging.Logger) -> int:
         return 1
 
 
+def _run_plan(args: argparse.Namespace, log: logging.Logger) -> int:
+    config_path: Path = args.config
+    if not config_path.exists():
+        log.error("Config file not found: %s", config_path)
+        return 1
+
+    try:
+        config = PlanConfig.from_yaml(config_path)
+    except (ValueError, OSError) as exc:
+        log.error("Failed to load plan config: %s", exc)
+        return 1
+
+    output_dir: Path = (args.output or Path("output") / config_path.stem).resolve()
+
+    all_names = config.backends.all_backend_names()
+    backends = get_backends(all_names)
+
+    for name, be in backends.items():
+        if not be.check_available():
+            log.error(
+                "%s CLI not found or not responding. "
+                "Ensure '%s --version' works from the terminal.",
+                name, be.cli_executable(),
+            )
+            return 1
+
+    refiner = PlanRefiner(
+        config=config,
+        output_dir=output_dir,
+        backends=backends,
+        resume=args.resume,
+    )
+
+    try:
+        return refiner.run(interactive=not args.no_interactive)
+    except Exception as exc:
+        log.error("Unexpected error: %s", exc, exc_info=getattr(args, "verbose", False))
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -231,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_research(args, log)
     if args.subcommand == "refine":
         return _run_refine(args, log)
+    if args.subcommand == "plan":
+        return _run_plan(args, log)
 
     log.error("Unknown subcommand: %s", args.subcommand)
     return 1
