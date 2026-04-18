@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 from src.backends.types import AgentResponse
 from src.config import BackendsConfig, PlanConfig, PlanPersonaConfig, SourceFileConfig
 from src.document_strategy import Patch, RawCritique, VerifiedCritique
-from src.hitl import HumanDecision
 from src.plan_strategy import PlanStrategy
 
 

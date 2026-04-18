@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
-from .backends import Backend, CallOptions
+from .backends import Backend
 from .config import PlanConfig
 from .document_strategy import (
     InvokeFn,
@@ -20,7 +20,6 @@ from .document_strategy import (
     RawCritique,
     VerifiedCritique,
     _format_human_decisions,
-    _format_patches,
     _parse_patches,
     _parse_raw_critiques,
     _parse_verified_critiques,
@@ -29,6 +28,15 @@ from .hitl import HumanDecision
 from .prompts import render
 
 log = logging.getLogger("autoresearch")
+
+
+def _format_plan_patches(patches: list[Patch]) -> str:
+    if not patches:
+        return "(no patches — generate initial plan)"
+    lines = []
+    for i, p in enumerate(patches, 1):
+        lines.append(f"Patch {i} [{p.section_ref}]: {p.proposed_text}\nRationale: {p.rationale}")
+    return "\n\n".join(lines)
 
 
 class PlanStrategy:
@@ -62,9 +70,16 @@ class PlanStrategy:
     def _source_block(self, role: str) -> str:
         """Return a formatted Markdown block of source files visible to *role*.
 
-        Returns an empty string when no files match — safe to inject into
-        prompt templates without checking. The ``## Reference Files`` heading
-        is included only when at least one file is readable.
+        Files are read lazily on each call (no caching), so changes on disk
+        between cycles are picked up automatically.
+
+        Returns an empty string when no files match *role* — callers can inject
+        this directly into prompt templates without checking for emptiness first.
+        The ``## Reference Files`` heading is included in the return value only
+        when at least one file is readable, preventing empty sections in prompts.
+
+        Unreadable files (permission errors, deleted between config load and
+        invocation) are logged as warnings and skipped rather than aborting the run.
         """
         matching = [sf for sf in self._config.source_files if role in sf.roles]
         if not matching:
@@ -93,7 +108,7 @@ class PlanStrategy:
     ) -> str:
         """Generate the initial plan (cycle 1) or apply validated patches (cycle N+)."""
         human_block = _format_human_decisions(human_decisions)
-        patches_block = _format_patches(patches)
+        patches_block = _format_plan_patches(patches)
         prompt = render(
             "plan_builder.md",
             topic=self._config.topic,
