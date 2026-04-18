@@ -178,6 +178,20 @@ research:
 
 Claude shortnames (`sonnet`, `opus`, `haiku`) are automatically translated to each backend's default model.
 
+### Turn budget (`max_turns`)
+
+Each backend invocation is capped at `max_turns` agentic turns. A **turn** is one round-trip between the model and the environment — including tool calls. When a backend uses a tool (e.g. web search), it consumes turns as follows:
+
+```
+Turn 1: model decides to call WebSearch
+Turn 2: model reads the search result
+Turn 3: model writes the final answer
+```
+
+If `max_turns` is exhausted mid-tool-call, the `result` field in the response is empty and the iteration is logged as a crash. The dimension is retried up to 3 times before being skipped.
+
+**Rule of thumb:** set `max_turns` to at least `(expected tool calls × 2) + 1`. For a single web search, `5` is a safe minimum. The default in `_template.yaml` is `10`.
+
 ## Output Artifacts
 
 Each run produces a directory under `output/<config-name>/`:
@@ -244,6 +258,7 @@ Key fields:
 | `backend` | `claude` | CLI backend |
 | `model` | `sonnet` | Model name |
 | `max_iterations` | `0` | Max iterations (0 = infinite) |
+| `max_turns` | `10` | Max agentic turns per backend call — see [Turn budget](#turn-budget-max_turns) |
 | `max_budget_per_call` | `0.50` | USD cap per invocation (Claude only) |
 | `timeout_seconds` | `600` | Timeout per invocation |
 | `strategy` | `single` | Multi-backend strategy |
