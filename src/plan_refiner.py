@@ -277,8 +277,11 @@ class PlanRefiner:
     # ── Backend invocation ──────────────────────────────────────────────────
 
     def _invoke(self, prompt: str, backend: Backend, backend_name: str) -> AgentResponse:
-        opts = CallOptions(max_turns=10)
-        resp = backend.run(prompt, opts)
+        opts = CallOptions(
+            max_turns=self._config.execution.max_turns,
+            allowed_tools=self._config.execution.allowed_tools,
+        )
+        resp = backend.invoke(prompt, opts, timeout=self._config.execution.timeout_seconds)
         self._track_usage(resp, backend_name)
         return resp
 

@@ -1,0 +1,57 @@
+plan:
+  topic: "Iris PoC Curriculum — 15-Lab Implementation Plan"
+  goal: >
+    Converge the Iris PoC Curriculum implementation plan into a complete,
+    unambiguous, sequenced execution guide that a senior engineer (or an agent
+    using subagent-driven-development) can execute task-by-task across all 15 lab
+    units without clarifying questions. Each task must map to a specific PoC,
+    include the exact commands or code stubs required, and respect the sequential
+    phase-gate constraint (Phase I → II → III). Acceptance criteria must be
+    verifiable and binary. The finished plan must be traceable to the Lab Syllabus
+    Design spec (source of truth for ACs and experiment specifications).
+
+  # Existing draft — seeds the Builder at cycle 0.
+  primary_artifact: "PLAN.md"
+  source_material: "/Users/josefigueredo/Code/josefigueredo/codename-iris/docs/superpowers/plans/2026-04-18-poc-curriculum.md"
+
+  # ── Execution settings ────────────────────────────────────────────────────
+  execution:
+    allowed_tools: ""
+    max_turns: 5
+    timeout_seconds: 600
+
+  # ── Convergence settings ──────────────────────────────────────────────────
+  convergence_cycles: 2
+  max_cycles: 10
+
+  # ── Review personas ───────────────────────────────────────────────────────
+  persona_mode: parallel
+
+  personas:
+    - name: architect         # File boundaries, coupling, PoC isolation
+    - name: tech_lead         # Task sizing, dependency order, phase-gate discipline
+    - name: qa_engineer       # AC completeness, binary verifiability, negative tests
+    - name: security_engineer # Phase II PoCs: Cilium, SPIRE, ESO, Gatekeeper validity
+    - name: devils_advocate   # Hidden assumptions, failure scenarios, missing steps
+
+  # ── Companion source files ────────────────────────────────────────────────
+  source_files:
+    # Lab Syllabus Design — source of truth for all 15 PoC specs and ACs
+    - path: /Users/josefigueredo/Code/josefigueredo/codename-iris/docs/superpowers/specs/2026-04-18-poc-curriculum-design.md
+      roles: [builder, architect, tech_lead, qa_engineer, security_engineer, devils_advocate]
+
+    # Existing plan draft — all personas need it to critique against the spec
+    - path: /Users/josefigueredo/Code/josefigueredo/codename-iris/docs/superpowers/plans/2026-04-18-poc-curriculum.md
+      roles: [builder, architect, tech_lead, qa_engineer, security_engineer, devils_advocate]
+
+  # ── Phase 2 artifacts (optional) ─────────────────────────────────────────
+  artifacts: []
+
+  # ── Backend configuration ─────────────────────────────────────────────────
+  backends:
+    primary: claude        # Personas, synthesis
+    research:
+      - claude             # Builder (research[0])
+      - gemini             # Challenger (research[1])
+    judge: claude          # Arbitrator — resolves conflicting critiques
+    utility: gemini        # Verifier — cheap, fast verification pass

@@ -270,7 +270,7 @@ class DocumentRefiner:
 
     def _invoke(self, prompt: str, backend: Backend, backend_name: str) -> AgentResponse:
         opts = CallOptions(max_turns=10)
-        resp = backend.run(prompt, opts)
+        resp = backend.invoke(prompt, opts)
         self._track_usage(resp, backend_name)
         return resp
 

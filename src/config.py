@@ -790,6 +790,7 @@ class PlanConfig:
     source_files: tuple[SourceFileConfig, ...] = ()
     backends: BackendsConfig = field(default_factory=BackendsConfig)
     strategy_config: StrategyConfig = field(default_factory=StrategyConfig)
+    execution: ExecutionConfig = field(default_factory=ExecutionConfig)
 
     @classmethod
     def from_yaml(cls, path: Path) -> "PlanConfig":
@@ -906,6 +907,14 @@ class PlanConfig:
             critique_depth=strat_raw.get("critique_depth", "standard"),
         )
 
+        exec_defaults = ExecutionConfig()
+        exec_raw: dict[str, Any] = plan_raw.get("execution", {})
+        execution_cfg = ExecutionConfig(
+            allowed_tools=exec_raw.get("allowed_tools", exec_defaults.allowed_tools),
+            max_turns=exec_raw.get("max_turns", exec_defaults.max_turns),
+            timeout_seconds=exec_raw.get("timeout_seconds", exec_defaults.timeout_seconds),
+        )
+
         return cls(
             topic=plan_raw["topic"],
             goal=plan_raw.get("goal", plan_raw["topic"]),
@@ -919,4 +928,5 @@ class PlanConfig:
             source_files=source_files,
             backends=backends_cfg,
             strategy_config=strategy_cfg,
+            execution=execution_cfg,
         )
