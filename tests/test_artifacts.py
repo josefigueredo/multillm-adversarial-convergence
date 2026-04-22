@@ -8,6 +8,8 @@ from src.artifacts import (
     load_json_if_exists,
     metrics_payload,
     pdf_run_summary_text,
+    prompt_snapshot_payload,
+    rerun_script_text,
     should_write_evaluation,
     tool_trace_payload,
 )
@@ -85,6 +87,7 @@ def test_metrics_evaluation_and_dashboard_payloads():
         strategy_summary={"current_strategy": "single"},
         semantic_calibration={"grade": "reasonable"},
         semantic_review={"grade": "good"},
+        certainty_summary={"conclusions_count": 2, "certainty_counts": {"high": 1, "moderate": 1}},
         search_log_summary={"queries_count": 2, "sources_considered": 5},
         screening_log_summary={"sources_screened": 5, "included_count": 3, "excluded_count": 2},
         retry_summary={
@@ -102,6 +105,7 @@ def test_metrics_evaluation_and_dashboard_payloads():
     assert dashboard["retry_summary"]["total_retries"] == 2
     assert dashboard["retry_insights"]["most_unstable_backend"]["backend"] == "litellm-api"
     assert dashboard["retry_insights"]["top_retry_categories"][0]["category"] == "rate_limit"
+    assert dashboard["certainty_summary"]["conclusions_count"] == 2
     assert dashboard["search_log_summary"]["sources_considered"] == 5
     assert dashboard["screening_log_summary"]["included_count"] == 3
     assert dashboard["tool_usage_summary"]["top_tools"][0]["name"] == "echo"
@@ -142,6 +146,10 @@ def test_pdf_summary_and_should_write_evaluation():
         explored_dimensions=["DX"],
         metrics={
             "iterations": 2,
+            "certainty_summary": {
+                "conclusions_count": 2,
+                "certainty_counts": {"high": 1, "moderate": 1},
+            },
             "tool_loop_summary": {
                 "runs": 2,
                 "tool_calls": 3,
@@ -160,6 +168,7 @@ def test_pdf_summary_and_should_write_evaluation():
     )
     assert "Topic: Python" in text
     assert "Rubric grade: good" in text
+    assert "Certainty: 2 conclusions / top band high" in text
     assert "Tool loops: 2 runs / 3 calls / 1 failures" in text
     assert "API retries: 2" in text
 
@@ -181,3 +190,26 @@ def test_pdf_summary_and_should_write_evaluation():
         execution=ExecutionConfig(),
     )
     assert should_write_evaluation(cfg) is True
+
+
+def test_prompt_snapshot_payload_and_rerun_script(tmp_path: Path):
+    payload = prompt_snapshot_payload(
+        prompts=[
+            {
+                "backend": "codex-api",
+                "model": "gpt-5.4",
+                "prompt": "Investigate Python packaging.",
+            }
+        ]
+    )
+    assert payload["entries_count"] == 1
+    assert payload["entries"][0]["backend"] == "codex-api"
+    assert payload["entries"][0]["prompt_sha256"]
+
+    script = rerun_script_text(
+        config_path=tmp_path / "config.yaml",
+        output_dir=tmp_path / "run-output",
+    )
+    assert "autoresearch run" in script
+    assert "--config" in script
+    assert "--output" in script

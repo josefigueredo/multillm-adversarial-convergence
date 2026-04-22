@@ -86,6 +86,7 @@ def render_html_report(
         rubric_json=json.dumps(rubric),
         semantic_html=_semantic_html(semantic_calibration),
         semantic_review_html=_semantic_review_html(semantic_review),
+        certainty_html=_certainty_html((dashboard or {}).get("certainty_summary")),
         search_screening_html=_search_screening_html(
             (dashboard or {}).get("search_log_summary"),
             (dashboard or {}).get("screening_log_summary"),
@@ -262,6 +263,27 @@ def _semantic_review_html(semantic_review: dict[str, Any] | None) -> str:
             ("Grade", semantic_review.get("grade", "")),
             ("Overall score", semantic_review.get("overall_score", "")),
             ("Judge backend", semantic_review.get("judge_backend", "")),
+        ],
+    )
+
+
+def _certainty_html(certainty_summary: dict[str, Any] | None) -> str:
+    if not certainty_summary:
+        return ""
+    conclusions_count = int(certainty_summary.get("conclusions_count", 0) or 0)
+    certainty_counts = certainty_summary.get("certainty_counts", {})
+    if conclusions_count <= 0:
+        return ""
+    top_band = ""
+    if isinstance(certainty_counts, dict) and certainty_counts:
+        top_band = max(certainty_counts.items(), key=lambda item: int(item[1] or 0))[0]
+    return _json_section_html(
+        "Certainty Tables",
+        certainty_summary,
+        [
+            ("Conclusions", conclusions_count),
+            ("Top certainty band", top_band),
+            ("High-certainty conclusions", int((certainty_counts or {}).get("high", 0) or 0)),
         ],
     )
 

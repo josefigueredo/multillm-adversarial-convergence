@@ -19,6 +19,7 @@ def test_build_portfolio_collects_dashboards(tmp_path):
                 "best_score": 72.5,
                 "rubric_grade": "good",
                 "consistency_level": "medium",
+                "certainty_summary": {"conclusions_count": 2, "certainty_counts": {"moderate": 2}},
                 "retry_summary": {"total_retries": 1},
                 "tool_loop_summary": {"tool_calls": 2, "tool_failures": 1},
             }
@@ -34,6 +35,7 @@ def test_build_portfolio_collects_dashboards(tmp_path):
                 "best_score": 88.1,
                 "rubric_grade": "strong",
                 "consistency_level": "high",
+                "certainty_summary": {"conclusions_count": 3, "certainty_counts": {"high": 2, "moderate": 1}},
                 "retry_summary": {"total_retries": 3},
                 "tool_loop_summary": {"tool_calls": 5, "tool_failures": 0},
             }
@@ -50,6 +52,9 @@ def test_build_portfolio_collects_dashboards(tmp_path):
     assert portfolio["total_retries"] == 4
     assert portfolio["total_tool_calls"] == 7
     assert portfolio["total_tool_failures"] == 1
+    assert portfolio["total_certainty_conclusions"] == 5
+    assert portfolio["certainty_counts"]["high"] == 2
+    assert portfolio["best_certainty_run"]["name"] == "run-b"
 
 
 def test_render_portfolio_html_renders_table():
@@ -60,10 +65,13 @@ def test_render_portfolio_html_renders_table():
             "strategies": ["ensemble"],
             "benchmarks": ["bench-001"],
             "best_run": {"name": "run-b", "best_score": 88.1},
+            "best_certainty_run": {"name": "run-b", "high_certainty_conclusions": 2},
             "most_unstable_run": {"name": "run-b", "total_retries": 3},
             "total_retries": 3,
             "total_tool_calls": 5,
             "total_tool_failures": 1,
+            "total_certainty_conclusions": 3,
+            "certainty_counts": {"high": 2, "moderate": 1},
             "runs": [
                 {
                     "name": "run-b",
@@ -76,6 +84,8 @@ def test_render_portfolio_html_renders_table():
                     "total_retries": 3,
                     "tool_calls": 5,
                     "tool_failures": 1,
+                    "certainty_conclusions": 3,
+                    "high_certainty_conclusions": 2,
                 }
             ],
         },
@@ -86,3 +96,4 @@ def test_render_portfolio_html_renders_table():
     assert "ensemble" in html
     assert "Total retries" in html
     assert "Tool calls" in html
+    assert "High-certainty conclusions" in html

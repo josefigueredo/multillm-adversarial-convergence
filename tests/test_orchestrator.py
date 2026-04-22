@@ -146,6 +146,8 @@ class TestAutoResearcherSetup:
         assert manifest["run"]["status"] == "initialized"
         assert manifest["project"]["version"] == "0.2.0"
         assert manifest["environment"]["git_commit"] == "abc123"
+        assert manifest["reproducibility"]["prompt_snapshot_path"].endswith("prompt_snapshot.json")
+        assert manifest["reproducibility"]["rerun_script_path"].endswith("rerun.sh")
 
     def test_setup_writes_methods_artifact(self, researcher):
         researcher.config = ResearchConfig(
@@ -177,6 +179,20 @@ class TestAutoResearcherSetup:
         assert "Search sources:" in methods
         assert "Stopping rationale: Bound cost while preserving quality." in methods
         assert "Scoring rationale: Reward evidence-backed synthesis." in methods
+
+    def test_setup_writes_rerun_script(self, researcher):
+        researcher.config_path = Path("configs/example.yaml")
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        rerun_script = researcher.output_dir / "rerun.sh"
+        assert rerun_script.exists()
+        content = rerun_script.read_text(encoding="utf-8")
+        assert "autoresearch run" in content
+        assert "--config" in content
+        assert "configs/example.yaml" in content
+        assert "--output" in content
 
     def test_lightweight_mode_is_auto_detected_for_short_smoke_goal(self, researcher):
         researcher.config = ResearchConfig(
@@ -1947,6 +1963,29 @@ class TestAutoResearcherCall:
 
         search_log = json.loads((researcher.output_dir / "search_log.json").read_text(encoding="utf-8"))
         screening_log = json.loads((researcher.output_dir / "screening_log.json").read_text(encoding="utf-8"))
+        certainty = json.loads((researcher.output_dir / "certainty_tables.json").read_text(encoding="utf-8"))
         assert search_log["summary"]["sources_considered"] == 2
         assert screening_log["summary"]["included_count"] == 1
         assert screening_log["summary"]["excluded_count"] == 1
+        assert certainty["summary"]["conclusions_count"] >= 1
+
+    def test_write_prompt_snapshot_artifact(self, researcher):
+        researcher.output_dir.mkdir(parents=True, exist_ok=True)
+        backend = get_backend("codex-api")
+
+        with patch.object(
+            backend,
+            "invoke",
+            return_value=AgentResponse(text="ok", cost_usd=0.0, is_error=False),
+        ):
+            researcher._call_with(backend, "Investigate Python packaging.", model="gpt-5.4")
+
+        researcher._write_prompt_snapshot_artifact()
+
+        payload = json.loads((researcher.output_dir / "prompt_snapshot.json").read_text(encoding="utf-8"))
+        assert payload["entries_count"] == 1
+        entry = payload["entries"][0]
+        assert entry["backend"] == "codex-api"
+        assert entry["model"] == "gpt-5.4"
+        assert entry["prompt"] == "Investigate Python packaging."
+        assert entry["prompt_sha256"]

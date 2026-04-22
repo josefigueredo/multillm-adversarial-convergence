@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.metadata
 import json
+import shlex
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
@@ -68,6 +70,10 @@ def run_manifest_payload(
             "platform": __import__("platform").platform(),
             "git_commit": git_commit,
         },
+        "reproducibility": {
+            "prompt_snapshot_path": str((output_dir / "prompt_snapshot.json").resolve()),
+            "rerun_script_path": str((output_dir / "rerun.sh").resolve()),
+        },
         "backends": {
             name: {
                 "cli": backend.cli_executable(),
@@ -76,6 +82,41 @@ def run_manifest_payload(
             for name, backend in backends.items()
         },
     }
+
+
+def prompt_snapshot_payload(
+    *,
+    prompts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build a prompt-snapshot artifact payload."""
+    entries: list[dict[str, Any]] = []
+    for index, prompt in enumerate(prompts, start=1):
+        text = str(prompt.get("prompt", ""))
+        entry = dict(prompt)
+        entry.setdefault("index", index)
+        entry["prompt_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        entries.append(entry)
+    return {
+        "entries_count": len(entries),
+        "entries": entries,
+    }
+
+
+def rerun_script_text(
+    *,
+    config_path: Path | None,
+    output_dir: Path,
+) -> str:
+    """Build a shell script that replays the run with the same config."""
+    config_arg = shlex.quote(str(config_path.resolve() if config_path else output_dir / "config.yaml"))
+    output_arg = shlex.quote(str(output_dir.resolve()))
+    return (
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n\n"
+        "# Re-run this research job with the same config and output directory.\n"
+        "# Tip: override the output directory by editing the command below or copying it elsewhere.\n"
+        f"autoresearch run --config {config_arg} --output {output_arg} \"$@\"\n"
+    )
 
 
 def metrics_payload(
@@ -199,6 +240,7 @@ def dashboard_payload(
     strategy_summary: dict[str, Any],
     semantic_calibration: dict[str, Any],
     semantic_review: dict[str, Any],
+    certainty_summary: dict[str, Any] | None = None,
     search_log_summary: dict[str, Any] | None = None,
     screening_log_summary: dict[str, Any] | None = None,
     retry_summary: dict[str, Any] | None = None,
@@ -228,6 +270,10 @@ def dashboard_payload(
         ),
         "semantic_calibration": semantic_calibration,
         "semantic_review": semantic_review,
+        "certainty_summary": certainty_summary or {
+            "conclusions_count": 0,
+            "certainty_counts": {},
+        },
         "search_log_summary": search_log_summary or {
             "queries_count": 0,
             "sources_considered": 0,
@@ -377,8 +423,19 @@ def pdf_run_summary_text(
     evidence_quality: dict[str, Any],
 ) -> str:
     """Format core run summary text for PDF export."""
+    certainty_summary = metrics.get("certainty_summary", {}) if isinstance(metrics, dict) else {}
     tool_loop = metrics.get("tool_loop_summary", {}) if isinstance(metrics, dict) else {}
     retry_summary = metrics.get("retry_summary", {}) if isinstance(metrics, dict) else {}
+    certainty_line = ""
+    if isinstance(certainty_summary, dict) and int(certainty_summary.get("conclusions_count", 0) or 0) > 0:
+        counts = certainty_summary.get("certainty_counts", {})
+        top_band = ""
+        if isinstance(counts, dict) and counts:
+            top_band = max(counts.items(), key=lambda item: int(item[1] or 0))[0]
+        certainty_line = (
+            f"Certainty: {int(certainty_summary.get('conclusions_count', 0) or 0)} "
+            f"conclusions / top band {top_band}\n"
+        )
     tool_line = ""
     if isinstance(tool_loop, dict) and int(tool_loop.get("runs", 0) or 0) > 0:
         tool_line = (
@@ -398,6 +455,7 @@ def pdf_run_summary_text(
         f"Rubric grade: {rubric.get('grade', 'insufficient')}\n"
         f"Evidence quality: {evidence_quality.get('average_evidence_quality_score', 0.0)}\n"
         f"Explored dimensions: {', '.join(metrics.get('explored_dimensions', explored_dimensions)) or '(none)'}\n"
+        f"{certainty_line}"
         f"{tool_line}"
         f"{retry_line}"
     )
@@ -561,6 +619,7 @@ def write_dashboard(
     strategy_summary = load_json_if_exists(output_dir / "strategy_summary.json", {})
     semantic_calibration = load_json_if_exists(output_dir / "semantic_calibration.json", {})
     semantic_review = load_json_if_exists(output_dir / "semantic_review.json", {})
+    certainty_tables = load_json_if_exists(output_dir / "certainty_tables.json", {})
     search_log = load_json_if_exists(output_dir / "search_log.json", {})
     screening_log = load_json_if_exists(output_dir / "screening_log.json", {})
     tool_trace = load_json_if_exists(output_dir / "tool_trace.json", {})
@@ -580,6 +639,7 @@ def write_dashboard(
         strategy_summary=strategy_summary,
         semantic_calibration=semantic_calibration,
         semantic_review=semantic_review,
+        certainty_summary=certainty_tables.get("summary", {}) if isinstance(certainty_tables, dict) else {},
         search_log_summary=search_log.get("summary", {}) if isinstance(search_log, dict) else {},
         screening_log_summary=screening_log.get("summary", {}) if isinstance(screening_log, dict) else {},
         retry_summary=retry_summary,

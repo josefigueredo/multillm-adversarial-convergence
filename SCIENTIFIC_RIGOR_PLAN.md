@@ -6,9 +6,20 @@ implementation-oriented plan grounded in the current codebase.
 ## Status check
 
 - inter-rater agreement is already implemented via `agreement.json`
-- the next highest-value rigor upgrade is PRISMA-like logging:
+- PRISMA-like logging is now implemented:
   - `search_log.json`
   - `screening_log.json`
+- methodology protocol fields now include:
+  - `review_type`
+  - `search_sources`
+  - `stopping_criteria`
+  - `stopping_rationale`
+  - `scoring_rationale`
+- reproducibility artifacts are now implemented:
+  - `prompt_snapshot.json`
+  - `rerun.sh`
+- the next highest-value rigor upgrade is conclusion-level certainty:
+  - `certainty_tables.json`
 
 ## Milestones
 
@@ -22,7 +33,7 @@ Goal:
 Scope:
 - `search_log.json`
 - `screening_log.json`
-- report/dashboard follow-up later
+- dashboard/report summaries
 
 ### R2 — methodology protocol expansion
 
@@ -42,8 +53,8 @@ Goal:
 - snapshot prompts and rerun-critical metadata
 
 Candidate artifacts:
-- prompt snapshots
-- rerun command artifact
+- `prompt_snapshot.json`
+- `rerun.sh`
 - optional raw backend payload snapshots
 
 ### R4 — certainty tables

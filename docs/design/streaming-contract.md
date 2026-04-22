@@ -1,7 +1,11 @@
 # Streaming Contract Design
 
-This document defines the recommended streaming contract for the project before
-any runtime implementation lands.
+This document originally defined the streaming rollout before runtime support
+landed. It now serves two purposes:
+
+1. document the **current implemented streaming contract**
+2. document the **still-deferred future work**, especially streaming combined
+   with tool-calling
 
 ## Why this needs a design first
 
@@ -36,27 +40,39 @@ Sources:
 - Bedrock ConverseStream: https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ConverseStream.html
 - Anthropic streaming messages: https://docs.anthropic.com/en/api/messages-streaming
 
-## Recommended project contract
+## Current implemented contract
 
-## Phase 1 — metadata only (current state)
+Streaming is already implemented with this scope:
 
-Keep `supports_streaming` as capability metadata only.
+- `CallOptions.stream`
+- normalized `StreamEvent`
+- backend `invoke_stream(...)` paths for:
+  - `claude-api`
+  - `codex-api`
+  - `gemini-api`
+  - `litellm-api`
+  - `copilot-api`
+  - `bedrock-api`
+- orchestration support in `run` research-phase calls only
 
-Why:
+Current behavior:
 
-- safe
-- no contract break
-- no partial-output persistence problems
+- streaming is **opt-in**
+- streaming is **interactive-first**
+- streamed text is **operator feedback only**
+- the **final parsed backend response remains authoritative**
+- hypothesis / judge / synthesis do **not** stream
+- `refine` / `plan` do **not** currently integrate workflow-level streaming
 
-## Phase 2 — opt-in text streaming for interactive use
+## Minimal normalized runtime contract
 
-Recommended first runtime contract:
+Implemented normalized contract:
 
 - add `stream: bool = False` to `CallOptions`
 - add a separate invocation path, for example:
   - `invoke_stream(...) -> Iterator[StreamEvent]`
 - keep current `invoke(...) -> AgentResponse` unchanged
-- only use streaming in interactive contexts first
+- use streaming only in interactive contexts first
 
 ### Minimal normalized event model
 
@@ -68,7 +84,7 @@ class StreamEvent:
     raw: dict[str, Any] = field(default_factory=dict)
 ```
 
-The project should normalize only:
+The project currently normalizes only:
 
 - `start`
 - `text_delta`
@@ -77,7 +93,9 @@ The project should normalize only:
 
 Everything else can remain provider-specific in `raw`.
 
-## Phase 3 — tool-call and structured-output streaming
+## What is still intentionally deferred
+
+### Streaming + tool-calling together
 
 Do **not** include this in the first implementation slice.
 
@@ -87,6 +105,13 @@ Why:
 - Bedrock and Anthropic have different event structures
 - Gemini and GitHub Models have different chunk shapes
 - partial tool-call argument assembly is harder than plain text streaming
+
+### Structured-output-first streaming semantics
+
+Still deferred because:
+
+- different providers surface structured deltas differently
+- final schema-valid payloads are easier to trust than partial ones
 
 ## Workflow policy
 
@@ -119,7 +144,9 @@ So the first rollout should:
 - avoid writing streamed deltas directly to final artifacts
 - use the final non-stream-assembled normalized response as source of truth
 
-## Recommended implementation order
+## Historical rollout order
+
+The early rollout plan was:
 
 1. add `stream` to `CallOptions`
 2. introduce `StreamEvent`
@@ -134,18 +161,20 @@ So the first rollout should:
    - `bedrock-api`
 6. defer CLI streaming
 
-## Why this provider order
+That rollout is now complete for the current API backend set.
+
+## Why this provider order still mattered
 
 - OpenAI-compatible APIs are the easiest to normalize first
 - the project already has shared OpenAI-compatible transport code
 - Bedrock and Anthropic have more specialized streaming event shapes
 
-## Recommendation
+## Current recommendation
 
-Implement streaming only as:
+Keep streaming:
 
 - **opt-in**
 - **interactive-first**
 - **text-delta only**
 
-Anything broader in v1 would be fake simplicity.
+Still do **not** combine streaming and function-tool execution yet.

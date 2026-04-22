@@ -2,6 +2,7 @@
 
 from src.reporting import (
     _comparison_html,
+    _certainty_html,
     _dashboard_html,
     _dimensions_html,
     _evaluation_html,
@@ -40,6 +41,10 @@ def test_render_html_report_renders_core_sections_and_escapes():
         semantic_review={"enabled": True, "grade": "good", "overall_score": 0.76, "judge_backend": "claude-cli"},
         dashboard={
             "current_strategy": "ensemble",
+            "certainty_summary": {
+                "conclusions_count": 2,
+                "certainty_counts": {"high": 1, "moderate": 1},
+            },
             "retry_summary": {
                 "total_retries": 2,
                 "per_backend": {"litellm-api": 2},
@@ -74,6 +79,7 @@ def test_render_html_report_renders_core_sections_and_escapes():
     assert "Run Summary" in html
     assert "Semantic Calibration" in html
     assert "Semantic Judge Review" in html
+    assert "Certainty Tables" in html
     assert "API Retries" in html
     assert "Search &amp; Screening" in html
     assert "Dashboard Summary" in html
@@ -151,6 +157,10 @@ def test_helper_html_sections_behave_as_expected():
         {"enabled": True, "grade": "good", "overall_score": 0.74, "judge_backend": "claude-cli"}
     )
     assert _semantic_review_html({"enabled": False}) == ""
+    assert "Top certainty band:" in _certainty_html(
+        {"conclusions_count": 2, "certainty_counts": {"high": 1, "moderate": 1}}
+    )
+    assert _certainty_html({"conclusions_count": 0, "certainty_counts": {}}) == ""
     assert "Top tools" in _tool_usage_html(
         {
             "top_tools": [{"name": "echo", "calls": 2, "failures": 1}],

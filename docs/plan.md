@@ -220,7 +220,10 @@ Behavior:
 
 - `allowed_tools` is removed automatically for backends that do not support tools
 - `json_schema` is removed automatically for backends that do not support structured output
-- API aggregators are currently tool-disabled in this project
+- normalized API function-tool execution is currently integrated in `run`, not
+  in the `plan` runtime loop
+- in `plan`, backend invocation still relies on capability stripping rather
+  than the explicit runtime function-tool loop used by `run`
 
 ### Normalized API error contract
 

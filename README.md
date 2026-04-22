@@ -38,6 +38,9 @@ Important runtime rules:
 - normalized API function-tool calling is currently implemented for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`, and only for non-streaming explicit tool-registered calls
 - PRISMA-like `search_log.json` and `screening_log.json` artifacts now capture what sources were considered and which ones were included/excluded
 - methodology now supports richer protocol fields such as `review_type`, `search_sources`, `stopping_criteria`, and scoring/stopping rationale
+- reproducibility artifacts now include `prompt_snapshot.json` and a runnable `rerun.sh` script
+- first-pass certainty tables are now written to `certainty_tables.json` and summarized in run dashboards/reports
+- portfolio views now aggregate certainty rollups, including total and high-certainty conclusions across runs
 - tool-loop observability is now captured in run metrics/dashboard artifacts when normalized API function tools are used, including per-backend and per-tool counts
 - per-run tool trace artifacts are now written to `tool_trace.json`, with redacted argument summaries and truncated output previews
 - dashboard/report views now surface compact tool-trace failure highlights without exposing raw payloads
@@ -79,5 +82,5 @@ uv run pytest tests/ -v
 - `docs/design/evaluation-architecture.md` — evaluation pipeline rationale, module boundaries, data flow
 - `docs/design/scientific-rigor-roadmap.md` — PRISMA/GRADE-informed roadmap toward scientific rigor
 - `docs/design/api-provider-contracts.md` — API adapter contracts for direct and aggregator providers
-- `docs/design/streaming-contract.md` — proposed normalized streaming rollout
+- `docs/design/streaming-contract.md` — current streaming contract and deferred follow-up work
 - `docs/design/api-tool-calling-contract.md` — proposed phased tool-calling contract

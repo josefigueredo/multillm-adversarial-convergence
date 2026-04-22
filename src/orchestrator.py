@@ -27,6 +27,8 @@ from .artifacts import (
     load_json_if_exists,
     metrics_payload,
     package_version,
+    prompt_snapshot_payload,
+    rerun_script_text,
     run_manifest_payload,
     should_write_evaluation,
     write_dashboard,
@@ -44,6 +46,7 @@ from .constraints import (
     synthesis_results_summary,
 )
 from .comparison import benchmark_summary, reference_run_comparison
+from .certainty import build_certainty_tables
 from .provenance import (
     detect_claim_conflicts,
     extract_citations,
@@ -129,6 +132,7 @@ class AutoResearcher:
         self.evidence_quality_path = output_dir / "evidence_quality.json"
         self.rubric_path = output_dir / "rubric.json"
         self.contradictions_path = output_dir / "contradictions.json"
+        self.certainty_tables_path = output_dir / "certainty_tables.json"
         self.search_log_path = output_dir / "search_log.json"
         self.screening_log_path = output_dir / "screening_log.json"
         self.baseline_path = output_dir / "baseline.md"
@@ -139,6 +143,8 @@ class AutoResearcher:
         self.semantic_calibration_path = output_dir / "semantic_calibration.json"
         self.semantic_review_path = output_dir / "semantic_review.json"
         self.tool_trace_path = output_dir / "tool_trace.json"
+        self.prompt_snapshot_path = output_dir / "prompt_snapshot.json"
+        self.rerun_script_path = output_dir / "rerun.sh"
         self.report_html_path = output_dir / "report.html"
         self.report_pdf_path = output_dir / "report.pdf"
         self.portfolio_path = output_dir.parent / "portfolio.json"
@@ -196,6 +202,7 @@ class AutoResearcher:
             "per_backend_category": {},
         }
         self._tool_trace: list[dict[str, Any]] = []
+        self._prompt_snapshots: list[dict[str, Any]] = []
 
     def _call(self, prompt: str, **kwargs: Any) -> AgentResponse:
         """Invoke the default backend with config defaults.
@@ -265,6 +272,7 @@ class AutoResearcher:
             sanitize_environment=opts.sanitize_environment,
         )
         opts = apply_backend_capabilities(backend, opts)
+        self._record_prompt_snapshot(backend, prompt, opts)
         tool_registry = kwargs.pop("tool_registry", None)
         default_timeout = (
             provider.timeout_seconds
@@ -588,6 +596,7 @@ class AutoResearcher:
         if not self.results_path.exists():
             self._write_tsv_header()
         self._write_methods()
+        self._write_rerun_artifact()
         self._write_run_manifest()
 
     def _resume(self) -> None:
@@ -949,10 +958,29 @@ class AutoResearcher:
             print(f"    mean score delta: {delta:.1f}")
         print()
 
+    def _record_prompt_snapshot(self, backend: Backend, prompt: str, opts: CallOptions) -> None:
+        """Capture each top-level backend prompt for reproducibility artifacts."""
+        if not isinstance(prompt, str):
+            return
+        self._prompt_snapshots.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "iteration": self.iteration,
+                "backend": backend.name,
+                "model": opts.model,
+                "max_turns": opts.max_turns,
+                "stream": opts.stream,
+                "has_function_tools": bool(opts.tools),
+                "allowed_tools": opts.allowed_tools,
+                "prompt": prompt,
+            }
+        )
+
     def _finalize_run_artifacts(self) -> None:
         """Write final manifest and metrics artifacts."""
         self._run_completed_at = datetime.now(timezone.utc).isoformat()
         self._write_run_manifest()
+        self._write_prompt_snapshot_artifact()
         self._write_metrics()
         self._write_agreement_artifact()
         self._write_provenance_artifacts()
@@ -961,6 +989,21 @@ class AutoResearcher:
         self._write_html_report()
         self._write_pdf_report()
         self._write_portfolio_artifacts()
+
+    def _write_prompt_snapshot_artifact(self) -> None:
+        """Write captured prompt inputs for later audit and replay."""
+        self.prompt_snapshot_path = self.output_dir / "prompt_snapshot.json"
+        self.prompt_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = prompt_snapshot_payload(prompts=self._prompt_snapshots)
+        self.prompt_snapshot_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def _write_rerun_artifact(self) -> None:
+        """Write a convenience shell script that replays the run."""
+        self.rerun_script_path = self.output_dir / "rerun.sh"
+        self.rerun_script_path.parent.mkdir(parents=True, exist_ok=True)
+        script = rerun_script_text(config_path=self.config_path, output_dir=self.output_dir)
+        self.rerun_script_path.write_text(script, encoding="utf-8")
+        self.rerun_script_path.chmod(0o755)
 
     def _write_agreement_artifact(self) -> None:
         """Compute and write inter-rater agreement when multi-candidate data exists."""
@@ -1048,12 +1091,20 @@ class AutoResearcher:
             benchmark_summary=benchmark_summary,
             reference_comparison=reference_comparison,
         )
+        certainty_tables = build_certainty_tables(
+            claims=self._claims,
+            citations=self._citations,
+            evidence_links=evidence_links,
+            contradictions=contradictions,
+        )
         self.evidence_links_path.write_text(json.dumps(evidence_links, indent=2), encoding="utf-8")
         self.search_log_path.write_text(json.dumps(search_log, indent=2), encoding="utf-8")
         self.screening_log_path.write_text(json.dumps(screening_log, indent=2), encoding="utf-8")
         self.evidence_quality_path.write_text(json.dumps(evidence_quality, indent=2), encoding="utf-8")
         self.rubric_path.write_text(json.dumps(rubric, indent=2), encoding="utf-8")
         self.contradictions_path.write_text(json.dumps(contradictions, indent=2), encoding="utf-8")
+        self.certainty_tables_path = self.output_dir / "certainty_tables.json"
+        self.certainty_tables_path.write_text(json.dumps(certainty_tables, indent=2), encoding="utf-8")
         self.semantic_review_path.write_text(json.dumps(semantic_review, indent=2), encoding="utf-8")
         self.semantic_calibration_path.write_text(
             json.dumps(semantic_calibration, indent=2),

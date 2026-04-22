@@ -1,6 +1,6 @@
 # Scientific Rigor Backlog
 
-## Current batch
+## Completed batches
 
 ### Batch R1A — search and screening logs
 
@@ -10,29 +10,39 @@ Tasks:
 - [x] wire provenance finalization to write:
   - `search_log.json`
   - `screening_log.json`
-- [ ] surface the new artifacts in reporting/docs
-- [ ] add dashboard/report summaries if useful
-
-## Next batch
+- [x] surface the new artifacts in reporting/docs
+- [x] add dashboard/report summaries if useful
 
 ### Batch R2A — methodology expansion
 
 Tasks:
-- [ ] extend `MethodologyConfig`
-- [ ] validate new fields from YAML
-- [ ] render new fields into `methods.md`
-- [ ] include them in manifest snapshots
+- [x] extend `MethodologyConfig`
+- [x] validate new fields from YAML
+- [x] render new fields into `methods.md`
+- [x] include them in manifest snapshots
+
+## Current batch
 
 ### Batch R3A — reproducibility snapshots
 
 Tasks:
-- [ ] snapshot prompt inputs per run
-- [ ] add rerun command artifact
+- [x] snapshot prompt inputs per run
+- [x] add rerun command artifact
 - [ ] decide whether raw backend outputs stay opt-in
 
 ### Batch R4A — certainty tables
 
 Tasks:
-- [ ] define a conclusion-level certainty schema
-- [ ] map current provenance/evidence data into first-pass certainty factors
-- [ ] add `certainty_tables.json`
+- [x] define a conclusion-level certainty schema
+- [x] map current provenance/evidence data into first-pass certainty factors
+- [x] add `certainty_tables.json`
+- [x] surface certainty summary in dashboard/reporting
+
+## Next batch
+
+### Batch R5A — raw backend output policy
+
+Tasks:
+- [ ] decide whether raw backend outputs stay opt-in
+- [ ] add explicit config if raw capture becomes supported
+- [ ] document redaction/size constraints if raw capture is enabled

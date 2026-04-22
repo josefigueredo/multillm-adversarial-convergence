@@ -267,6 +267,22 @@ These fields are carried into:
 - `run_manifest.json`
 - prompt-side methodology summaries
 
+### Reproducibility artifacts
+
+Each run now also emits:
+
+- `prompt_snapshot.json` — top-level prompt inputs sent to backends, with model/turn metadata and prompt hashes
+- `rerun.sh` — a shell script that replays the run with the same config and output directory
+- `certainty_tables.json` — first-pass conclusion-level certainty bands derived from claims, evidence links, citations, and contradictions
+
+Current scope:
+
+- prompt snapshots capture top-level orchestrator/backend invocations
+- they do **not** yet snapshot raw backend payloads
+- raw backend payload capture remains intentionally deferred until an opt-in policy is defined
+- certainty tables are heuristic and GRADE-lite, not a full formal evidence-certainty implementation
+- PDF summaries and cross-run portfolio views now surface compact certainty rollups
+
 ### Streaming contract
 
 You can enable live run-time progress for research-phase calls with:
@@ -300,7 +316,7 @@ Current behavior:
   - `copilot-api` supports `json_schema`
   - `litellm-api` supports `json_schema`
   - `bedrock-api` does not
-  - API aggregators are still tool-disabled in this project
+  - function-tool runtime loops are integrated in `run`; other workflows still rely on capability stripping rather than explicit tool execution
 
 ### API function-tool calling
 
@@ -380,6 +396,8 @@ Each run produces a directory under `output/<config-name>/`:
 | `iterations/iter_NNN.md` | Per-iteration markdown files |
 | `synthesis.md` | Final synthesized report |
 | `run_manifest.json` | Reproducibility metadata (config, env, versions) |
+| `prompt_snapshot.json` | Captured prompt inputs with backend/model metadata and hashes |
+| `rerun.sh` | Shell command artifact for replaying the run |
 | `metrics.json` | Machine-readable run summary |
 | `methods.md` | Human-readable research methodology |
 
@@ -393,6 +411,7 @@ Each run produces a directory under `output/<config-name>/`:
 | `screening_log.json` | Inclusion/exclusion screening log derived from linked evidence |
 | `evidence_links.json` | Claim-to-citation links with support strength |
 | `evidence_quality.json` | Run-level evidence quality summary |
+| `certainty_tables.json` | Conclusion-level certainty bands with factor-level downgrade reasons |
 | `rubric.json` | Research quality rubric (grade + 6 dimensions) |
 | `contradictions.json` | Detected recommendation conflicts |
 
@@ -419,7 +438,7 @@ Each run produces a directory under `output/<config-name>/`:
 |------|-------------|
 | `report.html` | Stakeholder-facing HTML report |
 | `report.pdf` | PDF export |
-| `portfolio.json` / `portfolio.html` | Cross-run portfolio aggregation, including retry/tool activity rollups |
+| `portfolio.json` / `portfolio.html` | Cross-run portfolio aggregation, including retry/tool activity and certainty rollups |
 
 ## Configuration
 
