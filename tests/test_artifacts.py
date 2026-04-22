@@ -9,6 +9,7 @@ from src.artifacts import (
     metrics_payload,
     pdf_run_summary_text,
     should_write_evaluation,
+    tool_trace_payload,
 )
 from src.config import EvaluationConfig, ExecutionConfig, ResearchConfig, ScoringConfig
 
@@ -74,6 +75,19 @@ def test_metrics_evaluation_and_dashboard_payloads():
     assert dashboard["consistency_level"] == "medium"
     assert dashboard["rubric_grade"] == "good"
     assert dashboard["tool_loop_summary"]["runs"] == 2
+
+    trace = tool_trace_payload(
+        tool_trace=[
+            {
+                "backend": "codex-api",
+                "turn": 1,
+                "tool_name": "echo",
+                "call_id": "call_123",
+                "status": "success",
+            }
+        ]
+    )
+    assert trace["entries_count"] == 1
 
 
 def test_pdf_summary_and_should_write_evaluation():

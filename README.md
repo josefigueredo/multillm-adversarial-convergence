@@ -34,6 +34,7 @@ Important runtime rules:
 - `execution.stream` currently enables live research-phase progress in `run` for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`
 - normalized API function-tool calling is currently implemented for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`, and only for non-streaming explicit tool-registered calls
 - tool-loop observability is now captured in run metrics/dashboard artifacts when normalized API function tools are used
+- per-run tool trace artifacts are now written to `tool_trace.json`
 - API failures are normalized into stable categories such as `rate_limit`, `timeout`, `transport`, `quota`, and `server_error`
 
 ## Requirements

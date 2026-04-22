@@ -26,18 +26,21 @@ def run_function_tool_loop(
         "tool_calls": 0,
         "tool_failures": 0,
     }
+    tool_trace: list[dict[str, Any]] = []
 
     for _ in range(max(1, opts.max_turns)):
         summary["turns"] += 1
         response = backend.invoke(current_input, opts, timeout=timeout)
         if response.is_error:
             response.raw["tool_loop"] = dict(summary)
+            response.raw["tool_trace"] = list(tool_trace)
             return response
 
         extract_calls = getattr(backend, "extract_function_tool_calls", None)
         tool_calls = extract_calls(response.raw) if callable(extract_calls) else []
         if not tool_calls:
             response.raw["tool_loop"] = dict(summary)
+            response.raw["tool_trace"] = list(tool_trace)
             return response
         summary["tool_calls"] += len(tool_calls)
 
@@ -46,6 +49,16 @@ def run_function_tool_loop(
             result = _execute_tool_call(tool_call.name, tool_call.call_id, tool_call.arguments_json, tool_registry)
             if result.is_error:
                 summary["tool_failures"] += 1
+                tool_trace.append(
+                    {
+                        "backend": backend.name,
+                        "turn": summary["turns"],
+                        "tool_name": tool_call.name,
+                        "call_id": tool_call.call_id,
+                        "status": "error",
+                        "provider_code": result.raw.get("provider_code", "tool_execution_failed"),
+                    }
+                )
                 return AgentResponse(
                     text="",
                     cost_usd=0.0,
@@ -59,8 +72,18 @@ def run_function_tool_loop(
                         },
                         "payload": result.raw,
                         "tool_loop": dict(summary),
+                        "tool_trace": list(tool_trace),
                     },
                 )
+            tool_trace.append(
+                {
+                    "backend": backend.name,
+                    "turn": summary["turns"],
+                    "tool_name": tool_call.name,
+                    "call_id": result.call_id,
+                    "status": "success",
+                }
+            )
             tool_outputs.append(
                 {
                     "type": "function_call_output",
@@ -94,6 +117,7 @@ def run_function_tool_loop(
             },
             "payload": {},
             "tool_loop": dict(summary),
+            "tool_trace": list(tool_trace),
         },
     )
 

@@ -134,6 +134,7 @@ class AutoResearcher:
         self.dashboard_path = output_dir / "dashboard.json"
         self.semantic_calibration_path = output_dir / "semantic_calibration.json"
         self.semantic_review_path = output_dir / "semantic_review.json"
+        self.tool_trace_path = output_dir / "tool_trace.json"
         self.report_html_path = output_dir / "report.html"
         self.report_pdf_path = output_dir / "report.pdf"
         self.portfolio_path = output_dir.parent / "portfolio.json"
@@ -183,6 +184,7 @@ class AutoResearcher:
             "tool_failures": 0,
             "per_backend": {},
         }
+        self._tool_trace: list[dict[str, Any]] = []
 
     def _call(self, prompt: str, **kwargs: Any) -> AgentResponse:
         """Invoke the default backend with config defaults.
@@ -414,6 +416,9 @@ class AutoResearcher:
         entry["runs"] += 1
         entry["tool_calls"] += int(summary.get("tool_calls", 0) or 0)
         entry["tool_failures"] += int(summary.get("tool_failures", 0) or 0)
+        trace = resp.raw.get("tool_trace", [])
+        if isinstance(trace, list):
+            self._tool_trace.extend(item for item in trace if isinstance(item, dict))
 
     # -- Public API --------------------------------------------------------
 
@@ -842,6 +847,7 @@ class AutoResearcher:
         self._write_agreement_artifact()
         self._write_provenance_artifacts()
         self._write_dashboard_artifact()
+        self._write_tool_trace_artifact()
         self._write_html_report()
         self._write_pdf_report()
         self._write_portfolio_artifacts()
@@ -1022,6 +1028,13 @@ class AutoResearcher:
             explored_dimensions=self.explored_dimensions,
             tool_loop_summary=self._tool_loop_summary,
         )
+
+    def _write_tool_trace_artifact(self) -> None:
+        from .artifacts import tool_trace_payload
+
+        payload = tool_trace_payload(tool_trace=self._tool_trace)
+        self.tool_trace_path.parent.mkdir(parents=True, exist_ok=True)
+        self.tool_trace_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     def _write_portfolio_artifacts(self) -> None:
         write_portfolio(self.output_dir, build_portfolio, render_portfolio_html)

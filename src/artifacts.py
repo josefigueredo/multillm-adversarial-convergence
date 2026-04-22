@@ -222,6 +222,14 @@ def dashboard_payload(
     }
 
 
+def tool_trace_payload(*, tool_trace: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build a machine-readable tool trace artifact payload."""
+    return {
+        "entries_count": len(tool_trace),
+        "entries": tool_trace,
+    }
+
+
 def pdf_run_summary_text(
     *,
     topic: str,

@@ -51,6 +51,8 @@ def test_run_function_tool_loop_executes_single_codex_tool_round_trip():
     assert resp.text == "Tool said hello"
     assert resp.raw["tool_loop"]["tool_calls"] == 1
     assert resp.raw["tool_loop"]["turns"] == 2
+    assert resp.raw["tool_trace"][0]["tool_name"] == "echo"
+    assert resp.raw["tool_trace"][0]["status"] == "success"
 
 
 def test_run_function_tool_loop_returns_error_for_unknown_tool():
@@ -88,6 +90,7 @@ def test_run_function_tool_loop_returns_error_for_unknown_tool():
     assert resp.is_error is True
     assert resp.raw["error"]["category"] == "tool_execution"
     assert resp.raw["tool_loop"]["tool_failures"] == 1
+    assert resp.raw["tool_trace"][0]["status"] == "error"
 
 
 def test_run_function_tool_loop_returns_error_for_invalid_json_arguments():
@@ -126,6 +129,7 @@ def test_run_function_tool_loop_returns_error_for_invalid_json_arguments():
     assert resp.raw["error"]["category"] == "tool_execution"
     assert resp.raw["error"]["provider_code"] == "invalid_arguments"
     assert resp.raw["tool_loop"]["tool_failures"] == 1
+    assert resp.raw["tool_trace"][0]["status"] == "error"
 
 
 def test_run_function_tool_loop_returns_error_when_max_turns_exhausted():
@@ -616,3 +620,4 @@ def test_run_function_tool_loop_returns_error_for_tool_handler_failure():
     assert resp.is_error is True
     assert resp.raw["error"]["provider_code"] == "tool_handler_failed"
     assert resp.raw["tool_loop"]["tool_failures"] == 1
+    assert resp.raw["tool_trace"][0]["status"] == "error"

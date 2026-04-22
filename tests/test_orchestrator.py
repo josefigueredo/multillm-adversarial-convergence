@@ -1711,7 +1711,16 @@ class TestAutoResearcherCall:
                         "turns": 2,
                         "tool_calls": 3,
                         "tool_failures": 1,
-                    }
+                    },
+                    "tool_trace": [
+                        {
+                            "backend": "codex-api",
+                            "turn": 1,
+                            "tool_name": "echo",
+                            "call_id": "call_123",
+                            "status": "success",
+                        }
+                    ],
                 },
             ),
             "codex-api",
@@ -1720,3 +1729,20 @@ class TestAutoResearcherCall:
         assert researcher._tool_loop_summary["tool_calls"] == 3
         assert researcher._tool_loop_summary["tool_failures"] == 1
         assert researcher._tool_loop_summary["per_backend"]["codex-api"]["runs"] == 1
+        assert researcher._tool_trace[0]["tool_name"] == "echo"
+
+    def test_write_tool_trace_artifact(self, researcher):
+        researcher.output_dir.mkdir(parents=True, exist_ok=True)
+        researcher._tool_trace = [
+            {
+                "backend": "codex-api",
+                "turn": 1,
+                "tool_name": "echo",
+                "call_id": "call_123",
+                "status": "success",
+            }
+        ]
+        researcher._write_tool_trace_artifact()
+        payload = json.loads(researcher.tool_trace_path.read_text(encoding="utf-8"))
+        assert payload["entries_count"] == 1
+        assert payload["entries"][0]["backend"] == "codex-api"

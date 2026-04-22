@@ -192,6 +192,7 @@ What landed:
 - normalized handler/argument/max-turn failure behavior
 - invalid `tool_choice` normalization back to `auto`
 - tool-loop observability in metrics/dashboard artifacts
+- per-run `tool_trace.json` artifact with normalized tool execution entries
 
 What is still intentionally deferred:
 

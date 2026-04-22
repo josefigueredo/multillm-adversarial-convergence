@@ -292,6 +292,7 @@ Important:
 - tool-enabled API calls currently require a runtime tool registry
 - streaming + function tools is intentionally unsupported in the first slice
 - tool-loop observability is written into `metrics.json` and `dashboard.json`
+- detailed per-run tool call traces are written into `tool_trace.json`
 
 ### Normalized API error contract
 
