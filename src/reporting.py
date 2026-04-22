@@ -86,6 +86,10 @@ def render_html_report(
         rubric_json=json.dumps(rubric),
         semantic_html=_semantic_html(semantic_calibration),
         semantic_review_html=_semantic_review_html(semantic_review),
+        search_screening_html=_search_screening_html(
+            (dashboard or {}).get("search_log_summary"),
+            (dashboard or {}).get("screening_log_summary"),
+        ),
         retry_html=_retry_html(
             (dashboard or {}).get("retry_summary"),
             (dashboard or {}).get("retry_insights"),
@@ -179,6 +183,31 @@ def _tool_trace_html(tool_trace_summary: dict[str, Any] | None) -> str:
                 if top_failure_codes and isinstance(top_failure_codes[0], dict)
                 else "",
             ),
+        ],
+    )
+
+
+def _search_screening_html(
+    search_log_summary: dict[str, Any] | None,
+    screening_log_summary: dict[str, Any] | None,
+) -> str:
+    search_log_summary = search_log_summary or {}
+    screening_log_summary = screening_log_summary or {}
+    considered = int(search_log_summary.get("sources_considered", 0) or 0)
+    screened = int(screening_log_summary.get("sources_screened", 0) or 0)
+    if considered <= 0 and screened <= 0:
+        return ""
+    return _json_section_html(
+        "Search & Screening",
+        {
+            "search_log_summary": search_log_summary,
+            "screening_log_summary": screening_log_summary,
+        },
+        [
+            ("Queries", int(search_log_summary.get("queries_count", 0) or 0)),
+            ("Sources considered", considered),
+            ("Included sources", int(screening_log_summary.get("included_count", 0) or 0)),
+            ("Excluded sources", int(screening_log_summary.get("excluded_count", 0) or 0)),
         ],
     )
 

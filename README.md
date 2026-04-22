@@ -36,6 +36,8 @@ Important runtime rules:
 - retry activity is now surfaced into machine-readable artifacts and HTML reports so runs can show when API retries happened by backend
 - retry summaries now include dominant retry categories and the most unstable backend for a run
 - normalized API function-tool calling is currently implemented for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`, and only for non-streaming explicit tool-registered calls
+- PRISMA-like `search_log.json` and `screening_log.json` artifacts now capture what sources were considered and which ones were included/excluded
+- methodology now supports richer protocol fields such as `review_type`, `search_sources`, `stopping_criteria`, and scoring/stopping rationale
 - tool-loop observability is now captured in run metrics/dashboard artifacts when normalized API function tools are used, including per-backend and per-tool counts
 - per-run tool trace artifacts are now written to `tool_trace.json`, with redacted argument summaries and truncated output previews
 - dashboard/report views now surface compact tool-trace failure highlights without exposing raw payloads

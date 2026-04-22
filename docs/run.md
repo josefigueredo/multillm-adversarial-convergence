@@ -242,6 +242,31 @@ Current behavior:
   - `copilot-api`
   - `bedrock-api`
 
+### Methodology protocol fields
+
+`methodology:` now supports richer protocol-style fields in addition to the
+earlier inclusion/exclusion guidance:
+
+```yaml
+research:
+  methodology:
+    review_type: systematic_review
+    search_sources:
+      - official docs
+      - benchmark corpora
+    stopping_criteria:
+      - cover all configured dimensions
+      - stop when no new evidence appears
+    stopping_rationale: "Bound cost while preserving coverage."
+    scoring_rationale: "Prefer evidence-backed, actionable synthesis."
+```
+
+These fields are carried into:
+
+- `methods.md`
+- `run_manifest.json`
+- prompt-side methodology summaries
+
 ### Streaming contract
 
 You can enable live run-time progress for research-phase calls with:
@@ -294,6 +319,7 @@ Important:
 - `execution.retry_api_errors` only applies to plain non-streaming API calls; tool loops and streaming calls are intentionally not retried automatically
 - retry counts are surfaced in run artifacts and reports so backend instability is visible after the run
 - retry reporting now highlights dominant retry categories and the most unstable backend in the run summary
+- PRISMA-like search/screening summaries are surfaced from `search_log.json` and `screening_log.json`
 - tool-loop observability is written into `metrics.json` and `dashboard.json`, including per-backend and per-tool usage/failure counts
 - detailed per-run tool call traces are written into `tool_trace.json`
 - tool traces store redacted argument summaries and truncated output previews rather than raw full payloads
@@ -363,6 +389,8 @@ Each run produces a directory under `output/<config-name>/`:
 |------|-------------|
 | `claims.json` | Extracted claims with type and confidence labels |
 | `citations.json` | Extracted URLs with source type classification |
+| `search_log.json` | Source-consideration log derived from extracted citations |
+| `screening_log.json` | Inclusion/exclusion screening log derived from linked evidence |
 | `evidence_links.json` | Claim-to-citation links with support strength |
 | `evidence_quality.json` | Run-level evidence quality summary |
 | `rubric.json` | Research quality rubric (grade + 6 dimensions) |

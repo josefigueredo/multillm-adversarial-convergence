@@ -6,6 +6,7 @@ from src.reporting import (
     _dimensions_html,
     _evaluation_html,
     _retry_html,
+    _search_screening_html,
     _semantic_html,
     _semantic_review_html,
     _summary_cards_html,
@@ -49,6 +50,8 @@ def test_render_html_report_renders_core_sections_and_escapes():
                 "most_unstable_backend": {"backend": "litellm-api", "retries": 2},
                 "top_retry_categories": [{"category": "rate_limit", "count": 2}],
             },
+            "search_log_summary": {"queries_count": 2, "sources_considered": 5},
+            "screening_log_summary": {"sources_screened": 5, "included_count": 3, "excluded_count": 2},
             "tool_usage_summary": {
                 "top_tools": [{"name": "echo", "calls": 2, "failures": 1}],
                 "failure_hotspots": [{"backend": "codex-api", "tool_name": "echo", "failures": 1}],
@@ -72,6 +75,7 @@ def test_render_html_report_renders_core_sections_and_escapes():
     assert "Semantic Calibration" in html
     assert "Semantic Judge Review" in html
     assert "API Retries" in html
+    assert "Search &amp; Screening" in html
     assert "Dashboard Summary" in html
     assert "Tool Usage" in html
     assert "Tool Trace" in html
@@ -107,6 +111,7 @@ def test_render_html_report_omits_optional_sections_when_empty():
     assert "Semantic Calibration" not in html
     assert "Dashboard Summary" not in html
     assert "API Retries" not in html
+    assert "Search & Screening" not in html
     assert "Tool Usage" not in html
     assert "Tool Trace" not in html
     assert "Semantic Judge Review" not in html
@@ -135,6 +140,11 @@ def test_helper_html_sections_behave_as_expected():
         },
     )
     assert _retry_html({"total_retries": 0, "per_backend": {}}, {}) == ""
+    assert "Included sources:" in _search_screening_html(
+        {"queries_count": 2, "sources_considered": 5},
+        {"sources_screened": 5, "included_count": 3, "excluded_count": 2},
+    )
+    assert _search_screening_html({}, {}) == ""
     assert "Calibrated score:" in _semantic_html({"enabled": True, "grade": "reasonable", "calibrated_score": 0.7})
     assert _semantic_html({"enabled": False}) == ""
     assert "Overall score:" in _semantic_review_html(

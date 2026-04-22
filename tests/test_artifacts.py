@@ -85,6 +85,8 @@ def test_metrics_evaluation_and_dashboard_payloads():
         strategy_summary={"current_strategy": "single"},
         semantic_calibration={"grade": "reasonable"},
         semantic_review={"grade": "good"},
+        search_log_summary={"queries_count": 2, "sources_considered": 5},
+        screening_log_summary={"sources_screened": 5, "included_count": 3, "excluded_count": 2},
         retry_summary={
             "total_retries": 2,
             "per_backend": {"litellm-api": 2},
@@ -100,6 +102,8 @@ def test_metrics_evaluation_and_dashboard_payloads():
     assert dashboard["retry_summary"]["total_retries"] == 2
     assert dashboard["retry_insights"]["most_unstable_backend"]["backend"] == "litellm-api"
     assert dashboard["retry_insights"]["top_retry_categories"][0]["category"] == "rate_limit"
+    assert dashboard["search_log_summary"]["sources_considered"] == 5
+    assert dashboard["screening_log_summary"]["included_count"] == 3
     assert dashboard["tool_usage_summary"]["top_tools"][0]["name"] == "echo"
     assert dashboard["tool_usage_summary"]["failure_hotspots"] == []
 

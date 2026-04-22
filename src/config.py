@@ -234,16 +234,26 @@ class MethodologyConfig:
     Attributes:
         question: Explicit research question framing.
         scope: Boundaries or intended audience/scope of the investigation.
+        review_type: Optional methodology label such as ``"systematic_review"``.
         inclusion_criteria: Evidence or source types that should be preferred.
         exclusion_criteria: Evidence or source types that should be avoided.
+        search_sources: Declared search-source groups or source systems.
+        stopping_criteria: Explicit stopping rules for the run.
+        stopping_rationale: Why the stopping criteria are appropriate.
+        scoring_rationale: Why the scoring contract is appropriate.
         preferred_source_types: Ordered preferred source categories.
         recency_days: Preferred freshness window for unstable information.
     """
 
     question: str = ""
     scope: str = ""
+    review_type: str = ""
     inclusion_criteria: tuple[str, ...] = ()
     exclusion_criteria: tuple[str, ...] = ()
+    search_sources: tuple[str, ...] = ()
+    stopping_criteria: tuple[str, ...] = ()
+    stopping_rationale: str = ""
+    scoring_rationale: str = ""
     preferred_source_types: tuple[str, ...] = ()
     recency_days: int = 0
 
@@ -427,8 +437,13 @@ class ResearchConfig:
         methodology = MethodologyConfig(
             question=methodology_raw.get("question", ""),
             scope=methodology_raw.get("scope", ""),
+            review_type=methodology_raw.get("review_type", ""),
             inclusion_criteria=tuple(methodology_raw.get("inclusion_criteria", [])),
             exclusion_criteria=tuple(methodology_raw.get("exclusion_criteria", [])),
+            search_sources=tuple(methodology_raw.get("search_sources", [])),
+            stopping_criteria=tuple(methodology_raw.get("stopping_criteria", [])),
+            stopping_rationale=methodology_raw.get("stopping_rationale", ""),
+            scoring_rationale=methodology_raw.get("scoring_rationale", ""),
             preferred_source_types=tuple(methodology_raw.get("preferred_source_types", [])),
             recency_days=methodology_raw.get("recency_days", 0),
         )

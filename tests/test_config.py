@@ -89,7 +89,12 @@ class TestMethodologyConfig:
         mc = MethodologyConfig()
         assert mc.question == ""
         assert mc.scope == ""
+        assert mc.review_type == ""
         assert mc.inclusion_criteria == ()
+        assert mc.search_sources == ()
+        assert mc.stopping_criteria == ()
+        assert mc.stopping_rationale == ""
+        assert mc.scoring_rationale == ""
         assert mc.recency_days == 0
 
 
@@ -182,14 +187,31 @@ class TestResearchConfigFromYaml:
                 preferred_source_types:
                   - vendor docs
                   - standards
+                search_sources:
+                  - official docs
+                  - benchmark corpora
+                stopping_criteria:
+                  - cover all configured dimensions
+                  - stop when no new evidence appears
+                stopping_rationale: "Bound cost while preserving coverage."
+                scoring_rationale: "Prefer evidence-backed, actionable synthesis."
+                review_type: "systematic_review"
                 recency_days: 180
         """), encoding="utf-8")
         cfg = ResearchConfig.from_yaml(p)
         assert cfg.methodology.question == "What is the best option?"
         assert cfg.methodology.scope == "Architectural decision support"
+        assert cfg.methodology.review_type == "systematic_review"
         assert cfg.methodology.inclusion_criteria == ("official docs",)
         assert cfg.methodology.exclusion_criteria == ("anonymous forum posts",)
         assert cfg.methodology.preferred_source_types == ("vendor docs", "standards")
+        assert cfg.methodology.search_sources == ("official docs", "benchmark corpora")
+        assert cfg.methodology.stopping_criteria == (
+            "cover all configured dimensions",
+            "stop when no new evidence appears",
+        )
+        assert cfg.methodology.stopping_rationale == "Bound cost while preserving coverage."
+        assert cfg.methodology.scoring_rationale == "Prefer evidence-backed, actionable synthesis."
         assert cfg.methodology.recency_days == 180
 
     def test_evaluation_config(self, tmp_path: Path):

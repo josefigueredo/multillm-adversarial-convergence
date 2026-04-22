@@ -148,6 +148,24 @@ class TestAutoResearcherSetup:
         assert manifest["environment"]["git_commit"] == "abc123"
 
     def test_setup_writes_methods_artifact(self, researcher):
+        researcher.config = ResearchConfig(
+            topic="Test topic",
+            goal="Test goal",
+            dimensions=("Dim A",),
+            methodology=researcher.config.methodology.__class__(
+                question="What is the best option?",
+                scope="Architectural decision support",
+                search_sources=("official docs", "benchmarks"),
+                stopping_criteria=("cover all dimensions",),
+                stopping_rationale="Bound cost while preserving quality.",
+                scoring_rationale="Reward evidence-backed synthesis.",
+                review_type="systematic_review",
+            ),
+            evaluation=researcher.config.evaluation,
+            reporting=researcher.config.reporting,
+            scoring=researcher.config.scoring,
+            execution=researcher.config.execution,
+        )
         with patch("src.orchestrator.git_commit", return_value="abc123"), \
              patch("src.orchestrator.cli_version", return_value="1.0"), \
              patch("src.orchestrator.package_version", return_value="0.2.0"):
@@ -155,6 +173,10 @@ class TestAutoResearcherSetup:
         methods = researcher.methods_path.read_text(encoding="utf-8")
         assert "# Research Methods" in methods
         assert "Test goal" in methods
+        assert "Review type: systematic_review" in methods
+        assert "Search sources:" in methods
+        assert "Stopping rationale: Bound cost while preserving quality." in methods
+        assert "Scoring rationale: Reward evidence-backed synthesis." in methods
 
     def test_lightweight_mode_is_auto_detected_for_short_smoke_goal(self, researcher):
         researcher.config = ResearchConfig(
@@ -577,6 +599,8 @@ class TestAutoResearcherSetup:
         researcher.evidence_quality_path = researcher.output_dir / "evidence_quality.json"
         researcher.rubric_path = researcher.output_dir / "rubric.json"
         researcher.contradictions_path = researcher.output_dir / "contradictions.json"
+        researcher.search_log_path = researcher.output_dir / "search_log.json"
+        researcher.screening_log_path = researcher.output_dir / "screening_log.json"
         researcher.baseline_path = researcher.output_dir / "baseline.md"
         researcher.evaluation_path = researcher.output_dir / "evaluation.json"
         researcher.comparison_path = researcher.output_dir / "comparison.json"
@@ -1884,3 +1908,45 @@ class TestAutoResearcherCall:
         payload = json.loads(researcher.tool_trace_path.read_text(encoding="utf-8"))
         assert payload["entries_count"] == 1
         assert payload["entries"][0]["backend"] == "codex-api"
+
+    def test_write_provenance_artifacts_writes_search_and_screening_logs(self, researcher):
+        researcher.output_dir.mkdir(parents=True, exist_ok=True)
+        researcher._claims = [
+            {
+                "id": "synthesis-claim-001",
+                "scope": "synthesis",
+                "dimension": "DX",
+                "text": "Python has strong docs.",
+                "claim_type": "factual",
+                "confidence": "high",
+                "cited_urls": ["https://docs.python.org/3/"],
+            }
+        ]
+        researcher._citations = [
+            {
+                "id": "synthesis-cite-001",
+                "scope": "synthesis",
+                "title": "Python docs",
+                "url": "https://docs.python.org/3/",
+                "source_type": "official_docs",
+                "source_quality_weight": 1.0,
+                "retrieved_at": "2026-04-22T00:00:00Z",
+            },
+            {
+                "id": "synthesis-cite-002",
+                "scope": "synthesis",
+                "title": "Random blog",
+                "url": "https://example.com/blog",
+                "source_type": "web",
+                "source_quality_weight": 0.6,
+                "retrieved_at": "2026-04-22T00:00:00Z",
+            },
+        ]
+
+        researcher._write_provenance_artifacts()
+
+        search_log = json.loads((researcher.output_dir / "search_log.json").read_text(encoding="utf-8"))
+        screening_log = json.loads((researcher.output_dir / "screening_log.json").read_text(encoding="utf-8"))
+        assert search_log["summary"]["sources_considered"] == 2
+        assert screening_log["summary"]["included_count"] == 1
+        assert screening_log["summary"]["excluded_count"] == 1

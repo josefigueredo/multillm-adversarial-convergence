@@ -57,6 +57,7 @@ from . import research_loop as loop_mod
 from .pdf_report import render_simple_pdf
 from .portfolio import build_portfolio, render_portfolio_html
 from .reporting import render_html_report as render_html_report_fn
+from .research_logs import build_screening_log, build_search_log
 from .run_io import setup_output_dir, write_results_header
 from .run_state import UsageTotals, resume_state, track_candidate_usage, track_cost, track_usage
 from .semantic_eval import (
@@ -128,6 +129,8 @@ class AutoResearcher:
         self.evidence_quality_path = output_dir / "evidence_quality.json"
         self.rubric_path = output_dir / "rubric.json"
         self.contradictions_path = output_dir / "contradictions.json"
+        self.search_log_path = output_dir / "search_log.json"
+        self.screening_log_path = output_dir / "screening_log.json"
         self.baseline_path = output_dir / "baseline.md"
         self.evaluation_path = output_dir / "evaluation.json"
         self.comparison_path = output_dir / "comparison.json"
@@ -787,12 +790,24 @@ class AutoResearcher:
             lines.append(f"- Question: {methodology.question}")
         if methodology.scope:
             lines.append(f"- Scope: {methodology.scope}")
+        if methodology.review_type:
+            lines.append(f"- Review type: {methodology.review_type}")
         if methodology.inclusion_criteria:
             lines.append("- Inclusion criteria:")
             lines.extend(f"  - {item}" for item in methodology.inclusion_criteria)
         if methodology.exclusion_criteria:
             lines.append("- Exclusion criteria:")
             lines.extend(f"  - {item}" for item in methodology.exclusion_criteria)
+        if methodology.search_sources:
+            lines.append("- Search sources:")
+            lines.extend(f"  - {item}" for item in methodology.search_sources)
+        if methodology.stopping_criteria:
+            lines.append("- Stopping criteria:")
+            lines.extend(f"  - {item}" for item in methodology.stopping_criteria)
+        if methodology.stopping_rationale:
+            lines.append(f"- Stopping rationale: {methodology.stopping_rationale}")
+        if methodology.scoring_rationale:
+            lines.append(f"- Scoring rationale: {methodology.scoring_rationale}")
         if methodology.preferred_source_types:
             lines.append("- Preferred source types:")
             lines.extend(f"  - {item}" for item in methodology.preferred_source_types)
@@ -1009,6 +1024,8 @@ class AutoResearcher:
         self.claims_path.write_text(json.dumps(self._claims, indent=2), encoding="utf-8")
         self.citations_path.write_text(json.dumps(self._citations, indent=2), encoding="utf-8")
         evidence_links = link_claims_to_citations(self._claims, self._citations)
+        search_log = build_search_log(self._citations)
+        screening_log = build_screening_log(self._citations, evidence_links)
         evidence_quality = summarize_evidence_quality(self._claims, evidence_links)
         contradictions = detect_claim_conflicts(self._claims)
         rubric = score_research_rubric(
@@ -1032,6 +1049,8 @@ class AutoResearcher:
             reference_comparison=reference_comparison,
         )
         self.evidence_links_path.write_text(json.dumps(evidence_links, indent=2), encoding="utf-8")
+        self.search_log_path.write_text(json.dumps(search_log, indent=2), encoding="utf-8")
+        self.screening_log_path.write_text(json.dumps(screening_log, indent=2), encoding="utf-8")
         self.evidence_quality_path.write_text(json.dumps(evidence_quality, indent=2), encoding="utf-8")
         self.rubric_path.write_text(json.dumps(rubric, indent=2), encoding="utf-8")
         self.contradictions_path.write_text(json.dumps(contradictions, indent=2), encoding="utf-8")

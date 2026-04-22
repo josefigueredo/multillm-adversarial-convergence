@@ -199,6 +199,8 @@ def dashboard_payload(
     strategy_summary: dict[str, Any],
     semantic_calibration: dict[str, Any],
     semantic_review: dict[str, Any],
+    search_log_summary: dict[str, Any] | None = None,
+    screening_log_summary: dict[str, Any] | None = None,
     retry_summary: dict[str, Any] | None = None,
     tool_loop_summary: dict[str, Any] | None = None,
     tool_trace_summary: dict[str, Any] | None = None,
@@ -226,6 +228,15 @@ def dashboard_payload(
         ),
         "semantic_calibration": semantic_calibration,
         "semantic_review": semantic_review,
+        "search_log_summary": search_log_summary or {
+            "queries_count": 0,
+            "sources_considered": 0,
+        },
+        "screening_log_summary": screening_log_summary or {
+            "sources_screened": 0,
+            "included_count": 0,
+            "excluded_count": 0,
+        },
         "retry_summary": retry_summary or {
             "total_retries": 0,
             "per_backend": {},
@@ -550,6 +561,8 @@ def write_dashboard(
     strategy_summary = load_json_if_exists(output_dir / "strategy_summary.json", {})
     semantic_calibration = load_json_if_exists(output_dir / "semantic_calibration.json", {})
     semantic_review = load_json_if_exists(output_dir / "semantic_review.json", {})
+    search_log = load_json_if_exists(output_dir / "search_log.json", {})
+    screening_log = load_json_if_exists(output_dir / "screening_log.json", {})
     tool_trace = load_json_if_exists(output_dir / "tool_trace.json", {})
 
     payload = dashboard_payload(
@@ -567,6 +580,8 @@ def write_dashboard(
         strategy_summary=strategy_summary,
         semantic_calibration=semantic_calibration,
         semantic_review=semantic_review,
+        search_log_summary=search_log.get("summary", {}) if isinstance(search_log, dict) else {},
+        screening_log_summary=screening_log.get("summary", {}) if isinstance(screening_log, dict) else {},
         retry_summary=retry_summary,
         tool_loop_summary=tool_loop_summary,
         tool_trace_summary=tool_trace.get("summary", {}) if isinstance(tool_trace, dict) else {},
