@@ -37,11 +37,11 @@ plan:
   # ── Companion source files ────────────────────────────────────────────────
   source_files:
     # Lab Syllabus Design — source of truth for all 15 PoC specs and ACs
-    - path: /Users/josefigueredo/Code/josefigueredo/codename-iris/docs/superpowers/specs/2026-04-18-poc-curriculum-design.md
+    - path: /Users/josefigueredo/Code/josefigueredo/multillm-adversarial-convergence/input/pocs/2026-04-18-poc-curriculum-design.md
       roles: [builder, architect, tech_lead, qa_engineer, security_engineer, devils_advocate]
 
     # Existing plan draft — all personas need it to critique against the spec
-    - path: /Users/josefigueredo/Code/josefigueredo/codename-iris/docs/superpowers/plans/2026-04-18-poc-curriculum.md
+    - path: /Users/josefigueredo/Code/josefigueredo/multillm-adversarial-convergence/input/pocs/2026-04-18-poc-curriculum.md
       roles: [builder, architect, tech_lead, qa_engineer, security_engineer, devils_advocate]
 
   # ── Phase 2 artifacts (optional) ─────────────────────────────────────────

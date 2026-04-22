@@ -110,21 +110,47 @@ class ClaudeBackend(Backend):
             return None
         try:
             payload = json.loads(stdout)
-            events = payload if isinstance(payload, list) else [payload]
-            for event in reversed(events):
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+        # Dict format: Claude CLI returns a single object (e.g. max_turns reached).
+        # No "type" field — result is directly at payload["result"].
+        if isinstance(payload, dict):
+            text = payload.get("result", "")
+            if text:
+                cost = payload.get("total_cost_usd", payload.get("cost_usd", 0.0))
+                usage = payload.get("usage", {})
+                in_tok = (
+                    usage.get("input_tokens", 0)
+                    + usage.get("cache_read_input_tokens", 0)
+                    + usage.get("cache_creation_input_tokens", 0)
+                )
+                out_tok = usage.get("output_tokens", 0)
+                errors = payload.get("errors", [])
+                if errors:
+                    log.warning("Claude CLI completed with errors: %s", errors)
+                return AgentResponse(text=text, cost_usd=cost, is_error=False, input_tokens=in_tok, output_tokens=out_tok)
+            return None
+
+        # Array-of-events format: scan in reverse for the last result event.
+        if isinstance(payload, list):
+            for event in reversed(payload):
                 if isinstance(event, dict) and event.get("type") == "result":
                     text = event.get("result", "")
                     if text:
                         cost = event.get("total_cost_usd", event.get("cost_usd", 0.0))
                         usage = event.get("usage", {})
-                        in_tok = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
+                        in_tok = (
+                            usage.get("input_tokens", 0)
+                            + usage.get("cache_read_input_tokens", 0)
+                            + usage.get("cache_creation_input_tokens", 0)
+                        )
                         out_tok = usage.get("output_tokens", 0)
                         errors = event.get("errors", [])
                         if errors:
                             log.warning("Claude CLI completed with errors: %s", errors)
                         return AgentResponse(text=text, cost_usd=cost, is_error=False, input_tokens=in_tok, output_tokens=out_tok)
-        except (json.JSONDecodeError, TypeError):
-            pass
+
         return None
 
     def invoke(self, prompt: str, opts: CallOptions, timeout: int = 300) -> AgentResponse:
