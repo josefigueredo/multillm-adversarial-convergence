@@ -183,6 +183,7 @@ class AutoResearcher:
             "tool_calls": 0,
             "tool_failures": 0,
             "per_backend": {},
+            "per_tool": {},
         }
         self._tool_trace: list[dict[str, Any]] = []
 
@@ -411,14 +412,28 @@ class AutoResearcher:
         self._tool_loop_summary["tool_failures"] += int(summary.get("tool_failures", 0) or 0)
         entry = self._tool_loop_summary["per_backend"].setdefault(
             name,
-            {"runs": 0, "tool_calls": 0, "tool_failures": 0},
+            {"runs": 0, "tool_calls": 0, "tool_failures": 0, "tools": {}},
         )
         entry["runs"] += 1
         entry["tool_calls"] += int(summary.get("tool_calls", 0) or 0)
         entry["tool_failures"] += int(summary.get("tool_failures", 0) or 0)
         trace = resp.raw.get("tool_trace", [])
         if isinstance(trace, list):
-            self._tool_trace.extend(item for item in trace if isinstance(item, dict))
+            for item in trace:
+                if not isinstance(item, dict):
+                    continue
+                self._tool_trace.append(item)
+                tool_name = str(item.get("tool_name") or "unknown")
+                failed = item.get("status") != "success"
+                per_tool = self._tool_loop_summary["per_tool"].setdefault(
+                    tool_name,
+                    {"calls": 0, "failures": 0},
+                )
+                per_tool["calls"] += 1
+                per_tool["failures"] += int(failed)
+                backend_tool = entry["tools"].setdefault(tool_name, {"calls": 0, "failures": 0})
+                backend_tool["calls"] += 1
+                backend_tool["failures"] += int(failed)
 
     # -- Public API --------------------------------------------------------
 

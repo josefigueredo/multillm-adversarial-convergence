@@ -291,8 +291,10 @@ Important:
 - this is **not** the same thing as CLI `allowed_tools`
 - tool-enabled API calls currently require a runtime tool registry
 - streaming + function tools is intentionally unsupported in the first slice
-- tool-loop observability is written into `metrics.json` and `dashboard.json`
+- tool-loop observability is written into `metrics.json` and `dashboard.json`, including per-backend and per-tool usage/failure counts
 - detailed per-run tool call traces are written into `tool_trace.json`
+- tool traces store redacted argument summaries and truncated output previews rather than raw full payloads
+- HTML/PDF reports surface compact tool-usage highlights when a run uses normalized API function tools
 
 ### Normalized API error contract
 

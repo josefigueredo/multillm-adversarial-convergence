@@ -86,6 +86,7 @@ def render_html_report(
         rubric_json=json.dumps(rubric),
         semantic_html=_semantic_html(semantic_calibration),
         semantic_review_html=_semantic_review_html(semantic_review),
+        tool_usage_html=_tool_usage_html((dashboard or {}).get("tool_usage_summary")),
         dashboard_html=_dashboard_html(dashboard),
         evaluation_html=_evaluation_html(evaluation),
         comparison_html=_comparison_html(comparison),
@@ -133,6 +134,23 @@ def _dashboard_html(dashboard: dict[str, Any] | None) -> str:
     if not dashboard:
         return ""
     return _json_section_html("Dashboard Summary", dashboard)
+
+
+def _tool_usage_html(tool_usage: dict[str, Any] | None) -> str:
+    if not tool_usage:
+        return ""
+    top_tools = tool_usage.get("top_tools", [])
+    failure_hotspots = tool_usage.get("failure_hotspots", [])
+    if not top_tools and not failure_hotspots:
+        return ""
+    return _json_section_html(
+        "Tool Usage",
+        tool_usage,
+        [
+            ("Top tools", ", ".join(str(item.get("name", "")) for item in top_tools if isinstance(item, dict))),
+            ("Failure hotspots", len(failure_hotspots)),
+        ],
+    )
 
 
 def _semantic_html(semantic_calibration: dict[str, Any] | None) -> str:

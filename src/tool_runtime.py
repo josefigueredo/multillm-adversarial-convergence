@@ -8,6 +8,22 @@ from typing import Any
 
 from .backends import AgentResponse, Backend, CallOptions, ToolResult
 
+TRACE_ARG_STRING_PREVIEW_CHARS = 120
+TRACE_OUTPUT_PREVIEW_CHARS = 240
+TRACE_SEQUENCE_PREVIEW_ITEMS = 5
+TRACE_SENSITIVE_KEYS = frozenset(
+    {
+        "api_key",
+        "apikey",
+        "authorization",
+        "password",
+        "secret",
+        "token",
+        "access_token",
+        "refresh_token",
+    }
+)
+
 
 def run_function_tool_loop(
     backend: Backend,
@@ -57,6 +73,8 @@ def run_function_tool_loop(
                         "call_id": tool_call.call_id,
                         "status": "error",
                         "provider_code": result.raw.get("provider_code", "tool_execution_failed"),
+                        "arguments_summary": result.raw.get("arguments_summary", {}),
+                        "output_summary": _summarize_output_text(result.output),
                     }
                 )
                 return AgentResponse(
@@ -82,6 +100,8 @@ def run_function_tool_loop(
                     "tool_name": tool_call.name,
                     "call_id": result.call_id,
                     "status": "success",
+                    "arguments_summary": result.raw.get("arguments_summary", {}),
+                    "output_summary": result.raw.get("output_summary", _summarize_output_text(result.output)),
                 }
             )
             tool_outputs.append(
@@ -129,6 +149,7 @@ def _execute_tool_call(
     tool_registry: dict[str, Callable[[dict[str, Any]], Any]],
 ) -> ToolResult:
     """Execute one function tool call from the normalized registry."""
+    arguments_summary = _summarize_arguments_json(arguments_json)
     handler = tool_registry.get(name)
     if handler is None:
         return ToolResult(
@@ -136,7 +157,7 @@ def _execute_tool_call(
             name=name,
             output=f"Unknown tool '{name}'.",
             is_error=True,
-            raw={"provider_code": "unknown_tool"},
+            raw={"provider_code": "unknown_tool", "arguments_summary": arguments_summary},
         )
     try:
         arguments = json.loads(arguments_json or "{}")
@@ -146,7 +167,7 @@ def _execute_tool_call(
             name=name,
             output=f"Invalid tool arguments for '{name}': {exc}",
             is_error=True,
-            raw={"provider_code": "invalid_arguments", "arguments_json": arguments_json},
+            raw={"provider_code": "invalid_arguments", "arguments_summary": arguments_summary},
         )
 
     try:
@@ -157,11 +178,68 @@ def _execute_tool_call(
             name=name,
             output=f"Tool '{name}' failed: {exc}",
             is_error=True,
-            raw={"provider_code": "tool_handler_failed"},
+            raw={"provider_code": "tool_handler_failed", "arguments_summary": arguments_summary},
         )
 
     if isinstance(output, str):
         rendered = output
     else:
         rendered = json.dumps(output)
-    return ToolResult(call_id=call_id, name=name, output=rendered)
+    return ToolResult(
+        call_id=call_id,
+        name=name,
+        output=rendered,
+        raw={
+            "arguments_summary": arguments_summary,
+            "output_summary": _summarize_output_text(rendered),
+        },
+    )
+
+
+def _summarize_arguments_json(arguments_json: str) -> dict[str, Any]:
+    """Return a safe, redacted preview of tool-call arguments."""
+    try:
+        parsed = json.loads(arguments_json or "{}")
+    except json.JSONDecodeError:
+        return {
+            "_invalid_json": True,
+            "_chars": len(arguments_json or ""),
+        }
+    return _summarize_trace_value(parsed)
+
+
+def _summarize_trace_value(value: Any, *, key_name: str = "") -> Any:
+    """Summarize nested tool trace data without leaking secrets or huge blobs."""
+    if key_name and key_name.lower() in TRACE_SENSITIVE_KEYS:
+        return "[redacted]"
+    if isinstance(value, dict):
+        return {
+            str(key): _summarize_trace_value(item, key_name=str(key))
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        preview = [_summarize_trace_value(item) for item in value[:TRACE_SEQUENCE_PREVIEW_ITEMS]]
+        if len(value) > TRACE_SEQUENCE_PREVIEW_ITEMS:
+            preview.append(f"... ({len(value) - TRACE_SEQUENCE_PREVIEW_ITEMS} more items)")
+        return preview
+    if isinstance(value, tuple):
+        return _summarize_trace_value(list(value))
+    if isinstance(value, str):
+        return _truncate_string(value, TRACE_ARG_STRING_PREVIEW_CHARS)
+    return value
+
+
+def _summarize_output_text(output: str) -> dict[str, Any]:
+    """Return safe output preview metadata for tool trace entries."""
+    return {
+        "preview": _truncate_string(output, TRACE_OUTPUT_PREVIEW_CHARS),
+        "chars": len(output),
+        "truncated": len(output) > TRACE_OUTPUT_PREVIEW_CHARS,
+    }
+
+
+def _truncate_string(value: str, limit: int) -> str:
+    """Truncate long strings for trace artifacts."""
+    if len(value) <= limit:
+        return value
+    return f"{value[:limit]}…"

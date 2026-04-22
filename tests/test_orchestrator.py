@@ -1729,6 +1729,8 @@ class TestAutoResearcherCall:
         assert researcher._tool_loop_summary["tool_calls"] == 3
         assert researcher._tool_loop_summary["tool_failures"] == 1
         assert researcher._tool_loop_summary["per_backend"]["codex-api"]["runs"] == 1
+        assert researcher._tool_loop_summary["per_backend"]["codex-api"]["tools"]["echo"]["calls"] == 1
+        assert researcher._tool_loop_summary["per_tool"]["echo"]["calls"] == 1
         assert researcher._tool_trace[0]["tool_name"] == "echo"
 
     def test_write_tool_trace_artifact(self, researcher):

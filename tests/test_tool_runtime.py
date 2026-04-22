@@ -55,6 +55,61 @@ def test_run_function_tool_loop_executes_single_codex_tool_round_trip():
     assert resp.raw["tool_trace"][0]["status"] == "success"
 
 
+def test_run_function_tool_loop_summarizes_and_redacts_tool_trace_details():
+    backend = get_backend("codex-api")
+    responses = iter([
+        AgentResponse(
+            text="",
+            cost_usd=0.0,
+            is_error=False,
+            raw={
+                "output": [
+                    {
+                        "id": "fc_123",
+                        "type": "function_call",
+                        "call_id": "call_123",
+                        "name": "echo",
+                        "arguments": json.dumps(
+                            {
+                                "message": "hello",
+                                "api_key": "super-secret-key",
+                                "nested": {"token": "very-secret-token"},
+                            }
+                        ),
+                    }
+                ]
+            },
+        ),
+        AgentResponse(
+            text="Tool said hello",
+            cost_usd=0.0,
+            is_error=False,
+            raw={"output_text": "Tool said hello"},
+        ),
+    ])
+    backend.invoke = lambda prompt, opts, timeout=300: next(responses)
+    opts = CallOptions(
+        model="gpt-5.4",
+        max_turns=3,
+        tools=(ToolDefinition(type="function", name="echo"),),
+    )
+
+    resp = run_function_tool_loop(
+        backend,
+        "Say hi",
+        opts,
+        timeout=30,
+        tool_registry={"echo": lambda args: "x" * 400},
+    )
+
+    trace = resp.raw["tool_trace"][0]
+    assert trace["arguments_summary"]["api_key"] == "[redacted]"
+    assert trace["arguments_summary"]["nested"]["token"] == "[redacted]"
+    assert trace["output_summary"]["chars"] == 400
+    assert trace["output_summary"]["truncated"] is True
+    assert len(trace["output_summary"]["preview"]) < 400
+
+
 def test_run_function_tool_loop_returns_error_for_unknown_tool():
     backend = get_backend("codex-api")
     backend.invoke = lambda prompt, opts, timeout=300: AgentResponse(
@@ -91,6 +146,7 @@ def test_run_function_tool_loop_returns_error_for_unknown_tool():
     assert resp.raw["error"]["category"] == "tool_execution"
     assert resp.raw["tool_loop"]["tool_failures"] == 1
     assert resp.raw["tool_trace"][0]["status"] == "error"
+    assert resp.raw["tool_trace"][0]["output_summary"]["preview"] == "Unknown tool 'missing_tool'."
 
 
 def test_run_function_tool_loop_returns_error_for_invalid_json_arguments():
@@ -130,6 +186,7 @@ def test_run_function_tool_loop_returns_error_for_invalid_json_arguments():
     assert resp.raw["error"]["provider_code"] == "invalid_arguments"
     assert resp.raw["tool_loop"]["tool_failures"] == 1
     assert resp.raw["tool_trace"][0]["status"] == "error"
+    assert resp.raw["tool_trace"][0]["arguments_summary"]["_invalid_json"] is True
 
 
 def test_run_function_tool_loop_returns_error_when_max_turns_exhausted():

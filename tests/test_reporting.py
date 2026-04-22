@@ -8,6 +8,7 @@ from src.reporting import (
     _semantic_html,
     _semantic_review_html,
     _summary_cards_html,
+    _tool_usage_html,
     render_html_report,
 )
 
@@ -34,7 +35,13 @@ def test_render_html_report_renders_core_sections_and_escapes():
         comparison={"compared_runs_count": 1, "summary": {"consistency_level": "high"}},
         semantic_calibration={"enabled": True, "grade": "reasonable", "calibrated_score": 0.81},
         semantic_review={"enabled": True, "grade": "good", "overall_score": 0.76, "judge_backend": "claude-cli"},
-        dashboard={"current_strategy": "ensemble"},
+        dashboard={
+            "current_strategy": "ensemble",
+            "tool_usage_summary": {
+                "top_tools": [{"name": "echo", "calls": 2, "failures": 1}],
+                "failure_hotspots": [{"backend": "codex-api", "tool_name": "echo", "failures": 1}],
+            },
+        },
         methods_text="# Method <1>\n\nSome **bold** text.",
         synthesis_text="Use <Python> & cite [sources](https://example.com).",
     )
@@ -48,6 +55,7 @@ def test_render_html_report_renders_core_sections_and_escapes():
     assert "Semantic Calibration" in html
     assert "Semantic Judge Review" in html
     assert "Dashboard Summary" in html
+    assert "Tool Usage" in html
     assert "Consistency Comparison" in html
     # Markdown content embedded as JS string, not HTML-escaped in <pre>
     assert "marked.parse" in html
@@ -79,6 +87,7 @@ def test_render_html_report_omits_optional_sections_when_empty():
 
     assert "Semantic Calibration" not in html
     assert "Dashboard Summary" not in html
+    assert "Tool Usage" not in html
     assert "Semantic Judge Review" not in html
     assert "Consistency Comparison" not in html
     assert "Evaluation" not in html
@@ -98,6 +107,13 @@ def test_helper_html_sections_behave_as_expected():
         {"enabled": True, "grade": "good", "overall_score": 0.74, "judge_backend": "claude-cli"}
     )
     assert _semantic_review_html({"enabled": False}) == ""
+    assert "Top tools" in _tool_usage_html(
+        {
+            "top_tools": [{"name": "echo", "calls": 2, "failures": 1}],
+            "failure_hotspots": [{"backend": "codex-api", "tool_name": "echo", "failures": 1}],
+        }
+    )
+    assert _tool_usage_html(None) == ""
 
 
 def test_json_sections_use_renderJsonTable():

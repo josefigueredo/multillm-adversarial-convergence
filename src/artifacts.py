@@ -114,6 +114,7 @@ def metrics_payload(
             "tool_calls": 0,
             "tool_failures": 0,
             "per_backend": {},
+            "per_tool": {},
         },
     }
 
@@ -194,6 +195,7 @@ def dashboard_payload(
     tool_loop_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the stakeholder-facing dashboard artifact payload."""
+    tool_usage_summary = _tool_usage_summary(tool_loop_summary or {})
     return {
         "topic": topic,
         "goal": goal,
@@ -218,7 +220,10 @@ def dashboard_payload(
             "runs": 0,
             "tool_calls": 0,
             "tool_failures": 0,
+            "per_backend": {},
+            "per_tool": {},
         },
+        "tool_usage_summary": tool_usage_summary,
     }
 
 
@@ -226,7 +231,53 @@ def tool_trace_payload(*, tool_trace: list[dict[str, Any]]) -> dict[str, Any]:
     """Build a machine-readable tool trace artifact payload."""
     return {
         "entries_count": len(tool_trace),
+        "redaction_policy": {
+            "sensitive_values": "redacted",
+            "argument_string_preview_chars": 120,
+            "output_preview_chars": 240,
+            "sequence_preview_items": 5,
+        },
         "entries": tool_trace,
+    }
+
+
+def _tool_usage_summary(tool_loop_summary: dict[str, Any]) -> dict[str, Any]:
+    """Build compact report-friendly tool usage highlights."""
+    per_tool = tool_loop_summary.get("per_tool", {})
+    per_backend = tool_loop_summary.get("per_backend", {})
+    top_tools = [
+        {
+            "name": name,
+            "calls": int(stats.get("calls", 0) or 0),
+            "failures": int(stats.get("failures", 0) or 0),
+        }
+        for name, stats in per_tool.items()
+        if isinstance(stats, dict)
+    ]
+    top_tools.sort(key=lambda item: (-item["calls"], item["name"]))
+
+    failure_hotspots: list[dict[str, Any]] = []
+    for backend_name, backend_stats in per_backend.items():
+        if not isinstance(backend_stats, dict):
+            continue
+        for tool_name, tool_stats in (backend_stats.get("tools", {}) or {}).items():
+            if not isinstance(tool_stats, dict):
+                continue
+            failures = int(tool_stats.get("failures", 0) or 0)
+            if failures <= 0:
+                continue
+            failure_hotspots.append(
+                {
+                    "backend": backend_name,
+                    "tool_name": tool_name,
+                    "failures": failures,
+                }
+            )
+    failure_hotspots.sort(key=lambda item: (-item["failures"], item["backend"], item["tool_name"]))
+
+    return {
+        "top_tools": top_tools[:5],
+        "failure_hotspots": failure_hotspots[:5],
     }
 
 
@@ -243,6 +294,14 @@ def pdf_run_summary_text(
     evidence_quality: dict[str, Any],
 ) -> str:
     """Format core run summary text for PDF export."""
+    tool_loop = metrics.get("tool_loop_summary", {}) if isinstance(metrics, dict) else {}
+    tool_line = ""
+    if isinstance(tool_loop, dict) and int(tool_loop.get("runs", 0) or 0) > 0:
+        tool_line = (
+            f"Tool loops: {int(tool_loop.get('runs', 0) or 0)} runs / "
+            f"{int(tool_loop.get('tool_calls', 0) or 0)} calls / "
+            f"{int(tool_loop.get('tool_failures', 0) or 0)} failures\n"
+        )
     return (
         f"Topic: {topic}\n"
         f"Goal: {goal}\n"
@@ -252,6 +311,7 @@ def pdf_run_summary_text(
         f"Rubric grade: {rubric.get('grade', 'insufficient')}\n"
         f"Evidence quality: {evidence_quality.get('average_evidence_quality_score', 0.0)}\n"
         f"Explored dimensions: {', '.join(metrics.get('explored_dimensions', explored_dimensions)) or '(none)'}\n"
+        f"{tool_line}"
     )
 
 
