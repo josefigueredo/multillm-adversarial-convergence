@@ -26,7 +26,7 @@ def _make_config(**kwargs) -> PlanConfig:
 def _make_strategy(backends_dict=None, **cfg_kwargs) -> PlanStrategy:
     cfg = _make_config(**cfg_kwargs)
     if backends_dict is None:
-        backends_dict = {"claude": _make_backend()}
+        backends_dict = {"claude-cli": _make_backend()}
     return PlanStrategy(cfg, backends_dict)
 
 
@@ -41,9 +41,9 @@ def test_builder_uses_research_0():
     claude = _make_backend()
     cfg = PlanConfig(
         topic="T", goal="G",
-        backends=BackendsConfig(primary="claude", research=("codex", "claude")),
+        backends=BackendsConfig(primary="claude-cli", research=("codex-cli", "claude-cli")),
     )
-    s = PlanStrategy(cfg, {"codex": codex, "claude": claude})
+    s = PlanStrategy(cfg, {"codex-cli": codex, "claude-cli": claude})
     assert s._builder is codex
 
 
@@ -52,9 +52,9 @@ def test_challenger_uses_research_1():
     claude = _make_backend()
     cfg = PlanConfig(
         topic="T", goal="G",
-        backends=BackendsConfig(primary="claude", research=("codex", "claude")),
+        backends=BackendsConfig(primary="claude-cli", research=("codex-cli", "claude-cli")),
     )
-    s = PlanStrategy(cfg, {"codex": codex, "claude": claude})
+    s = PlanStrategy(cfg, {"codex-cli": codex, "claude-cli": claude})
     assert s._challenger is claude
 
 
@@ -62,9 +62,9 @@ def test_challenger_falls_back_to_primary_when_single_research():
     claude = _make_backend()
     cfg = PlanConfig(
         topic="T", goal="G",
-        backends=BackendsConfig(primary="claude", research=("claude",)),
+        backends=BackendsConfig(primary="claude-cli", research=("claude-cli",)),
     )
-    s = PlanStrategy(cfg, {"claude": claude})
+    s = PlanStrategy(cfg, {"claude-cli": claude})
     assert s._challenger is claude
 
 
@@ -84,7 +84,7 @@ def test_source_block_filters_by_role(tmp_path):
             SourceFileConfig(path=str(f), roles=("builder",)),
         ),
     )
-    s = PlanStrategy(cfg, {"claude": _make_backend()})
+    s = PlanStrategy(cfg, {"claude-cli": _make_backend()})
     block = s._source_block("builder")
     assert "## Reference Files" in block
     assert "# Doc" in block
@@ -99,7 +99,7 @@ def test_source_block_empty_for_unmatched_role(tmp_path):
             SourceFileConfig(path=str(f), roles=("builder",)),
         ),
     )
-    s = PlanStrategy(cfg, {"claude": _make_backend()})
+    s = PlanStrategy(cfg, {"claude-cli": _make_backend()})
     assert s._source_block("architect") == ""
 
 
@@ -107,14 +107,14 @@ def test_source_block_empty_for_unmatched_role(tmp_path):
 
 def test_run_builder_returns_text():
     backend = _make_backend("# Revised Plan")
-    s = PlanStrategy(_make_config(), {"claude": backend})
+    s = PlanStrategy(_make_config(), {"claude-cli": backend})
     result = s.run_builder("# Old", [], _call_with, human_decisions=[])
     assert result == "# Revised Plan"
 
 
 def test_run_builder_calls_invoke_once():
     backend = _make_backend("# Plan")
-    s = PlanStrategy(_make_config(), {"claude": backend})
+    s = PlanStrategy(_make_config(), {"claude-cli": backend})
     s.run_builder("", [], _call_with, human_decisions=[])
     assert backend.run.call_count == 1
 
@@ -126,7 +126,7 @@ def test_run_challenger_parses_json():
         "description": "Missing test", "section_ref": "Task 1", "raised_by": "challenger"
     }])
     backend = _make_backend(payload)
-    s = PlanStrategy(_make_config(), {"claude": backend})
+    s = PlanStrategy(_make_config(), {"claude-cli": backend})
     result = s.run_challenger("# Plan", _call_with)
     assert len(result) == 1
     assert isinstance(result[0], RawCritique)
@@ -134,7 +134,7 @@ def test_run_challenger_parses_json():
 
 
 def test_run_challenger_returns_empty_on_no_issues():
-    s = PlanStrategy(_make_config(), {"claude": _make_backend("[]")})
+    s = PlanStrategy(_make_config(), {"claude-cli": _make_backend("[]")})
     result = s.run_challenger("# Plan", _call_with)
     assert result == []
 
@@ -153,7 +153,7 @@ def test_run_verifier_parses_verified_critiques():
         "status": "valid", "defer_reason": None, "question": None, "suggested_answer": None
     }])
     backend = _make_backend(payload)
-    s = PlanStrategy(_make_config(), {"claude": backend})
+    s = PlanStrategy(_make_config(), {"claude-cli": backend})
     raw = [RawCritique(description="d", section_ref="Task 1", raised_by="challenger")]
     result = s.run_verifier("# Plan", raw, _call_with)
     assert len(result) == 1
@@ -173,7 +173,7 @@ def test_run_arbitrator_parses_patches():
         "section_ref": "Task 1", "proposed_text": "New text", "rationale": "Fix it"
     }])
     backend = _make_backend(payload)
-    s = PlanStrategy(_make_config(), {"claude": backend})
+    s = PlanStrategy(_make_config(), {"claude-cli": backend})
     valid = [VerifiedCritique(
         description="d", section_ref="Task 1", raised_by="challenger", status="valid"
     )]
@@ -191,7 +191,7 @@ def test_run_personas_parallel_collects_all_results():
         persona_mode="parallel",
         personas=(PlanPersonaConfig("architect"), PlanPersonaConfig("tech_lead")),
     )
-    s = PlanStrategy(cfg, {"claude": backend})
+    s = PlanStrategy(cfg, {"claude-cli": backend})
     result = s.run_personas("# Plan", _call_with)
     assert result == []
     assert backend.run.call_count == 2
@@ -204,7 +204,7 @@ def test_run_personas_serial_collects_all_results():
         persona_mode="serial",
         personas=(PlanPersonaConfig("architect"), PlanPersonaConfig("tech_lead")),
     )
-    s = PlanStrategy(cfg, {"claude": backend})
+    s = PlanStrategy(cfg, {"claude-cli": backend})
     result = s.run_personas("# Plan", _call_with)
     assert result == []
     assert backend.run.call_count == 2
@@ -216,7 +216,7 @@ def test_invoke_persona_uses_plan_prefix_by_default(tmp_path):
         topic="T", goal="G",
         personas=(PlanPersonaConfig("tech_lead"),),
     )
-    s = PlanStrategy(cfg, {"claude": backend})
+    s = PlanStrategy(cfg, {"claude-cli": backend})
     # plan_persona_tech_lead.md exists (created in Task 3) — verify the call succeeds
     # and uses the plan_persona_{name}.md prefix convention
     result = s._invoke_persona(cfg.personas[0], "# Plan", _call_with)

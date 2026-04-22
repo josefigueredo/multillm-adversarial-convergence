@@ -24,8 +24,10 @@ RATE_LIMIT_COOLDOWN_SECONDS = 30
 
 class ClaudeBackend(Backend):
 
-    name = "claude"
+    name = "claude-cli"
     capabilities = BackendCapabilities(
+        transport="cli",
+        provider_kind="direct",
         supports_json_schema=True,
         supports_budget_cap=True,
         supports_rate_limit_detection=True,

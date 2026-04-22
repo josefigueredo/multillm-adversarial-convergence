@@ -23,6 +23,7 @@ from typing import Any
 
 from .backends import AgentResponse, Backend, CallOptions
 from .config import BackendsConfig, StrategyConfig
+from .provider_instances import backend_label
 from .prompts import render as _render
 
 log = logging.getLogger("autoresearch")
@@ -221,19 +222,20 @@ class SingleStrategy(Strategy):
         self, prompt, invoke, *, allowed_tools="", max_turns=10, timeout=600
     ) -> ResearchResult:
         backend = self.research_backends[0]
+        label = backend_label(backend)
         resp = invoke(
             backend, prompt,
             allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
         )
         return ResearchResult(
             findings=resp.text if not resp.is_error else "",
-            backend_name=backend.name,
+            backend_name=label,
             cost_usd=resp.cost_usd,
-            per_backend_costs={backend.name: resp.cost_usd},
+            per_backend_costs={label: resp.cost_usd},
             candidates=[
                 ResearchCandidate(
                     findings=resp.text,
-                    backend_name=backend.name,
+                    backend_name=label,
                     cost_usd=resp.cost_usd,
                     input_tokens=resp.input_tokens,
                     output_tokens=resp.output_tokens,
@@ -281,7 +283,7 @@ class EnsembleStrategy(Strategy):
                     invoke, backend, prompt,
                     allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
                 )
-                futures[fut] = backend.name
+                futures[fut] = backend_label(backend)
 
             for fut in as_completed(futures):
                 name = futures[fut]
@@ -342,19 +344,20 @@ class AdversarialStrategy(Strategy):
     ) -> ResearchResult:
         # Use the first research backend as the researcher
         backend = self.research_backends[0]
+        label = backend_label(backend)
         resp = invoke(
             backend, prompt,
             allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
         )
         return ResearchResult(
             findings=resp.text if not resp.is_error else "",
-            backend_name=backend.name,
+            backend_name=label,
             cost_usd=resp.cost_usd,
-            per_backend_costs={backend.name: resp.cost_usd},
+            per_backend_costs={label: resp.cost_usd},
             candidates=[
                 ResearchCandidate(
                     findings=resp.text,
-                    backend_name=backend.name,
+                    backend_name=label,
                     cost_usd=resp.cost_usd,
                     input_tokens=resp.input_tokens,
                     output_tokens=resp.output_tokens,
@@ -508,19 +511,20 @@ class SerialStrategy(Strategy):
             # Fallback: single backend acts as both drafter and refiner
             log.warning("Serial strategy requires 2+ research backends; falling back to single.")
             backend = research[0]
+            label = backend_label(backend)
             resp = invoke(
                 backend, prompt,
                 allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
             )
             return ResearchResult(
                 findings=resp.text if not resp.is_error else "",
-                backend_name=backend.name,
+                backend_name=label,
                 cost_usd=resp.cost_usd,
-                per_backend_costs={backend.name: resp.cost_usd},
+                per_backend_costs={label: resp.cost_usd},
                 candidates=[
                     ResearchCandidate(
                         findings=resp.text,
-                        backend_name=backend.name,
+                        backend_name=label,
                         cost_usd=resp.cost_usd,
                         input_tokens=resp.input_tokens,
                         output_tokens=resp.output_tokens,
@@ -538,11 +542,13 @@ class SerialStrategy(Strategy):
             drafter, prompt,
             allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
         )
-        per_backend[drafter.name] = draft_resp.cost_usd
+        drafter_label = backend_label(drafter)
+        refiner_label = backend_label(refiner)
+        per_backend[drafter_label] = draft_resp.cost_usd
 
         if draft_resp.is_error or not draft_resp.text:
             return ResearchResult(
-                findings="", backend_name=drafter.name,
+                findings="", backend_name=drafter_label,
                 cost_usd=sum(per_backend.values()),
                 per_backend_costs=per_backend,
                 candidates=[],
@@ -570,19 +576,19 @@ class SerialStrategy(Strategy):
             refiner, refine_prompt,
             allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
         )
-        per_backend[refiner.name] = refine_resp.cost_usd
+        per_backend[refiner_label] = refine_resp.cost_usd
 
         if refine_resp.is_error or not refine_resp.text:
             # Fallback to draft
             return ResearchResult(
                 findings=draft_resp.text,
-                backend_name=drafter.name,
+                backend_name=drafter_label,
                 cost_usd=sum(per_backend.values()),
                 per_backend_costs=per_backend,
                 candidates=[
                     ResearchCandidate(
                         findings=draft_resp.text,
-                        backend_name=drafter.name,
+                        backend_name=drafter_label,
                         cost_usd=draft_resp.cost_usd,
                         input_tokens=draft_resp.input_tokens,
                         output_tokens=draft_resp.output_tokens,
@@ -592,20 +598,20 @@ class SerialStrategy(Strategy):
 
         return ResearchResult(
             findings=refine_resp.text,
-            backend_name=f"{drafter.name}+{refiner.name}",
+            backend_name=f"{drafter_label}+{refiner_label}",
             cost_usd=sum(per_backend.values()),
             per_backend_costs=per_backend,
             candidates=[
                 ResearchCandidate(
                     findings=draft_resp.text,
-                    backend_name=drafter.name,
+                    backend_name=drafter_label,
                     cost_usd=draft_resp.cost_usd,
                     input_tokens=draft_resp.input_tokens,
                     output_tokens=draft_resp.output_tokens,
                 ),
                 ResearchCandidate(
                     findings=refine_resp.text,
-                    backend_name=refiner.name,
+                    backend_name=refiner_label,
                     cost_usd=refine_resp.cost_usd,
                     input_tokens=refine_resp.input_tokens,
                     output_tokens=refine_resp.output_tokens,
@@ -636,10 +642,10 @@ class SpecialistStrategy(Strategy):
 
     # Default keyword associations
     DEFAULT_KEYWORDS: dict[str, list[str]] = {
-        "codex": ["code", "implementation", "API", "SDK", "library", "example", "programming"],
-        "gemini": ["comparison", "overview", "landscape", "pricing", "market", "alternatives", "cost"],
-        "claude": ["trade-off", "architecture", "design", "security", "reasoning", "analysis", "strategy"],
-        "copilot": ["integration", "workflow", "tooling", "IDE", "developer experience"],
+        "codex-cli": ["code", "implementation", "API", "SDK", "library", "example", "programming"],
+        "gemini-cli": ["comparison", "overview", "landscape", "pricing", "market", "alternatives", "cost"],
+        "claude-cli": ["trade-off", "architecture", "design", "security", "reasoning", "analysis", "strategy"],
+        "copilot-cli": ["integration", "workflow", "tooling", "IDE", "developer experience"],
     }
 
     def route_dimension(self, dimension: str) -> Backend:
@@ -662,7 +668,8 @@ class SpecialistStrategy(Strategy):
         dimension: str = "",
     ) -> ResearchResult:
         backend = self.route_dimension(dimension) if dimension else self.research_backends[0]
-        log.info("Specialist: routing to %s for dimension '%s'.", backend.name, dimension)
+        label = backend_label(backend)
+        log.info("Specialist: routing to %s for dimension '%s'.", label, dimension)
 
         resp = invoke(
             backend, prompt,
@@ -670,13 +677,13 @@ class SpecialistStrategy(Strategy):
         )
         return ResearchResult(
             findings=resp.text if not resp.is_error else "",
-            backend_name=backend.name,
+            backend_name=label,
             cost_usd=resp.cost_usd,
-            per_backend_costs={backend.name: resp.cost_usd},
+            per_backend_costs={label: resp.cost_usd},
             candidates=[
                 ResearchCandidate(
                     findings=resp.text,
-                    backend_name=backend.name,
+                    backend_name=label,
                     cost_usd=resp.cost_usd,
                     input_tokens=resp.input_tokens,
                     output_tokens=resp.output_tokens,

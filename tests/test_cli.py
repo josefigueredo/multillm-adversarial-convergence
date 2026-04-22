@@ -44,7 +44,7 @@ class TestRunSubcommand:
               topic: "Test"
               execution:
                 max_iterations: 1
-                backend: claude
+                backend: claude-cli
                 model: sonnet
         """), encoding="utf-8")
         return p
@@ -62,8 +62,8 @@ class TestRunSubcommand:
     def _mock_cli_deps(self):
         mock_backend = MagicMock()
         mock_backend.check_available.return_value = True
-        mock_backend.name = "claude"
-        mock_backend.cli_executable.return_value = "claude"
+        mock_backend.name = "claude-cli"
+        mock_backend.cli_executable.return_value = "claude-cli"
         mock_strategy = MagicMock()
         return mock_backend, mock_strategy
 
@@ -73,10 +73,10 @@ class TestRunSubcommand:
     def test_backend_not_available(self, mock_get, mock_get_backends, mock_get_strat, config_file):
         mock_backend = MagicMock()
         mock_backend.check_available.return_value = False
-        mock_backend.name = "claude"
-        mock_backend.cli_executable.return_value = "claude"
+        mock_backend.name = "claude-cli"
+        mock_backend.cli_executable.return_value = "claude-cli"
         mock_get.return_value = mock_backend
-        mock_get_backends.return_value = {"claude": mock_backend}
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
         result = main(["run", "--config", str(config_file)])
         assert result == 1
 
@@ -87,7 +87,7 @@ class TestRunSubcommand:
     def test_synthesize_mode(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file):
         mock_backend, mock_strategy = self._mock_cli_deps()
         mock_get.return_value = mock_backend
-        mock_get_backends.return_value = {"claude": mock_backend}
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_instance = MagicMock()
         mock_researcher_cls.return_value = mock_instance
@@ -102,7 +102,7 @@ class TestRunSubcommand:
     def test_run_mode(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file):
         mock_backend, mock_strategy = self._mock_cli_deps()
         mock_get.return_value = mock_backend
-        mock_get_backends.return_value = {"claude": mock_backend}
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_instance = MagicMock()
         mock_researcher_cls.return_value = mock_instance
@@ -120,7 +120,7 @@ class TestRunSubcommand:
     def test_resume_flag_passed_to_researcher(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file):
         mock_backend, mock_strategy = self._mock_cli_deps()
         mock_get.return_value = mock_backend
-        mock_get_backends.return_value = {"claude": mock_backend}
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
         main(["run", "--config", str(config_file), "--resume"])
@@ -134,11 +134,11 @@ class TestRunSubcommand:
     def test_backend_flag_overrides_config(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file):
         mock_backend, mock_strategy = self._mock_cli_deps()
         mock_get.return_value = mock_backend
-        mock_get_backends.return_value = {"codex": mock_backend}
+        mock_get_backends.return_value = {"codex-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
-        main(["run", "--config", str(config_file), "--backend", "codex"])
-        mock_get.assert_called_with("codex")
+        main(["run", "--config", str(config_file), "--backend", "codex-cli"])
+        mock_get.assert_called_with("codex-cli")
 
     @patch("src.cli.get_strategy")
     @patch("src.cli.get_backends")
@@ -147,11 +147,11 @@ class TestRunSubcommand:
     def test_backend_defaults_from_config(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file):
         mock_backend, mock_strategy = self._mock_cli_deps()
         mock_get.return_value = mock_backend
-        mock_get_backends.return_value = {"claude": mock_backend}
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
         main(["run", "--config", str(config_file)])
-        mock_get.assert_called_with("claude")
+        mock_get.assert_called_with("claude-cli")
 
     @patch("src.cli.get_strategy")
     @patch("src.cli.get_backends")
@@ -160,7 +160,7 @@ class TestRunSubcommand:
     def test_custom_output_dir(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file, tmp_path):
         mock_backend, mock_strategy = self._mock_cli_deps()
         mock_get.return_value = mock_backend
-        mock_get_backends.return_value = {"claude": mock_backend}
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
         custom = tmp_path / "custom_out"
@@ -175,12 +175,57 @@ class TestRunSubcommand:
     def test_backend_passed_to_researcher(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file):
         mock_backend, mock_strategy = self._mock_cli_deps()
         mock_get.return_value = mock_backend
-        mock_get_backends.return_value = {"claude": mock_backend}
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
         main(["run", "--config", str(config_file)])
         _, kwargs = mock_researcher_cls.call_args
         assert kwargs["backend"] is mock_backend
+
+    @patch("src.cli.instantiate_provider_backends")
+    @patch("src.cli.AutoResearcher")
+    def test_run_uses_provider_instances_when_declared(self, mock_researcher_cls, mock_instantiate, tmp_path):
+        config_file = tmp_path / "provider_run.yaml"
+        config_file.write_text(textwrap.dedent("""\
+            research:
+              topic: "Provider test"
+              execution:
+                strategy: ensemble
+                providers:
+                  primary_reasoner:
+                    adapter: claude-cli
+                    model: opus
+                  fast_research:
+                    adapter: codex-cli
+                    model: gpt-5.4
+                backends:
+                  primary: primary_reasoner
+                  research:
+                    - primary_reasoner
+                    - fast_research
+        """), encoding="utf-8")
+
+        be1 = MagicMock()
+        be1.check_available.return_value = True
+        be1.cli_executable.return_value = "claude"
+        be2 = MagicMock()
+        be2.check_available.return_value = True
+        be2.cli_executable.return_value = "codex"
+        mock_instantiate.return_value = {
+            "primary_reasoner": be1,
+            "fast_research": be2,
+        }
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = None
+        mock_researcher_cls.return_value = mock_instance
+
+        result = main(["run", "--config", str(config_file)])
+
+        assert result == 0
+        mock_instantiate.assert_called_once()
+        _, kwargs = mock_researcher_cls.call_args
+        assert kwargs["backend"] is be1
+        assert kwargs["backends"] == {"primary_reasoner": be1, "fast_research": be2}
 
 
 # ---------------------------------------------------------------------------
@@ -197,10 +242,10 @@ class TestRefineSubcommand:
               goal: "Build something"
               primary_artifact: "PRD.md"
               backends:
-                primary: claude
+                primary: claude-cli
                 research:
-                  - claude
-                  - gemini
+                  - claude-cli
+                  - gemini-cli
         """), encoding="utf-8")
         return p
 
@@ -213,8 +258,8 @@ class TestRefineSubcommand:
     def test_refine_calls_refiner_run(self, mock_refiner_cls, mock_get_backends, doc_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 0
         mock_refiner_cls.return_value = mock_instance
@@ -229,8 +274,8 @@ class TestRefineSubcommand:
     def test_no_interactive_flag(self, mock_refiner_cls, mock_get_backends, doc_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 0
         mock_refiner_cls.return_value = mock_instance
@@ -244,8 +289,8 @@ class TestRefineSubcommand:
     def test_resume_flag_passed_to_refiner(self, mock_refiner_cls, mock_get_backends, doc_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 0
         mock_refiner_cls.return_value = mock_instance
@@ -260,8 +305,8 @@ class TestRefineSubcommand:
     def test_backend_unavailable_returns_1(self, mock_refiner_cls, mock_get_backends, doc_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = False
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be}
 
         result = main(["refine", "--config", str(doc_config_file)])
 
@@ -273,8 +318,8 @@ class TestRefineSubcommand:
     def test_exit_code_2_propagated(self, mock_refiner_cls, mock_get_backends, doc_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 2
         mock_refiner_cls.return_value = mock_instance
@@ -288,8 +333,8 @@ class TestRefineSubcommand:
     def test_custom_output_dir(self, mock_refiner_cls, mock_get_backends, doc_config_file, tmp_path):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 0
         mock_refiner_cls.return_value = mock_instance
@@ -314,10 +359,10 @@ class TestPlanSubcommand:
               topic: "Test Plan"
               goal: "Build something"
               backends:
-                primary: claude
+                primary: claude-cli
                 research:
-                  - claude
-                  - gemini
+                  - claude-cli
+                  - gemini-cli
         """), encoding="utf-8")
         return p
 
@@ -330,8 +375,8 @@ class TestPlanSubcommand:
     def test_plan_calls_refiner_run(self, mock_refiner_cls, mock_get_backends, plan_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 0
         mock_refiner_cls.return_value = mock_instance
@@ -346,8 +391,8 @@ class TestPlanSubcommand:
     def test_plan_no_interactive_flag(self, mock_refiner_cls, mock_get_backends, plan_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 0
         mock_refiner_cls.return_value = mock_instance
@@ -361,8 +406,8 @@ class TestPlanSubcommand:
     def test_plan_resume_flag(self, mock_refiner_cls, mock_get_backends, plan_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 0
         mock_refiner_cls.return_value = mock_instance
@@ -377,8 +422,8 @@ class TestPlanSubcommand:
     def test_plan_backend_unavailable_returns_1(self, mock_refiner_cls, mock_get_backends, plan_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = False
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be}
 
         result = main(["plan", "--config", str(plan_config_file)])
 
@@ -390,8 +435,8 @@ class TestPlanSubcommand:
     def test_plan_custom_output_dir(self, mock_refiner_cls, mock_get_backends, plan_config_file, tmp_path):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 0
         mock_refiner_cls.return_value = mock_instance
@@ -407,8 +452,8 @@ class TestPlanSubcommand:
     def test_plan_exit_code_2_propagated(self, mock_refiner_cls, mock_get_backends, plan_config_file):
         mock_be = MagicMock()
         mock_be.check_available.return_value = True
-        mock_be.cli_executable.return_value = "claude"
-        mock_get_backends.return_value = {"claude": mock_be, "gemini": mock_be}
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
         mock_instance = MagicMock()
         mock_instance.run.return_value = 2
         mock_refiner_cls.return_value = mock_instance

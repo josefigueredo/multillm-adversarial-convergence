@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.config import ArtifactConfig, DocumentConfig, PersonaConfig, SourceFileConfig
+from src.config import ArtifactConfig, DocumentConfig, ExecutionConfig, PersonaConfig, ProviderConfig, SourceFileConfig
 
 
 def _write_yaml(tmp_path: Path, content: str) -> Path:
@@ -51,10 +51,15 @@ def test_document_config_full(tmp_path):
               layer: companion
               review: false
           backends:
-            primary: claude
-            research: [codex, claude]
-            judge: gemini
-            utility: claude
+            primary: claude-cli
+            research: [codex-cli, claude-cli]
+            judge: gemini-cli
+            utility: claude-cli
+          execution:
+            model: opus
+            allowed_tools: "Read,Bash"
+            max_turns: 7
+            timeout_seconds: 321
     """)
     cfg = DocumentConfig.from_yaml(cfg_path)
     assert cfg.primary_artifact == "SPEC.md"
@@ -66,9 +71,70 @@ def test_document_config_full(tmp_path):
     assert len(cfg.artifacts) == 2
     assert cfg.artifacts[0].layer == "execution"
     assert cfg.artifacts[1].review is False
-    assert cfg.backends.primary == "claude"
-    assert cfg.backends.research == ("codex", "claude")
-    assert cfg.backends.judge == "gemini"
+    assert cfg.backends.primary == "claude-cli"
+    assert cfg.backends.research == ("codex-cli", "claude-cli")
+    assert cfg.backends.judge == "gemini-cli"
+    assert cfg.execution.model == "opus"
+    assert cfg.execution.allowed_tools == "Read,Bash"
+    assert cfg.execution.max_turns == 7
+    assert cfg.execution.timeout_seconds == 321
+
+
+def test_document_config_accepts_explicit_cli_aliases(tmp_path):
+    cfg_path = _write_yaml(tmp_path, """
+        document:
+          topic: "Iris PRD"
+          goal: "Execution-ready PRD"
+          backends:
+            primary: claude-cli
+            research: [codex-cli, gemini-cli]
+            judge: claude-cli
+            utility: gemini-cli
+    """)
+    cfg = DocumentConfig.from_yaml(cfg_path)
+    assert cfg.backends.primary == "claude-cli"
+    assert cfg.backends.research == ("codex-cli", "gemini-cli")
+    assert cfg.backends.judge == "claude-cli"
+    assert cfg.backends.utility == "gemini-cli"
+
+
+def test_document_config_provider_instances_parse(tmp_path):
+    cfg_path = _write_yaml(tmp_path, """
+        document:
+          topic: "Iris PRD"
+          goal: "Execution-ready PRD"
+          providers:
+            builder_main:
+              adapter: claude-cli
+              model: opus
+            challenger_fast:
+              adapter: gemini-cli
+              model: gemini-2.5-flash
+          backends:
+            primary: builder_main
+            research: [builder_main, challenger_fast]
+            judge: builder_main
+            utility: challenger_fast
+    """)
+    cfg = DocumentConfig.from_yaml(cfg_path)
+    assert cfg.providers["builder_main"] == ProviderConfig(adapter="claude-cli", model="opus")
+    assert cfg.backends.primary == "builder_main"
+    assert cfg.backends.research == ("builder_main", "challenger_fast")
+
+
+def test_document_config_provider_reference_must_exist(tmp_path):
+    cfg_path = _write_yaml(tmp_path, """
+        document:
+          topic: "T"
+          goal: "G"
+          providers:
+            builder_main:
+              adapter: claude-cli
+          backends:
+            primary: missing
+    """)
+    with pytest.raises(ValueError, match="Unknown provider instance"):
+        DocumentConfig.from_yaml(cfg_path)
 
 
 def test_document_config_missing_topic_raises(tmp_path):
@@ -100,6 +166,41 @@ def test_document_config_invalid_persona_mode_raises(tmp_path):
     """)
     with pytest.raises(ValueError, match="persona_mode"):
         DocumentConfig.from_yaml(cfg_path)
+
+
+def test_document_config_legacy_primary_backend_raises(tmp_path):
+    cfg_path = _write_yaml(tmp_path, """
+        document:
+          topic: "T"
+          goal: "G"
+          backends:
+            primary: claude
+    """)
+    with pytest.raises(ValueError, match="Invalid primary backend"):
+        DocumentConfig.from_yaml(cfg_path)
+
+
+def test_document_config_invalid_research_backend_raises(tmp_path):
+    cfg_path = _write_yaml(tmp_path, """
+        document:
+          topic: "T"
+          goal: "G"
+          backends:
+            primary: claude-cli
+            research: [claude-cli, nope]
+    """)
+    with pytest.raises(ValueError, match="Invalid research backend"):
+        DocumentConfig.from_yaml(cfg_path)
+
+
+def test_document_config_defaults_execution_when_not_declared(tmp_path):
+    cfg_path = _write_yaml(tmp_path, """
+        document:
+          topic: "T"
+          goal: "G"
+    """)
+    cfg = DocumentConfig.from_yaml(cfg_path)
+    assert cfg.execution == ExecutionConfig()
 
 
 def test_persona_config_default_prompt_file():

@@ -23,6 +23,8 @@ class CallOptions:
     """
 
     model: str = ""
+    system_prompt: str = ""
+    stream: bool = False
     allowed_tools: str = ""
     max_turns: int = 10
     max_budget_usd: float = 0.0
@@ -44,6 +46,15 @@ class AgentResponse:
 
 
 @dataclass(frozen=True)
+class StreamEvent:
+    """Normalized streaming event."""
+
+    type: str
+    text: str = ""
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class BackendCapabilities:
     """Declares what a backend supports.
 
@@ -59,9 +70,15 @@ class BackendCapabilities:
             shortname (e.g. ``"sonnet"``) that this backend doesn't understand.
     """
 
+    transport: str = "cli"
+    provider_kind: str = "direct"
     supports_json_schema: bool = False
     supports_budget_cap: bool = False
     supports_rate_limit_detection: bool = False
+    supports_system_prompt: bool = False
+    supports_streaming: bool = False
+    supports_response_format: bool = False
+    supports_org_routing: bool = False
     supports_tools: bool = True
     default_model: str = ""
 

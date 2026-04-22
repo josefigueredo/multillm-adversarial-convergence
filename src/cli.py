@@ -12,10 +12,11 @@ import sys
 from pathlib import Path
 
 from .backends import VALID_BACKENDS, get_backend, get_backends
-from .config import VALID_STRATEGIES, DocumentConfig, PlanConfig, ResearchConfig
+from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
 from .document_refiner import DocumentRefiner
 from .orchestrator import AutoResearcher
 from .plan_refiner import PlanRefiner
+from .provider_instances import instantiate_provider_backends
 from .strategy import get_strategy
 
 
@@ -153,7 +154,6 @@ def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
         return 1
 
     backend_name = args.backend or config.execution.backend
-    backend = get_backend(backend_name)
     strategy_name = args.strategy or config.execution.strategy
     output_dir: Path = (args.output or Path("output") / config_path.stem).resolve()
 
@@ -168,10 +168,23 @@ def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
                     len(existing), output_dir,
                 )
 
-    all_names = config.execution.backends.all_backend_names()
-    if strategy_name == "single":
-        all_names = {backend_name}
-    backends = get_backends(all_names)
+    if config.providers:
+        role_config = config.execution.backends
+        if strategy_name == "single":
+            role_config = BackendsConfig(
+                primary=config.execution.backends.primary,
+                research=(config.execution.backends.primary,),
+                judge=config.execution.backends.judge,
+                utility=config.execution.backends.utility,
+            )
+        backends = instantiate_provider_backends(config.providers, role_config)
+        backend = backends[config.execution.backends.primary]
+    else:
+        backend = get_backend(backend_name)
+        all_names = config.execution.backends.all_backend_names()
+        if strategy_name == "single":
+            all_names = {backend_name}
+        backends = get_backends(all_names)
 
     for name, be in backends.items():
         if not be.check_available():
@@ -225,8 +238,11 @@ def _run_refine(args: argparse.Namespace, log: logging.Logger) -> int:
 
     output_dir: Path = (args.output or Path("output") / config_path.stem).resolve()
 
-    all_names = config.backends.all_backend_names()
-    backends = get_backends(all_names)
+    if config.providers:
+        backends = instantiate_provider_backends(config.providers, config.backends)
+    else:
+        all_names = config.backends.all_backend_names()
+        backends = get_backends(all_names)
 
     for name, be in backends.items():
         if not be.check_available():
@@ -265,8 +281,11 @@ def _run_plan(args: argparse.Namespace, log: logging.Logger) -> int:
 
     output_dir: Path = (args.output or Path("output") / config_path.stem).resolve()
 
-    all_names = config.backends.all_backend_names()
-    backends = get_backends(all_names)
+    if config.providers:
+        backends = instantiate_provider_backends(config.providers, config.backends)
+    else:
+        all_names = config.backends.all_backend_names()
+        backends = get_backends(all_names)
 
     for name, be in backends.items():
         if not be.check_available():

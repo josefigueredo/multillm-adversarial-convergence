@@ -24,7 +24,7 @@ uv sync
 # Single backend (Claude)
 uv run python -m src.cli run --config configs/aws_api_gateway.yaml
 
-# Multi-backend adversarial (codex researches, claude critiques)
+# Multi-backend adversarial (codex researches, claude-cli critiques)
 uv run python -m src.cli run --config configs/localstack_alternatives.yaml
 
 # Resume a previous session
@@ -32,6 +32,12 @@ uv run python -m src.cli run --config configs/aws_api_gateway.yaml --resume
 
 # Generate synthesis from existing iterations
 uv run python -m src.cli run --config configs/aws_api_gateway.yaml --synthesize
+
+# Example: GitHub Models + LiteLLM aggregators
+uv run python -m src.cli run --config configs/example_github_models.yaml
+
+# Example: Bedrock Converse + LiteLLM utility
+uv run python -m src.cli run --config configs/example_bedrock.yaml
 ```
 
 Copy `configs/_template.yaml` to create a new research topic.
@@ -158,25 +164,140 @@ The key principle: **the judge must be a different provider than the researchers
 research:
   execution:
     strategy: adversarial
+    providers:
+      primary_reasoner:
+        adapter: claude-cli
+        model: sonnet
+      research_coder:
+        adapter: codex-cli
+        model: gpt-5.4
+      utility_gateway:
+        adapter: litellm-api
+        model: openai/gpt-4.1-mini
+        base_url: http://localhost:4000
     backends:
-      primary: claude           # hypothesis + synthesis
+      primary: primary_reasoner     # hypothesis + synthesis
       research:
-        - codex                 # researcher
-        - claude                # adversary (critiques codex's findings)
-      judge: codex              # adjudicator (different from critic)
-      utility: codex            # compression
+        - research_coder            # researcher
+        - utility_gateway           # alternate provider route
+      judge: research_coder         # adjudicator (different from critic)
+      utility: utility_gateway      # compression
 ```
 
 ## Backends
 
-| Backend | Default Model | Budget Cap | Rate Limit Detection | Recommended Role |
-|---------|--------------|------------|---------------------|-----------------|
-| **claude** | sonnet | Yes | Yes | Primary (hypothesis, judge, synthesis) |
-| **codex** | gpt-5.4 | No | No | Research, adversarial judge |
-| **gemini** | gemini-2.5-flash | No | No | Utility, cheap research |
-| **copilot** | gpt-4.1 | No | No | Research only (no structured JSON) |
+| Backend | Transport | Kind | Default Model | Budget Cap | Rate Limit Detection | Recommended Role |
+|---------|-----------|------|---------------|------------|----------------------|-----------------|
+| **claude-cli** | CLI | direct | sonnet | Yes | Yes | Primary (hypothesis, judge, synthesis) |
+| **codex-cli** | CLI | direct | gpt-5.4 | No | No | Research, adversarial judge |
+| **gemini-cli** | CLI | direct | gemini-2.5-flash | No | No | Utility, cheap research |
+| **copilot-cli** | CLI | direct | gpt-4.1 | No | No | Research only (no structured JSON) |
+| **claude-api** | API | direct | claude-sonnet-4-5 | No | No | Direct Anthropic integration |
+| **codex-api** | API | direct | gpt-5.4 | No | No | Direct OpenAI Responses integration |
+| **gemini-api** | API | direct | gemini-2.5-flash | No | No | Direct Google Gemini integration |
+| **litellm-api** | API | aggregator | openai/gpt-4.1-mini | No | No | Gateway / multi-provider routing |
+| **copilot-api** | API | aggregator | openai/gpt-4.1 | No | No | GitHub Models aggregation / org attribution |
+| **bedrock-api** | API | aggregator | (provider-defined) | No | No | AWS Bedrock Converse routing |
 
-Claude shortnames (`sonnet`, `opus`, `haiku`) are automatically translated to each backend's default model.
+### Model resolution contract
+
+- `claude-cli` accepts Claude shortnames directly (`sonnet`, `opus`, `haiku`)
+- direct non-Claude providers translate Claude shortnames to their own `default_model`
+- aggregators (`litellm-api`, `copilot-api`, `bedrock-api`) require an **explicit model identifier**
+
+Examples:
+
+- `codex-api` + `sonnet` -> `gpt-5.4`
+- `gemini-api` + `sonnet` -> `gemini-2.5-flash`
+- `litellm-api` + `sonnet` -> **configuration error**
+
+For provider-instance contract details, see `docs/design/api-provider-contracts.md`.
+For ready-to-copy examples, see:
+
+- `configs/example_direct_api.yaml`
+- `configs/example_mixed_cli_api.yaml`
+- `configs/example_litellm_only.yaml`
+- `configs/example_github_models.yaml`
+- `configs/example_bedrock.yaml`
+
+### `system_prompt` contract
+
+Use `execution.system_prompt` when you want a shared system/developer instruction:
+
+```yaml
+research:
+  execution:
+    system_prompt: "You are precise, evidence-driven, and concise."
+```
+
+Current behavior:
+
+- preserved for supported API backends
+- stripped automatically for backends that do not support it
+- currently implemented for:
+  - `claude-api`
+  - `codex-api`
+  - `gemini-api`
+  - `litellm-api`
+  - `copilot-api`
+  - `bedrock-api`
+
+### Streaming contract
+
+You can enable live run-time progress for research-phase calls with:
+
+```yaml
+research:
+  execution:
+    stream: true
+```
+
+Current behavior:
+
+- only the `run` workflow uses this today
+- only research-phase backend calls stream; hypothesis/judge/synthesis remain final-response only
+- unsupported backends strip `stream` automatically
+- currently implemented for:
+  - `codex-api`
+  - `litellm-api`
+- streamed text is for operator feedback only; the final backend response remains authoritative
+
+### Tools and structured-output contract
+
+- `allowed_tools` is normalized away for backends that do not support tools.
+- `json_schema` is normalized away for backends that do not support structured output.
+- Today:
+  - `copilot-api` supports `json_schema`
+  - `litellm-api` supports `json_schema`
+  - `bedrock-api` does not
+  - API aggregators are still tool-disabled in this project
+
+### Normalized API error contract
+
+API adapters normalize failures into `AgentResponse.raw["error"]`.
+
+Current categories:
+
+- `auth`
+- `permission`
+- `not_found`
+- `bad_request`
+- `quota`
+- `rate_limit`
+- `timeout`
+- `transport`
+- `malformed_response`
+- `server_error`
+- `unknown`
+
+Operational rule of thumb:
+
+- retryable: `rate_limit`, `timeout`, `transport`, `server_error`
+- usually non-retryable without changing input/config:
+  - `auth`
+  - `permission`
+  - `bad_request`
+  - `quota`
 
 ### Turn budget (`max_turns`)
 
@@ -255,7 +376,7 @@ Key fields:
 | `topic` | (required) | The research question |
 | `goal` | same as topic | Desired output description |
 | `dimensions` | `[]` | Dimensions to explore |
-| `backend` | `claude` | CLI backend |
+| `backend` | `claude-cli` | Default adapter name (`claude-cli`, `codex-cli`, `gemini-cli`, `copilot-cli`, `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, `bedrock-api`) |
 | `model` | `sonnet` | Model name |
 | `max_iterations` | `0` | Max iterations (0 = infinite) |
 | `max_turns` | `10` | Max agentic turns per backend call — see [Turn budget](#turn-budget-max_turns) |

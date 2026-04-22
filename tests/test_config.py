@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.config import BackendsConfig, EvaluationConfig, ExecutionConfig, MethodologyConfig, ReportingConfig, ResearchConfig, ScoringConfig, StrategyConfig
+from src.config import BackendsConfig, EvaluationConfig, ExecutionConfig, MethodologyConfig, ProviderConfig, ReportingConfig, ResearchConfig, ScoringConfig, StrategyConfig
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +123,8 @@ class TestExecutionConfig:
         assert ec.max_iterations == 0
         assert ec.compress_every == 5
         assert ec.model == "sonnet"
+        assert ec.system_prompt == ""
+        assert ec.stream is False
         assert ec.max_budget_per_call == 0.50
         assert ec.lightweight_mode is False
         assert ec.isolate_backend_context is True
@@ -156,6 +158,8 @@ class TestResearchConfigFromYaml:
         assert cfg.execution.max_turns == 5
         assert cfg.execution.timeout_seconds == 120
         assert cfg.execution.model == "opus"
+        assert cfg.execution.system_prompt == ""
+        assert cfg.execution.stream is False
         assert cfg.execution.max_budget_per_call == 1.25
         assert cfg.execution.lightweight_mode is True
         assert cfg.execution.isolate_backend_context is False
@@ -237,12 +241,193 @@ class TestResearchConfigFromYaml:
         assert cfg.dimensions == ()
         assert cfg.scoring == ScoringConfig()
         assert cfg.execution.model == "sonnet"
+        assert cfg.execution.system_prompt == ""
         assert cfg.execution.max_iterations == 0
+
+    def test_execution_system_prompt_parses(self, tmp_path: Path):
+        p = tmp_path / "system_prompt.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "System prompt test"
+              execution:
+                system_prompt: "You are precise."
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.execution.system_prompt == "You are precise."
+
+    def test_execution_stream_parses(self, tmp_path: Path):
+        p = tmp_path / "stream.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Streaming test"
+              execution:
+                stream: true
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.execution.stream is True
 
     def test_goal_falls_back_to_topic(self, no_goal_yaml: Path):
         cfg = ResearchConfig.from_yaml(no_goal_yaml)
         assert cfg.goal == "Topic without goal"
         assert cfg.dimensions == ("Dim A",)
+
+    def test_explicit_cli_aliases_are_valid_backends(self, tmp_path: Path):
+        p = tmp_path / "aliases.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Alias test"
+              execution:
+                backend: claude-cli
+                strategy: ensemble
+                backends:
+                  primary: claude-cli
+                  research:
+                    - codex-cli
+                    - gemini-cli
+                  judge: claude-cli
+                  utility: gemini-cli
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.execution.backend == "claude-cli"
+        assert cfg.execution.backends.primary == "claude-cli"
+        assert cfg.execution.backends.research == ("codex-cli", "gemini-cli")
+        assert cfg.execution.backends.utility == "gemini-cli"
+
+    def test_provider_instances_parse_and_roles_reference_instances(self, tmp_path: Path):
+        p = tmp_path / "providers.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Provider test"
+              execution:
+                strategy: ensemble
+                providers:
+                  primary_reasoner:
+                    adapter: claude-cli
+                    model: opus
+                  fast_research:
+                    adapter: codex-cli
+                    model: gpt-5.4
+                  cheap_utility:
+                    adapter: gemini-cli
+                    model: gemini-2.5-flash
+                backends:
+                  primary: primary_reasoner
+                  research:
+                    - primary_reasoner
+                    - fast_research
+                  judge: primary_reasoner
+                  utility: cheap_utility
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.providers["primary_reasoner"] == ProviderConfig(adapter="claude-cli", model="opus")
+        assert cfg.providers["fast_research"] == ProviderConfig(adapter="codex-cli", model="gpt-5.4")
+        assert cfg.execution.backends.primary == "primary_reasoner"
+        assert cfg.execution.backends.research == ("primary_reasoner", "fast_research")
+        assert cfg.execution.backends.utility == "cheap_utility"
+
+    def test_provider_role_reference_must_exist(self, tmp_path: Path):
+        p = tmp_path / "bad_provider_ref.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Provider test"
+              execution:
+                providers:
+                  primary_reasoner:
+                    adapter: claude-cli
+                backends:
+                  primary: missing_instance
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Unknown provider instance"):
+            ResearchConfig.from_yaml(p)
+
+    def test_provider_adapter_must_be_valid(self, tmp_path: Path):
+        p = tmp_path / "bad_provider_adapter.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Provider test"
+              execution:
+                providers:
+                  primary_reasoner:
+                    adapter: no-such-adapter
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid provider adapter"):
+            ResearchConfig.from_yaml(p)
+
+    def test_api_provider_instances_are_valid(self, tmp_path: Path):
+        p = tmp_path / "api_providers.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "API Provider test"
+              execution:
+                providers:
+                  claude_direct:
+                    adapter: claude-api
+                    model: claude-sonnet-4-5
+                  codex_direct:
+                    adapter: codex-api
+                    model: gpt-5.4
+                    base_url: https://litellm.example.com
+                  gemini_direct:
+                    adapter: gemini-api
+                    model: gemini-2.5-flash
+                  gateway_fast:
+                    adapter: litellm-api
+                    model: openai/gpt-4.1-mini
+                    base_url: http://localhost:4000
+                  github_models:
+                    adapter: copilot-api
+                    model: openai/gpt-4.1
+                    organization: acme
+                    api_version: 2026-03-10
+                  aws_foundation:
+                    adapter: bedrock-api
+                    model: anthropic.claude-3-5-sonnet-20240620-v1:0
+                    region: us-east-1
+                    aws_profile: sandbox
+                backends:
+                  primary: claude_direct
+                  research:
+                    - codex_direct
+                    - gateway_fast
+                  judge: claude_direct
+                  utility: gemini_direct
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.providers["claude_direct"] == ProviderConfig(adapter="claude-api", model="claude-sonnet-4-5")
+        assert cfg.providers["codex_direct"] == ProviderConfig(
+            adapter="codex-api",
+            model="gpt-5.4",
+            base_url="https://litellm.example.com",
+        )
+        assert cfg.providers["gemini_direct"] == ProviderConfig(adapter="gemini-api", model="gemini-2.5-flash")
+        assert cfg.providers["gateway_fast"] == ProviderConfig(
+            adapter="litellm-api",
+            model="openai/gpt-4.1-mini",
+            base_url="http://localhost:4000",
+        )
+        assert cfg.providers["github_models"] == ProviderConfig(
+            adapter="copilot-api",
+            model="openai/gpt-4.1",
+            organization="acme",
+            api_version="2026-03-10",
+        )
+        assert cfg.providers["aws_foundation"] == ProviderConfig(
+            adapter="bedrock-api",
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            region="us-east-1",
+            aws_profile="sandbox",
+        )
+
+    def test_legacy_backend_name_is_invalid(self, tmp_path: Path):
+        p = tmp_path / "legacy.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Legacy test"
+              execution:
+                backend: claude
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid backend 'claude'"):
+            ResearchConfig.from_yaml(p)
 
     def test_missing_topic_raises(self, tmp_path: Path):
         p = tmp_path / "bad.yaml"
@@ -268,8 +453,36 @@ class TestResearchConfigFromYaml:
         with pytest.raises(ValueError, match="Invalid backend"):
             ResearchConfig.from_yaml(p)
 
+    def test_example_github_models_config_parses(self):
+        cfg = ResearchConfig.from_yaml(Path("configs/example_github_models.yaml"))
+        assert cfg.providers["github_models"].adapter == "copilot-api"
+        assert cfg.providers["gateway_fast"].adapter == "litellm-api"
+
+    def test_example_bedrock_config_parses(self):
+        cfg = ResearchConfig.from_yaml(Path("configs/example_bedrock.yaml"))
+        assert cfg.providers["aws_foundation"].adapter == "bedrock-api"
+        assert cfg.providers["gateway_fast"].adapter == "litellm-api"
+
+    def test_example_direct_api_config_parses(self):
+        cfg = ResearchConfig.from_yaml(Path("configs/example_direct_api.yaml"))
+        assert cfg.providers["anthropic_primary"].adapter == "claude-api"
+        assert cfg.providers["openai_research"].adapter == "codex-api"
+        assert cfg.providers["google_utility"].adapter == "gemini-api"
+
+    def test_example_mixed_cli_api_config_parses(self):
+        cfg = ResearchConfig.from_yaml(Path("configs/example_mixed_cli_api.yaml"))
+        assert cfg.providers["primary_cli"].adapter == "claude-cli"
+        assert cfg.providers["research_api"].adapter == "codex-api"
+        assert cfg.providers["utility_gateway"].adapter == "litellm-api"
+
+    def test_example_litellm_only_config_parses(self):
+        cfg = ResearchConfig.from_yaml(Path("configs/example_litellm_only.yaml"))
+        assert cfg.providers["primary_gateway"].adapter == "litellm-api"
+        assert cfg.providers["research_gateway"].adapter == "litellm-api"
+        assert cfg.providers["utility_gateway"].adapter == "litellm-api"
+
     def test_valid_backends(self, tmp_path: Path):
-        for backend in ("claude", "codex", "gemini", "copilot"):
+        for backend in ("claude-cli", "codex-cli", "gemini-cli", "copilot-cli"):
             p = tmp_path / f"{backend}.yaml"
             p.write_text(f"research:\n  topic: test\n  execution:\n    backend: {backend}\n", encoding="utf-8")
             cfg = ResearchConfig.from_yaml(p)
@@ -300,15 +513,15 @@ class TestResearchConfigFromYaml:
 class TestMultiBackendConfig:
     def test_defaults(self):
         bc = BackendsConfig()
-        assert bc.primary == "claude"
-        assert bc.research == ("claude",)
-        assert bc.judge_or_primary == "claude"
-        assert bc.utility_or_primary == "claude"
+        assert bc.primary == "claude-cli"
+        assert bc.research == ("claude-cli",)
+        assert bc.judge_or_primary == "claude-cli"
+        assert bc.utility_or_primary == "claude-cli"
 
     def test_all_backend_names(self):
-        bc = BackendsConfig(primary="claude", research=("codex", "gemini"), judge="claude", utility="gemini")
+        bc = BackendsConfig(primary="claude-cli", research=("codex-cli", "gemini-cli"), judge="claude-cli", utility="gemini-cli")
         names = bc.all_backend_names()
-        assert names == {"claude", "codex", "gemini"}
+        assert names == {"claude-cli", "codex-cli", "gemini-cli"}
 
     def test_strategy_config_defaults(self):
         sc = StrategyConfig()
@@ -322,8 +535,8 @@ class TestMultiBackendConfig:
     def test_backward_compat_single_backend(self, minimal_yaml: Path):
         cfg = ResearchConfig.from_yaml(minimal_yaml)
         assert cfg.execution.strategy == "single"
-        assert cfg.execution.backends.primary == "claude"
-        assert cfg.execution.backends.research == ("claude",)
+        assert cfg.execution.backends.primary == "claude-cli"
+        assert cfg.execution.backends.research == ("claude-cli",)
 
     def test_ensemble_config(self, tmp_path: Path):
         p = tmp_path / "ensemble.yaml"
@@ -331,25 +544,25 @@ class TestMultiBackendConfig:
             research:
               topic: "Test ensemble"
               execution:
-                backend: claude
+                backend: claude-cli
                 strategy: ensemble
                 backends:
-                  primary: claude
+                  primary: claude-cli
                   research:
-                    - codex
-                    - gemini
-                  judge: claude
-                  utility: gemini
+                    - codex-cli
+                    - gemini-cli
+                  judge: claude-cli
+                  utility: gemini-cli
                 strategy_config:
                   merge_mode: union
                   stagger_seconds: 10
         """), encoding="utf-8")
         cfg = ResearchConfig.from_yaml(p)
         assert cfg.execution.strategy == "ensemble"
-        assert cfg.execution.backends.primary == "claude"
-        assert cfg.execution.backends.research == ("codex", "gemini")
-        assert cfg.execution.backends.judge == "claude"
-        assert cfg.execution.backends.utility == "gemini"
+        assert cfg.execution.backends.primary == "claude-cli"
+        assert cfg.execution.backends.research == ("codex-cli", "gemini-cli")
+        assert cfg.execution.backends.judge == "claude-cli"
+        assert cfg.execution.backends.utility == "gemini-cli"
         assert cfg.execution.strategy_config.merge_mode == "union"
         assert cfg.execution.strategy_config.stagger_seconds == 10
 
@@ -372,7 +585,7 @@ class TestMultiBackendConfig:
               execution:
                 strategy: ensemble
                 backends:
-                  primary: claude
+                  primary: claude-cli
                   research:
                     - chatgpt
         """), encoding="utf-8")
@@ -387,8 +600,8 @@ class TestMultiBackendConfig:
               execution:
                 strategy: single
                 backends:
-                  primary: claude
-                  research: codex
+                  primary: claude-cli
+                  research: codex-cli
         """), encoding="utf-8")
         cfg = ResearchConfig.from_yaml(p)
-        assert cfg.execution.backends.research == ("codex",)
+        assert cfg.execution.backends.research == ("codex-cli",)

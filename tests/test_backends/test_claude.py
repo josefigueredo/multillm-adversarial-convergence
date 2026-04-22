@@ -12,7 +12,7 @@ class TestClaudeBackend:
         self.backend = ClaudeBackend()
 
     def test_name(self):
-        assert self.backend.name == "claude"
+        assert self.backend.name == "claude-cli"
 
     def test_cli_executable(self):
         assert self.backend.cli_executable() == "claude"
@@ -21,6 +21,8 @@ class TestClaudeBackend:
         assert self.backend.prompt_mode() == PromptMode.STDIN
 
     def test_capabilities(self):
+        assert self.backend.capabilities.transport == "cli"
+        assert self.backend.capabilities.provider_kind == "direct"
         assert self.backend.capabilities.supports_json_schema is True
         assert self.backend.capabilities.supports_budget_cap is True
         assert self.backend.capabilities.supports_rate_limit_detection is True
@@ -105,7 +107,7 @@ class TestClaudeBackend:
     @patch.object(ClaudeBackend, "_run_process")
     def test_invoke_timeout(self, mock_run):
         import subprocess
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="claude", timeout=10)
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="claude-cli", timeout=10)
         resp = self.backend.invoke("prompt", CallOptions(), timeout=10)
         assert resp.is_error is True
 

@@ -12,7 +12,7 @@ class TestCodexBackend:
         self.backend = CodexBackend()
 
     def test_name(self):
-        assert self.backend.name == "codex"
+        assert self.backend.name == "codex-cli"
 
     def test_cli_executable(self):
         assert self.backend.cli_executable() == "codex"

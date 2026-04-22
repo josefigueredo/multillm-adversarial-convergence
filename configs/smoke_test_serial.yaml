@@ -1,5 +1,5 @@
 # Smoke test for serial strategy.
-# Codex drafts (fast), claude refines (precise), codex judges.
+# Codex drafts (fast), claude-cli refines (precise), codex-cli judges.
 
 research:
   topic: "What are three pros and cons of Python?"
@@ -19,19 +19,29 @@ research:
     compress_every: 99
     allowed_tools: ""
     max_turns: 2
-    backend: claude
+    backend: claude-cli
     model: sonnet
     max_budget_per_call: 1.00
     timeout_seconds: 300
     lightweight_mode: true
 
     strategy: serial
+    providers:
+      primary_reasoner:
+        adapter: claude-cli
+        model: sonnet
+      draft_fast:
+        adapter: codex-cli
+        model: gpt-5.4
+      refine_precise:
+        adapter: claude-cli
+        model: sonnet
     backends:
-      primary: claude         # hypothesis + synthesis
+      primary: primary_reasoner   # hypothesis + synthesis
       research:
-        - codex              # drafter (fast)
-        - claude             # refiner (precise)
-      judge: codex           # judge (different from refiner)
-      utility: codex
+        - draft_fast             # drafter (fast)
+        - refine_precise         # refiner (precise)
+      judge: draft_fast          # judge (different from refiner)
+      utility: draft_fast
     strategy_config:
       refiner_sees_draft: true

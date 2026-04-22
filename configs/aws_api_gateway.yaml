@@ -32,6 +32,6 @@ research:
     compress_every: 5
     allowed_tools: "WebSearch,WebFetch,Read,Bash,Glob,Grep"
     max_turns: 10
-    backend: claude              # "claude", "codex", "gemini", or "copilot"
+    backend: claude-cli              # "claude-cli", "codex-cli", "gemini-cli", or "copilot-cli"
     model: sonnet                # model name (backend-specific)
     timeout_seconds: 600

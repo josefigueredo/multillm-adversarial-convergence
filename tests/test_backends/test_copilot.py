@@ -12,7 +12,7 @@ class TestCopilotBackend:
         self.backend = CopilotBackend()
 
     def test_name(self):
-        assert self.backend.name == "copilot"
+        assert self.backend.name == "copilot-cli"
 
     def test_cli_executable(self):
         assert self.backend.cli_executable() == "copilot"

@@ -59,13 +59,21 @@ plan:
   #     review: false
 
   # ── Backend configuration ───────────────────────────────────────────────────
+  providers:
+    planner_main:
+      adapter: claude-cli
+      model: sonnet
+    verifier_fast:
+      adapter: gemini-cli
+      model: gemini-2.5-flash
+
   backends:
-    primary: claude        # Personas, synthesis
+    primary: planner_main      # Personas, synthesis
     research:
-      - claude             # Builder (research[0])
-      - gemini             # Challenger (research[1])
-    judge: claude          # Arbitrator — resolves conflicting critiques
-    utility: gemini        # Verifier — cheap, fast verification pass
+      - planner_main           # Builder (research[0])
+      - verifier_fast          # Challenger (research[1])
+    judge: planner_main        # Arbitrator — resolves conflicting critiques
+    utility: verifier_fast     # Verifier — cheap, fast verification pass
 
   # ── Strategy tuning (optional) ──────────────────────────────────────────────
   # strategy_config:

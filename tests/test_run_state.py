@@ -17,16 +17,16 @@ from src.strategy import ResearchCandidate
 
 def test_usage_tracking_and_candidate_tracking():
     usage = UsageTotals()
-    track_cost(usage, 1.25, "claude")
+    track_cost(usage, 1.25, "claude-cli")
     track_usage(
         usage,
         AgentResponse(text="ok", cost_usd=0.5, is_error=False, input_tokens=10, output_tokens=3),
-        "claude",
+        "claude-cli",
     )
     track_candidate_usage(
         usage,
         ResearchCandidate(
-            backend_name="gemini",
+            backend_name="gemini-cli",
             findings="x",
             cost_usd=0.25,
             input_tokens=5,
@@ -35,8 +35,8 @@ def test_usage_tracking_and_candidate_tracking():
     )
     assert usage.total_cost == 2.0
     assert usage.total_input_tokens == 15
-    assert usage.per_backend_costs["claude"] == 1.75
-    assert usage.per_backend_tokens["gemini"]["output"] == 2
+    assert usage.per_backend_costs["claude-cli"] == 1.75
+    assert usage.per_backend_tokens["gemini-cli"]["output"] == 2
 
 
 def test_merge_findings_and_exhaust_dimension():

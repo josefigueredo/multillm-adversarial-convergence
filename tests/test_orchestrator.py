@@ -2,13 +2,14 @@
 
 import csv
 import json
+import io
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.backends import AgentResponse, Backend, CallOptions
-from src.config import ExecutionConfig, ResearchConfig, ScoringConfig
+from src.backends import AgentResponse, Backend, CallOptions, StreamEvent, get_backend
+from src.config import ExecutionConfig, ProviderConfig, ResearchConfig, ScoringConfig
 from src.orchestrator import AutoResearcher
 from src.prompts import render as _render
 from src.scorer import IterationScore
@@ -69,7 +70,7 @@ def research_config() -> ResearchConfig:
         scoring=ScoringConfig(),
         execution=ExecutionConfig(
             max_iterations=2,
-            backend="claude",
+            backend="claude-cli",
             model="sonnet",
             timeout_seconds=10,
             max_budget_per_call=0.10,
@@ -166,7 +167,7 @@ class TestAutoResearcherSetup:
             scoring=researcher.config.scoring,
             execution=ExecutionConfig(
                 max_iterations=1,
-                backend="claude",
+                backend="claude-cli",
                 model="sonnet",
                 timeout_seconds=10,
                 max_budget_per_call=0.10,
@@ -189,7 +190,7 @@ class TestAutoResearcherSetup:
             scoring=researcher.config.scoring,
             execution=ExecutionConfig(
                 max_iterations=1,
-                backend="claude",
+                backend="claude-cli",
                 model="sonnet",
                 timeout_seconds=10,
                 max_budget_per_call=0.10,
@@ -230,7 +231,7 @@ class TestAutoResearcherSetup:
             dimensions=("Dim A",),
             scoring=ScoringConfig(),
             execution=ExecutionConfig(
-                backend="claude",
+                backend="claude-cli",
                 model="sonnet",
                 isolate_backend_context=True,
                 sanitize_backend_env=True,
@@ -246,6 +247,96 @@ class TestAutoResearcherSetup:
         assert backend.last_opts.sanitize_environment is True
         assert backend.last_opts.working_directory
         assert "autoresearch-backend-" in backend.last_opts.working_directory
+
+    def test_call_with_applies_provider_model_override(self, tmp_path):
+        backend = CapturingBackend()
+        backend.provider_config = ProviderConfig(adapter="claude-cli", model="opus")
+        cfg = ResearchConfig(
+            topic="Test topic",
+            goal="Test goal",
+            dimensions=("Dim A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                model="sonnet",
+                isolate_backend_context=False,
+                sanitize_backend_env=False,
+            ),
+            providers={"primary_reasoner": backend.provider_config},
+        )
+        researcher = AutoResearcher(config=cfg, backend=backend, output_dir=tmp_path / "output")
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        researcher._call_with(backend, "hello")
+        assert backend.last_opts is not None
+        assert backend.last_opts.model == "opus"
+
+    def test_resolve_model_keeps_claude_shortname_for_claude_cli(self):
+        backend = get_backend("claude-cli")
+        assert AutoResearcher._resolve_model(backend, "sonnet") == "sonnet"
+
+    def test_resolve_model_maps_claude_shortname_for_claude_api(self):
+        backend = get_backend("claude-api")
+        assert AutoResearcher._resolve_model(backend, "sonnet") == "claude-sonnet-4-5"
+
+    def test_resolve_model_maps_claude_shortname_for_direct_openai_api(self):
+        backend = get_backend("codex-api")
+        assert AutoResearcher._resolve_model(backend, "sonnet") == "gpt-5.4"
+
+    def test_resolve_model_maps_claude_shortname_for_direct_gemini_api(self):
+        backend = get_backend("gemini-api")
+        assert AutoResearcher._resolve_model(backend, "sonnet") == "gemini-2.5-flash"
+
+    def test_resolve_model_rejects_claude_shortname_for_aggregator(self):
+        backend = get_backend("litellm-api")
+        with pytest.raises(ValueError, match="explicit model"):
+            AutoResearcher._resolve_model(backend, "sonnet")
+
+    def test_call_with_rejects_implicit_shortname_on_aggregator(self, tmp_path):
+        backend = get_backend("litellm-api")
+        with patch.object(backend, "invoke", return_value=AgentResponse(text="ok", cost_usd=0.0, is_error=False)):
+            cfg = ResearchConfig(
+                topic="Test topic",
+                goal="Test goal",
+                dimensions=("Dim A",),
+                scoring=ScoringConfig(),
+                execution=ExecutionConfig(
+                    backend="litellm-api",
+                    model="sonnet",
+                    isolate_backend_context=False,
+                    sanitize_backend_env=False,
+                ),
+            )
+            researcher = AutoResearcher(config=cfg, backend=backend, output_dir=tmp_path / "output")
+            with pytest.raises(ValueError, match="explicit model"):
+                researcher._call_with(backend, "hello")
+
+    def test_call_with_preserves_explicit_aggregator_model(self, tmp_path):
+        backend = get_backend("litellm-api")
+        captured = {}
+
+        def fake_invoke(prompt, opts, timeout=300):
+            captured["model"] = opts.model
+            return AgentResponse(text="ok", cost_usd=0.0, is_error=False)
+
+        with patch.object(backend, "invoke", side_effect=fake_invoke):
+            cfg = ResearchConfig(
+                topic="Test topic",
+                goal="Test goal",
+                dimensions=("Dim A",),
+                scoring=ScoringConfig(),
+                execution=ExecutionConfig(
+                    backend="litellm-api",
+                    model="openai/gpt-4.1-mini",
+                    isolate_backend_context=False,
+                    sanitize_backend_env=False,
+                ),
+            )
+            researcher = AutoResearcher(config=cfg, backend=backend, output_dir=tmp_path / "output")
+            researcher._call_with(backend, "hello")
+        assert captured["model"] == "openai/gpt-4.1-mini"
 
     def test_call_with_skips_isolation_when_disabled_in_config(self, tmp_path):
         """When isolate_backend_context=False, _call_with must pass cwd=None
@@ -280,7 +371,7 @@ class TestAutoResearcherSetup:
             dimensions=("Dim A",),
             scoring=ScoringConfig(),
             execution=ExecutionConfig(
-                backend="claude",
+                backend="claude-cli",
                 model="sonnet",
                 isolate_backend_context=False,
                 sanitize_backend_env=False,
@@ -320,7 +411,7 @@ class TestAutoResearcherSetup:
             scoring=researcher.config.scoring,
             execution=ExecutionConfig(
                 max_iterations=1,
-                backend="claude",
+                backend="claude-cli",
                 model="sonnet",
                 timeout_seconds=10,
                 max_budget_per_call=0.10,
@@ -969,8 +1060,8 @@ class TestAutoResearcherHelpers:
 
     def test_candidate_selection_prefers_scored_best_over_longest(self, researcher):
         candidates = [
-            ResearchCandidate(findings="long but weak", backend_name="claude", cost_usd=0.1),
-            ResearchCandidate(findings="short but strong", backend_name="codex", cost_usd=0.1),
+            ResearchCandidate(findings="long but weak", backend_name="claude-cli", cost_usd=0.1),
+            ResearchCandidate(findings="short but strong", backend_name="codex-cli", cost_usd=0.1),
         ]
 
         def fake_score(ctx, state, dimension, findings):
@@ -1003,8 +1094,8 @@ class TestAutoResearcherHelpers:
             ),
         )
         candidates = [
-            ResearchCandidate(findings="finding A", backend_name="claude", cost_usd=0.1),
-            ResearchCandidate(findings="finding B", backend_name="codex", cost_usd=0.1),
+            ResearchCandidate(findings="finding A", backend_name="claude-cli", cost_usd=0.1),
+            ResearchCandidate(findings="finding B", backend_name="codex-cli", cost_usd=0.1),
         ]
 
         def fake_score(ctx, state, dimension, findings):
@@ -1065,10 +1156,10 @@ class TestAutoResearcherHelpers:
                     "findings": "",
                     "backend_name": "multiple",
                     "cost_usd": 0.3,
-                    "per_backend_costs": {"claude": 0.1, "codex": 0.2},
+                    "per_backend_costs": {"claude-cli": 0.1, "codex-cli": 0.2},
                     "candidates": [
-                        ResearchCandidate(findings="candidate a", backend_name="claude", cost_usd=0.1, input_tokens=10, output_tokens=2),
-                        ResearchCandidate(findings="candidate b", backend_name="codex", cost_usd=0.2, input_tokens=20, output_tokens=3),
+                        ResearchCandidate(findings="candidate a", backend_name="claude-cli", cost_usd=0.1, input_tokens=10, output_tokens=2),
+                        ResearchCandidate(findings="candidate b", backend_name="codex-cli", cost_usd=0.2, input_tokens=20, output_tokens=3),
                     ],
                 })()
 
@@ -1084,8 +1175,8 @@ class TestAutoResearcherHelpers:
         assert researcher.total_cost == pytest.approx(0.3)
         assert researcher.total_input_tokens == 30
         assert researcher.total_output_tokens == 5
-        assert researcher.per_backend_costs["claude"] == pytest.approx(0.1)
-        assert researcher.per_backend_costs["codex"] == pytest.approx(0.2)
+        assert researcher.per_backend_costs["claude-cli"] == pytest.approx(0.1)
+        assert researcher.per_backend_costs["codex-cli"] == pytest.approx(0.2)
 
 
 # ---------------------------------------------------------------------------
@@ -1137,7 +1228,7 @@ class TestAutoResearcherCall:
 
     def test_call_passes_config_defaults(self, researcher):
         mock_backend = MagicMock()
-        mock_backend.name = "claude"
+        mock_backend.name = "claude-cli"
         mock_backend.invoke.return_value = AgentResponse(text="ok", cost_usd=0.01, is_error=False)
         researcher.backend = mock_backend
         researcher._call("prompt")
@@ -1148,10 +1239,73 @@ class TestAutoResearcherCall:
 
     def test_call_allows_overrides(self, researcher):
         mock_backend = MagicMock()
-        mock_backend.name = "claude"
+        mock_backend.name = "claude-cli"
         mock_backend.invoke.return_value = AgentResponse(text="ok", cost_usd=0.01, is_error=False)
         researcher.backend = mock_backend
         researcher._call("prompt", model="opus", max_turns=3)
         opts = mock_backend.invoke.call_args[0][1]
         assert opts.model == "opus"
         assert opts.max_turns == 3
+
+    def test_invoke_for_strategy_enables_stream_from_execution_config(self, researcher):
+        researcher.config = ResearchConfig(
+            topic="Test topic",
+            goal="Test goal",
+            dimensions=("Dim A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                model="sonnet",
+                timeout_seconds=10,
+                stream=True,
+            ),
+        )
+        mock_backend = CapturingBackend()
+        mock_backend.name = "codex-api"
+        mock_backend.capabilities = get_backend("codex-api").capabilities
+
+        researcher._invoke_for_strategy(mock_backend, "prompt")
+
+        assert mock_backend.last_opts is not None
+        assert mock_backend.last_opts.stream is True
+
+    def test_call_with_uses_streaming_backend_for_run_progress(self, researcher):
+        backend = MagicMock()
+        backend.name = "litellm-api"
+        backend.capabilities = get_backend("litellm-api").capabilities
+        backend.parse_payload.return_value = AgentResponse(
+            text="Hello world",
+            cost_usd=0.0,
+            is_error=False,
+            input_tokens=3,
+            output_tokens=2,
+        )
+        backend.invoke_stream.return_value = iter([
+            StreamEvent(type="start"),
+            StreamEvent(type="text_delta", text="Hello "),
+            StreamEvent(type="text_delta", text="world"),
+            StreamEvent(type="completed", raw={"response": {"output_text": "Hello world", "usage": {"input_tokens": 3, "output_tokens": 2}}}),
+        ])
+
+        with patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            resp = researcher._call_with(backend, "prompt", model="openai/gpt-4.1-mini", stream=True)
+
+        backend.invoke.assert_not_called()
+        backend.invoke_stream.assert_called_once()
+        backend.parse_payload.assert_called_once_with(
+            {"output_text": "Hello world", "usage": {"input_tokens": 3, "output_tokens": 2}}
+        )
+        assert resp.text == "Hello world"
+        assert "[litellm-api stream]" in stdout.getvalue()
+        assert "Hello world" in stdout.getvalue()
+
+    def test_call_with_falls_back_to_invoke_when_streaming_disabled(self, researcher):
+        backend = MagicMock()
+        backend.name = "litellm-api"
+        backend.capabilities = get_backend("litellm-api").capabilities
+        backend.invoke.return_value = AgentResponse(text="ok", cost_usd=0.01, is_error=False)
+
+        researcher._call_with(backend, "prompt", model="openai/gpt-4.1-mini", stream=False)
+
+        backend.invoke.assert_called_once()
+        backend.invoke_stream.assert_not_called()

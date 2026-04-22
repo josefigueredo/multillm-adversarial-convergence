@@ -1,0 +1,32 @@
+research:
+  topic: "Example: direct API providers"
+  goal: "Demonstrate direct vendor API provider-instance configuration."
+  dimensions:
+    - "Provider contracts"
+    - "Cross-vendor orchestration"
+
+  execution:
+    strategy: ensemble
+    model: sonnet
+    timeout_seconds: 600
+
+    providers:
+      anthropic_primary:
+        adapter: claude-api
+        model: claude-sonnet-4-5
+
+      openai_research:
+        adapter: codex-api
+        model: gpt-5.4
+
+      google_utility:
+        adapter: gemini-api
+        model: gemini-2.5-flash
+
+    backends:
+      primary: anthropic_primary
+      research:
+        - anthropic_primary
+        - openai_research
+      judge: anthropic_primary
+      utility: google_utility

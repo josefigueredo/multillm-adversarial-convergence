@@ -41,7 +41,7 @@ def researcher(tmp_path: Path) -> AutoResearcher:
         dimensions=("DX",),
         evaluation=EvaluationConfig(),
         scoring=ScoringConfig(),
-        execution=ExecutionConfig(max_iterations=1, backend="claude", model="sonnet"),
+        execution=ExecutionConfig(max_iterations=1, backend="claude-cli", model="sonnet"),
     )
     return AutoResearcher(config=cfg, backend=FakeBackend(), output_dir=tmp_path / "output")
 

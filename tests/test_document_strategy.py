@@ -41,7 +41,7 @@ def _make_config(**kwargs) -> DocumentConfig:
 def _make_strategy(backends_dict=None, **cfg_kwargs) -> ConvergeStrategy:
     cfg = _make_config(**cfg_kwargs)
     if backends_dict is None:
-        backends_dict = {"claude": _make_backend()}
+        backends_dict = {"claude-cli": _make_backend()}
     return ConvergeStrategy(cfg, backends_dict)
 
 
@@ -56,11 +56,11 @@ def test_builder_uses_research_0():
     claude = _make_backend()
     cfg = DocumentConfig(
         topic="T", goal="G",
-        backends=BackendsConfig(primary="claude", research=("codex", "claude")),
+        backends=BackendsConfig(primary="claude-cli", research=("codex-cli", "claude-cli")),
     )
-    s = ConvergeStrategy(cfg, {"codex": codex, "claude": claude})
+    s = ConvergeStrategy(cfg, {"codex-cli": codex, "claude-cli": claude})
     assert s._builder is codex
-    assert s._builder_name == "codex"
+    assert s._builder_name == "codex-cli"
 
 
 def test_challenger_uses_research_1():
@@ -68,20 +68,20 @@ def test_challenger_uses_research_1():
     claude = _make_backend()
     cfg = DocumentConfig(
         topic="T", goal="G",
-        backends=BackendsConfig(primary="claude", research=("codex", "claude")),
+        backends=BackendsConfig(primary="claude-cli", research=("codex-cli", "claude-cli")),
     )
-    s = ConvergeStrategy(cfg, {"codex": codex, "claude": claude})
+    s = ConvergeStrategy(cfg, {"codex-cli": codex, "claude-cli": claude})
     assert s._challenger is claude
-    assert s._challenger_name == "claude"
+    assert s._challenger_name == "claude-cli"
 
 
 def test_challenger_falls_back_to_primary_when_only_one_research():
     claude = _make_backend()
     cfg = DocumentConfig(
         topic="T", goal="G",
-        backends=BackendsConfig(primary="claude", research=("claude",)),
+        backends=BackendsConfig(primary="claude-cli", research=("claude-cli",)),
     )
-    s = ConvergeStrategy(cfg, {"claude": claude})
+    s = ConvergeStrategy(cfg, {"claude-cli": claude})
     assert s._challenger is claude
 
 
@@ -90,9 +90,9 @@ def test_verifier_uses_utility():
     utility = _make_backend()
     cfg = DocumentConfig(
         topic="T", goal="G",
-        backends=BackendsConfig(primary="claude", utility="utility_be"),
+        backends=BackendsConfig(primary="claude-cli", utility="utility_be"),
     )
-    s = ConvergeStrategy(cfg, {"claude": claude, "utility_be": utility})
+    s = ConvergeStrategy(cfg, {"claude-cli": claude, "utility_be": utility})
     assert s._verifier is utility
 
 
@@ -101,9 +101,9 @@ def test_arbitrator_uses_judge():
     gemini = _make_backend()
     cfg = DocumentConfig(
         topic="T", goal="G",
-        backends=BackendsConfig(primary="claude", judge="gemini"),
+        backends=BackendsConfig(primary="claude-cli", judge="gemini-cli"),
     )
-    s = ConvergeStrategy(cfg, {"claude": claude, "gemini": gemini})
+    s = ConvergeStrategy(cfg, {"claude-cli": claude, "gemini-cli": gemini})
     assert s._arbitrator is gemini
 
 
@@ -111,14 +111,14 @@ def test_arbitrator_uses_judge():
 
 def test_run_builder_returns_text():
     backend = _make_backend("Generated PRD content")
-    s = _make_strategy({"claude": backend})
+    s = _make_strategy({"claude-cli": backend})
     result = s.run_builder("", [], _call_with, human_decisions=[])
     assert result == "Generated PRD content"
 
 
 def test_run_builder_includes_human_decisions_in_prompt():
     backend = _make_backend("Updated PRD")
-    s = _make_strategy({"claude": backend})
+    s = _make_strategy({"claude-cli": backend})
     prompts_seen = []
 
     def capturing_call(prompt, b, name):
@@ -141,7 +141,7 @@ def test_run_challenger_parses_json_array():
         {"description": "§3 contradicts §7", "section_ref": "§3", "raised_by": "challenger"}
     ])
     backend = _make_backend(response_json)
-    s = _make_strategy({"claude": backend})
+    s = _make_strategy({"claude-cli": backend})
     critiques = s.run_challenger("prd text", _call_with)
     assert len(critiques) == 1
     assert isinstance(critiques[0], RawCritique)
@@ -151,14 +151,14 @@ def test_run_challenger_parses_json_array():
 
 def test_run_challenger_handles_empty_array():
     backend = _make_backend("[]")
-    s = _make_strategy({"claude": backend})
+    s = _make_strategy({"claude-cli": backend})
     critiques = s.run_challenger("prd", _call_with)
     assert critiques == []
 
 
 def test_run_challenger_handles_malformed_json():
     backend = _make_backend("not json at all")
-    s = _make_strategy({"claude": backend})
+    s = _make_strategy({"claude-cli": backend})
     critiques = s.run_challenger("prd", _call_with)
     assert critiques == []
 
@@ -172,7 +172,7 @@ def test_run_verifier_classifies_valid():
          "status": "valid", "defer_reason": None, "question": None, "suggested_answer": None}
     ])
     backend = _make_backend(response_json)
-    s = _make_strategy({"claude": backend})
+    s = _make_strategy({"claude-cli": backend})
     verified = s.run_verifier("prd", raw, _call_with)
     assert len(verified) == 1
     assert verified[0].status == "valid"
@@ -189,7 +189,7 @@ def test_run_verifier_classifies_human_required():
         }
     ])
     backend = _make_backend(response_json)
-    s = _make_strategy({"claude": backend})
+    s = _make_strategy({"claude-cli": backend})
     verified = s.run_verifier("prd", raw, _call_with)
     assert verified[0].defer_reason == DeferReason.HUMAN_REQUIRED
     assert verified[0].question == "Which topology?"
@@ -212,7 +212,7 @@ def test_run_arbitrator_returns_patches():
         {"section_ref": "§3", "proposed_text": "New text", "rationale": "Because X"}
     ])
     backend = _make_backend(response_json)
-    s = _make_strategy({"claude": backend})
+    s = _make_strategy({"claude-cli": backend})
     patches = s.run_arbitrator("prd", critiques, _call_with)
     assert len(patches) == 1
     assert isinstance(patches[0], Patch)
@@ -244,7 +244,7 @@ def test_run_personas_parallel_returns_merged():
         {"description": "persona critique", "section_ref": "§2", "raised_by": "architect"}
     ]))
     cfg = DocumentConfig(topic="T", goal="G", persona_mode="parallel")
-    s = ConvergeStrategy(cfg, {"claude": backend})
+    s = ConvergeStrategy(cfg, {"claude-cli": backend})
     critiques = s.run_personas("prd", _call_with)
     # 3 default personas × 1 critique each = 3 total
     assert len(critiques) == 3
@@ -256,7 +256,7 @@ def test_run_personas_serial_returns_merged():
         {"description": "critique", "section_ref": "§1", "raised_by": "scrum_master"}
     ]))
     cfg = DocumentConfig(topic="T", goal="G", persona_mode="serial")
-    s = ConvergeStrategy(cfg, {"claude": backend})
+    s = ConvergeStrategy(cfg, {"claude-cli": backend})
     critiques = s.run_personas("prd", _call_with)
     assert len(critiques) == 3
 
@@ -314,7 +314,7 @@ def test_source_block_returns_content_for_matching_role(tmp_path):
         topic="T", goal="G",
         source_files=(SourceFileConfig(path=str(f), roles=("builder",)),),
     )
-    s = ConvergeStrategy(cfg, {"claude": _make_backend()})
+    s = ConvergeStrategy(cfg, {"claude-cli": _make_backend()})
     block = s._source_block("builder")
     assert "arch.md" in block
     assert "# Architecture" in block
@@ -328,7 +328,7 @@ def test_source_block_excludes_files_not_matching_role(tmp_path):
         topic="T", goal="G",
         source_files=(SourceFileConfig(path=str(f), roles=("architect",)),),
     )
-    s = ConvergeStrategy(cfg, {"claude": _make_backend()})
+    s = ConvergeStrategy(cfg, {"claude-cli": _make_backend()})
     assert s._source_block("builder") == ""
     assert "secret content" in s._source_block("architect")
 
@@ -340,7 +340,7 @@ def test_source_block_warns_and_skips_unreadable_file(tmp_path, caplog):
         topic="T", goal="G",
         source_files=(SourceFileConfig(path=str(f), roles=("builder",)),),
     )
-    s = ConvergeStrategy(cfg, {"claude": _make_backend()})
+    s = ConvergeStrategy(cfg, {"claude-cli": _make_backend()})
     f.unlink()
     with caplog.at_level(logging.WARNING):
         block = s._source_block("builder")
@@ -355,7 +355,7 @@ def test_run_builder_injects_source_files(tmp_path):
         topic="T", goal="G",
         source_files=(SourceFileConfig(path=str(f), roles=("builder",)),),
     )
-    s = ConvergeStrategy(cfg, {"claude": _make_backend("# PRD Output")})
+    s = ConvergeStrategy(cfg, {"claude-cli": _make_backend("# PRD Output")})
     with patch("src.document_strategy.render", return_value="prompt") as mock_render:
         s.run_builder("", [], _call_with, human_decisions=[])
     _, kwargs = mock_render.call_args
@@ -369,7 +369,7 @@ def test_run_challenger_injects_source_files(tmp_path):
         topic="T", goal="G",
         source_files=(SourceFileConfig(path=str(f), roles=("challenger",)),),
     )
-    s = ConvergeStrategy(cfg, {"claude": _make_backend("[]")})
+    s = ConvergeStrategy(cfg, {"claude-cli": _make_backend("[]")})
     with patch("src.document_strategy.render", return_value="[]") as mock_render:
         s.run_challenger("prd text", _call_with)
     _, kwargs = mock_render.call_args
@@ -384,7 +384,7 @@ def test_invoke_persona_injects_source_files(tmp_path):
         personas=(PersonaConfig("architect"),),
         source_files=(SourceFileConfig(path=str(f), roles=("architect",)),),
     )
-    s = ConvergeStrategy(cfg, {"claude": _make_backend("[]")})
+    s = ConvergeStrategy(cfg, {"claude-cli": _make_backend("[]")})
     with patch("src.document_strategy.render", return_value="[]") as mock_render:
         s._invoke_persona(cfg.personas[0], "prd", _call_with)
     _, kwargs = mock_render.call_args
@@ -398,7 +398,7 @@ def test_run_builder_source_files_empty_when_no_match(tmp_path):
         topic="T", goal="G",
         source_files=(SourceFileConfig(path=str(f), roles=("architect",)),),
     )
-    s = ConvergeStrategy(cfg, {"claude": _make_backend("# PRD")})
+    s = ConvergeStrategy(cfg, {"claude-cli": _make_backend("# PRD")})
     with patch("src.document_strategy.render", return_value="prompt") as mock_render:
         s.run_builder("", [], _call_with, human_decisions=[])
     _, kwargs = mock_render.call_args

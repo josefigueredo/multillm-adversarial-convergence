@@ -1,0 +1,30 @@
+research:
+  topic: "Example: Bedrock plus LiteLLM routing"
+  goal: "Demonstrate Bedrock Converse configuration with a gateway utility provider."
+  dimensions:
+    - "AWS provider routing"
+    - "Cross-provider orchestration"
+
+  execution:
+    strategy: serial
+    model: sonnet
+    timeout_seconds: 600
+
+    providers:
+      aws_foundation:
+        adapter: bedrock-api
+        model: anthropic.claude-3-5-sonnet-20240620-v1:0
+        region: us-east-1
+        aws_profile: sandbox
+
+      gateway_fast:
+        adapter: litellm-api
+        model: openai/gpt-4.1-mini
+        base_url: http://localhost:4000
+
+    backends:
+      primary: aws_foundation
+      research:
+        - gateway_fast
+      judge: aws_foundation
+      utility: gateway_fast

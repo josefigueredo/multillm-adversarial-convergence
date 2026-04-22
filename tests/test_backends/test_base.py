@@ -21,5 +21,5 @@ class TestCheckAvailable:
     @patch("src.backends.base.subprocess.run")
     def test_timeout(self, mock_run):
         import subprocess
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="gemini", timeout=10)
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="gemini-cli", timeout=10)
         assert GeminiBackend().check_available() is False

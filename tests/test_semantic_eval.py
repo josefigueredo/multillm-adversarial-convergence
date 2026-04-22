@@ -39,10 +39,10 @@ def test_semantic_weight_profile_and_calibration():
 
 def test_semantic_review_helpers():
     assert semantic_review_disabled()["grade"] == "disabled"
-    assert semantic_review_empty(judge_backend="claude")["judge_backend"] == "claude"
+    assert semantic_review_empty(judge_backend="claude-cli")["judge_backend"] == "claude-cli"
 
     fallback = semantic_review_fallback(
-        judge_backend="claude",
+        judge_backend="claude-cli",
         rubric={"overall_score": 0.72, "grade": "good", "dimensions": {"actionability": 0.8, "uncertainty_reporting": 0.5, "contradiction_handling": 0.9}},
         evidence_quality={"average_evidence_quality_score": 0.66},
         raw_response="oops",
@@ -61,7 +61,7 @@ def test_semantic_review_helpers():
             },
             "summary": "Looks solid",
         },
-        judge_backend="claude",
+        judge_backend="claude-cli",
         raw_response='{"ok":true}',
     )
     assert reviewed["overall_score"] == 0.75

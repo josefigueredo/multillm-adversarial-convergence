@@ -53,8 +53,8 @@ def _make_invoke_error():
 
 def _strategy(
     cls,
-    primary="claude",
-    research=("claude",),
+    primary="claude-cli",
+    research=("claude-cli",),
     judge="",
     utility="",
     **strategy_kwargs,
@@ -77,7 +77,7 @@ class TestGetStrategy:
         for name in ("single", "ensemble", "adversarial", "parallel", "serial", "specialist"):
             bc = BackendsConfig()
             sc = StrategyConfig()
-            backends = {"claude": _make_backend("claude")}
+            backends = {"claude-cli": _make_backend("claude-cli")}
             s = get_strategy(name, bc, sc, backends)
             assert s.name == name
 
@@ -95,7 +95,7 @@ class TestSingleStrategy:
         s = _strategy(SingleStrategy)
         result = s.execute_research("prompt", _make_invoke("hello"))
         assert result.findings == "hello"
-        assert result.backend_name == "claude"
+        assert result.backend_name == "claude-cli"
         assert result.cost_usd == 0.1
 
     def test_execute_error(self):
@@ -106,15 +106,15 @@ class TestSingleStrategy:
     def test_describe(self):
         s = _strategy(SingleStrategy)
         assert "single" in s.describe()
-        assert "claude" in s.describe()
+        assert "claude-cli" in s.describe()
 
     def test_hypothesis_backend(self):
         s = _strategy(SingleStrategy)
-        assert s.get_hypothesis_backend().name == "claude"
+        assert s.get_hypothesis_backend().name == "claude-cli"
 
     def test_judge_backend_fallback(self):
         s = _strategy(SingleStrategy)
-        assert s.get_judge_backend().name == "claude"
+        assert s.get_judge_backend().name == "claude-cli"
 
     def test_no_post_research(self):
         s = _strategy(SingleStrategy)
@@ -127,37 +127,37 @@ class TestSingleStrategy:
 
 class TestEnsembleStrategy:
     def test_parallel_execution_returns_candidates(self):
-        s = _strategy(EnsembleStrategy, research=("claude", "codex"), stagger_seconds=0)
-        invoke = _make_invoke_per_backend({"claude": "short", "codex": "much longer findings"})
+        s = _strategy(EnsembleStrategy, research=("claude-cli", "codex-cli"), stagger_seconds=0)
+        invoke = _make_invoke_per_backend({"claude-cli": "short", "codex-cli": "much longer findings"})
         result = s.execute_research("prompt", invoke)
         assert result.findings == ""
         assert result.backend_name == "multiple"
-        assert [candidate.backend_name for candidate in result.candidates] == ["claude", "codex"]
+        assert [candidate.backend_name for candidate in result.candidates] == ["claude-cli", "codex-cli"]
 
     def test_all_fail(self):
-        s = _strategy(EnsembleStrategy, research=("claude", "codex"), stagger_seconds=0)
+        s = _strategy(EnsembleStrategy, research=("claude-cli", "codex-cli"), stagger_seconds=0)
         result = s.execute_research("prompt", _make_invoke_error())
         assert result.findings == ""
         assert result.backend_name == "none"
 
     def test_union_mode_still_returns_candidates(self):
-        s = _strategy(EnsembleStrategy, research=("claude", "codex"), merge_mode="union", stagger_seconds=0)
-        invoke = _make_invoke_per_backend({"claude": "finding A", "codex": "finding B"})
+        s = _strategy(EnsembleStrategy, research=("claude-cli", "codex-cli"), merge_mode="union", stagger_seconds=0)
+        invoke = _make_invoke_per_backend({"claude-cli": "finding A", "codex-cli": "finding B"})
         result = s.execute_research("prompt", invoke)
         assert result.findings == ""
         assert len(result.candidates) == 2
 
     def test_judge_isolation(self):
-        s = _strategy(EnsembleStrategy, research=("codex", "gemini"), judge="claude")
-        assert s.get_judge_backend().name == "claude"
-        assert "claude" not in [b.name for b in s.research_backends]
+        s = _strategy(EnsembleStrategy, research=("codex-cli", "gemini-cli"), judge="claude-cli")
+        assert s.get_judge_backend().name == "claude-cli"
+        assert "claude-cli" not in [b.name for b in s.research_backends]
 
     def test_describe(self):
-        s = _strategy(EnsembleStrategy, research=("claude", "codex"), judge="gemini")
+        s = _strategy(EnsembleStrategy, research=("claude-cli", "codex-cli"), judge="gemini-cli")
         desc = s.describe()
         assert "ensemble" in desc
-        assert "claude" in desc
-        assert "codex" in desc
+        assert "claude-cli" in desc
+        assert "codex-cli" in desc
 
 
 # ---------------------------------------------------------------------------
@@ -166,24 +166,24 @@ class TestEnsembleStrategy:
 
 class TestAdversarialStrategy:
     def test_execute_uses_first_research_backend(self):
-        s = _strategy(AdversarialStrategy, research=("codex", "claude"))
+        s = _strategy(AdversarialStrategy, research=("codex-cli", "claude-cli"))
         result = s.execute_research("prompt", _make_invoke("research output"))
         assert result.findings == "research output"
-        assert result.backend_name == "codex"
+        assert result.backend_name == "codex-cli"
 
     def test_post_research_critique(self):
-        s = _strategy(AdversarialStrategy, research=("codex", "claude"))
+        s = _strategy(AdversarialStrategy, research=("codex-cli", "claude-cli"))
         critique = s.post_research("findings text", _make_invoke("errors found"))
         assert critique is not None
         assert critique.critique == "errors found"
-        assert critique.backend_name == "claude"
+        assert critique.backend_name == "claude-cli"
 
     def test_post_research_empty_findings(self):
-        s = _strategy(AdversarialStrategy, research=("codex", "claude"))
+        s = _strategy(AdversarialStrategy, research=("codex-cli", "claude-cli"))
         assert s.post_research("", _make_invoke()) is None
 
     def test_describe(self):
-        s = _strategy(AdversarialStrategy, research=("codex", "claude"))
+        s = _strategy(AdversarialStrategy, research=("codex-cli", "claude-cli"))
         desc = s.describe()
         assert "adversarial" in desc
 
@@ -194,11 +194,11 @@ class TestAdversarialStrategy:
 
 class TestParallelStrategy:
     def test_returns_candidates(self):
-        s = _strategy(ParallelStrategy, research=("claude", "codex", "gemini"), stagger_seconds=0)
+        s = _strategy(ParallelStrategy, research=("claude-cli", "codex-cli", "gemini-cli"), stagger_seconds=0)
         invoke = _make_invoke_per_backend({
-            "claude": "a",
-            "codex": "bb",
-            "gemini": "ccc",
+            "claude-cli": "a",
+            "codex-cli": "bb",
+            "gemini-cli": "ccc",
         })
         result = s.execute_research("prompt", invoke)
         assert result.findings == ""
@@ -206,7 +206,7 @@ class TestParallelStrategy:
         assert len(result.candidates) == 3
 
     def test_all_fail(self):
-        s = _strategy(ParallelStrategy, research=("claude", "codex"), stagger_seconds=0)
+        s = _strategy(ParallelStrategy, research=("claude-cli", "codex-cli"), stagger_seconds=0)
         result = s.execute_research("prompt", _make_invoke_error())
         assert result.findings == ""
 
@@ -217,7 +217,7 @@ class TestParallelStrategy:
 
 class TestSerialStrategy:
     def test_draft_then_refine(self):
-        s = _strategy(SerialStrategy, research=("gemini", "claude"), stagger_seconds=0)
+        s = _strategy(SerialStrategy, research=("gemini-cli", "claude-cli"), stagger_seconds=0)
         call_count = [0]
         def invoke(backend, prompt, *, allowed_tools="", max_turns=0, timeout=0):
             call_count[0] += 1
@@ -227,17 +227,17 @@ class TestSerialStrategy:
 
         result = s.execute_research("prompt", invoke)
         assert result.findings == "refined"
-        assert "gemini" in result.backend_name
-        assert "claude" in result.backend_name
+        assert "gemini-cli" in result.backend_name
+        assert "claude-cli" in result.backend_name
         assert result.cost_usd == pytest.approx(0.20)
 
     def test_draft_fails_returns_empty(self):
-        s = _strategy(SerialStrategy, research=("gemini", "claude"))
+        s = _strategy(SerialStrategy, research=("gemini-cli", "claude-cli"))
         result = s.execute_research("prompt", _make_invoke_error())
         assert result.findings == ""
 
     def test_refine_fails_returns_draft(self):
-        s = _strategy(SerialStrategy, research=("gemini", "claude"))
+        s = _strategy(SerialStrategy, research=("gemini-cli", "claude-cli"))
         call_count = [0]
         def invoke(backend, prompt, *, allowed_tools="", max_turns=0, timeout=0):
             call_count[0] += 1
@@ -249,7 +249,7 @@ class TestSerialStrategy:
         assert result.findings == "draft"
 
     def test_single_backend_fallback(self):
-        s = _strategy(SerialStrategy, research=("claude",))
+        s = _strategy(SerialStrategy, research=("claude-cli",))
         result = s.execute_research("prompt", _make_invoke("solo"))
         assert result.findings == "solo"
 
@@ -260,27 +260,27 @@ class TestSerialStrategy:
 
 class TestSpecialistStrategy:
     def test_routing_code_dimension(self):
-        s = _strategy(SpecialistStrategy, research=("claude", "codex", "gemini"))
+        s = _strategy(SpecialistStrategy, research=("claude-cli", "codex-cli", "gemini-cli"))
         backend = s.route_dimension("SDK implementation and code examples")
-        assert backend.name == "codex"
+        assert backend.name == "codex-cli"
 
     def test_routing_pricing_dimension(self):
-        s = _strategy(SpecialistStrategy, research=("claude", "codex", "gemini"))
+        s = _strategy(SpecialistStrategy, research=("claude-cli", "codex-cli", "gemini-cli"))
         backend = s.route_dimension("pricing comparison and market overview")
-        assert backend.name == "gemini"
+        assert backend.name == "gemini-cli"
 
     def test_routing_architecture_dimension(self):
-        s = _strategy(SpecialistStrategy, research=("claude", "codex", "gemini"))
+        s = _strategy(SpecialistStrategy, research=("claude-cli", "codex-cli", "gemini-cli"))
         backend = s.route_dimension("architecture trade-off analysis")
-        assert backend.name == "claude"
+        assert backend.name == "claude-cli"
 
     def test_routing_fallback(self):
-        s = _strategy(SpecialistStrategy, research=("claude", "codex"))
+        s = _strategy(SpecialistStrategy, research=("claude-cli", "codex-cli"))
         backend = s.route_dimension("random unrelated topic")
-        assert backend.name == "claude"  # falls back to primary
+        assert backend.name == "claude-cli"  # falls back to primary
 
     def test_execute_with_dimension(self):
-        s = _strategy(SpecialistStrategy, research=("claude", "codex"))
+        s = _strategy(SpecialistStrategy, research=("claude-cli", "codex-cli"))
         result = s.execute_research(
             "prompt", _make_invoke("coded"),
             dimension="code implementation",
@@ -294,21 +294,21 @@ class TestSpecialistStrategy:
 
 class TestBackendRoles:
     def test_utility_fallback_to_primary(self):
-        s = _strategy(SingleStrategy, primary="claude", utility="")
-        assert s.get_compress_backend().name == "claude"
+        s = _strategy(SingleStrategy, primary="claude-cli", utility="")
+        assert s.get_compress_backend().name == "claude-cli"
 
     def test_utility_explicit(self):
-        s = _strategy(SingleStrategy, primary="claude", utility="gemini")
-        assert s.get_compress_backend().name == "gemini"
+        s = _strategy(SingleStrategy, primary="claude-cli", utility="gemini-cli")
+        assert s.get_compress_backend().name == "gemini-cli"
 
     def test_judge_fallback_to_primary(self):
-        s = _strategy(SingleStrategy, primary="claude", judge="")
-        assert s.get_judge_backend().name == "claude"
+        s = _strategy(SingleStrategy, primary="claude-cli", judge="")
+        assert s.get_judge_backend().name == "claude-cli"
 
     def test_judge_explicit(self):
-        s = _strategy(EnsembleStrategy, primary="claude", research=("codex",), judge="gemini")
-        assert s.get_judge_backend().name == "gemini"
+        s = _strategy(EnsembleStrategy, primary="claude-cli", research=("codex-cli",), judge="gemini-cli")
+        assert s.get_judge_backend().name == "gemini-cli"
 
     def test_synthesize_uses_primary(self):
-        s = _strategy(SingleStrategy, primary="codex")
-        assert s.get_synthesize_backend().name == "codex"
+        s = _strategy(SingleStrategy, primary="codex-cli")
+        assert s.get_synthesize_backend().name == "codex-cli"

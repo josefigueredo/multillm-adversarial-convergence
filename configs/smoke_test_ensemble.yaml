@@ -1,5 +1,5 @@
 # Smoke test for ensemble strategy.
-# Claude + codex research independently, claude judges blindly.
+# Claude + codex-cli research independently, claude-cli judges blindly.
 # Codex never touches hypothesis/judge — different provider for blind review.
 
 research:
@@ -20,20 +20,30 @@ research:
     compress_every: 99
     allowed_tools: ""
     max_turns: 2
-    backend: claude
+    backend: claude-cli
     model: sonnet
     max_budget_per_call: 1.00
     timeout_seconds: 600
     lightweight_mode: true
 
     strategy: ensemble
+    providers:
+      primary_reasoner:
+        adapter: claude-cli
+        model: sonnet
+      research_coder:
+        adapter: codex-cli
+        model: gpt-5.4
+      research_reasoner:
+        adapter: claude-cli
+        model: sonnet
     backends:
-      primary: claude         # hypothesis + synthesis
+      primary: primary_reasoner   # hypothesis + synthesis
       research:
-        - codex              # researcher 1 (different provider)
-        - claude             # researcher 2
-      judge: codex           # blind review (didn't do hypothesis)
-      utility: codex
+        - research_coder         # researcher 1 (different provider)
+        - research_reasoner      # researcher 2
+      judge: research_coder      # blind review (didn't do hypothesis)
+      utility: research_coder
     strategy_config:
       merge_mode: best
       stagger_seconds: 5

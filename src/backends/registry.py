@@ -37,3 +37,9 @@ def get_backend(name: str) -> Backend:
 def get_backends(backend_names: set[str]) -> dict[str, Backend]:
     """Instantiate a set of backends by name, deduplicating instances."""
     return {name: get_backend(name) for name in backend_names}
+
+
+def canonical_backend_name(name: str) -> str:
+    """Return the canonical backend class name for a registered name or alias."""
+    backend = get_backend(name)
+    return backend.name

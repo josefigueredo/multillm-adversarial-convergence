@@ -1,5 +1,5 @@
 # Smoke test for adversarial strategy.
-# Codex researches, claude critiques, codex adjudicates.
+# Codex researches, claude-cli critiques, codex-cli adjudicates.
 # Three-way separation: researcher != critic != judge.
 
 research:
@@ -20,19 +20,29 @@ research:
     compress_every: 99
     allowed_tools: ""
     max_turns: 2
-    backend: claude
+    backend: claude-cli
     model: sonnet
     max_budget_per_call: 1.00
     timeout_seconds: 300
     lightweight_mode: true
 
     strategy: adversarial
+    providers:
+      primary_reasoner:
+        adapter: claude-cli
+        model: sonnet
+      research_coder:
+        adapter: codex-cli
+        model: gpt-5.4
+      adversary_reasoner:
+        adapter: claude-cli
+        model: sonnet
     backends:
-      primary: claude         # hypothesis + synthesis
+      primary: primary_reasoner   # hypothesis + synthesis
       research:
-        - codex              # researcher
-        - claude             # adversary (critique)
-      judge: codex           # adjudicator (different from critic)
-      utility: codex
+        - research_coder         # researcher
+        - adversary_reasoner     # adversary (critique)
+      judge: research_coder      # adjudicator (different from critic)
+      utility: research_coder
     strategy_config:
       critique_depth: standard

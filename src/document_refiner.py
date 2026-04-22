@@ -13,8 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .backends import AgentResponse, Backend, CallOptions
-from .config import ArtifactConfig, DocumentConfig
+from .backends import AgentResponse, Backend
+from .backend_options import apply_backend_capabilities, build_call_options
+from .config import ArtifactConfig, DocumentConfig, ProviderConfig
 from .document_loop import CycleContext, CycleState, _should_stop, run_cycle
 from .document_strategy import ConvergeStrategy
 from .hitl import (
@@ -269,8 +270,16 @@ class DocumentRefiner:
     # ── Backend invocation ──────────────────────────────────────────────────
 
     def _invoke(self, prompt: str, backend: Backend, backend_name: str) -> AgentResponse:
-        opts = CallOptions(max_turns=10)
-        resp = backend.invoke(prompt, opts)
+        provider = getattr(backend, "provider_config", None)
+        provider = provider if isinstance(provider, ProviderConfig) else None
+        opts = build_call_options(self._config.execution, provider=provider)
+        opts = apply_backend_capabilities(backend, opts)
+        timeout = (
+            provider.timeout_seconds
+            if provider is not None and provider.timeout_seconds > 0
+            else self._config.execution.timeout_seconds
+        )
+        resp = backend.invoke(prompt, opts, timeout=timeout)
         self._track_usage(resp, backend_name)
         return resp
 

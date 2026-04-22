@@ -13,8 +13,10 @@ from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode
 
 class CodexBackend(Backend):
 
-    name = "codex"
+    name = "codex-cli"
     capabilities = BackendCapabilities(
+        transport="cli",
+        provider_kind="direct",
         default_model="gpt-5.4",
     )
 

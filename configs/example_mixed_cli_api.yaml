@@ -1,0 +1,33 @@
+research:
+  topic: "Example: mixed CLI and API providers"
+  goal: "Demonstrate a workflow that mixes local CLI adapters with API and gateway adapters."
+  dimensions:
+    - "Hybrid backend orchestration"
+    - "Provider-instance composition"
+
+  execution:
+    strategy: adversarial
+    model: sonnet
+    timeout_seconds: 600
+
+    providers:
+      primary_cli:
+        adapter: claude-cli
+        model: sonnet
+
+      research_api:
+        adapter: codex-api
+        model: gpt-5.4
+
+      utility_gateway:
+        adapter: litellm-api
+        model: openai/gpt-4.1-mini
+        base_url: http://localhost:4000
+
+    backends:
+      primary: primary_cli
+      research:
+        - research_api
+        - utility_gateway
+      judge: primary_cli
+      utility: utility_gateway

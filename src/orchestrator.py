@@ -16,7 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .backends import CLAUDE_SHORTNAMES, AgentResponse, Backend, CallOptions, get_backends
+from .backends import CLAUDE_SHORTNAMES, AgentResponse, Backend, CallOptions, StreamEvent, get_backends
+from .backend_options import apply_backend_capabilities, build_call_options
 from .artifacts import (
     cli_version,
     dashboard_payload,
@@ -32,7 +33,7 @@ from .artifacts import (
     write_pdf_report,
     write_portfolio,
 )
-from .config import ResearchConfig
+from .config import ProviderConfig, ResearchConfig
 from .constraints import (
     format_results_table,
     goal_constraints_summary,
@@ -186,13 +187,23 @@ class AutoResearcher:
 
     @staticmethod
     def _resolve_model(backend: Backend, config_model: str) -> str:
-        """Translate the config model name for a specific backend.
+        """Resolve model shortcuts into backend-safe model identifiers.
 
-        If the config uses a Claude shortname (``"sonnet"``, ``"opus"``,
-        ``"haiku"``) and the backend is not Claude, substitute that
-        backend's ``capabilities.default_model`` instead.
+        Policy:
+        - ``claude-cli`` accepts Claude shortnames directly.
+        - direct providers may translate Claude shortnames to their own
+          ``default_model`` when that mapping is well-defined.
+        - aggregators must receive explicit model identifiers because silent
+          translation hides routing semantics.
         """
-        if config_model in CLAUDE_SHORTNAMES and backend.name != "claude":
+        if config_model in CLAUDE_SHORTNAMES:
+            if backend.name == "claude-cli":
+                return config_model
+            if backend.capabilities.provider_kind == "aggregator":
+                raise ValueError(
+                    f"Backend '{backend.name}' requires an explicit model identifier; "
+                    f"shortname '{config_model}' is ambiguous for aggregators."
+                )
             resolved = backend.capabilities.default_model
             if resolved:
                 log.debug(
@@ -208,18 +219,38 @@ class AutoResearcher:
         Keyword arguments override the defaults from ``self.config.execution``.
         Automatically translates Claude model shortnames for non-Claude backends.
         """
-        config_model = kwargs.pop("model", self.config.execution.model)
+        provider = getattr(backend, "provider_config", None)
+        provider = provider if isinstance(provider, ProviderConfig) else None
+        default_model = provider.model if provider is not None and provider.model else self.config.execution.model
+        config_model = kwargs.pop("model", default_model)
         model = self._resolve_model(backend, config_model)
         isolated = self._should_isolate_backend(backend)
-        opts = CallOptions(
-            model=model,
-            allowed_tools=kwargs.pop("allowed_tools", ""),
-            max_turns=kwargs.pop("max_turns", self.config.execution.max_turns),
-            max_budget_usd=kwargs.pop("max_budget_usd", self.config.execution.max_budget_per_call),
+        opts = build_call_options(
+            self.config.execution,
+            provider=provider,
             working_directory=str(self._backend_runtime_dir()) if isolated and self._backend_runtime_dir() else "",
             sanitize_environment=isolated and self.config.execution.sanitize_backend_env,
         )
-        timeout = kwargs.pop("timeout", self.config.execution.timeout_seconds)
+        opts = CallOptions(
+            model=model,
+            system_prompt=opts.system_prompt,
+            stream=kwargs.pop("stream", False),
+            allowed_tools=kwargs.pop("allowed_tools", opts.allowed_tools),
+            max_turns=kwargs.pop("max_turns", opts.max_turns),
+            max_budget_usd=kwargs.pop("max_budget_usd", opts.max_budget_usd),
+            json_schema=opts.json_schema,
+            working_directory=opts.working_directory,
+            sanitize_environment=opts.sanitize_environment,
+        )
+        opts = apply_backend_capabilities(backend, opts)
+        default_timeout = (
+            provider.timeout_seconds
+            if provider is not None and provider.timeout_seconds > 0
+            else self.config.execution.timeout_seconds
+        )
+        timeout = kwargs.pop("timeout", default_timeout)
+        if opts.stream and hasattr(backend, "invoke_stream"):
+            return self._invoke_streaming_backend(backend, prompt, opts, timeout=timeout)
         return backend.invoke(prompt, opts, timeout=timeout)
 
     def _invoke_for_strategy(
@@ -238,10 +269,59 @@ class AutoResearcher:
         return self._call_with(
             backend,
             prompt,
+            stream=self.config.execution.stream,
             allowed_tools=allowed_tools or "",
             max_turns=max_turns or self.config.execution.max_turns,
             timeout=timeout or self.config.execution.timeout_seconds,
         )
+
+    def _invoke_streaming_backend(
+        self,
+        backend: Backend,
+        prompt: str,
+        opts: CallOptions,
+        *,
+        timeout: int,
+    ) -> AgentResponse:
+        """Render normalized streaming progress while preserving a final response."""
+        events = backend.invoke_stream(prompt, opts, timeout=timeout)
+        collected_text: list[str] = []
+        completed_payload: dict[str, Any] | None = None
+        error_payload: dict[str, Any] | None = None
+
+        for event in events:
+            self._print_stream_event(backend, event)
+            if event.type == "text_delta" and event.text:
+                collected_text.append(event.text)
+            elif event.type == "completed":
+                completed_payload = event.raw.get("response", event.raw)
+            elif event.type == "error":
+                error_payload = event.raw
+
+        if error_payload:
+            return AgentResponse(text="", cost_usd=0.0, is_error=True, raw={"stream_error": error_payload})
+
+        if completed_payload and hasattr(backend, "parse_payload"):
+            return backend.parse_payload(completed_payload)
+
+        return AgentResponse(
+            text="".join(collected_text),
+            cost_usd=0.0,
+            is_error=False,
+            raw={"stream_completed": completed_payload or {}},
+        )
+
+    @staticmethod
+    def _print_stream_event(backend: Backend, event: StreamEvent) -> None:
+        """Emit a compact streaming progress trace for interactive runs."""
+        if event.type == "start":
+            print(f"[{backend.name} stream] ", end="", flush=True)
+            return
+        if event.type == "text_delta" and event.text:
+            print(event.text, end="", flush=True)
+            return
+        if event.type in {"completed", "error"}:
+            print(flush=True)
 
     def _track_cost(self, cost: float, backend_name: str = "") -> None:
         """Add cost to totals (no token data available)."""
@@ -963,4 +1043,3 @@ class AutoResearcher:
             knowledge_text=self.knowledge_base or "",
             synthesis_text=synthesis_text,
         )
-

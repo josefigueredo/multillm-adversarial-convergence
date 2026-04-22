@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.backends.types import AgentResponse
-from src.config import ArtifactConfig, BackendsConfig, DocumentConfig, PersonaConfig
+from src.backends.types import AgentResponse, BackendCapabilities
+from src.config import ArtifactConfig, BackendsConfig, DocumentConfig, ExecutionConfig, PersonaConfig, ProviderConfig
 from src.document_loop import CycleState, Issue
 from src.document_refiner import EXIT_HUMAN_REQUIRED, DocumentRefiner
 from src.hitl import HumanInputRequest
@@ -26,7 +26,8 @@ def _make_config(**kwargs) -> DocumentConfig:
         primary_artifact="PRD.md",
         convergence_cycles=1,
         max_cycles=5,
-        backends=BackendsConfig(primary="claude", research=["claude", "gemini"]),
+        backends=BackendsConfig(primary="claude-cli", research=["claude-cli", "gemini-cli"]),
+        execution=ExecutionConfig(),
     )
     defaults.update(kwargs)
     return DocumentConfig(**defaults)
@@ -34,7 +35,7 @@ def _make_config(**kwargs) -> DocumentConfig:
 
 def _make_backend(text: str = "generated content") -> MagicMock:
     backend = MagicMock()
-    backend.run.return_value = AgentResponse(
+    backend.invoke.return_value = AgentResponse(
         text=text, cost_usd=0.01, is_error=False,
         input_tokens=100, output_tokens=50,
     )
@@ -43,8 +44,8 @@ def _make_backend(text: str = "generated content") -> MagicMock:
 
 def _make_backends(text: str = "generated content") -> dict:
     return {
-        "claude": _make_backend(text),
-        "gemini": _make_backend(text),
+        "claude-cli": _make_backend(text),
+        "gemini-cli": _make_backend(text),
     }
 
 
@@ -277,6 +278,66 @@ class TestPhase3Indexing:
         assert (tmp_path / "DOCS_INDEX.md").exists()
 
 
+class TestBackendInvocation:
+    def test_invoke_uses_configured_execution_options(self, tmp_path):
+        config = _make_config(
+            execution=ExecutionConfig(
+                model="opus",
+                allowed_tools="Read,Bash",
+                max_turns=7,
+                timeout_seconds=123,
+            )
+        )
+        backend = _make_backend()
+        refiner = DocumentRefiner(config, tmp_path, {"claude-cli": backend, "gemini-cli": _make_backend()})
+
+        resp = refiner._invoke("prompt", backend, "claude-cli")
+
+        assert resp.text == "generated content"
+        backend.invoke.assert_called_once()
+        call_args = backend.invoke.call_args
+        assert call_args.args[0] == "prompt"
+        opts = call_args.args[1]
+        assert opts.model == "opus"
+        assert opts.allowed_tools == "Read,Bash"
+        assert opts.max_turns == 7
+        assert call_args.kwargs["timeout"] == 123
+
+    def test_invoke_applies_provider_model_override(self, tmp_path):
+        config = _make_config(
+            execution=ExecutionConfig(model="sonnet", allowed_tools="Read", max_turns=7, timeout_seconds=123),
+            providers={"builder_main": ProviderConfig(adapter="claude-cli", model="opus")},
+            backends=BackendsConfig(primary="builder_main", research=["builder_main"]),
+        )
+        backend = _make_backend()
+        backend.instance_name = "builder_main"
+        backend.provider_config = config.providers["builder_main"]
+        refiner = DocumentRefiner(config, tmp_path, {"builder_main": backend})
+
+        refiner._invoke("prompt", backend, "builder_main")
+
+        opts = backend.invoke.call_args.args[1]
+        assert opts.model == "opus"
+
+    def test_invoke_strips_tools_for_backend_without_tool_support(self, tmp_path):
+        config = _make_config(
+            execution=ExecutionConfig(model="openai/gpt-4.1-mini", allowed_tools="Read,Bash", timeout_seconds=123),
+        )
+        backend = _make_backend()
+        backend.capabilities = BackendCapabilities(
+            transport="api",
+            provider_kind="aggregator",
+            supports_tools=False,
+            default_model="openai/gpt-4.1-mini",
+        )
+        refiner = DocumentRefiner(config, tmp_path, {"litellm-api": backend})
+
+        refiner._invoke("prompt", backend, "litellm-api")
+
+        opts = backend.invoke.call_args.args[1]
+        assert opts.allowed_tools == ""
+
+
 # ---------------------------------------------------------------------------
 # Run manifest
 # ---------------------------------------------------------------------------
@@ -306,11 +367,11 @@ class TestRunManifest:
     def test_token_tracking_accumulates(self, tmp_path):
         config = _make_config()
         backend = _make_backend()
-        backend.run.return_value = AgentResponse(
+        backend.invoke.return_value = AgentResponse(
             text="content", cost_usd=0.05, is_error=False,
             input_tokens=200, output_tokens=100,
         )
-        backends = {"claude": backend, "gemini": backend}
+        backends = {"claude-cli": backend, "gemini-cli": backend}
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (

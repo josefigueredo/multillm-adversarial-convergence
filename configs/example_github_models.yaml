@@ -1,0 +1,35 @@
+research:
+  topic: "Example: GitHub Models plus LiteLLM routing"
+  goal: "Demonstrate aggregator provider-instance configuration for GitHub Models and LiteLLM."
+  dimensions:
+    - "Contract shape"
+    - "Gateway routing"
+
+  execution:
+    strategy: adversarial
+    model: sonnet
+    timeout_seconds: 600
+
+    providers:
+      primary_direct:
+        adapter: claude-api
+        model: claude-sonnet-4-5
+
+      github_models:
+        adapter: copilot-api
+        model: openai/gpt-4.1
+        organization: acme
+        api_version: 2026-03-10
+
+      gateway_fast:
+        adapter: litellm-api
+        model: openai/gpt-4.1-mini
+        base_url: http://localhost:4000
+
+    backends:
+      primary: primary_direct
+      research:
+        - github_models
+        - gateway_fast
+      judge: primary_direct
+      utility: gateway_fast

@@ -33,7 +33,7 @@ def test_render_html_report_renders_core_sections_and_escapes():
         evaluation={"benchmark_id": "bench-001", "summary": {"rubric_grade": "strong"}},
         comparison={"compared_runs_count": 1, "summary": {"consistency_level": "high"}},
         semantic_calibration={"enabled": True, "grade": "reasonable", "calibrated_score": 0.81},
-        semantic_review={"enabled": True, "grade": "good", "overall_score": 0.76, "judge_backend": "claude"},
+        semantic_review={"enabled": True, "grade": "good", "overall_score": 0.76, "judge_backend": "claude-cli"},
         dashboard={"current_strategy": "ensemble"},
         methods_text="# Method <1>\n\nSome **bold** text.",
         synthesis_text="Use <Python> & cite [sources](https://example.com).",
@@ -95,7 +95,7 @@ def test_helper_html_sections_behave_as_expected():
     assert "Calibrated score:" in _semantic_html({"enabled": True, "grade": "reasonable", "calibrated_score": 0.7})
     assert _semantic_html({"enabled": False}) == ""
     assert "Overall score:" in _semantic_review_html(
-        {"enabled": True, "grade": "good", "overall_score": 0.74, "judge_backend": "claude"}
+        {"enabled": True, "grade": "good", "overall_score": 0.74, "judge_backend": "claude-cli"}
     )
     assert _semantic_review_html({"enabled": False}) == ""
 

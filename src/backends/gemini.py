@@ -15,8 +15,10 @@ from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode
 
 class GeminiBackend(Backend):
 
-    name = "gemini"
+    name = "gemini-cli"
     capabilities = BackendCapabilities(
+        transport="cli",
+        provider_kind="direct",
         default_model="gemini-2.5-flash",
     )
 

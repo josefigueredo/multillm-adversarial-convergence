@@ -130,25 +130,104 @@ document:
       layer: execution
       review: false
 
+  providers:
+    builder_main:
+      adapter: claude-cli
+      model: sonnet
+    challenger_fast:
+      adapter: gemini-cli
+      model: gemini-2.5-flash
+
   backends:
-    primary: claude            # personas, synthesis
+    primary: builder_main          # personas, synthesis
     research:
-      - claude                 # Builder (research[0])
-      - gemini                 # Challenger (research[1])
-    judge: claude              # Arbitrator
-    utility: gemini            # Verifier (cheap, fast classification)
+      - builder_main               # Builder (research[0])
+      - challenger_fast            # Challenger (research[1])
+    judge: builder_main            # Arbitrator
+    utility: challenger_fast       # Verifier (cheap, fast classification)
 ```
 
 See `configs/prd_template.yaml` for the full annotated reference.
 
 ## Backends
 
-| Backend | Default Model | Budget Cap | Recommended Role |
-|---------|--------------|------------|-----------------|
-| **claude** | sonnet | Yes | Primary, Builder, Arbitrator |
-| **codex** | gpt-5.4 | No | Builder, Challenger |
-| **gemini** | gemini-2.5-flash | No | Verifier (cheap classification) |
-| **copilot** | gpt-4.1 | No | Builder only |
+| Backend | Transport | Kind | Default Model | Budget Cap | Recommended Role |
+|---------|-----------|------|---------------|------------|-----------------|
+| **claude-cli** | CLI | direct | sonnet | Yes | Primary, Builder, Arbitrator |
+| **codex-cli** | CLI | direct | gpt-5.4 | No | Builder, Challenger |
+| **gemini-cli** | CLI | direct | gemini-2.5-flash | No | Verifier (cheap classification) |
+| **copilot-cli** | CLI | direct | gpt-4.1 | No | Builder only |
+| **claude-api** | API | direct | claude-sonnet-4-5 | No | Primary direct API path |
+| **codex-api** | API | direct | gpt-5.4 | No | Builder / challenger via Responses API |
+| **gemini-api** | API | direct | gemini-2.5-flash | No | Utility / verifier via Gemini API |
+| **litellm-api** | API | aggregator | openai/gpt-4.1-mini | No | Gateway-based routing |
+| **copilot-api** | API | aggregator | openai/gpt-4.1 | No | GitHub Models aggregation |
+| **bedrock-api** | API | aggregator | provider-defined | No | AWS Bedrock Converse routing |
+
+For provider-instance contract details, see `docs/design/api-provider-contracts.md`.
+
+### Model resolution contract
+
+- `claude-cli` accepts Claude shortnames directly
+- direct non-Claude providers translate Claude shortnames to their `default_model`
+- aggregators require an **explicit** model identifier
+
+So:
+
+- `adapter: codex-api` + `model: sonnet` is allowed and resolves to the provider default
+- `adapter: litellm-api` + `model: sonnet` is rejected because the routed target is ambiguous
+
+### API-oriented example
+
+Use `providers:` when you want document refinement to target API adapters or gateways:
+
+```yaml
+providers:
+  builder_main:
+    adapter: claude-api
+    model: claude-sonnet-4-5
+
+  challenger_fast:
+    adapter: litellm-api
+    model: openai/gpt-4.1-mini
+    base_url: http://localhost:4000
+
+backends:
+  primary: builder_main
+  research: [builder_main, challenger_fast]
+  judge: builder_main
+  utility: challenger_fast
+```
+
+### `system_prompt` contract
+
+You can set a shared instruction in `execution.system_prompt`:
+
+```yaml
+execution:
+  system_prompt: "You are a rigorous product reviewer."
+```
+
+Behavior:
+
+- preserved for supported API backends
+- removed automatically for unsupported backends
+- current CLI adapters still behave as unsupported unless explicitly modeled otherwise
+
+### Capability contract
+
+- `allowed_tools` is removed automatically for backends that do not support tools
+- `json_schema` is removed automatically for backends that do not support structured output
+- API aggregators are currently tool-disabled in this project
+
+### Normalized API error contract
+
+When API backends fail, the normalized error category is stored in `AgentResponse.raw["error"]`.
+
+The most useful categories for operators are:
+
+- retryable: `rate_limit`, `timeout`, `transport`, `server_error`
+- non-retryable until changed: `auth`, `permission`, `bad_request`, `quota`
 
 ## Companion Files (`source_files`)
 

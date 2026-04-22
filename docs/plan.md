@@ -135,25 +135,101 @@ plan:
   #     layer: companion
   #     review: false
 
+  providers:
+    planner_main:
+      adapter: claude-cli
+      model: sonnet
+    verifier_fast:
+      adapter: gemini-cli
+      model: gemini-2.5-flash
+
   backends:
-    primary: claude            # personas, synthesis
+    primary: planner_main          # personas, synthesis
     research:
-      - claude                 # Builder (research[0])
-      - gemini                 # Challenger (research[1])
-    judge: claude              # Arbitrator
-    utility: gemini            # Verifier (cheap, fast classification)
+      - planner_main               # Builder (research[0])
+      - verifier_fast              # Challenger (research[1])
+    judge: planner_main            # Arbitrator
+    utility: verifier_fast         # Verifier (cheap, fast classification)
 ```
 
 See `configs/plan_template.yaml` for the full annotated reference.
 
 ## Backends
 
-| Backend | Default Model | Budget Cap | Recommended Role |
-|---------|--------------|------------|-----------------|
-| **claude** | sonnet | Yes | Primary, Builder, Arbitrator |
-| **codex** | gpt-5.4 | No | Builder, Challenger |
-| **gemini** | gemini-2.5-flash | No | Verifier (cheap classification) |
-| **copilot** | gpt-4.1 | No | Builder only |
+| Backend | Transport | Kind | Default Model | Budget Cap | Recommended Role |
+|---------|-----------|------|---------------|------------|-----------------|
+| **claude-cli** | CLI | direct | sonnet | Yes | Primary, Builder, Arbitrator |
+| **codex-cli** | CLI | direct | gpt-5.4 | No | Builder, Challenger |
+| **gemini-cli** | CLI | direct | gemini-2.5-flash | No | Verifier (cheap classification) |
+| **copilot-cli** | CLI | direct | gpt-4.1 | No | Builder only |
+| **claude-api** | API | direct | claude-sonnet-4-5 | No | Primary direct API path |
+| **codex-api** | API | direct | gpt-5.4 | No | Builder / challenger via Responses API |
+| **gemini-api** | API | direct | gemini-2.5-flash | No | Utility / verifier via Gemini API |
+| **litellm-api** | API | aggregator | openai/gpt-4.1-mini | No | Gateway-based routing |
+| **copilot-api** | API | aggregator | openai/gpt-4.1 | No | GitHub Models aggregation |
+| **bedrock-api** | API | aggregator | provider-defined | No | AWS Bedrock Converse routing |
+
+For provider-instance contract details, see `docs/design/api-provider-contracts.md`.
+
+### Model resolution contract
+
+- `claude-cli` accepts Claude shortnames directly
+- direct non-Claude providers translate Claude shortnames to their provider defaults
+- aggregators require an **explicit model identifier**
+
+That means gateway-style adapters should be configured with the actual routed model, not a shorthand.
+
+### API-oriented example
+
+```yaml
+providers:
+  planner_main:
+    adapter: bedrock-api
+    model: anthropic.claude-3-5-sonnet-20240620-v1:0
+    region: us-east-1
+    aws_profile: sandbox
+
+  verifier_fast:
+    adapter: litellm-api
+    model: openai/gpt-4.1-mini
+    base_url: http://localhost:4000
+
+backends:
+  primary: planner_main
+  research: [planner_main, verifier_fast]
+  judge: planner_main
+  utility: verifier_fast
+```
+
+### `system_prompt` contract
+
+You can provide a shared planning instruction in `execution.system_prompt`:
+
+```yaml
+execution:
+  system_prompt: "You are a cautious architect and implementation planner."
+```
+
+Behavior:
+
+- preserved for supported API backends
+- stripped automatically for unsupported backends
+- currently safest on API adapters, not CLI adapters
+
+### Capability contract
+
+- `allowed_tools` is removed automatically for backends that do not support tools
+- `json_schema` is removed automatically for backends that do not support structured output
+- API aggregators are currently tool-disabled in this project
+
+### Normalized API error contract
+
+API failures are normalized into categories in `AgentResponse.raw["error"]`.
+
+For planning workflows, the most important split is:
+
+- retryable: `rate_limit`, `timeout`, `transport`, `server_error`
+- configuration/input issues: `auth`, `permission`, `bad_request`, `quota`
 
 ## Companion Files (`source_files`)
 

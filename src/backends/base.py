@@ -29,6 +29,7 @@ class Backend(ABC):
     """
 
     name: str
+    aliases: tuple[str, ...] = ()
     capabilities: BackendCapabilities = BackendCapabilities()
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -36,6 +37,8 @@ class Backend(ABC):
         if hasattr(cls, "name") and isinstance(cls.name, str):
             from .registry import _register
             _register(cls.name, cls)
+            for alias in getattr(cls, "aliases", ()):
+                _register(alias, cls)
 
     @abstractmethod
     def cli_executable(self) -> str:

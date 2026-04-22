@@ -22,6 +22,137 @@ from .backends import VALID_BACKENDS
 VALID_STRATEGIES = ("single", "ensemble", "adversarial", "parallel", "serial", "specialist")
 
 
+def _validate_backend_name(name: str, role: str) -> None:
+    """Raise ``ValueError`` when *name* is not a known backend."""
+    if name not in VALID_BACKENDS:
+        raise ValueError(
+            f"Invalid {role} backend '{name}'. Must be one of: {', '.join(VALID_BACKENDS)}"
+        )
+
+
+@dataclass(frozen=True)
+class ProviderConfig:
+    """Named provider instance configuration."""
+
+    adapter: str
+    model: str = ""
+    base_url: str = ""
+    api_version: str = ""
+    region: str = ""
+    organization: str = ""
+    aws_profile: str = ""
+    allowed_tools: str = ""
+    max_turns: int = 0
+    timeout_seconds: int = 0
+    max_budget_per_call: float = -1.0
+
+
+def _parse_providers_config(raw: dict[str, Any]) -> dict[str, "ProviderConfig"]:
+    """Parse named provider instances."""
+    providers: dict[str, ProviderConfig] = {}
+    for name, entry in raw.items():
+        if not isinstance(entry, dict):
+            raise ValueError(f"Provider '{name}' must be a mapping")
+        adapter = entry.get("adapter", "")
+        if adapter not in VALID_BACKENDS:
+            raise ValueError(
+                f"Invalid provider adapter '{adapter}' for provider '{name}'. "
+                f"Must be one of: {', '.join(VALID_BACKENDS)}"
+            )
+        providers[name] = ProviderConfig(
+            adapter=adapter,
+            model=entry.get("model", ""),
+            base_url=entry.get("base_url", ""),
+            api_version=str(entry.get("api_version", "")),
+            region=entry.get("region", ""),
+            organization=entry.get("organization", ""),
+            aws_profile=entry.get("aws_profile", ""),
+            allowed_tools=entry.get("allowed_tools", ""),
+            max_turns=entry.get("max_turns", 0),
+            timeout_seconds=entry.get("timeout_seconds", 0),
+            max_budget_per_call=entry.get("max_budget_per_call", -1.0),
+        )
+    return providers
+
+
+def _validate_provider_references(backends: "BackendsConfig", providers: dict[str, "ProviderConfig"]) -> None:
+    """Validate that role mappings point to defined provider instances."""
+    if not providers:
+        return
+    for name in backends.all_backend_names():
+        if name not in providers:
+            raise ValueError(f"Unknown provider instance '{name}' referenced in backends")
+
+
+def _parse_backends_config(raw: dict[str, Any], *, default_primary: str = "claude-cli") -> "BackendsConfig":
+    """Parse and validate a ``backends:`` mapping."""
+    if not raw:
+        return BackendsConfig(primary=default_primary, research=(default_primary,))
+
+    research_val = raw.get("research", [raw.get("primary", default_primary)])
+    if isinstance(research_val, str):
+        research_val = [research_val]
+
+    primary = raw.get("primary", default_primary)
+    _validate_backend_name(primary, "primary")
+    for name in research_val:
+        _validate_backend_name(name, "research")
+
+    judge = raw.get("judge", "")
+    if judge:
+        _validate_backend_name(judge, "judge")
+
+    utility = raw.get("utility", "")
+    if utility:
+        _validate_backend_name(utility, "utility")
+
+    return BackendsConfig(
+        primary=primary,
+        research=tuple(research_val),
+        judge=judge,
+        utility=utility,
+    )
+
+
+def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
+    """Parse the shared execution settings used by all workflows."""
+    exec_defaults = ExecutionConfig()
+    timeout = raw.get("timeout_seconds", exec_defaults.timeout_seconds)
+    if timeout <= 0:
+        raise ValueError(f"timeout_seconds must be positive, got {timeout}")
+
+    max_budget = raw.get("max_budget_per_call", exec_defaults.max_budget_per_call)
+    if max_budget < 0:
+        raise ValueError(f"max_budget_per_call must be non-negative, got {max_budget}")
+
+    model = raw.get("model", exec_defaults.model)
+
+    return ExecutionConfig(
+        max_iterations=raw.get("max_iterations", exec_defaults.max_iterations),
+        compress_every=raw.get("compress_every", exec_defaults.compress_every),
+        system_prompt=raw.get("system_prompt", exec_defaults.system_prompt),
+        stream=raw.get("stream", exec_defaults.stream),
+        allowed_tools=raw.get("allowed_tools", exec_defaults.allowed_tools),
+        max_turns=raw.get("max_turns", exec_defaults.max_turns),
+        timeout_seconds=timeout,
+        backend=raw.get("backend", exec_defaults.backend),
+        model=model,
+        max_budget_per_call=max_budget,
+        lightweight_mode=raw.get("lightweight_mode", exec_defaults.lightweight_mode),
+        isolate_backend_context=raw.get(
+            "isolate_backend_context",
+            exec_defaults.isolate_backend_context,
+        ),
+        sanitize_backend_env=raw.get(
+            "sanitize_backend_env",
+            exec_defaults.sanitize_backend_env,
+        ),
+        strategy=raw.get("strategy", exec_defaults.strategy),
+        backends=raw.get("backends", exec_defaults.backends),
+        strategy_config=raw.get("strategy_config", exec_defaults.strategy_config),
+    )
+
+
 @dataclass(frozen=True)
 class BackendsConfig:
     """Role-to-backend mapping for multi-backend strategies.
@@ -35,8 +166,8 @@ class BackendsConfig:
         utility: Backend used for mechanical tasks (compression).
     """
 
-    primary: str = "claude"
-    research: tuple[str, ...] = ("claude",)
+    primary: str = "claude-cli"
+    research: tuple[str, ...] = ("claude-cli",)
     judge: str = ""  # empty → falls back to primary
     utility: str = ""  # empty → falls back to primary
 
@@ -177,11 +308,14 @@ class ExecutionConfig:
         max_iterations: Maximum iterations before stopping.  ``0`` means
             infinite (run until interrupted).
         compress_every: Compress the knowledge base every *N* iterations.
+        system_prompt: Optional shared system/developer instruction.
+        stream: Enable live backend streaming for research-phase calls when the
+            selected backend supports it.
         allowed_tools: Comma-separated list of tools available to the agent.
         max_turns: Maximum agent turns per CLI invocation.
         timeout_seconds: Per-invocation timeout in seconds.
-        backend: CLI backend to use (``"claude"``, ``"codex"``, ``"gemini"``,
-            or ``"copilot"``).
+        backend: CLI backend to use (``"claude-cli"``, ``"codex-cli"``, ``"gemini-cli"``,
+            or ``"copilot-cli"``).
         model: Model name (backend-specific, e.g. ``"sonnet"`` for Claude).
         max_budget_per_call: USD cap per CLI invocation (backends that don't
             support per-call budgets ignore this).
@@ -198,10 +332,12 @@ class ExecutionConfig:
 
     max_iterations: int = 0
     compress_every: int = 5
+    system_prompt: str = ""
+    stream: bool = False
     allowed_tools: str = "WebSearch,WebFetch,Read,Bash,Glob,Grep"
     max_turns: int = 10
     timeout_seconds: int = 600
-    backend: str = "claude"
+    backend: str = "claude-cli"
     model: str = "sonnet"
     max_budget_per_call: float = 0.50
     lightweight_mode: bool = False
@@ -232,6 +368,7 @@ class ResearchConfig:
     reporting: ReportingConfig = field(default_factory=ReportingConfig)
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    providers: dict[str, ProviderConfig] = field(default_factory=dict)
 
     @classmethod
     def from_yaml(cls, path: Path) -> ResearchConfig:
@@ -319,6 +456,7 @@ class ResearchConfig:
         # --- Execution --------------------------------------------------------
         exec_raw: dict[str, Any] = research.get("execution", {})
         exec_defaults = ExecutionConfig()
+        providers = _parse_providers_config(exec_raw.get("providers", {}))
 
         backend = exec_raw.get("backend", exec_defaults.backend)
         if backend not in VALID_BACKENDS:
@@ -344,7 +482,22 @@ class ResearchConfig:
             )
 
         backends_raw: dict[str, Any] = exec_raw.get("backends", {})
-        if backends_raw:
+        if providers:
+            if backends_raw:
+                research_val = backends_raw.get("research", [backends_raw.get("primary", next(iter(providers)))])
+                if isinstance(research_val, str):
+                    research_val = [research_val]
+                backends_config = BackendsConfig(
+                    primary=backends_raw.get("primary", next(iter(providers))),
+                    research=tuple(research_val),
+                    judge=backends_raw.get("judge", ""),
+                    utility=backends_raw.get("utility", ""),
+                )
+            else:
+                first_provider = next(iter(providers))
+                backends_config = BackendsConfig(primary=first_provider, research=(first_provider,))
+            _validate_provider_references(backends_config, providers)
+        elif backends_raw:
             research_val = backends_raw.get("research", [backend])
             if isinstance(research_val, str):
                 research_val = [research_val]
@@ -392,6 +545,8 @@ class ResearchConfig:
         execution = ExecutionConfig(
             max_iterations=exec_raw.get("max_iterations", exec_defaults.max_iterations),
             compress_every=exec_raw.get("compress_every", exec_defaults.compress_every),
+            system_prompt=exec_raw.get("system_prompt", exec_defaults.system_prompt),
+            stream=exec_raw.get("stream", exec_defaults.stream),
             allowed_tools=exec_raw.get("allowed_tools", exec_defaults.allowed_tools),
             max_turns=exec_raw.get("max_turns", exec_defaults.max_turns),
             timeout_seconds=timeout,
@@ -421,6 +576,7 @@ class ResearchConfig:
             reporting=reporting,
             scoring=scoring,
             execution=execution,
+            providers=providers,
         )
 
 
@@ -592,8 +748,10 @@ class DocumentConfig:
     )
     artifacts: tuple[ArtifactConfig, ...] = ()
     source_files: tuple[SourceFileConfig, ...] = ()
+    providers: dict[str, ProviderConfig] = field(default_factory=dict)
     backends: BackendsConfig = field(default_factory=BackendsConfig)
     strategy_config: StrategyConfig = field(default_factory=StrategyConfig)
+    execution: ExecutionConfig = field(default_factory=ExecutionConfig)
 
     @classmethod
     def from_yaml(cls, path: Path) -> "DocumentConfig":
@@ -686,24 +844,31 @@ class DocumentConfig:
             for a in doc.get("artifacts", [])
         )
 
-        backends_raw: dict[str, Any] = doc.get("backends", {})
-        if backends_raw:
-            research_val = backends_raw.get("research", [backends_raw.get("primary", "claude")])
-            if isinstance(research_val, str):
-                research_val = [research_val]
-            backends_cfg = BackendsConfig(
-                primary=backends_raw.get("primary", "claude"),
-                research=tuple(research_val),
-                judge=backends_raw.get("judge", ""),
-                utility=backends_raw.get("utility", ""),
-            )
+        providers = _parse_providers_config(doc.get("providers", {}))
+        if providers:
+            backends_raw = doc.get("backends", {})
+            if backends_raw:
+                research_val = backends_raw.get("research", [backends_raw.get("primary", next(iter(providers)))])
+                if isinstance(research_val, str):
+                    research_val = [research_val]
+                backends_cfg = BackendsConfig(
+                    primary=backends_raw.get("primary", next(iter(providers))),
+                    research=tuple(research_val),
+                    judge=backends_raw.get("judge", ""),
+                    utility=backends_raw.get("utility", ""),
+                )
+            else:
+                first_provider = next(iter(providers))
+                backends_cfg = BackendsConfig(primary=first_provider, research=(first_provider,))
+            _validate_provider_references(backends_cfg, providers)
         else:
-            backends_cfg = BackendsConfig()
+            backends_cfg = _parse_backends_config(doc.get("backends", {}))
 
         strat_raw: dict[str, Any] = doc.get("strategy_config", {})
         strategy_cfg = StrategyConfig(
             critique_depth=strat_raw.get("critique_depth", "standard"),
         )
+        execution_cfg = _parse_execution_config(doc.get("execution", {}))
 
         return cls(
             topic=doc["topic"],
@@ -716,8 +881,10 @@ class DocumentConfig:
             personas=personas,
             artifacts=artifacts,
             source_files=source_files,
+            providers=providers,
             backends=backends_cfg,
             strategy_config=strategy_cfg,
+            execution=execution_cfg,
         )
 
 
@@ -788,6 +955,7 @@ class PlanConfig:
     )
     artifacts: tuple[ArtifactConfig, ...] = ()
     source_files: tuple[SourceFileConfig, ...] = ()
+    providers: dict[str, ProviderConfig] = field(default_factory=dict)
     backends: BackendsConfig = field(default_factory=BackendsConfig)
     strategy_config: StrategyConfig = field(default_factory=StrategyConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
@@ -888,32 +1056,32 @@ class PlanConfig:
             for a in plan_raw.get("artifacts", [])
         )
 
-        backends_raw: dict[str, Any] = plan_raw.get("backends", {})
-        if backends_raw:
-            research_val = backends_raw.get("research", [backends_raw.get("primary", "claude")])
-            if isinstance(research_val, str):
-                research_val = [research_val]
-            backends_cfg = BackendsConfig(
-                primary=backends_raw.get("primary", "claude"),
-                research=tuple(research_val),
-                judge=backends_raw.get("judge", ""),
-                utility=backends_raw.get("utility", ""),
-            )
+        providers = _parse_providers_config(plan_raw.get("providers", {}))
+        if providers:
+            backends_raw = plan_raw.get("backends", {})
+            if backends_raw:
+                research_val = backends_raw.get("research", [backends_raw.get("primary", next(iter(providers)))])
+                if isinstance(research_val, str):
+                    research_val = [research_val]
+                backends_cfg = BackendsConfig(
+                    primary=backends_raw.get("primary", next(iter(providers))),
+                    research=tuple(research_val),
+                    judge=backends_raw.get("judge", ""),
+                    utility=backends_raw.get("utility", ""),
+                )
+            else:
+                first_provider = next(iter(providers))
+                backends_cfg = BackendsConfig(primary=first_provider, research=(first_provider,))
+            _validate_provider_references(backends_cfg, providers)
         else:
-            backends_cfg = BackendsConfig()
+            backends_cfg = _parse_backends_config(plan_raw.get("backends", {}))
 
         strat_raw: dict[str, Any] = plan_raw.get("strategy_config", {})
         strategy_cfg = StrategyConfig(
             critique_depth=strat_raw.get("critique_depth", "standard"),
         )
 
-        exec_defaults = ExecutionConfig()
-        exec_raw: dict[str, Any] = plan_raw.get("execution", {})
-        execution_cfg = ExecutionConfig(
-            allowed_tools=exec_raw.get("allowed_tools", exec_defaults.allowed_tools),
-            max_turns=exec_raw.get("max_turns", exec_defaults.max_turns),
-            timeout_seconds=exec_raw.get("timeout_seconds", exec_defaults.timeout_seconds),
-        )
+        execution_cfg = _parse_execution_config(plan_raw.get("execution", {}))
 
         return cls(
             topic=plan_raw["topic"],
@@ -926,6 +1094,7 @@ class PlanConfig:
             personas=personas,
             artifacts=artifacts,
             source_files=source_files,
+            providers=providers,
             backends=backends_cfg,
             strategy_config=strategy_cfg,
             execution=execution_cfg,

@@ -7,7 +7,7 @@
 #   - hectorvent/floci (Docker image)
 #   - Any others discovered during research
 #
-# Strategy: adversarial (codex researches, claude critiques, codex judges)
+# Strategy: adversarial (codex researches, claude-cli critiques, codex-cli judges)
 # Rationale: high hallucination risk on obscure tools — critique catches
 #            fabricated features, compatibility claims, and pricing.
 
@@ -48,18 +48,28 @@ research:
     compress_every: 4
     allowed_tools: "WebSearch,WebFetch,Read,Bash,Glob,Grep"
     max_turns: 8
-    backend: claude
+    backend: claude-cli
     model: sonnet
     max_budget_per_call: 2.00
     timeout_seconds: 600
 
     strategy: adversarial
+    providers:
+      primary_reasoner:
+        adapter: claude-cli
+        model: sonnet
+      research_coder:
+        adapter: codex-cli
+        model: gpt-5.4
+      adversary_reasoner:
+        adapter: claude-cli
+        model: sonnet
     backends:
-      primary: claude           # hypothesis + synthesis (best reasoner)
+      primary: primary_reasoner     # hypothesis + synthesis (best reasoner)
       research:
-        - codex                 # researcher (different provider)
-        - claude                # adversary (critiques codex's findings)
-      judge: codex              # adjudicator (different from critic)
-      utility: codex
+        - research_coder            # researcher (different provider)
+        - adversary_reasoner        # adversary (critiques researcher's findings)
+      judge: research_coder         # adjudicator (different from critic)
+      utility: research_coder
     strategy_config:
       critique_depth: thorough  # line-by-line — obscure tools need strict fact-checking

@@ -18,8 +18,10 @@ log = logging.getLogger("autoresearch")
 
 class CopilotBackend(Backend):
 
-    name = "copilot"
+    name = "copilot-cli"
     capabilities = BackendCapabilities(
+        transport="cli",
+        provider_kind="direct",
         default_model="gpt-4.1",
     )
 

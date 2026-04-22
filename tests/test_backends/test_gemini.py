@@ -12,7 +12,7 @@ class TestGeminiBackend:
         self.backend = GeminiBackend()
 
     def test_name(self):
-        assert self.backend.name == "gemini"
+        assert self.backend.name == "gemini-cli"
 
     def test_cli_executable(self):
         assert self.backend.cli_executable() == "gemini"

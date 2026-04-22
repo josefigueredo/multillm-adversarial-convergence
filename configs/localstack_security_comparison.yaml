@@ -58,18 +58,28 @@ research:
     compress_every: 4
     allowed_tools: "WebSearch,WebFetch,Read,Bash,Glob,Grep"
     max_turns: 8
-    backend: claude
+    backend: claude-cli
     model: sonnet
     max_budget_per_call: 2.00
     timeout_seconds: 600
 
     strategy: adversarial
+    providers:
+      primary_reasoner:
+        adapter: claude-cli
+        model: sonnet
+      research_coder:
+        adapter: codex-cli
+        model: gpt-5.4
+      adversary_reasoner:
+        adapter: claude-cli
+        model: sonnet
     backends:
-      primary: claude
+      primary: primary_reasoner
       research:
-        - codex
-        - claude
-      judge: codex
-      utility: codex
+        - research_coder
+        - adversary_reasoner
+      judge: research_coder
+      utility: research_coder
     strategy_config:
       critique_depth: thorough

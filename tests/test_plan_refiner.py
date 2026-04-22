@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.backends.types import AgentResponse
-from src.config import ArtifactConfig, BackendsConfig, PlanConfig
+from src.backends.types import AgentResponse, BackendCapabilities
+from src.config import ArtifactConfig, BackendsConfig, ExecutionConfig, PlanConfig, ProviderConfig
 from src.plan_loop import PlanCycleState
 from src.plan_refiner import EXIT_HUMAN_REQUIRED, PlanRefiner
 
@@ -21,7 +21,8 @@ def _make_config(**kwargs) -> PlanConfig:
         primary_artifact="PLAN.md",
         convergence_cycles=1,
         max_cycles=5,
-        backends=BackendsConfig(primary="claude", research=["claude", "gemini"]),
+        backends=BackendsConfig(primary="claude-cli", research=["claude-cli", "gemini-cli"]),
+        execution=ExecutionConfig(),
     )
     defaults.update(kwargs)
     return PlanConfig(**defaults)
@@ -29,7 +30,7 @@ def _make_config(**kwargs) -> PlanConfig:
 
 def _make_backend(text: str = "# Generated Plan") -> MagicMock:
     backend = MagicMock()
-    backend.run.return_value = AgentResponse(
+    backend.invoke.return_value = AgentResponse(
         text=text, cost_usd=0.01, is_error=False,
         input_tokens=100, output_tokens=50,
     )
@@ -38,8 +39,8 @@ def _make_backend(text: str = "# Generated Plan") -> MagicMock:
 
 def _make_backends(text: str = "# Generated Plan") -> dict:
     return {
-        "claude": _make_backend(text),
-        "gemini": _make_backend(text),
+        "claude-cli": _make_backend(text),
+        "gemini-cli": _make_backend(text),
     }
 
 
@@ -165,3 +166,63 @@ class TestPhase3Indexing:
 
         assert (tmp_path / "README.md").exists()
         assert (tmp_path / "DOCS_INDEX.md").exists()
+
+
+class TestBackendInvocation:
+    def test_invoke_uses_configured_execution_options(self, tmp_path):
+        config = _make_config(
+            execution=ExecutionConfig(
+                model="opus",
+                allowed_tools="Read,Bash",
+                max_turns=9,
+                timeout_seconds=456,
+            )
+        )
+        backend = _make_backend()
+        refiner = PlanRefiner(config, tmp_path, {"claude-cli": backend, "gemini-cli": _make_backend()})
+
+        resp = refiner._invoke("prompt", backend, "claude-cli")
+
+        assert resp.text == "# Generated Plan"
+        backend.invoke.assert_called_once()
+        call_args = backend.invoke.call_args
+        assert call_args.args[0] == "prompt"
+        opts = call_args.args[1]
+        assert opts.model == "opus"
+        assert opts.allowed_tools == "Read,Bash"
+        assert opts.max_turns == 9
+        assert call_args.kwargs["timeout"] == 456
+
+    def test_invoke_applies_provider_model_override(self, tmp_path):
+        config = _make_config(
+            execution=ExecutionConfig(model="sonnet", allowed_tools="Read", max_turns=9, timeout_seconds=456),
+            providers={"planner_main": ProviderConfig(adapter="claude-cli", model="opus")},
+            backends=BackendsConfig(primary="planner_main", research=["planner_main"]),
+        )
+        backend = _make_backend()
+        backend.instance_name = "planner_main"
+        backend.provider_config = config.providers["planner_main"]
+        refiner = PlanRefiner(config, tmp_path, {"planner_main": backend})
+
+        refiner._invoke("prompt", backend, "planner_main")
+
+        opts = backend.invoke.call_args.args[1]
+        assert opts.model == "opus"
+
+    def test_invoke_strips_tools_for_backend_without_tool_support(self, tmp_path):
+        config = _make_config(
+            execution=ExecutionConfig(model="openai/gpt-4.1-mini", allowed_tools="Read,Bash", timeout_seconds=456),
+        )
+        backend = _make_backend()
+        backend.capabilities = BackendCapabilities(
+            transport="api",
+            provider_kind="aggregator",
+            supports_tools=False,
+            default_model="openai/gpt-4.1-mini",
+        )
+        refiner = PlanRefiner(config, tmp_path, {"litellm-api": backend})
+
+        refiner._invoke("prompt", backend, "litellm-api")
+
+        opts = backend.invoke.call_args.args[1]
+        assert opts.allowed_tools == ""

@@ -31,8 +31,8 @@ def test_metrics_evaluation_and_dashboard_payloads():
         total_cost=1.25,
         total_input_tokens=100,
         total_output_tokens=20,
-        per_backend_costs={"claude": 1.25},
-        per_backend_tokens={"claude": {"input": 100, "output": 20}},
+        per_backend_costs={"claude-cli": 1.25},
+        per_backend_tokens={"claude-cli": {"input": 100, "output": 20}},
         results=[{"iteration": "001"}],
     )
     assert metrics["explored_dimensions_count"] == 1

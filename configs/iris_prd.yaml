@@ -47,10 +47,18 @@ document:
 
   artifacts: []
 
+  providers:
+    builder_main:
+      adapter: claude-cli
+      model: sonnet
+    challenger_fast:
+      adapter: gemini-cli
+      model: gemini-2.5-flash
+
   backends:
-    primary: claude
+    primary: builder_main
     research:
-      - claude
-      - gemini
-    judge: claude
-    utility: gemini
+      - builder_main
+      - challenger_fast
+    judge: builder_main
+    utility: challenger_fast

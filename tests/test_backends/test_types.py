@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.backends.types import AgentResponse, BackendCapabilities, CallOptions
+from src.backends.types import AgentResponse, BackendCapabilities, CallOptions, StreamEvent
 
 
 class TestAgentResponse:
@@ -22,18 +22,33 @@ class TestCallOptions:
     def test_defaults(self):
         opts = CallOptions()
         assert opts.model == ""
+        assert opts.system_prompt == ""
+        assert opts.stream is False
         assert opts.allowed_tools == ""
         assert opts.max_turns == 10
         assert opts.max_budget_usd == 0.0
         assert opts.json_schema is None
 
 
+class TestStreamEvent:
+    def test_defaults(self):
+        event = StreamEvent(type="text_delta")
+        assert event.text == ""
+        assert event.raw == {}
+
+
 class TestBackendCapabilities:
     def test_defaults(self):
         cap = BackendCapabilities()
+        assert cap.transport == "cli"
+        assert cap.provider_kind == "direct"
         assert cap.supports_json_schema is False
         assert cap.supports_budget_cap is False
         assert cap.supports_rate_limit_detection is False
+        assert cap.supports_system_prompt is False
+        assert cap.supports_streaming is False
+        assert cap.supports_response_format is False
+        assert cap.supports_org_routing is False
         assert cap.supports_tools is True
         assert cap.default_model == ""
 

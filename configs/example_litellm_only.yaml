@@ -1,0 +1,35 @@
+research:
+  topic: "Example: LiteLLM-only routing"
+  goal: "Demonstrate multiple provider instances using the same LiteLLM gateway with different routed models."
+  dimensions:
+    - "Gateway-only setup"
+    - "Per-instance model routing"
+
+  execution:
+    strategy: specialist
+    model: sonnet
+    timeout_seconds: 600
+
+    providers:
+      primary_gateway:
+        adapter: litellm-api
+        model: anthropic/claude-3-5-sonnet-latest
+        base_url: http://localhost:4000
+
+      research_gateway:
+        adapter: litellm-api
+        model: openai/gpt-4.1
+        base_url: http://localhost:4000
+
+      utility_gateway:
+        adapter: litellm-api
+        model: google/gemini-2.5-flash
+        base_url: http://localhost:4000
+
+    backends:
+      primary: primary_gateway
+      research:
+        - primary_gateway
+        - research_gateway
+      judge: primary_gateway
+      utility: utility_gateway
