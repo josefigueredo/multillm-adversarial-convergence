@@ -21,6 +21,7 @@ class LiteLLMApiBackend(OpenAICompatibleResponsesApiBackend):
         supports_streaming=True,
         supports_response_format=True,
         supports_org_routing=False,
+        supports_function_tools=True,
         supports_tools=False,
         default_model="openai/gpt-4.1-mini",
     )

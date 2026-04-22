@@ -2,7 +2,7 @@
 
 from src.backend_options import apply_backend_capabilities, build_call_options
 from src.backends import get_backend
-from src.backends.types import CallOptions
+from src.backends.types import CallOptions, ToolDefinition
 from src.config import ExecutionConfig
 
 
@@ -90,3 +90,41 @@ def test_apply_backend_capabilities_preserves_stream_when_supported():
         CallOptions(model="openai/gpt-4.1-mini", stream=True),
     )
     assert normalized.stream is True
+
+
+def test_apply_backend_capabilities_preserves_function_tools_when_supported():
+    backend = get_backend("codex-api")
+    tool = ToolDefinition(type="function", name="echo")
+    normalized = apply_backend_capabilities(
+        backend,
+        CallOptions(model="gpt-5.4", tools=(tool,), tool_choice="required"),
+    )
+    assert normalized.tools == (tool,)
+    assert normalized.tool_choice == "required"
+
+
+def test_apply_backend_capabilities_strips_function_tools_when_unsupported():
+    backend = get_backend("copilot-cli")
+    normalized = apply_backend_capabilities(
+        backend,
+        CallOptions(
+            model="gpt-5",
+            tools=(ToolDefinition(type="function", name="echo"),),
+            tool_choice="required",
+        ),
+    )
+    assert normalized.tools == ()
+    assert normalized.tool_choice == "none"
+
+
+def test_apply_backend_capabilities_normalizes_invalid_tool_choice_for_supported_backend():
+    backend = get_backend("codex-api")
+    normalized = apply_backend_capabilities(
+        backend,
+        CallOptions(
+            model="gpt-5.4",
+            tools=(ToolDefinition(type="function", name="echo"),),
+            tool_choice="wild-west",
+        ),
+    )
+    assert normalized.tool_choice == "auto"

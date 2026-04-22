@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from .base_api import ApiBackend
-from .types import AgentResponse, CallOptions, StreamEvent
+from .types import AgentResponse, CallOptions, StreamEvent, ToolCallRequest
 
 
 class OpenAICompatibleResponsesApiBackend(ApiBackend):
@@ -28,6 +27,18 @@ class OpenAICompatibleResponsesApiBackend(ApiBackend):
         }
         if opts.stream:
             body["stream"] = True
+        if opts.tools:
+            body["tools"] = [
+                {
+                    "type": tool.type,
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.input_schema,
+                    "strict": tool.strict,
+                }
+                for tool in opts.tools
+            ]
+            body["tool_choice"] = opts.tool_choice
         if opts.system_prompt:
             body["instructions"] = opts.system_prompt
         if self.supports_json_schema_format and opts.json_schema:
@@ -58,6 +69,22 @@ class OpenAICompatibleResponsesApiBackend(ApiBackend):
         provider = getattr(self, "provider_config", None)
         base_url = getattr(provider, "base_url", "") if provider is not None else ""
         return base_url or self.default_service_base_url()
+
+    def extract_function_tool_calls(self, payload: dict[str, Any]) -> list[ToolCallRequest]:
+        calls: list[ToolCallRequest] = []
+        for item in payload.get("output", []):
+            if not isinstance(item, dict) or item.get("type") != "function_call":
+                continue
+            calls.append(
+                ToolCallRequest(
+                    id=str(item.get("id", "")),
+                    call_id=str(item.get("call_id", "")),
+                    name=str(item.get("name", "")),
+                    arguments_json=str(item.get("arguments", "")),
+                    raw=item,
+                )
+            )
+        return calls
 
     def invoke_stream(self, prompt: str, opts: CallOptions, timeout: int = 300):
         for payload in self._post_stream(prompt, opts, timeout=timeout):

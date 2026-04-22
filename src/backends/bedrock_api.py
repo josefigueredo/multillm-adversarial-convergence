@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 from typing import Any
 
 from .base import Backend
-from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode, StreamEvent
+from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode, StreamEvent, ToolCallRequest
 
 
 class BedrockApiBackend(Backend):
@@ -20,6 +21,7 @@ class BedrockApiBackend(Backend):
         supports_rate_limit_detection=False,
         supports_system_prompt=True,
         supports_streaming=True,
+        supports_function_tools=True,
         supports_tools=False,
         default_model="",
     )
@@ -77,10 +79,71 @@ class BedrockApiBackend(Backend):
             }
             if opts.system_prompt:
                 request["system"] = [{"text": opts.system_prompt}]
+            if opts.tools:
+                request["toolConfig"] = {
+                    "tools": [
+                        {
+                            "toolSpec": {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "inputSchema": {"json": tool.input_schema},
+                            }
+                        }
+                        for tool in opts.tools
+                    ]
+                }
+                if opts.tool_choice == "required" and opts.tools:
+                    request["toolConfig"]["toolChoice"] = {"tool": {"name": opts.tools[0].name}}
             payload = client.converse(**request)
             return self.parse_payload(payload)
         except Exception as exc:
             return self._error_response_from_exception(exc)
+
+    def extract_function_tool_calls(self, payload: dict[str, Any]) -> list[ToolCallRequest]:
+        calls: list[ToolCallRequest] = []
+        output = payload.get("output", {})
+        message = output.get("message", {}) if isinstance(output, dict) else {}
+        for block in message.get("content", []):
+            if not isinstance(block, dict):
+                continue
+            tool_use = block.get("toolUse")
+            if not isinstance(tool_use, dict):
+                continue
+            calls.append(
+                ToolCallRequest(
+                    id=str(tool_use.get("toolUseId", "")),
+                    call_id=str(tool_use.get("toolUseId", "")),
+                    name=str(tool_use.get("name", "")),
+                    arguments_json=json.dumps(tool_use.get("input", {})),
+                    raw=block,
+                )
+            )
+        return calls
+
+    def build_tool_followup_input(
+        self,
+        prompt: str,
+        response_payload: dict[str, Any],
+        tool_outputs: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        messages = list(response_payload.get("messages", []))
+        if not messages:
+            messages = [{"role": "user", "content": [{"text": prompt}]}]
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "toolResult": {
+                            "toolUseId": item["call_id"],
+                            "content": [{"text": item["output"]}],
+                        }
+                    }
+                    for item in tool_outputs
+                ],
+            }
+        )
+        return messages
 
     def invoke_stream(self, prompt: str, opts: CallOptions, timeout: int = 300):
         model = opts.model or self.capabilities.default_model

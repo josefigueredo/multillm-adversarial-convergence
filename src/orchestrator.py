@@ -66,6 +66,7 @@ from .semantic_eval import (
     semantic_review_from_payload,
 )
 from .strategy import ResearchCandidate, Strategy, get_strategy
+from .tool_runtime import run_function_tool_loop
 
 log = logging.getLogger("autoresearch")
 
@@ -176,6 +177,12 @@ class AutoResearcher:
         self._candidate_assessments: list = []
         self._usage = UsageTotals()
         self._backend_workdir: Path | None = None
+        self._tool_loop_summary: dict[str, Any] = {
+            "runs": 0,
+            "tool_calls": 0,
+            "tool_failures": 0,
+            "per_backend": {},
+        }
 
     def _call(self, prompt: str, **kwargs: Any) -> AgentResponse:
         """Invoke the default backend with config defaults.
@@ -235,6 +242,8 @@ class AutoResearcher:
             model=model,
             system_prompt=opts.system_prompt,
             stream=kwargs.pop("stream", False),
+            tools=kwargs.pop("tools", ()),
+            tool_choice=kwargs.pop("tool_choice", "auto"),
             allowed_tools=kwargs.pop("allowed_tools", opts.allowed_tools),
             max_turns=kwargs.pop("max_turns", opts.max_turns),
             max_budget_usd=kwargs.pop("max_budget_usd", opts.max_budget_usd),
@@ -243,12 +252,51 @@ class AutoResearcher:
             sanitize_environment=opts.sanitize_environment,
         )
         opts = apply_backend_capabilities(backend, opts)
+        tool_registry = kwargs.pop("tool_registry", None)
         default_timeout = (
             provider.timeout_seconds
             if provider is not None and provider.timeout_seconds > 0
             else self.config.execution.timeout_seconds
         )
         timeout = kwargs.pop("timeout", default_timeout)
+        if opts.tools:
+            if opts.stream:
+                return AgentResponse(
+                    text="",
+                    cost_usd=0.0,
+                    is_error=True,
+                    raw={
+                        "error": {
+                            "category": "tool_execution",
+                            "message": "Function-tool execution is currently non-streaming only.",
+                            "provider_code": "streaming_tool_calls_unsupported",
+                            "retryable": False,
+                        },
+                        "payload": {},
+                    },
+                )
+            if not tool_registry:
+                return AgentResponse(
+                    text="",
+                    cost_usd=0.0,
+                    is_error=True,
+                    raw={
+                        "error": {
+                            "category": "tool_execution",
+                            "message": "Function tools require a tool_registry for execution.",
+                            "provider_code": "missing_tool_registry",
+                            "retryable": False,
+                        },
+                        "payload": {},
+                    },
+                )
+            return run_function_tool_loop(
+                backend,
+                prompt,
+                opts,
+                timeout=timeout,
+                tool_registry=tool_registry,
+            )
         if opts.stream and hasattr(backend, "invoke_stream"):
             return self._invoke_streaming_backend(backend, prompt, opts, timeout=timeout)
         return backend.invoke(prompt, opts, timeout=timeout)
@@ -337,6 +385,7 @@ class AutoResearcher:
         self.total_output_tokens = self._usage.total_output_tokens
         self.per_backend_costs = self._usage.per_backend_costs
         self.per_backend_tokens = self._usage.per_backend_tokens
+        self._track_tool_loop(resp, backend_name)
 
     def _track_candidate_usage(self, candidate: ResearchCandidate) -> None:
         """Record usage for a strategy-produced research candidate."""
@@ -346,6 +395,25 @@ class AutoResearcher:
         self.total_output_tokens = self._usage.total_output_tokens
         self.per_backend_costs = self._usage.per_backend_costs
         self.per_backend_tokens = self._usage.per_backend_tokens
+
+    def _track_tool_loop(self, resp: AgentResponse, backend_name: str = "") -> None:
+        """Accumulate normalized tool-loop observability from responses."""
+        if not isinstance(resp.raw, dict):
+            return
+        summary = resp.raw.get("tool_loop", {})
+        if not isinstance(summary, dict) or not summary:
+            return
+        name = str(summary.get("backend") or backend_name or "unknown")
+        self._tool_loop_summary["runs"] += 1
+        self._tool_loop_summary["tool_calls"] += int(summary.get("tool_calls", 0) or 0)
+        self._tool_loop_summary["tool_failures"] += int(summary.get("tool_failures", 0) or 0)
+        entry = self._tool_loop_summary["per_backend"].setdefault(
+            name,
+            {"runs": 0, "tool_calls": 0, "tool_failures": 0},
+        )
+        entry["runs"] += 1
+        entry["tool_calls"] += int(summary.get("tool_calls", 0) or 0)
+        entry["tool_failures"] += int(summary.get("tool_failures", 0) or 0)
 
     # -- Public API --------------------------------------------------------
 
@@ -820,6 +888,7 @@ class AutoResearcher:
             per_backend_costs=self.per_backend_costs,
             per_backend_tokens=self.per_backend_tokens,
             results=self.results,
+            tool_loop_summary=self._tool_loop_summary,
         )
         self.metrics_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -951,6 +1020,7 @@ class AutoResearcher:
             best_score=self.best_score,
             iteration=self.iteration,
             explored_dimensions=self.explored_dimensions,
+            tool_loop_summary=self._tool_loop_summary,
         )
 
     def _write_portfolio_artifacts(self) -> None:

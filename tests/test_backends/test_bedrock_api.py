@@ -1,10 +1,11 @@
 """Tests for src.backends.bedrock_api — BedrockApiBackend."""
 
+import json
 from unittest.mock import patch
 
 from src.backends import StreamEvent
 from src.backends.bedrock_api import BedrockApiBackend
-from src.backends.types import CallOptions
+from src.backends.types import CallOptions, ToolDefinition
 
 
 class TestBedrockApiBackend:
@@ -29,6 +30,80 @@ class TestBedrockApiBackend:
         assert resp.text == "hi"
         assert resp.input_tokens == 10
         assert resp.output_tokens == 5
+
+    def test_extract_function_tool_calls(self):
+        payload = {
+            "output": {
+                "message": {
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "toolu_123",
+                                "name": "echo",
+                                "input": {"message": "hi"},
+                            }
+                        }
+                    ]
+                }
+            },
+            "stopReason": "tool_use",
+        }
+        calls = self.backend.extract_function_tool_calls(payload)
+        assert len(calls) == 1
+        assert calls[0].call_id == "toolu_123"
+        assert calls[0].name == "echo"
+        assert calls[0].arguments_json == '{"message": "hi"}'
+
+    def test_build_tool_followup_input(self):
+        followup = self.backend.build_tool_followup_input(
+            "hello",
+            {
+                "messages": [
+                    {"role": "user", "content": [{"text": "hello"}]},
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "toolUse": {
+                                    "toolUseId": "toolu_123",
+                                    "name": "echo",
+                                    "input": {"message": "hi"},
+                                }
+                            }
+                        ],
+                    },
+                ]
+            },
+            [
+                {"type": "function_call_output", "call_id": "toolu_123", "output": "echo:hi"},
+            ],
+        )
+        assert followup == [
+            {"role": "user", "content": [{"text": "hello"}]},
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": "toolu_123",
+                            "name": "echo",
+                            "input": {"message": "hi"},
+                        }
+                    }
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "toolResult": {
+                            "toolUseId": "toolu_123",
+                            "content": [{"text": "echo:hi"}],
+                        }
+                    }
+                ],
+            },
+        ]
 
     @patch("src.backends.bedrock_api.BedrockApiBackend._has_boto3", return_value=True)
     @patch.dict("os.environ", {"AWS_REGION": "us-east-1"}, clear=True)
@@ -107,6 +182,46 @@ class TestBedrockApiBackend:
         assert resp.is_error is True
         assert resp.raw["error"]["category"] == "rate_limit"
         assert resp.raw["error"]["provider_code"] == "ThrottlingException"
+
+    @patch("src.backends.bedrock_api.BedrockApiBackend._has_boto3", return_value=True)
+    @patch("src.backends.bedrock_api.BedrockApiBackend._client")
+    def test_invoke_uses_bedrock_tool_config(self, mock_client, _):
+        self.backend.provider_config = type(
+            "Provider",
+            (),
+            {"region": "us-east-1", "aws_profile": "sandbox"},
+        )()
+        mock_client.return_value.converse.return_value = {
+            "output": {"message": {"content": [{"text": "hi"}]}},
+            "usage": {"inputTokens": 10, "outputTokens": 5},
+        }
+        self.backend.invoke(
+            "hello",
+            CallOptions(
+                model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+                tools=(
+                    ToolDefinition(
+                        type="function",
+                        name="echo",
+                        description="Echo a message.",
+                        input_schema={"type": "object", "properties": {"message": {"type": "string"}}},
+                    ),
+                ),
+                tool_choice="required",
+            ),
+            timeout=30,
+        )
+        kwargs = mock_client.return_value.converse.call_args.kwargs
+        assert kwargs["toolConfig"]["tools"] == [
+            {
+                "toolSpec": {
+                    "name": "echo",
+                    "description": "Echo a message.",
+                    "inputSchema": {"json": {"type": "object", "properties": {"message": {"type": "string"}}}},
+                }
+            }
+        ]
+        assert kwargs["toolConfig"]["toolChoice"] == {"tool": {"name": "echo"}}
 
     @patch("src.backends.bedrock_api.BedrockApiBackend._has_boto3", return_value=True)
     @patch("src.backends.bedrock_api.BedrockApiBackend._client")

@@ -1,9 +1,10 @@
 """Tests for src.backends.codex_api — CodexApiBackend."""
 
+import json
 from unittest.mock import patch
 
 from src.backends.codex_api import CodexApiBackend
-from src.backends.types import CallOptions
+from src.backends.types import CallOptions, ToolDefinition
 
 
 class TestCodexApiBackend:
@@ -40,6 +41,33 @@ class TestCodexApiBackend:
         assert body["text"]["format"]["type"] == "json_schema"
         assert body["text"]["format"]["schema"]["type"] == "object"
 
+    def test_build_request_with_function_tools(self):
+        _, _, body = self.backend.build_request(
+            "hello",
+            CallOptions(
+                model="gpt-5.4",
+                tools=(
+                    ToolDefinition(
+                        type="function",
+                        name="echo",
+                        description="Echo a message.",
+                        input_schema={"type": "object", "properties": {"message": {"type": "string"}}},
+                    ),
+                ),
+                tool_choice="required",
+            ),
+        )
+        assert body["tools"] == [
+            {
+                "type": "function",
+                "name": "echo",
+                "description": "Echo a message.",
+                "parameters": {"type": "object", "properties": {"message": {"type": "string"}}},
+                "strict": True,
+            }
+        ]
+        assert body["tool_choice"] == "required"
+
     def test_parse_payload(self):
         payload = {
             "output_text": "hi",
@@ -73,6 +101,24 @@ class TestCodexApiBackend:
         assert resp.input_tokens == 10
         assert resp.output_tokens == 5
         mock_post.assert_called_once()
+
+    def test_extract_function_tool_calls(self):
+        payload = {
+            "output": [
+                {
+                    "id": "fc_123",
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "echo",
+                    "arguments": json.dumps({"message": "hi"}),
+                }
+            ]
+        }
+        calls = self.backend.extract_function_tool_calls(payload)
+        assert len(calls) == 1
+        assert calls[0].call_id == "call_123"
+        assert calls[0].name == "echo"
+        assert calls[0].arguments_json == '{"message": "hi"}'
 
     @patch.dict("os.environ", {"OPENAI_API_KEY": "x"})
     def test_check_available_when_api_key_present(self):

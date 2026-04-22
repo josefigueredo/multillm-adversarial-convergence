@@ -1,7 +1,9 @@
 """Tests for shared OpenAI-compatible API backend helpers."""
 
+import json
+
 from src.backends.openai_compatible_api import OpenAICompatibleResponsesApiBackend
-from src.backends.types import BackendCapabilities, CallOptions
+from src.backends.types import BackendCapabilities, CallOptions, ToolDefinition
 
 
 class _StubOpenAICompatibleBackend(OpenAICompatibleResponsesApiBackend):
@@ -11,6 +13,7 @@ class _StubOpenAICompatibleBackend(OpenAICompatibleResponsesApiBackend):
         transport="api",
         provider_kind="direct",
         supports_json_schema=True,
+        supports_function_tools=True,
         supports_tools=False,
         default_model="gpt-test",
     )
@@ -49,3 +52,44 @@ def test_openai_compatible_base_adds_stream_flag():
     backend = _StubOpenAICompatibleBackend()
     _, _, body = backend.build_request("hello", CallOptions(model="gpt-test", stream=True))
     assert body["stream"] is True
+
+
+def test_openai_compatible_base_adds_function_tools():
+    backend = _StubOpenAICompatibleBackend()
+    _, _, body = backend.build_request(
+        "hello",
+        CallOptions(
+            model="gpt-test",
+            tools=(ToolDefinition(type="function", name="echo", input_schema={"type": "object"}),),
+            tool_choice="required",
+        ),
+    )
+    assert body["tools"] == [
+        {
+            "type": "function",
+            "name": "echo",
+            "description": "",
+            "parameters": {"type": "object"},
+            "strict": True,
+        }
+    ]
+    assert body["tool_choice"] == "required"
+
+
+def test_openai_compatible_base_extracts_function_tool_calls():
+    backend = _StubOpenAICompatibleBackend()
+    calls = backend.extract_function_tool_calls(
+        {
+            "output": [
+                {
+                    "id": "fc_123",
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "echo",
+                    "arguments": json.dumps({"message": "hi"}),
+                }
+            ]
+        }
+    )
+    assert len(calls) == 1
+    assert calls[0].call_id == "call_123"

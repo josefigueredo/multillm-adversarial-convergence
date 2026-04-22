@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from .base_api import ApiBackend
-from .types import AgentResponse, BackendCapabilities, CallOptions, StreamEvent
+import json
+
+from .types import AgentResponse, BackendCapabilities, CallOptions, StreamEvent, ToolCallRequest
 
 
 class ClaudeApiBackend(ApiBackend):
@@ -19,6 +21,7 @@ class ClaudeApiBackend(ApiBackend):
         supports_rate_limit_detection=False,
         supports_system_prompt=True,
         supports_streaming=True,
+        supports_function_tools=True,
         supports_tools=False,
         default_model="claude-sonnet-4-5",
     )
@@ -26,20 +29,35 @@ class ClaudeApiBackend(ApiBackend):
     def build_request(self, prompt: str, opts: CallOptions) -> tuple[str, dict[str, str], dict[str, Any]]:
         api_key = self._api_key()
         model = opts.model or self.capabilities.default_model
-        body = {
-            "model": model,
-            "max_tokens": 4096,
-            "messages": [
+        if isinstance(prompt, list):
+            messages = prompt
+        else:
+            messages = [
                 {
                     "role": "user",
                     "content": prompt,
                 }
-            ],
+            ]
+        body = {
+            "model": model,
+            "max_tokens": 4096,
+            "messages": messages,
         }
         if opts.system_prompt:
             body["system"] = opts.system_prompt
         if opts.stream:
             body["stream"] = True
+        if opts.tools:
+            body["tools"] = [
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": tool.input_schema,
+                }
+                for tool in opts.tools
+            ]
+            if opts.tool_choice == "required" and opts.tools:
+                body["tool_choice"] = {"type": "tool", "name": opts.tools[0].name}
         return (
             self._base_url("https://api.anthropic.com/v1/messages"),
             {
@@ -65,6 +83,48 @@ class ClaudeApiBackend(ApiBackend):
             output_tokens=usage.get("output_tokens", 0),
             raw=payload,
         )
+
+    def extract_function_tool_calls(self, payload: dict[str, Any]) -> list[ToolCallRequest]:
+        calls: list[ToolCallRequest] = []
+        for block in payload.get("content", []):
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            calls.append(
+                ToolCallRequest(
+                    id=str(block.get("id", "")),
+                    call_id=str(block.get("id", "")),
+                    name=str(block.get("name", "")),
+                    arguments_json=json.dumps(block.get("input", {})),
+                    raw=block,
+                )
+            )
+        return calls
+
+    def build_tool_followup_input(
+        self,
+        prompt: str,
+        response_payload: dict[str, Any],
+        tool_outputs: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        tool_result_blocks = [
+            {
+                "type": "tool_result",
+                "tool_use_id": item["call_id"],
+                "content": item["output"],
+            }
+            for item in tool_outputs
+        ]
+        return [
+            {"role": "user", "content": prompt},
+            {
+                "role": "assistant",
+                "content": response_payload.get("content", []),
+            },
+            {
+                "role": "user",
+                "content": tool_result_blocks,
+            },
+        ]
 
     def invoke_stream(self, prompt: str, opts: CallOptions, timeout: int = 300):
         message_payload: dict[str, Any] = {"content": []}

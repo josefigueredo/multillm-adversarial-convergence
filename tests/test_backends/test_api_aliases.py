@@ -18,6 +18,7 @@ def test_direct_api_capability_details():
     assert codex.capabilities.supports_streaming is True
     assert codex.capabilities.supports_response_format is True
     assert codex.capabilities.supports_org_routing is False
+    assert codex.capabilities.supports_function_tools is True
 
 
 def test_api_backends_with_system_prompt_support():
@@ -32,6 +33,16 @@ def test_claude_and_gemini_api_support_streaming():
         assert backend.capabilities.supports_streaming is True
 
 
+def test_claude_api_supports_function_tools():
+    backend = get_backend("claude-api")
+    assert backend.capabilities.supports_function_tools is True
+
+
+def test_gemini_api_supports_function_tools():
+    backend = get_backend("gemini-api")
+    assert backend.capabilities.supports_function_tools is True
+
+
 def test_litellm_api_has_aggregator_metadata():
     backend = get_backend("litellm-api")
     assert backend.capabilities.transport == "api"
@@ -40,6 +51,7 @@ def test_litellm_api_has_aggregator_metadata():
     assert backend.capabilities.supports_streaming is True
     assert backend.capabilities.supports_response_format is True
     assert backend.capabilities.supports_org_routing is False
+    assert backend.capabilities.supports_function_tools is True
     assert backend.capabilities.supports_tools is False
 
 
@@ -55,6 +67,7 @@ def test_copilot_api_supports_org_routing_and_response_format():
     assert backend.capabilities.supports_response_format is True
     assert backend.capabilities.supports_org_routing is True
     assert backend.capabilities.supports_streaming is True
+    assert backend.capabilities.supports_function_tools is True
 
 
 def test_bedrock_api_does_not_support_response_format_or_org_routing():
@@ -62,3 +75,4 @@ def test_bedrock_api_does_not_support_response_format_or_org_routing():
     assert backend.capabilities.supports_response_format is False
     assert backend.capabilities.supports_org_routing is False
     assert backend.capabilities.supports_streaming is True
+    assert backend.capabilities.supports_function_tools is True

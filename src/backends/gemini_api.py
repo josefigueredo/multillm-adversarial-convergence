@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from .base_api import ApiBackend
-from .types import AgentResponse, BackendCapabilities, CallOptions, StreamEvent
+import json
+
+from .types import AgentResponse, BackendCapabilities, CallOptions, StreamEvent, ToolCallRequest
 
 
 class GeminiApiBackend(ApiBackend):
@@ -19,6 +21,7 @@ class GeminiApiBackend(ApiBackend):
         supports_rate_limit_detection=False,
         supports_system_prompt=True,
         supports_streaming=True,
+        supports_function_tools=True,
         supports_tools=False,
         default_model="gemini-2.5-flash",
     )
@@ -31,17 +34,20 @@ class GeminiApiBackend(ApiBackend):
             self._base_url(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:{method}"),
             {"key": api_key},
         )
-        body = {
-            "contents": [
+        if isinstance(prompt, list):
+            contents = prompt
+        else:
+            contents = [
                 {
+                    "role": "user",
                     "parts": [
                         {
                             "text": prompt,
                         }
-                    ]
+                    ],
                 }
             ]
-        }
+        body = {"contents": contents}
         if opts.system_prompt:
             body["system_instruction"] = {
                 "parts": [
@@ -50,6 +56,26 @@ class GeminiApiBackend(ApiBackend):
                     }
                 ]
             }
+        if opts.tools:
+            body["tools"] = [
+                {
+                    "functionDeclarations": [
+                        {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": tool.input_schema,
+                        }
+                        for tool in opts.tools
+                    ]
+                }
+            ]
+            if opts.tool_choice == "required" and opts.tools:
+                body["toolConfig"] = {
+                    "functionCallingConfig": {
+                        "mode": "ANY",
+                        "allowedFunctionNames": [tool.name for tool in opts.tools],
+                    }
+                }
         return (
             url,
             {
@@ -76,6 +102,57 @@ class GeminiApiBackend(ApiBackend):
             output_tokens=usage.get("candidatesTokenCount", 0),
             raw=payload,
         )
+
+    def extract_function_tool_calls(self, payload: dict[str, Any]) -> list[ToolCallRequest]:
+        calls: list[ToolCallRequest] = []
+        for candidate in payload.get("candidates", []):
+            if not isinstance(candidate, dict):
+                continue
+            content = candidate.get("content", {})
+            for part in content.get("parts", []):
+                if not isinstance(part, dict):
+                    continue
+                function_call = part.get("functionCall")
+                if not isinstance(function_call, dict):
+                    continue
+                name = str(function_call.get("name", ""))
+                calls.append(
+                    ToolCallRequest(
+                        id=name,
+                        call_id=name,
+                        name=name,
+                        arguments_json=json.dumps(function_call.get("args", {})),
+                        raw=part,
+                    )
+                )
+        return calls
+
+    def build_tool_followup_input(
+        self,
+        prompt: str,
+        response_payload: dict[str, Any],
+        tool_outputs: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        assistant_content = {"role": "model", "parts": []}
+        candidates = response_payload.get("candidates", [])
+        if candidates and isinstance(candidates[0], dict):
+            assistant_content = candidates[0].get("content", assistant_content)
+        return [
+            {"role": "user", "parts": [{"text": prompt}]},
+            assistant_content,
+            {
+                "role": "tool",
+                "parts": [
+                    {
+                        "functionResponse": {
+                            "name": item["call_id"],
+                            "response": {"output": item["output"]},
+                        }
+                    }
+                    for item in tool_outputs
+                ],
+            },
+        ]
 
     def invoke_stream(self, prompt: str, opts: CallOptions, timeout: int = 300):
         started = False

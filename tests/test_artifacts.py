@@ -34,8 +34,10 @@ def test_metrics_evaluation_and_dashboard_payloads():
         per_backend_costs={"claude-cli": 1.25},
         per_backend_tokens={"claude-cli": {"input": 100, "output": 20}},
         results=[{"iteration": "001"}],
+        tool_loop_summary={"runs": 2, "tool_calls": 3, "tool_failures": 1, "per_backend": {"codex-api": {"runs": 2}}},
     )
     assert metrics["explored_dimensions_count"] == 1
+    assert metrics["tool_loop_summary"]["tool_calls"] == 3
 
     evaluation = evaluation_payload(
         benchmark_id="bench-1",
@@ -67,9 +69,11 @@ def test_metrics_evaluation_and_dashboard_payloads():
         strategy_summary={"current_strategy": "single"},
         semantic_calibration={"grade": "reasonable"},
         semantic_review={"grade": "good"},
+        tool_loop_summary={"runs": 2, "tool_calls": 3, "tool_failures": 1},
     )
     assert dashboard["consistency_level"] == "medium"
     assert dashboard["rubric_grade"] == "good"
+    assert dashboard["tool_loop_summary"]["runs"] == 2
 
 
 def test_pdf_summary_and_should_write_evaluation():

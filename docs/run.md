@@ -270,11 +270,28 @@ Current behavior:
 
 - `allowed_tools` is normalized away for backends that do not support tools.
 - `json_schema` is normalized away for backends that do not support structured output.
+- normalized API function tools are a separate contract from CLI `allowed_tools`
 - Today:
   - `copilot-api` supports `json_schema`
   - `litellm-api` supports `json_schema`
   - `bedrock-api` does not
   - API aggregators are still tool-disabled in this project
+
+### API function-tool calling
+
+The first normalized API tool-calling slice is intentionally narrow:
+
+- function tools only
+- non-streaming only
+- `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`
+- explicit runtime/tool-registry usage only
+
+Important:
+
+- this is **not** the same thing as CLI `allowed_tools`
+- tool-enabled API calls currently require a runtime tool registry
+- streaming + function tools is intentionally unsupported in the first slice
+- tool-loop observability is written into `metrics.json` and `dashboard.json`
 
 ### Normalized API error contract
 

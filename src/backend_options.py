@@ -27,6 +27,8 @@ def build_call_options(
         model=model,
         system_prompt=execution.system_prompt,
         stream=execution.stream,
+        tools=(),
+        tool_choice="auto",
         allowed_tools=allowed_tools,
         max_turns=max_turns,
         max_budget_usd=max_budget,
@@ -37,10 +39,13 @@ def build_call_options(
 
 def apply_backend_capabilities(backend: Backend, opts: CallOptions) -> CallOptions:
     """Strip unsupported options so the runtime contract is explicit."""
+    normalized_tool_choice = opts.tool_choice if opts.tool_choice in {"auto", "required", "none"} else "auto"
     return CallOptions(
         model=opts.model,
         system_prompt=opts.system_prompt if backend.capabilities.supports_system_prompt else "",
         stream=opts.stream if backend.capabilities.supports_streaming else False,
+        tools=opts.tools if backend.capabilities.supports_function_tools else (),
+        tool_choice=normalized_tool_choice if backend.capabilities.supports_function_tools else "none",
         allowed_tools=opts.allowed_tools if backend.capabilities.supports_tools else "",
         max_turns=opts.max_turns,
         max_budget_usd=opts.max_budget_usd if backend.capabilities.supports_budget_cap else 0.0,

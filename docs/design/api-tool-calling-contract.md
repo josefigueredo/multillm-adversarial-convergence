@@ -170,13 +170,38 @@ Add capability enforcement so unsupported adapters strip or reject tool config.
 
 Only then evaluate aggregators and non-OpenAI-native mappings.
 
+## Current implementation status
+
+The first implementation slice is now in place with the following scope:
+
+- function tools only
+- non-streaming only
+- explicit backend support only
+- currently enabled for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`
+
+What landed:
+
+- normalized tool dataclasses
+- `CallOptions.tools` and `CallOptions.tool_choice`
+- capability flag: `supports_function_tools`
+- OpenAI Responses request shaping for function tools
+- normalized function-call extraction from Responses payloads
+- a bounded runtime tool loop for explicit tool registries
+- orchestrator wiring for explicit tool-enabled calls
+- multi-tool execution in a single model turn
+- normalized handler/argument/max-turn failure behavior
+- invalid `tool_choice` normalization back to `auto`
+- tool-loop observability in metrics/dashboard artifacts
+
+What is still intentionally deferred:
+
+- streaming + tool-calling together
+- hosted tools / MCP tools / provider-native non-function tools
+
 ## Recommendation
 
-If this project implements API tool-calling, the first version should be:
+Keep the next step narrow too:
 
-- function-tools only
-- non-streaming
-- explicit backend support
-- likely centered on OpenAI-compatible adapters first
-
-Anything broader initially would create a messy contract very fast.
+- extend to one more OpenAI-compatible adapter only after runtime behavior is stable
+- do not mix streaming and tools yet
+- keep CLI `allowed_tools` separate from normalized API function tools

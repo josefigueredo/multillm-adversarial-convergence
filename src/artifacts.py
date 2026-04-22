@@ -92,6 +92,7 @@ def metrics_payload(
     per_backend_costs: dict[str, float],
     per_backend_tokens: dict[str, dict[str, int]],
     results: list[dict[str, str]],
+    tool_loop_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the machine-readable metrics payload."""
     return {
@@ -108,6 +109,12 @@ def metrics_payload(
         "per_backend_costs": per_backend_costs,
         "per_backend_tokens": per_backend_tokens,
         "results": results,
+        "tool_loop_summary": tool_loop_summary or {
+            "runs": 0,
+            "tool_calls": 0,
+            "tool_failures": 0,
+            "per_backend": {},
+        },
     }
 
 
@@ -184,6 +191,7 @@ def dashboard_payload(
     strategy_summary: dict[str, Any],
     semantic_calibration: dict[str, Any],
     semantic_review: dict[str, Any],
+    tool_loop_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the stakeholder-facing dashboard artifact payload."""
     return {
@@ -206,6 +214,11 @@ def dashboard_payload(
         ),
         "semantic_calibration": semantic_calibration,
         "semantic_review": semantic_review,
+        "tool_loop_summary": tool_loop_summary or {
+            "runs": 0,
+            "tool_calls": 0,
+            "tool_failures": 0,
+        },
     }
 
 
@@ -381,6 +394,7 @@ def write_dashboard(
     best_score: float,
     iteration: int,
     explored_dimensions: list[str],
+    tool_loop_summary: dict[str, Any] | None = None,
 ) -> None:
     """Write a stakeholder-friendly summary dashboard artifact."""
     rubric = load_json_if_exists(output_dir / "rubric.json", {})
@@ -406,6 +420,7 @@ def write_dashboard(
         strategy_summary=strategy_summary,
         semantic_calibration=semantic_calibration,
         semantic_review=semantic_review,
+        tool_loop_summary=tool_loop_summary,
     )
     (output_dir / "dashboard.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 

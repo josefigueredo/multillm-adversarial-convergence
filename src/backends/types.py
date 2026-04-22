@@ -25,6 +25,8 @@ class CallOptions:
     model: str = ""
     system_prompt: str = ""
     stream: bool = False
+    tools: tuple["ToolDefinition", ...] = ()
+    tool_choice: str = "auto"
     allowed_tools: str = ""
     max_turns: int = 10
     max_budget_usd: float = 0.0
@@ -55,6 +57,39 @@ class StreamEvent:
 
 
 @dataclass(frozen=True)
+class ToolDefinition:
+    """Normalized function-tool definition."""
+
+    type: str
+    name: str
+    description: str = ""
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    strict: bool = True
+
+
+@dataclass(frozen=True)
+class ToolCallRequest:
+    """Normalized function-tool call request emitted by a backend."""
+
+    call_id: str
+    name: str
+    arguments_json: str
+    id: str = ""
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ToolResult:
+    """Normalized function-tool execution result."""
+
+    call_id: str
+    name: str
+    output: str = ""
+    is_error: bool = False
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class BackendCapabilities:
     """Declares what a backend supports.
 
@@ -79,6 +114,7 @@ class BackendCapabilities:
     supports_streaming: bool = False
     supports_response_format: bool = False
     supports_org_routing: bool = False
+    supports_function_tools: bool = False
     supports_tools: bool = True
     default_model: str = ""
 

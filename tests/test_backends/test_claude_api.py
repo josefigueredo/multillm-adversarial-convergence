@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from src.backends import StreamEvent
 from src.backends.claude_api import ClaudeApiBackend
-from src.backends.types import CallOptions
+from src.backends.types import CallOptions, ToolDefinition
 
 
 class TestClaudeApiBackend:
@@ -29,6 +29,31 @@ class TestClaudeApiBackend:
         )
         assert body["system"] == "You are precise."
 
+    def test_build_request_with_function_tools(self):
+        _, _, body = self.backend.build_request(
+            "hello",
+            CallOptions(
+                model="opus",
+                tools=(
+                    ToolDefinition(
+                        type="function",
+                        name="echo",
+                        description="Echo a message.",
+                        input_schema={"type": "object", "properties": {"message": {"type": "string"}}},
+                    ),
+                ),
+                tool_choice="required",
+            ),
+        )
+        assert body["tools"] == [
+            {
+                "name": "echo",
+                "description": "Echo a message.",
+                "input_schema": {"type": "object", "properties": {"message": {"type": "string"}}},
+            }
+        ]
+        assert body["tool_choice"] == {"type": "tool", "name": "echo"}
+
     def test_build_request_enables_stream(self):
         _, _, body = self.backend.build_request(
             "hello",
@@ -45,6 +70,66 @@ class TestClaudeApiBackend:
         assert resp.text == "hi"
         assert resp.input_tokens == 10
         assert resp.output_tokens == 5
+
+    def test_extract_function_tool_calls(self):
+        payload = {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "toolu_123",
+                    "name": "echo",
+                    "input": {"message": "hi"},
+                }
+            ],
+            "stop_reason": "tool_use",
+        }
+        calls = self.backend.extract_function_tool_calls(payload)
+        assert len(calls) == 1
+        assert calls[0].call_id == "toolu_123"
+        assert calls[0].name == "echo"
+        assert calls[0].arguments_json == '{"message": "hi"}'
+
+    def test_build_tool_followup_input(self):
+        followup = self.backend.build_tool_followup_input(
+            "hello",
+            {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "toolu_123",
+                        "name": "echo",
+                        "input": {"message": "hi"},
+                    }
+                ]
+            },
+            [
+                {"type": "function_call_output", "call_id": "toolu_123", "output": "echo:hi"},
+            ],
+        )
+        assert followup == [
+            {"role": "user", "content": "hello"},
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "toolu_123",
+                        "name": "echo",
+                        "input": {"message": "hi"},
+                    }
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "toolu_123",
+                        "content": "echo:hi",
+                    }
+                ],
+            },
+        ]
 
     def test_extract_error_details_for_rate_limit(self):
         details = self.backend.extract_error_details(

@@ -1,9 +1,10 @@
 """Tests for src.backends.copilot_api — CopilotApiBackend."""
 
+import json
 from unittest.mock import patch
 
 from src.backends.copilot_api import CopilotApiBackend
-from src.backends.types import CallOptions
+from src.backends.types import CallOptions, ToolDefinition
 
 
 class TestCopilotApiBackend:
@@ -46,6 +47,34 @@ class TestCopilotApiBackend:
         assert body["response_format"]["type"] == "json_schema"
         assert body["response_format"]["json_schema"]["type"] == "object"
 
+    def test_build_request_with_function_tools(self):
+        _, _, body = self.backend.build_request(
+            "hello",
+            CallOptions(
+                model="openai/gpt-4.1",
+                tools=(
+                    ToolDefinition(
+                        type="function",
+                        name="echo",
+                        description="Echo a message.",
+                        input_schema={"type": "object", "properties": {"message": {"type": "string"}}},
+                    ),
+                ),
+                tool_choice="required",
+            ),
+        )
+        assert body["tools"] == [
+            {
+                "type": "function",
+                "function": {
+                    "name": "echo",
+                    "description": "Echo a message.",
+                    "parameters": {"type": "object", "properties": {"message": {"type": "string"}}},
+                },
+            }
+        ]
+        assert body["tool_choice"] == "required"
+
     def test_build_request_enables_stream_with_usage(self):
         _, _, body = self.backend.build_request(
             "hello",
@@ -70,6 +99,78 @@ class TestCopilotApiBackend:
         assert resp.text == "hi"
         assert resp.input_tokens == 10
         assert resp.output_tokens == 5
+
+    def test_extract_function_tool_calls(self):
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "id": "call_123",
+                                "type": "function",
+                                "function": {
+                                    "name": "echo",
+                                    "arguments": json.dumps({"message": "hi"}),
+                                },
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+        calls = self.backend.extract_function_tool_calls(payload)
+        assert len(calls) == 1
+        assert calls[0].call_id == "call_123"
+        assert calls[0].name == "echo"
+
+    def test_build_tool_followup_input(self):
+        followup = self.backend.build_tool_followup_input(
+            "hello",
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "call_123",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "echo",
+                                        "arguments": "{\"message\":\"hi\"}",
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            },
+            [
+                {"type": "function_call_output", "call_id": "call_123", "output": "echo:hi"},
+            ],
+        )
+        assert followup == [
+            {"role": "user", "content": "hello"},
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {
+                            "name": "echo",
+                            "arguments": "{\"message\":\"hi\"}",
+                        },
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_123",
+                "content": "echo:hi",
+            },
+        ]
 
     def test_extract_error_details_for_permission(self):
         details = self.backend.extract_error_details(

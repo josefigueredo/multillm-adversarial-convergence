@@ -1,10 +1,11 @@
 """Tests for src.backends.gemini_api — GeminiApiBackend."""
 
+import json
 from unittest.mock import patch
 
 from src.backends import StreamEvent
 from src.backends.gemini_api import GeminiApiBackend
-from src.backends.types import CallOptions
+from src.backends.types import CallOptions, ToolDefinition
 
 
 class TestGeminiApiBackend:
@@ -26,6 +27,38 @@ class TestGeminiApiBackend:
             CallOptions(model="gemini-2.5-pro", system_prompt="You are precise."),
         )
         assert body["system_instruction"]["parts"][0]["text"] == "You are precise."
+
+    def test_build_request_with_function_tools(self):
+        _, _, body = self.backend.build_request(
+            "hello",
+            CallOptions(
+                model="gemini-2.5-pro",
+                tools=(
+                    ToolDefinition(
+                        type="function",
+                        name="echo",
+                        description="Echo a message.",
+                        input_schema={"type": "object", "properties": {"message": {"type": "string"}}},
+                    ),
+                ),
+                tool_choice="required",
+            ),
+        )
+        assert body["tools"] == [
+            {
+                "functionDeclarations": [
+                    {
+                        "name": "echo",
+                        "description": "Echo a message.",
+                        "parameters": {"type": "object", "properties": {"message": {"type": "string"}}},
+                    }
+                ]
+            }
+        ]
+        assert body["toolConfig"]["functionCallingConfig"] == {
+            "mode": "ANY",
+            "allowedFunctionNames": ["echo"],
+        }
 
     def test_build_stream_request_uses_stream_endpoint(self):
         url, _, _ = self.backend.build_request(
@@ -52,6 +85,79 @@ class TestGeminiApiBackend:
         assert resp.text == "hi"
         assert resp.input_tokens == 10
         assert resp.output_tokens == 5
+
+    def test_extract_function_tool_calls(self):
+        payload = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "functionCall": {
+                                    "name": "echo",
+                                    "args": {"message": "hi"},
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+        calls = self.backend.extract_function_tool_calls(payload)
+        assert len(calls) == 1
+        assert calls[0].call_id == "echo"
+        assert calls[0].name == "echo"
+        assert calls[0].arguments_json == '{"message": "hi"}'
+
+    def test_build_tool_followup_input(self):
+        followup = self.backend.build_tool_followup_input(
+            "hello",
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "role": "model",
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": "echo",
+                                        "args": {"message": "hi"},
+                                    }
+                                }
+                            ],
+                        }
+                    }
+                ]
+            },
+            [
+                {"type": "function_call_output", "call_id": "echo", "output": "echo:hi"},
+            ],
+        )
+        assert followup == [
+            {"role": "user", "parts": [{"text": "hello"}]},
+            {
+                "role": "model",
+                "parts": [
+                    {
+                        "functionCall": {
+                            "name": "echo",
+                            "args": {"message": "hi"},
+                        }
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "parts": [
+                    {
+                        "functionResponse": {
+                            "name": "echo",
+                            "response": {"output": "echo:hi"},
+                        }
+                    }
+                ],
+            },
+        ]
 
     def test_extract_error_details_for_unavailable(self):
         details = self.backend.extract_error_details(

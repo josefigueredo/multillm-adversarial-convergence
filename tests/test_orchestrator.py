@@ -1368,3 +1368,355 @@ class TestAutoResearcherCall:
 
         assert resp.text == expected_text
         backend.invoke_stream.assert_called_once()
+
+    def test_call_with_runs_function_tool_loop_for_codex_api(self, researcher):
+        backend = get_backend("codex-api")
+        responses = iter([
+            AgentResponse(
+                text="",
+                cost_usd=0.0,
+                is_error=False,
+                raw={
+                    "output": [
+                        {
+                            "id": "fc_123",
+                            "type": "function_call",
+                            "call_id": "call_123",
+                            "name": "echo",
+                            "arguments": json.dumps({"message": "hello"}),
+                        }
+                    ]
+                },
+            ),
+            AgentResponse(
+                text="Final answer",
+                cost_usd=0.0,
+                is_error=False,
+                raw={"output_text": "Final answer"},
+            ),
+        ])
+        backend.invoke = MagicMock(side_effect=lambda prompt, opts, timeout=300: next(responses))
+
+        resp = researcher._call_with(
+            backend,
+            "Say hi",
+            model="gpt-5.4",
+            tools=(
+                __import__("src.backends.types", fromlist=["ToolDefinition"]).ToolDefinition(
+                    type="function",
+                    name="echo",
+                ),
+            ),
+            tool_registry={"echo": lambda args: f"echo:{args['message']}"},
+        )
+
+        assert resp.text == "Final answer"
+        assert backend.invoke.call_count == 2
+
+    def test_call_with_does_not_run_function_tool_loop_for_unsupported_backend(self, researcher):
+        backend = get_backend("gemini-api")
+        backend.invoke = MagicMock(return_value=AgentResponse(text="ok", cost_usd=0.0, is_error=False))
+
+        resp = researcher._call_with(
+            backend,
+            "Say hi",
+            model="gemini-2.5-flash",
+            tools=(
+                __import__("src.backends.types", fromlist=["ToolDefinition"]).ToolDefinition(
+                    type="function",
+                    name="echo",
+                ),
+            ),
+            tool_registry={"echo": lambda args: "unused"},
+        )
+
+        assert resp.text == "ok"
+        backend.invoke.assert_called_once()
+
+    def test_call_with_runs_function_tool_loop_for_litellm_api(self, researcher):
+        backend = get_backend("litellm-api")
+        responses = iter([
+            AgentResponse(
+                text="",
+                cost_usd=0.0,
+                is_error=False,
+                raw={
+                    "output": [
+                        {
+                            "id": "fc_123",
+                            "type": "function_call",
+                            "call_id": "call_123",
+                            "name": "echo",
+                            "arguments": json.dumps({"message": "hello"}),
+                        }
+                    ]
+                },
+            ),
+            AgentResponse(
+                text="LiteLLM final",
+                cost_usd=0.0,
+                is_error=False,
+                raw={"output_text": "LiteLLM final"},
+            ),
+        ])
+        backend.invoke = MagicMock(side_effect=lambda prompt, opts, timeout=300: next(responses))
+
+        resp = researcher._call_with(
+            backend,
+            "Say hi",
+            model="openai/gpt-4.1-mini",
+            tools=(
+                __import__("src.backends.types", fromlist=["ToolDefinition"]).ToolDefinition(
+                    type="function",
+                    name="echo",
+                ),
+            ),
+            tool_registry={"echo": lambda args: f"echo:{args['message']}"},
+        )
+
+        assert resp.text == "LiteLLM final"
+        assert backend.invoke.call_count == 2
+
+    def test_call_with_runs_function_tool_loop_for_copilot_api(self, researcher):
+        backend = get_backend("copilot-api")
+        responses = iter([
+            AgentResponse(
+                text="",
+                cost_usd=0.0,
+                is_error=False,
+                raw={
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "tool_calls": [
+                                    {
+                                        "id": "call_123",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "echo",
+                                            "arguments": json.dumps({"message": "hello"}),
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                },
+            ),
+            AgentResponse(
+                text="Copilot final",
+                cost_usd=0.0,
+                is_error=False,
+                raw={
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": "Copilot final",
+                            }
+                        }
+                    ]
+                },
+            ),
+        ])
+        backend.invoke = MagicMock(side_effect=lambda prompt, opts, timeout=300: next(responses))
+
+        resp = researcher._call_with(
+            backend,
+            "Say hi",
+            model="openai/gpt-4.1",
+            tools=(
+                __import__("src.backends.types", fromlist=["ToolDefinition"]).ToolDefinition(
+                    type="function",
+                    name="echo",
+                ),
+            ),
+            tool_registry={"echo": lambda args: f"echo:{args['message']}"},
+        )
+
+        assert resp.text == "Copilot final"
+        assert backend.invoke.call_count == 2
+
+    def test_call_with_runs_function_tool_loop_for_claude_api(self, researcher):
+        backend = get_backend("claude-api")
+        responses = iter([
+            AgentResponse(
+                text="",
+                cost_usd=0.0,
+                is_error=False,
+                raw={
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_123",
+                            "name": "echo",
+                            "input": {"message": "hello"},
+                        }
+                    ],
+                    "stop_reason": "tool_use",
+                },
+            ),
+            AgentResponse(
+                text="Claude final",
+                cost_usd=0.0,
+                is_error=False,
+                raw={"content": [{"type": "text", "text": "Claude final"}]},
+            ),
+        ])
+        backend.invoke = MagicMock(side_effect=lambda prompt, opts, timeout=300: next(responses))
+
+        resp = researcher._call_with(
+            backend,
+            "Say hi",
+            model="claude-sonnet-4-5",
+            tools=(
+                __import__("src.backends.types", fromlist=["ToolDefinition"]).ToolDefinition(
+                    type="function",
+                    name="echo",
+                ),
+            ),
+            tool_choice="required",
+            tool_registry={"echo": lambda args: f"echo:{args['message']}"},
+        )
+
+        assert resp.text == "Claude final"
+        assert backend.invoke.call_count == 2
+
+    def test_call_with_runs_function_tool_loop_for_gemini_api(self, researcher):
+        backend = get_backend("gemini-api")
+        responses = iter([
+            AgentResponse(
+                text="",
+                cost_usd=0.0,
+                is_error=False,
+                raw={
+                    "candidates": [
+                        {
+                            "content": {
+                                "role": "model",
+                                "parts": [
+                                    {
+                                        "functionCall": {
+                                            "name": "echo",
+                                            "args": {"message": "hello"},
+                                        }
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                },
+            ),
+            AgentResponse(
+                text="Gemini final",
+                cost_usd=0.0,
+                is_error=False,
+                raw={"candidates": [{"content": {"parts": [{"text": "Gemini final"}]}}]},
+            ),
+        ])
+        backend.invoke = MagicMock(side_effect=lambda prompt, opts, timeout=300: next(responses))
+
+        resp = researcher._call_with(
+            backend,
+            "Say hi",
+            model="gemini-2.5-flash",
+            tools=(
+                __import__("src.backends.types", fromlist=["ToolDefinition"]).ToolDefinition(
+                    type="function",
+                    name="echo",
+                ),
+            ),
+            tool_choice="required",
+            tool_registry={"echo": lambda args: f"echo:{args['message']}"},
+        )
+
+        assert resp.text == "Gemini final"
+        assert backend.invoke.call_count == 2
+
+    def test_call_with_runs_function_tool_loop_for_bedrock_api(self, researcher):
+        backend = get_backend("bedrock-api")
+        responses = iter([
+            AgentResponse(
+                text="",
+                cost_usd=0.0,
+                is_error=False,
+                raw={
+                    "output": {
+                        "message": {
+                            "content": [
+                                {
+                                    "toolUse": {
+                                        "toolUseId": "toolu_123",
+                                        "name": "echo",
+                                        "input": {"message": "hello"},
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "stopReason": "tool_use",
+                    "messages": [
+                        {"role": "user", "content": [{"text": "Say hi"}]},
+                        {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "toolUse": {
+                                        "toolUseId": "toolu_123",
+                                        "name": "echo",
+                                        "input": {"message": "hello"},
+                                    }
+                                }
+                            ],
+                        },
+                    ],
+                },
+            ),
+            AgentResponse(
+                text="Bedrock final",
+                cost_usd=0.0,
+                is_error=False,
+                raw={"output": {"message": {"content": [{"text": "Bedrock final"}]}}},
+            ),
+        ])
+        backend.invoke = MagicMock(side_effect=lambda prompt, opts, timeout=300: next(responses))
+
+        resp = researcher._call_with(
+            backend,
+            "Say hi",
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            tools=(
+                __import__("src.backends.types", fromlist=["ToolDefinition"]).ToolDefinition(
+                    type="function",
+                    name="echo",
+                ),
+            ),
+            tool_choice="required",
+            tool_registry={"echo": lambda args: f"echo:{args['message']}"},
+        )
+
+        assert resp.text == "Bedrock final"
+        assert backend.invoke.call_count == 2
+
+    def test_track_usage_accumulates_tool_loop_summary(self, researcher):
+        researcher._track_usage(
+            AgentResponse(
+                text="ok",
+                cost_usd=0.0,
+                is_error=False,
+                raw={
+                    "tool_loop": {
+                        "backend": "codex-api",
+                        "turns": 2,
+                        "tool_calls": 3,
+                        "tool_failures": 1,
+                    }
+                },
+            ),
+            "codex-api",
+        )
+        assert researcher._tool_loop_summary["runs"] == 1
+        assert researcher._tool_loop_summary["tool_calls"] == 3
+        assert researcher._tool_loop_summary["tool_failures"] == 1
+        assert researcher._tool_loop_summary["per_backend"]["codex-api"]["runs"] == 1

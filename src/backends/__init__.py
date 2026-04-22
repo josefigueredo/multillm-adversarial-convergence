@@ -34,6 +34,9 @@ from .types import (
     CallOptions,
     PromptMode,
     StreamEvent,
+    ToolCallRequest,
+    ToolDefinition,
+    ToolResult,
 )
 
 __all__ = [
@@ -58,6 +61,9 @@ __all__ = [
     "OpenAICompatibleResponsesApiBackend",
     "PromptMode",
     "StreamEvent",
+    "ToolCallRequest",
+    "ToolDefinition",
+    "ToolResult",
     "VALID_BACKENDS",
     "get_backend",
     "get_backends",
