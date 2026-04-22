@@ -46,3 +46,17 @@ Tasks:
 - [ ] decide whether raw backend outputs stay opt-in
 - [ ] add explicit config if raw capture becomes supported
 - [ ] document redaction/size constraints if raw capture is enabled
+
+### Batch O1A — orchestrator cleanup
+
+Tasks:
+- [ ] extract runtime telemetry aggregation helpers from `src/orchestrator.py`
+- [ ] extract reproducibility artifact writing helpers from `src/orchestrator.py`
+- [ ] keep orchestration flow focused on control logic, not artifact plumbing
+
+### Batch R4B — richer certainty reporting
+
+Tasks:
+- [ ] surface factor-level certainty details in HTML/PDF summaries
+- [ ] add portfolio certainty deltas across runs
+- [ ] report high-certainty recommendation counts separately from total conclusion counts

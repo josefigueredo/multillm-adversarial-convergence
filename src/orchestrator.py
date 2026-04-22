@@ -679,8 +679,7 @@ class AutoResearcher:
         loop_mod.run_iteration(ctx, state)
         self._sync_from_loop_state(state)
 
-    # -- Loop shims (delegate to research_loop, keep tests green) ----------
-    # TODO: remove these when tests are rewritten to test research_loop directly
+    # -- Loop shims (delegate to research_loop, retained for compatibility) --
 
     def _generate_hypothesis(self) -> dict[str, Any] | None:
         return loop_mod._generate_hypothesis(self._build_loop_context(), self._build_loop_state())

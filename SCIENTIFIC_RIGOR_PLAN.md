@@ -18,8 +18,12 @@ implementation-oriented plan grounded in the current codebase.
 - reproducibility artifacts are now implemented:
   - `prompt_snapshot.json`
   - `rerun.sh`
-- the next highest-value rigor upgrade is conclusion-level certainty:
+- conclusion-level certainty is now implemented:
   - `certainty_tables.json`
+- the next highest-value follow-up is raw backend output policy:
+  - decide whether capture is opt-in
+  - define redaction and size limits
+  - only then consider implementation
 
 ## Milestones
 
@@ -71,6 +75,49 @@ Goal:
 - human/gold-standard validation beyond internal rubricing
 
 This is a research program, not a short implementation batch.
+
+## Recommended next items
+
+### Best next item — raw backend output capture policy
+
+Goal:
+- define the reproducibility boundary safely before storing raw backend payloads
+
+Why:
+- raw payloads can leak secrets
+- payloads can become huge and noisy
+- provider-specific junk is expensive to keep forever unless the storage contract is explicit
+
+Recommendation:
+- opt-in only
+- final-response capture first
+- redact secrets
+- cap size aggressively
+
+### Second best item — orchestrator cleanup
+
+Goal:
+- extract runtime telemetry and reproducibility helpers out of `src/orchestrator.py`
+
+Why:
+- the orchestrator is still coordinating too much artifact logic
+- cleanup now is safer than cleanup after another large feature wave
+
+Focus:
+- telemetry accumulation
+- reproducibility artifact writing
+- report finalization helpers
+
+### Third best item — richer certainty reporting
+
+Goal:
+- make certainty easier to interpret without reading raw JSON artifacts
+
+Focus:
+- factor-level certainty details in HTML/PDF
+- portfolio certainty deltas across runs
+- high-certainty recommendation counts
+- tighter linkage between certainty and recommendation/factual claim classes
 
 ## Recommended order
 
