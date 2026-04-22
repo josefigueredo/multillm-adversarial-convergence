@@ -391,7 +391,7 @@ Each run produces a directory under `output/<config-name>/`:
 |------|-------------|
 | `report.html` | Stakeholder-facing HTML report |
 | `report.pdf` | PDF export |
-| `portfolio.json` / `portfolio.html` | Cross-run portfolio aggregation |
+| `portfolio.json` / `portfolio.html` | Cross-run portfolio aggregation, including retry/tool activity rollups |
 
 ## Configuration
 

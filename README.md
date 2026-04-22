@@ -39,6 +39,7 @@ Important runtime rules:
 - tool-loop observability is now captured in run metrics/dashboard artifacts when normalized API function tools are used, including per-backend and per-tool counts
 - per-run tool trace artifacts are now written to `tool_trace.json`, with redacted argument summaries and truncated output previews
 - dashboard/report views now surface compact tool-trace failure highlights without exposing raw payloads
+- portfolio views now aggregate retries and tool activity across runs so cross-run instability is visible
 - HTML/PDF reports now surface tool-usage highlights when tool loops are used in a run
 - API failures are normalized into stable categories such as `rate_limit`, `timeout`, `transport`, `quota`, and `server_error`
 

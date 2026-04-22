@@ -18,6 +18,10 @@
     <div><strong>Strategies:</strong> ${strategies}</div>
     <div><strong>Benchmarks:</strong> ${benchmarks}</div>
     <div><strong>Best run:</strong> ${best_run_name} (${best_run_score})</div>
+    <div><strong>Total retries:</strong> ${total_retries}</div>
+    <div><strong>Total Tool calls:</strong> ${total_tool_calls}</div>
+    <div><strong>Total Tool failures:</strong> ${total_tool_failures}</div>
+    <div><strong>Most unstable run:</strong> ${unstable_run_name} (${unstable_run_retries})</div>
   </div>
   <table>
     <thead>
@@ -29,6 +33,9 @@
         <th>Best Score</th>
         <th>Rubric Grade</th>
         <th>Consistency</th>
+        <th>Total Retries</th>
+        <th>Tool calls</th>
+        <th>Tool failures</th>
       </tr>
     </thead>
     <tbody>
