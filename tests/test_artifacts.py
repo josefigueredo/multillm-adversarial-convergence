@@ -111,11 +111,21 @@ def test_metrics_evaluation_and_dashboard_payloads():
                 "tool_name": "echo",
                 "call_id": "call_123",
                 "status": "success",
+            },
+            {
+                "backend": "codex-api",
+                "turn": 2,
+                "tool_name": "explode",
+                "call_id": "call_456",
+                "status": "error",
+                "provider_code": "tool_handler_failed",
             }
         ]
     )
-    assert trace["entries_count"] == 1
+    assert trace["entries_count"] == 2
     assert trace["redaction_policy"]["sensitive_values"] == "redacted"
+    assert trace["summary"]["status_counts"]["error"] == 1
+    assert trace["summary"]["top_failure_codes"][0]["provider_code"] == "tool_handler_failed"
 
 
 def test_pdf_summary_and_should_write_evaluation():

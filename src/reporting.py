@@ -91,6 +91,7 @@ def render_html_report(
             (dashboard or {}).get("retry_insights"),
         ),
         tool_usage_html=_tool_usage_html((dashboard or {}).get("tool_usage_summary")),
+        tool_trace_html=_tool_trace_html((dashboard or {}).get("tool_trace_summary")),
         dashboard_html=_dashboard_html(dashboard),
         evaluation_html=_evaluation_html(evaluation),
         comparison_html=_comparison_html(comparison),
@@ -153,6 +154,31 @@ def _tool_usage_html(tool_usage: dict[str, Any] | None) -> str:
         [
             ("Top tools", ", ".join(str(item.get("name", "")) for item in top_tools if isinstance(item, dict))),
             ("Failure hotspots", len(failure_hotspots)),
+        ],
+    )
+
+
+def _tool_trace_html(tool_trace_summary: dict[str, Any] | None) -> str:
+    if not tool_trace_summary:
+        return ""
+    entries_count = int(tool_trace_summary.get("entries_count", 0) or 0)
+    if entries_count <= 0:
+        return ""
+    status_counts = tool_trace_summary.get("status_counts", {})
+    failed_calls = int(status_counts.get("error", 0) or 0) if isinstance(status_counts, dict) else 0
+    top_failure_codes = tool_trace_summary.get("top_failure_codes", [])
+    return _json_section_html(
+        "Tool Trace",
+        tool_trace_summary,
+        [
+            ("Trace entries", entries_count),
+            ("Failed calls", failed_calls),
+            (
+                "Top failure code",
+                top_failure_codes[0].get("provider_code", "")
+                if top_failure_codes and isinstance(top_failure_codes[0], dict)
+                else "",
+            ),
         ],
     )
 

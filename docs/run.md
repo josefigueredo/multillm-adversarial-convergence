@@ -298,6 +298,7 @@ Important:
 - detailed per-run tool call traces are written into `tool_trace.json`
 - tool traces store redacted argument summaries and truncated output previews rather than raw full payloads
 - HTML/PDF reports surface compact tool-usage highlights when a run uses normalized API function tools
+- dashboard/report summaries now also highlight tool-trace failure patterns such as dominant failure codes
 
 ### Normalized API error contract
 

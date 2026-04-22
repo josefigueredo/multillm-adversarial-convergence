@@ -38,6 +38,7 @@ Important runtime rules:
 - normalized API function-tool calling is currently implemented for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`, and only for non-streaming explicit tool-registered calls
 - tool-loop observability is now captured in run metrics/dashboard artifacts when normalized API function tools are used, including per-backend and per-tool counts
 - per-run tool trace artifacts are now written to `tool_trace.json`, with redacted argument summaries and truncated output previews
+- dashboard/report views now surface compact tool-trace failure highlights without exposing raw payloads
 - HTML/PDF reports now surface tool-usage highlights when tool loops are used in a run
 - API failures are normalized into stable categories such as `rate_limit`, `timeout`, `transport`, `quota`, and `server_error`
 

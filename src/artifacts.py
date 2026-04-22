@@ -201,6 +201,7 @@ def dashboard_payload(
     semantic_review: dict[str, Any],
     retry_summary: dict[str, Any] | None = None,
     tool_loop_summary: dict[str, Any] | None = None,
+    tool_trace_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the stakeholder-facing dashboard artifact payload."""
     tool_usage_summary = _tool_usage_summary(tool_loop_summary or {})
@@ -240,6 +241,11 @@ def dashboard_payload(
             "per_tool": {},
         },
         "tool_usage_summary": tool_usage_summary,
+        "tool_trace_summary": tool_trace_summary or {
+            "entries_count": 0,
+            "status_counts": {},
+            "top_failure_codes": [],
+        },
     }
 
 
@@ -247,6 +253,7 @@ def tool_trace_payload(*, tool_trace: list[dict[str, Any]]) -> dict[str, Any]:
     """Build a machine-readable tool trace artifact payload."""
     return {
         "entries_count": len(tool_trace),
+        "summary": _tool_trace_summary(tool_trace),
         "redaction_policy": {
             "sensitive_values": "redacted",
             "argument_string_preview_chars": 120,
@@ -254,6 +261,32 @@ def tool_trace_payload(*, tool_trace: list[dict[str, Any]]) -> dict[str, Any]:
             "sequence_preview_items": 5,
         },
         "entries": tool_trace,
+    }
+
+
+def _tool_trace_summary(tool_trace: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build compact report-friendly tool trace highlights."""
+    status_counts: dict[str, int] = {}
+    failure_codes: dict[str, int] = {}
+    for entry in tool_trace:
+        if not isinstance(entry, dict):
+            continue
+        status = str(entry.get("status", "") or "")
+        if status:
+            status_counts[status] = status_counts.get(status, 0) + 1
+        if status == "error":
+            provider_code = str(entry.get("provider_code", "") or "unknown")
+            failure_codes[provider_code] = failure_codes.get(provider_code, 0) + 1
+
+    top_failure_codes = [
+        {"provider_code": code, "count": count}
+        for code, count in failure_codes.items()
+    ]
+    top_failure_codes.sort(key=lambda item: (-item["count"], item["provider_code"]))
+    return {
+        "entries_count": len(tool_trace),
+        "status_counts": status_counts,
+        "top_failure_codes": top_failure_codes[:5],
     }
 
 
@@ -517,6 +550,7 @@ def write_dashboard(
     strategy_summary = load_json_if_exists(output_dir / "strategy_summary.json", {})
     semantic_calibration = load_json_if_exists(output_dir / "semantic_calibration.json", {})
     semantic_review = load_json_if_exists(output_dir / "semantic_review.json", {})
+    tool_trace = load_json_if_exists(output_dir / "tool_trace.json", {})
 
     payload = dashboard_payload(
         topic=config.topic,
@@ -535,6 +569,7 @@ def write_dashboard(
         semantic_review=semantic_review,
         retry_summary=retry_summary,
         tool_loop_summary=tool_loop_summary,
+        tool_trace_summary=tool_trace.get("summary", {}) if isinstance(tool_trace, dict) else {},
     )
     (output_dir / "dashboard.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
