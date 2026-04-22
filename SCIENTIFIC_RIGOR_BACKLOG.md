@@ -28,7 +28,7 @@ Tasks:
 Tasks:
 - [x] snapshot prompt inputs per run
 - [x] add rerun command artifact
-- [ ] decide whether raw backend outputs stay opt-in
+- [x] decide whether raw backend outputs stay opt-in
 
 ### Batch R4A — certainty tables
 
@@ -50,13 +50,19 @@ Tasks:
 ### Batch O1A — orchestrator cleanup
 
 Tasks:
-- [ ] extract runtime telemetry aggregation helpers from `src/orchestrator.py`
-- [ ] extract reproducibility artifact writing helpers from `src/orchestrator.py`
+- [x] extract runtime telemetry aggregation helpers from `src/orchestrator.py`
+- [x] extract reproducibility artifact writing helpers from `src/orchestrator.py`
 - [ ] keep orchestration flow focused on control logic, not artifact plumbing
+
+### Batch O1B — provenance pipeline extraction
+
+Tasks:
+- [x] extract core provenance/evidence computation into a helper module
+- [ ] extract provenance artifact persistence/write sequencing fully out of `src/orchestrator.py`
 
 ### Batch R4B — richer certainty reporting
 
 Tasks:
-- [ ] surface factor-level certainty details in HTML/PDF summaries
-- [ ] add portfolio certainty deltas across runs
-- [ ] report high-certainty recommendation counts separately from total conclusion counts
+- [x] surface factor-level certainty details in HTML/PDF summaries
+- [x] add portfolio certainty deltas across runs
+- [x] report high-certainty recommendation counts separately from total conclusion counts

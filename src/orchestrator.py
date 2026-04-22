@@ -27,8 +27,6 @@ from .artifacts import (
     load_json_if_exists,
     metrics_payload,
     package_version,
-    prompt_snapshot_payload,
-    rerun_script_text,
     run_manifest_payload,
     should_write_evaluation,
     write_dashboard,
@@ -46,24 +44,22 @@ from .constraints import (
     synthesis_results_summary,
 )
 from .comparison import benchmark_summary, reference_run_comparison
-from .certainty import build_certainty_tables
 from .provenance import (
-    detect_claim_conflicts,
     extract_citations,
     extract_claims,
-    link_claims_to_citations,
-    score_research_rubric,
-    summarize_evidence_quality,
 )
 from .prompts import render as _render
 from . import research_loop as loop_mod
 from .pdf_report import render_simple_pdf
 from .portfolio import build_portfolio, render_portfolio_html
 from .reporting import render_html_report as render_html_report_fn
-from .research_logs import build_screening_log, build_search_log
+from .reproducibility import write_prompt_snapshot, write_rerun_script
+from .run_finalize import finalize_run_artifacts
 from .run_io import setup_output_dir, write_results_header
+from .run_paths import RunPaths
 from .run_state import UsageTotals, resume_state, track_candidate_usage, track_cost, track_usage
 from .runtime_telemetry import accumulate_retries, accumulate_tool_loop
+from .provenance_pipeline import build_provenance_bundle
 from .semantic_eval import (
     semantic_calibration,
     semantic_review_disabled,
@@ -120,36 +116,37 @@ class AutoResearcher:
         self.resume = resume
         self.config_path = config_path
         self.output_dir = output_dir
-        self.iterations_dir = output_dir / "iterations"
-        self.results_path = output_dir / "results.tsv"
-        self.kb_path = output_dir / "knowledge_base.md"
-        self.synthesis_path = output_dir / "synthesis.md"
-        self.methods_path = output_dir / "methods.md"
-        self.manifest_path = output_dir / "run_manifest.json"
-        self.metrics_path = output_dir / "metrics.json"
-        self.claims_path = output_dir / "claims.json"
-        self.citations_path = output_dir / "citations.json"
-        self.evidence_links_path = output_dir / "evidence_links.json"
-        self.evidence_quality_path = output_dir / "evidence_quality.json"
-        self.rubric_path = output_dir / "rubric.json"
-        self.contradictions_path = output_dir / "contradictions.json"
-        self.certainty_tables_path = output_dir / "certainty_tables.json"
-        self.search_log_path = output_dir / "search_log.json"
-        self.screening_log_path = output_dir / "screening_log.json"
-        self.baseline_path = output_dir / "baseline.md"
-        self.evaluation_path = output_dir / "evaluation.json"
-        self.comparison_path = output_dir / "comparison.json"
-        self.strategy_summary_path = output_dir / "strategy_summary.json"
-        self.dashboard_path = output_dir / "dashboard.json"
-        self.semantic_calibration_path = output_dir / "semantic_calibration.json"
-        self.semantic_review_path = output_dir / "semantic_review.json"
-        self.tool_trace_path = output_dir / "tool_trace.json"
-        self.prompt_snapshot_path = output_dir / "prompt_snapshot.json"
-        self.rerun_script_path = output_dir / "rerun.sh"
-        self.report_html_path = output_dir / "report.html"
-        self.report_pdf_path = output_dir / "report.pdf"
-        self.portfolio_path = output_dir.parent / "portfolio.json"
-        self.portfolio_html_path = output_dir.parent / "portfolio.html"
+        self.paths = RunPaths.for_output_dir(output_dir)
+        self.iterations_dir = self.paths.iterations_dir
+        self.results_path = self.paths.results
+        self.kb_path = self.paths.knowledge_base
+        self.synthesis_path = self.paths.synthesis
+        self.methods_path = self.paths.methods
+        self.manifest_path = self.paths.manifest
+        self.metrics_path = self.paths.metrics
+        self.claims_path = self.paths.claims
+        self.citations_path = self.paths.citations
+        self.evidence_links_path = self.paths.evidence_links
+        self.evidence_quality_path = self.paths.evidence_quality
+        self.rubric_path = self.paths.rubric
+        self.contradictions_path = self.paths.contradictions
+        self.certainty_tables_path = self.paths.certainty_tables
+        self.search_log_path = self.paths.search_log
+        self.screening_log_path = self.paths.screening_log
+        self.baseline_path = self.paths.baseline
+        self.evaluation_path = self.paths.evaluation
+        self.comparison_path = self.paths.comparison
+        self.strategy_summary_path = self.paths.strategy_summary
+        self.dashboard_path = self.paths.dashboard
+        self.semantic_calibration_path = self.paths.semantic_calibration
+        self.semantic_review_path = self.paths.semantic_review
+        self.tool_trace_path = self.paths.tool_trace
+        self.prompt_snapshot_path = self.paths.prompt_snapshot
+        self.rerun_script_path = self.paths.rerun_script
+        self.report_html_path = self.paths.report_html
+        self.report_pdf_path = self.paths.report_pdf
+        self.portfolio_path = self.paths.portfolio
+        self.portfolio_html_path = self.paths.portfolio_html
 
         # Multi-backend support
         if backends is None:
@@ -939,32 +936,17 @@ class AutoResearcher:
 
     def _finalize_run_artifacts(self) -> None:
         """Write final manifest and metrics artifacts."""
-        self._run_completed_at = datetime.now(timezone.utc).isoformat()
-        self._write_run_manifest()
-        self._write_prompt_snapshot_artifact()
-        self._write_metrics()
-        self._write_agreement_artifact()
-        self._write_provenance_artifacts()
-        self._write_dashboard_artifact()
-        self._write_tool_trace_artifact()
-        self._write_html_report()
-        self._write_pdf_report()
-        self._write_portfolio_artifacts()
+        finalize_run_artifacts(self)
 
     def _write_prompt_snapshot_artifact(self) -> None:
         """Write captured prompt inputs for later audit and replay."""
         self.prompt_snapshot_path = self.output_dir / "prompt_snapshot.json"
-        self.prompt_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = prompt_snapshot_payload(prompts=self._prompt_snapshots)
-        self.prompt_snapshot_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        write_prompt_snapshot(self.prompt_snapshot_path, prompts=self._prompt_snapshots)
 
     def _write_rerun_artifact(self) -> None:
         """Write a convenience shell script that replays the run."""
         self.rerun_script_path = self.output_dir / "rerun.sh"
-        self.rerun_script_path.parent.mkdir(parents=True, exist_ok=True)
-        script = rerun_script_text(config_path=self.config_path, output_dir=self.output_dir)
-        self.rerun_script_path.write_text(script, encoding="utf-8")
-        self.rerun_script_path.chmod(0o755)
+        write_rerun_script(self.rerun_script_path, config_path=self.config_path, output_dir=self.output_dir)
 
     def _write_agreement_artifact(self) -> None:
         """Compute and write inter-rater agreement when multi-candidate data exists."""
@@ -1027,19 +1009,20 @@ class AutoResearcher:
         """Write claim and citation artifacts."""
         self.claims_path.write_text(json.dumps(self._claims, indent=2), encoding="utf-8")
         self.citations_path.write_text(json.dumps(self._citations, indent=2), encoding="utf-8")
-        evidence_links = link_claims_to_citations(self._claims, self._citations)
-        search_log = build_search_log(self._citations)
-        screening_log = build_screening_log(self._citations, evidence_links)
-        evidence_quality = summarize_evidence_quality(self._claims, evidence_links)
-        contradictions = detect_claim_conflicts(self._claims)
-        rubric = score_research_rubric(
-            self._claims,
-            self._citations,
-            evidence_links,
-            contradictions,
-        )
         benchmark_summary = self._benchmark_summary()
         reference_comparison = self._reference_run_comparison()
+        bundle = build_provenance_bundle(
+            claims=self._claims,
+            citations=self._citations,
+            benchmark_summary=benchmark_summary,
+            reference_comparison=reference_comparison,
+        )
+        evidence_links = bundle["evidence_links"]
+        search_log = bundle["search_log"]
+        screening_log = bundle["screening_log"]
+        evidence_quality = bundle["evidence_quality"]
+        contradictions = bundle["contradictions"]
+        rubric = bundle["rubric"]
         semantic_review = self._semantic_review(
             rubric=rubric,
             evidence_quality=evidence_quality,
@@ -1052,12 +1035,7 @@ class AutoResearcher:
             benchmark_summary=benchmark_summary,
             reference_comparison=reference_comparison,
         )
-        certainty_tables = build_certainty_tables(
-            claims=self._claims,
-            citations=self._citations,
-            evidence_links=evidence_links,
-            contradictions=contradictions,
-        )
+        certainty_tables = bundle["certainty_tables"]
         self.evidence_links_path.write_text(json.dumps(evidence_links, indent=2), encoding="utf-8")
         self.search_log_path.write_text(json.dumps(search_log, indent=2), encoding="utf-8")
         self.screening_log_path.write_text(json.dumps(screening_log, indent=2), encoding="utf-8")

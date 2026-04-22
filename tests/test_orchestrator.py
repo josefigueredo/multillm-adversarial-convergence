@@ -647,6 +647,11 @@ class TestAutoResearcherSetup:
         assert "current-run" in portfolio_html
         assert "prior-run" in portfolio_html
 
+    def test_finalize_delegates_to_run_finalize_module(self, researcher):
+        with patch("src.orchestrator.finalize_run_artifacts") as finalize:
+            researcher._finalize_run_artifacts()
+        finalize.assert_called_once_with(researcher)
+
     def test_resume_empty_dir(self, researcher):
         researcher._setup()
         researcher._resume()
