@@ -7,7 +7,7 @@ import os
 from typing import Any
 
 from .base import Backend
-from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode
+from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode, StreamEvent
 
 
 class BedrockApiBackend(Backend):
@@ -19,6 +19,7 @@ class BedrockApiBackend(Backend):
         supports_budget_cap=False,
         supports_rate_limit_detection=False,
         supports_system_prompt=True,
+        supports_streaming=True,
         supports_tools=False,
         default_model="",
     )
@@ -80,6 +81,62 @@ class BedrockApiBackend(Backend):
             return self.parse_payload(payload)
         except Exception as exc:
             return self._error_response_from_exception(exc)
+
+    def invoke_stream(self, prompt: str, opts: CallOptions, timeout: int = 300):
+        model = opts.model or self.capabilities.default_model
+        if not model:
+            yield StreamEvent(type="error", raw={"error": {"message": "Missing model"}})
+            return
+        try:
+            client = self._client(region=self._region(), profile=self._aws_profile(), timeout=timeout)
+            request: dict[str, Any] = {
+                "modelId": model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{"text": prompt}],
+                    }
+                ],
+            }
+            if opts.system_prompt:
+                request["system"] = [{"text": opts.system_prompt}]
+
+            response = client.converse_stream(**request)
+            text_parts: list[str] = []
+            usage: dict[str, Any] = {}
+
+            for event in response.get("stream", []):
+                if "messageStart" in event:
+                    yield StreamEvent(type="start", raw=event)
+                    continue
+                if "contentBlockDelta" in event:
+                    delta = event["contentBlockDelta"].get("delta", {})
+                    text = str(delta.get("text", "") or "")
+                    if text:
+                        text_parts.append(text)
+                        yield StreamEvent(type="text_delta", text=text, raw=event)
+                    continue
+                if "metadata" in event:
+                    metadata = event["metadata"]
+                    if isinstance(metadata, dict) and isinstance(metadata.get("usage"), dict):
+                        usage = metadata["usage"]
+                    continue
+                if any(key.endswith("Exception") for key in event):
+                    yield StreamEvent(type="error", raw=event)
+                    return
+                if "messageStop" in event:
+                    yield StreamEvent(
+                        type="completed",
+                        raw={
+                            "response": {
+                                "output": {"message": {"content": [{"text": "".join(text_parts)}]}},
+                                "usage": usage,
+                            }
+                        },
+                    )
+                    return
+        except Exception as exc:
+            yield StreamEvent(type="error", raw=self._error_response_from_exception(exc).raw)
 
     def _region(self) -> str:
         provider = getattr(self, "provider_config", None)

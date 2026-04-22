@@ -31,7 +31,7 @@ Example starting points:
 Important runtime rules:
 - aggregator adapters (`litellm-api`, `copilot-api`, `bedrock-api`) require explicit model identifiers
 - `execution.system_prompt` is supported on the current API adapters and stripped automatically where unsupported
-- `execution.stream` currently enables live research-phase progress in `run` for `codex-api` and `litellm-api`
+- `execution.stream` currently enables live research-phase progress in `run` for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`
 - API failures are normalized into stable categories such as `rate_limit`, `timeout`, `transport`, `quota`, and `server_error`
 
 ## Requirements

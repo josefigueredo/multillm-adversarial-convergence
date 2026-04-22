@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+from src.backends import StreamEvent
 from src.backends.bedrock_api import BedrockApiBackend
 from src.backends.types import CallOptions
 
@@ -106,3 +107,70 @@ class TestBedrockApiBackend:
         assert resp.is_error is True
         assert resp.raw["error"]["category"] == "rate_limit"
         assert resp.raw["error"]["provider_code"] == "ThrottlingException"
+
+    @patch("src.backends.bedrock_api.BedrockApiBackend._has_boto3", return_value=True)
+    @patch("src.backends.bedrock_api.BedrockApiBackend._client")
+    def test_invoke_stream_normalizes_bedrock_stream(self, mock_client, _):
+        self.backend.provider_config = type(
+            "Provider",
+            (),
+            {"region": "us-east-1", "aws_profile": "sandbox"},
+        )()
+        mock_client.return_value.converse_stream.return_value = {
+            "stream": iter([
+                {"messageStart": {"role": "assistant"}},
+                {"contentBlockDelta": {"delta": {"text": "Hel"}}},
+                {"contentBlockDelta": {"delta": {"text": "lo"}}},
+                {
+                    "metadata": {
+                        "usage": {"inputTokens": 10, "outputTokens": 5},
+                    }
+                },
+                {"messageStop": {"stopReason": "end_turn"}},
+            ])
+        }
+
+        events = list(self.backend.invoke_stream(
+            "hello",
+            CallOptions(model="anthropic.claude-3-5-sonnet-20240620-v1:0", stream=True),
+            timeout=30,
+        ))
+
+        assert events == [
+            StreamEvent(type="start", raw={"messageStart": {"role": "assistant"}}),
+            StreamEvent(type="text_delta", text="Hel", raw={"contentBlockDelta": {"delta": {"text": "Hel"}}}),
+            StreamEvent(type="text_delta", text="lo", raw={"contentBlockDelta": {"delta": {"text": "lo"}}}),
+            StreamEvent(
+                type="completed",
+                raw={
+                    "response": {
+                        "output": {"message": {"content": [{"text": "Hello"}]}},
+                        "usage": {"inputTokens": 10, "outputTokens": 5},
+                    }
+                },
+            ),
+        ]
+
+    @patch("src.backends.bedrock_api.BedrockApiBackend._has_boto3", return_value=True)
+    @patch("src.backends.bedrock_api.BedrockApiBackend._client")
+    def test_invoke_stream_maps_bedrock_error_event(self, mock_client, _):
+        self.backend.provider_config = type(
+            "Provider",
+            (),
+            {"region": "us-east-1", "aws_profile": "sandbox"},
+        )()
+        mock_client.return_value.converse_stream.return_value = {
+            "stream": iter([
+                {"internalServerException": {"message": "boom"}},
+            ])
+        }
+
+        events = list(self.backend.invoke_stream(
+            "hello",
+            CallOptions(model="anthropic.claude-3-5-sonnet-20240620-v1:0", stream=True),
+            timeout=30,
+        ))
+
+        assert events == [
+            StreamEvent(type="error", raw={"internalServerException": {"message": "boom"}}),
+        ]

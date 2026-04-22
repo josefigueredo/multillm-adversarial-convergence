@@ -46,6 +46,14 @@ class TestCopilotApiBackend:
         assert body["response_format"]["type"] == "json_schema"
         assert body["response_format"]["json_schema"]["type"] == "object"
 
+    def test_build_request_enables_stream_with_usage(self):
+        _, _, body = self.backend.build_request(
+            "hello",
+            CallOptions(model="openai/gpt-4.1", stream=True),
+        )
+        assert body["stream"] is True
+        assert body["stream_options"] == {"include_usage": True}
+
     def test_parse_payload(self):
         payload = {
             "choices": [

@@ -26,6 +26,12 @@ def test_api_backends_with_system_prompt_support():
         assert backend.capabilities.supports_system_prompt is True
 
 
+def test_claude_and_gemini_api_support_streaming():
+    for name in ("claude-api", "gemini-api"):
+        backend = get_backend(name)
+        assert backend.capabilities.supports_streaming is True
+
+
 def test_litellm_api_has_aggregator_metadata():
     backend = get_backend("litellm-api")
     assert backend.capabilities.transport == "api"
@@ -48,9 +54,11 @@ def test_copilot_api_supports_org_routing_and_response_format():
     backend = get_backend("copilot-api")
     assert backend.capabilities.supports_response_format is True
     assert backend.capabilities.supports_org_routing is True
+    assert backend.capabilities.supports_streaming is True
 
 
 def test_bedrock_api_does_not_support_response_format_or_org_routing():
     backend = get_backend("bedrock-api")
     assert backend.capabilities.supports_response_format is False
     assert backend.capabilities.supports_org_routing is False
+    assert backend.capabilities.supports_streaming is True

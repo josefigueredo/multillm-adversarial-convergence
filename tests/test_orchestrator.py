@@ -1309,3 +1309,62 @@ class TestAutoResearcherCall:
 
         backend.invoke.assert_called_once()
         backend.invoke_stream.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("backend_name", "model", "completed_payload", "expected_text"),
+        [
+            (
+                "claude-api",
+                "claude-sonnet-4-5",
+                {"content": [{"type": "text", "text": "Hello from Claude"}], "usage": {"input_tokens": 4, "output_tokens": 3}},
+                "Hello from Claude",
+            ),
+            (
+                "gemini-api",
+                "gemini-2.5-flash",
+                {
+                    "candidates": [{"content": {"parts": [{"text": "Hello from Gemini"}]}}],
+                    "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 3},
+                },
+                "Hello from Gemini",
+            ),
+            (
+                "copilot-api",
+                "openai/gpt-4.1",
+                {
+                    "choices": [{"message": {"role": "assistant", "content": "Hello from GitHub Models"}}],
+                    "usage": {"prompt_tokens": 4, "completion_tokens": 3},
+                },
+                "Hello from GitHub Models",
+            ),
+            (
+                "bedrock-api",
+                "anthropic.claude-3-5-sonnet-20240620-v1:0",
+                {
+                    "output": {"message": {"content": [{"text": "Hello from Bedrock"}]}},
+                    "usage": {"inputTokens": 4, "outputTokens": 3},
+                },
+                "Hello from Bedrock",
+            ),
+        ],
+    )
+    def test_call_with_streaming_round_trips_completed_payloads(
+        self,
+        researcher,
+        backend_name,
+        model,
+        completed_payload,
+        expected_text,
+    ):
+        backend = get_backend(backend_name)
+        backend.invoke_stream = MagicMock(return_value=iter([
+            StreamEvent(type="start"),
+            StreamEvent(type="text_delta", text="Hello "),
+            StreamEvent(type="completed", raw={"response": completed_payload}),
+        ]))
+
+        with patch("sys.stdout", new_callable=io.StringIO):
+            resp = researcher._call_with(backend, "prompt", model=model, stream=True)
+
+        assert resp.text == expected_text
+        backend.invoke_stream.assert_called_once()

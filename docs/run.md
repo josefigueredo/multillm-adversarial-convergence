@@ -258,8 +258,12 @@ Current behavior:
 - only research-phase backend calls stream; hypothesis/judge/synthesis remain final-response only
 - unsupported backends strip `stream` automatically
 - currently implemented for:
+  - `claude-api`
   - `codex-api`
+  - `gemini-api`
   - `litellm-api`
+  - `copilot-api`
+  - `bedrock-api`
 - streamed text is for operator feedback only; the final backend response remains authoritative
 
 ### Tools and structured-output contract

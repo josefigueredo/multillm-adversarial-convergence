@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .base_api import ApiBackend
-from .types import AgentResponse, BackendCapabilities, CallOptions
+from .types import AgentResponse, BackendCapabilities, CallOptions, StreamEvent
 
 
 class CopilotApiBackend(ApiBackend):
@@ -18,6 +18,7 @@ class CopilotApiBackend(ApiBackend):
         supports_budget_cap=False,
         supports_rate_limit_detection=False,
         supports_system_prompt=True,
+        supports_streaming=True,
         supports_response_format=True,
         supports_org_routing=True,
         supports_tools=False,
@@ -41,6 +42,9 @@ class CopilotApiBackend(ApiBackend):
             "model": opts.model or self.capabilities.default_model,
             "messages": messages,
         }
+        if opts.stream:
+            body["stream"] = True
+            body["stream_options"] = {"include_usage": True}
         if opts.json_schema:
             body["response_format"] = {
                 "type": "json_schema",
@@ -72,3 +76,51 @@ class CopilotApiBackend(ApiBackend):
             output_tokens=usage.get("completion_tokens", 0),
             raw=payload,
         )
+
+    def invoke_stream(self, prompt: str, opts: CallOptions, timeout: int = 300):
+        accumulated_text: list[str] = []
+        usage: dict[str, Any] = {}
+        started = False
+
+        for payload in self._post_stream(prompt, opts, timeout=timeout):
+            if payload.get("error"):
+                yield StreamEvent(type="error", raw=payload)
+                continue
+
+            choices = payload.get("choices", [])
+            if not isinstance(choices, list) or not choices:
+                continue
+
+            choice = choices[0] if isinstance(choices[0], dict) else {}
+            delta = choice.get("delta", {}) if isinstance(choice, dict) else {}
+            if not started:
+                started = True
+                yield StreamEvent(type="start", raw=payload)
+
+            content = ""
+            if isinstance(delta, dict):
+                content = str(delta.get("content", "") or "")
+            if content:
+                accumulated_text.append(content)
+                yield StreamEvent(type="text_delta", text=content, raw=payload)
+
+            if isinstance(payload.get("usage"), dict):
+                usage = payload["usage"]
+
+            if choice.get("finish_reason"):
+                yield StreamEvent(
+                    type="completed",
+                    raw={
+                        "response": {
+                            "choices": [
+                                {
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": "".join(accumulated_text),
+                                    }
+                                }
+                            ],
+                            "usage": usage,
+                        }
+                    },
+                )

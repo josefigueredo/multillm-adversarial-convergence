@@ -75,10 +75,10 @@ def test_apply_backend_capabilities_preserves_json_schema_when_supported():
 
 
 def test_apply_backend_capabilities_strips_stream_when_unsupported():
-    backend = get_backend("claude-api")
+    backend = get_backend("claude-cli")
     normalized = apply_backend_capabilities(
         backend,
-        CallOptions(model="claude-sonnet-4-5", stream=True),
+        CallOptions(model="sonnet", stream=True),
     )
     assert normalized.stream is False
 

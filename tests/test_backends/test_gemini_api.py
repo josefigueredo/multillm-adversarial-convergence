@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+from src.backends import StreamEvent
 from src.backends.gemini_api import GeminiApiBackend
 from src.backends.types import CallOptions
 
@@ -25,6 +26,13 @@ class TestGeminiApiBackend:
             CallOptions(model="gemini-2.5-pro", system_prompt="You are precise."),
         )
         assert body["system_instruction"]["parts"][0]["text"] == "You are precise."
+
+    def test_build_stream_request_uses_stream_endpoint(self):
+        url, _, _ = self.backend.build_request(
+            "hello",
+            CallOptions(model="gemini-2.5-pro", stream=True),
+        )
+        assert ":streamGenerateContent" in url
 
     def test_parse_payload(self):
         payload = {
@@ -70,3 +78,47 @@ class TestGeminiApiBackend:
     @patch.dict("os.environ", {}, clear=True)
     def test_check_available_when_api_key_missing(self):
         assert self.backend.check_available() is False
+
+    def test_invoke_stream_normalizes_gemini_chunks(self):
+        payloads = iter([
+            {"candidates": [{"content": {"parts": [{"text": "Hel"}]}}]},
+            {"candidates": [{"content": {"parts": [{"text": "lo"}]}}], "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5}},
+        ])
+        with patch.object(self.backend, "_post_stream", return_value=payloads):
+            events = list(self.backend.invoke_stream("hello", CallOptions(model="gemini-2.5-pro", stream=True), timeout=20))
+
+        assert events == [
+            StreamEvent(type="start", raw={"candidates": [{"content": {"parts": [{"text": "Hel"}]}}]}),
+            StreamEvent(
+                type="text_delta",
+                text="Hel",
+                raw={"candidates": [{"content": {"parts": [{"text": "Hel"}]}}]},
+            ),
+            StreamEvent(
+                type="text_delta",
+                text="lo",
+                raw={
+                    "candidates": [{"content": {"parts": [{"text": "lo"}]}}],
+                    "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5},
+                },
+            ),
+            StreamEvent(
+                type="completed",
+                raw={
+                    "response": {
+                        "candidates": [{"content": {"parts": [{"text": "Hello"}]}}],
+                        "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5},
+                    }
+                },
+            ),
+        ]
+
+    def test_invoke_stream_maps_gemini_error_event(self):
+        payloads = iter([
+            {"error": {"status": "UNAVAILABLE", "message": "Overloaded"}},
+        ])
+        with patch.object(self.backend, "_post_stream", return_value=payloads):
+            events = list(self.backend.invoke_stream("hello", CallOptions(model="gemini-2.5-pro", stream=True), timeout=20))
+        assert events == [
+            StreamEvent(type="error", raw={"error": {"status": "UNAVAILABLE", "message": "Overloaded"}}),
+        ]
