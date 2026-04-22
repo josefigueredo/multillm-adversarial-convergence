@@ -46,6 +46,8 @@ def test_build_certainty_tables_high_evidence_conclusion():
 
     assert payload["summary"]["conclusions_count"] == 1
     assert payload["summary"]["certainty_counts"]["high"] == 1
+    assert payload["summary"]["high_certainty_factual_count"] == 1
+    assert payload["summary"]["high_certainty_recommendation_count"] == 0
     conclusion = payload["conclusions"][0]
     assert conclusion["dimension"] == "DX"
     assert conclusion["certainty"] == "high"
@@ -109,6 +111,7 @@ def test_build_certainty_tables_downgrades_contradictory_sparse_conclusion():
         contradictions=contradictions,
     )
 
+    assert payload["summary"]["high_certainty_recommendation_count"] == 0
     conclusion = payload["conclusions"][0]
     assert conclusion["certainty"] == "very_low"
     assert conclusion["factors"]["risk_of_bias"]["level"] == "very_serious"

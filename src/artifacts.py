@@ -273,6 +273,8 @@ def dashboard_payload(
         "certainty_summary": certainty_summary or {
             "conclusions_count": 0,
             "certainty_counts": {},
+            "high_certainty_factual_count": 0,
+            "high_certainty_recommendation_count": 0,
         },
         "search_log_summary": search_log_summary or {
             "queries_count": 0,

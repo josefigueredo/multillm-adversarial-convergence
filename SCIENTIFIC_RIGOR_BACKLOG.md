@@ -43,9 +43,9 @@ Tasks:
 ### Batch R5A — raw backend output policy
 
 Tasks:
-- [ ] decide whether raw backend outputs stay opt-in
+- [x] decide whether raw backend outputs stay opt-in
 - [ ] add explicit config if raw capture becomes supported
-- [ ] document redaction/size constraints if raw capture is enabled
+- [x] document redaction/size constraints if raw capture is enabled
 
 ### Batch O1A — orchestrator cleanup
 

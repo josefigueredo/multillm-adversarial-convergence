@@ -45,6 +45,8 @@ def build_certainty_tables(
 
     conclusions: list[dict[str, Any]] = []
     certainty_counts: Counter[str] = Counter()
+    high_certainty_factual_count = 0
+    high_certainty_recommendation_count = 0
 
     for dimension, group in sorted(claims_by_dimension.items()):
         claim_ids = [str(claim.get("id", "")) for claim in group]
@@ -74,6 +76,12 @@ def build_certainty_tables(
         downgrade_points = sum(_DOWNGRADE_POINTS[factor["level"]] for factor in factors.values())
         certainty = _certainty_label(downgrade_points)
         certainty_counts[certainty] += 1
+        if certainty == "high":
+            claim_types = {str(claim.get("claim_type", "")) for claim in group}
+            if "recommendation" in claim_types:
+                high_certainty_recommendation_count += 1
+            if claim_types <= {"factual"}:
+                high_certainty_factual_count += 1
 
         conclusions.append(
             {
@@ -91,6 +99,8 @@ def build_certainty_tables(
         "summary": {
             "conclusions_count": len(conclusions),
             "certainty_counts": dict(certainty_counts),
+            "high_certainty_factual_count": high_certainty_factual_count,
+            "high_certainty_recommendation_count": high_certainty_recommendation_count,
         },
         "conclusions": conclusions,
     }

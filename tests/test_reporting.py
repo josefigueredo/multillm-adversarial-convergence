@@ -158,7 +158,11 @@ def test_helper_html_sections_behave_as_expected():
     )
     assert _semantic_review_html({"enabled": False}) == ""
     assert "Top certainty band:" in _certainty_html(
-        {"conclusions_count": 2, "certainty_counts": {"high": 1, "moderate": 1}}
+        {
+            "conclusions_count": 2,
+            "certainty_counts": {"high": 1, "moderate": 1},
+            "high_certainty_recommendation_count": 1,
+        }
     )
     assert _certainty_html({"conclusions_count": 0, "certainty_counts": {}}) == ""
     assert "Top tools" in _tool_usage_html(

@@ -84,3 +84,4 @@ uv run pytest tests/ -v
 - `docs/design/api-provider-contracts.md` — API adapter contracts for direct and aggregator providers
 - `docs/design/streaming-contract.md` — current streaming contract and deferred follow-up work
 - `docs/design/api-tool-calling-contract.md` — proposed phased tool-calling contract
+- `docs/design/raw-backend-output-policy.md` — policy boundary for any future raw backend payload capture

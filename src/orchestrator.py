@@ -63,6 +63,7 @@ from .reporting import render_html_report as render_html_report_fn
 from .research_logs import build_screening_log, build_search_log
 from .run_io import setup_output_dir, write_results_header
 from .run_state import UsageTotals, resume_state, track_candidate_usage, track_cost, track_usage
+from .runtime_telemetry import accumulate_retries, accumulate_tool_loop
 from .semantic_eval import (
     semantic_calibration,
     semantic_review_disabled,
@@ -472,59 +473,20 @@ class AutoResearcher:
 
     def _track_tool_loop(self, resp: AgentResponse, backend_name: str = "") -> None:
         """Accumulate normalized tool-loop observability from responses."""
-        if not isinstance(resp.raw, dict):
-            return
-        summary = resp.raw.get("tool_loop", {})
-        if not isinstance(summary, dict) or not summary:
-            return
-        name = str(summary.get("backend") or backend_name or "unknown")
-        self._tool_loop_summary["runs"] += 1
-        self._tool_loop_summary["tool_calls"] += int(summary.get("tool_calls", 0) or 0)
-        self._tool_loop_summary["tool_failures"] += int(summary.get("tool_failures", 0) or 0)
-        entry = self._tool_loop_summary["per_backend"].setdefault(
-            name,
-            {"runs": 0, "tool_calls": 0, "tool_failures": 0, "tools": {}},
+        accumulate_tool_loop(
+            self._tool_loop_summary,
+            self._tool_trace,
+            resp,
+            backend_name=backend_name,
         )
-        entry["runs"] += 1
-        entry["tool_calls"] += int(summary.get("tool_calls", 0) or 0)
-        entry["tool_failures"] += int(summary.get("tool_failures", 0) or 0)
-        trace = resp.raw.get("tool_trace", [])
-        if isinstance(trace, list):
-            for item in trace:
-                if not isinstance(item, dict):
-                    continue
-                self._tool_trace.append(item)
-                tool_name = str(item.get("tool_name") or "unknown")
-                failed = item.get("status") != "success"
-                per_tool = self._tool_loop_summary["per_tool"].setdefault(
-                    tool_name,
-                    {"calls": 0, "failures": 0},
-                )
-                per_tool["calls"] += 1
-                per_tool["failures"] += int(failed)
-                backend_tool = entry["tools"].setdefault(tool_name, {"calls": 0, "failures": 0})
-                backend_tool["calls"] += 1
-                backend_tool["failures"] += int(failed)
 
     def _track_retries(self, resp: AgentResponse, backend_name: str = "") -> None:
         """Accumulate retry counts from backend responses."""
-        if not isinstance(resp.raw, dict):
-            return
-        attempts = int(resp.raw.get("retry_attempts", 0) or 0)
-        if attempts <= 0:
-            return
-        name = str(backend_name or getattr(resp, "backend", "") or "unknown")
-        self._retry_summary["total_retries"] += attempts
-        self._retry_summary["per_backend"][name] = self._retry_summary["per_backend"].get(name, 0) + attempts
-        category_entry = self._retry_summary["per_backend_category"].setdefault(name, {})
-        retry_summary = resp.raw.get("retry_summary", {})
-        if isinstance(retry_summary, dict):
-            categories = retry_summary.get("categories", {})
-            if isinstance(categories, dict):
-                for category, count in categories.items():
-                    value = int(count or 0)
-                    self._retry_summary["per_category"][category] = self._retry_summary["per_category"].get(category, 0) + value
-                    category_entry[category] = category_entry.get(category, 0) + value
+        accumulate_retries(
+            self._retry_summary,
+            resp,
+            backend_name=backend_name,
+        )
 
     # -- Public API --------------------------------------------------------
 

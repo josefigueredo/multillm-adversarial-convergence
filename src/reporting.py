@@ -284,6 +284,10 @@ def _certainty_html(certainty_summary: dict[str, Any] | None) -> str:
             ("Conclusions", conclusions_count),
             ("Top certainty band", top_band),
             ("High-certainty conclusions", int((certainty_counts or {}).get("high", 0) or 0)),
+            (
+                "High-certainty recommendations",
+                int(certainty_summary.get("high_certainty_recommendation_count", 0) or 0),
+            ),
         ],
     )
 
