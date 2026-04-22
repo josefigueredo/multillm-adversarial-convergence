@@ -293,6 +293,7 @@ Important:
 - streaming + function tools is intentionally unsupported in the first slice
 - `execution.retry_api_errors` only applies to plain non-streaming API calls; tool loops and streaming calls are intentionally not retried automatically
 - retry counts are surfaced in run artifacts and reports so backend instability is visible after the run
+- retry reporting now highlights dominant retry categories and the most unstable backend in the run summary
 - tool-loop observability is written into `metrics.json` and `dashboard.json`, including per-backend and per-tool usage/failure counts
 - detailed per-run tool call traces are written into `tool_trace.json`
 - tool traces store redacted argument summaries and truncated output previews rather than raw full payloads

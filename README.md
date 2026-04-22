@@ -34,6 +34,7 @@ Important runtime rules:
 - `execution.stream` currently enables live research-phase progress in `run` for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`
 - `execution.retry_api_errors` retries retryable non-streaming API failures with exponential backoff; streaming calls and function-tool loops are intentionally excluded
 - retry activity is now surfaced into machine-readable artifacts and HTML reports so runs can show when API retries happened by backend
+- retry summaries now include dominant retry categories and the most unstable backend for a run
 - normalized API function-tool calling is currently implemented for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`, and only for non-streaming explicit tool-registered calls
 - tool-loop observability is now captured in run metrics/dashboard artifacts when normalized API function tools are used, including per-backend and per-tool counts
 - per-run tool trace artifacts are now written to `tool_trace.json`, with redacted argument summaries and truncated output previews

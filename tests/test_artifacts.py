@@ -35,7 +35,12 @@ def test_metrics_evaluation_and_dashboard_payloads():
         per_backend_costs={"claude-cli": 1.25},
         per_backend_tokens={"claude-cli": {"input": 100, "output": 20}},
         results=[{"iteration": "001"}],
-        retry_summary={"total_retries": 2, "per_backend": {"litellm-api": 2}},
+        retry_summary={
+            "total_retries": 2,
+            "per_backend": {"litellm-api": 2},
+            "per_category": {"rate_limit": 2},
+            "per_backend_category": {"litellm-api": {"rate_limit": 2}},
+        },
         tool_loop_summary={
             "runs": 2,
             "tool_calls": 3,
@@ -48,6 +53,7 @@ def test_metrics_evaluation_and_dashboard_payloads():
     assert metrics["tool_loop_summary"]["tool_calls"] == 3
     assert metrics["tool_loop_summary"]["per_tool"]["echo"]["calls"] == 2
     assert metrics["retry_summary"]["total_retries"] == 2
+    assert metrics["retry_summary"]["per_category"]["rate_limit"] == 2
 
     evaluation = evaluation_payload(
         benchmark_id="bench-1",
@@ -79,7 +85,12 @@ def test_metrics_evaluation_and_dashboard_payloads():
         strategy_summary={"current_strategy": "single"},
         semantic_calibration={"grade": "reasonable"},
         semantic_review={"grade": "good"},
-        retry_summary={"total_retries": 2, "per_backend": {"litellm-api": 2}},
+        retry_summary={
+            "total_retries": 2,
+            "per_backend": {"litellm-api": 2},
+            "per_category": {"rate_limit": 2},
+            "per_backend_category": {"litellm-api": {"rate_limit": 2}},
+        },
         tool_loop_summary={"runs": 2, "tool_calls": 3, "tool_failures": 1, "per_tool": {"echo": {"calls": 2}}},
     )
     assert dashboard["consistency_level"] == "medium"
@@ -87,6 +98,8 @@ def test_metrics_evaluation_and_dashboard_payloads():
     assert dashboard["tool_loop_summary"]["runs"] == 2
     assert dashboard["tool_loop_summary"]["per_tool"]["echo"]["calls"] == 2
     assert dashboard["retry_summary"]["total_retries"] == 2
+    assert dashboard["retry_insights"]["most_unstable_backend"]["backend"] == "litellm-api"
+    assert dashboard["retry_insights"]["top_retry_categories"][0]["category"] == "rate_limit"
     assert dashboard["tool_usage_summary"]["top_tools"][0]["name"] == "echo"
     assert dashboard["tool_usage_summary"]["failure_hotspots"] == []
 
@@ -121,7 +134,12 @@ def test_pdf_summary_and_should_write_evaluation():
                 "tool_failures": 1,
                 "per_tool": {"echo": {"calls": 2, "failures": 1}},
             },
-            "retry_summary": {"total_retries": 2, "per_backend": {"litellm-api": 2}},
+            "retry_summary": {
+                "total_retries": 2,
+                "per_backend": {"litellm-api": 2},
+                "per_category": {"rate_limit": 2},
+                "per_backend_category": {"litellm-api": {"rate_limit": 2}},
+            },
         },
         rubric={"grade": "good"},
         evidence_quality={"average_evidence_quality_score": 0.7},

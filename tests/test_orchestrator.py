@@ -1341,6 +1341,7 @@ class TestAutoResearcherCall:
 
         assert resp.text == "ok after retry"
         assert resp.raw["retry_attempts"] == 1
+        assert resp.raw["retry_summary"]["categories"]["rate_limit"] == 1
         backend.invoke.assert_called()
         assert backend.invoke.call_count == 2
         sleep_mock.assert_called_once_with(2.5)
@@ -1854,12 +1855,19 @@ class TestAutoResearcherCall:
                 text="ok",
                 cost_usd=0.0,
                 is_error=False,
-                raw={"retry_attempts": 2},
+                raw={
+                    "retry_attempts": 2,
+                    "retry_summary": {
+                        "categories": {"rate_limit": 2},
+                    },
+                },
             ),
             "litellm-api",
         )
         assert researcher._retry_summary["total_retries"] == 2
         assert researcher._retry_summary["per_backend"]["litellm-api"] == 2
+        assert researcher._retry_summary["per_category"]["rate_limit"] == 2
+        assert researcher._retry_summary["per_backend_category"]["litellm-api"]["rate_limit"] == 2
 
     def test_write_tool_trace_artifact(self, researcher):
         researcher.output_dir.mkdir(parents=True, exist_ok=True)

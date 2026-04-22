@@ -86,7 +86,10 @@ def render_html_report(
         rubric_json=json.dumps(rubric),
         semantic_html=_semantic_html(semantic_calibration),
         semantic_review_html=_semantic_review_html(semantic_review),
-        retry_html=_retry_html((dashboard or {}).get("retry_summary")),
+        retry_html=_retry_html(
+            (dashboard or {}).get("retry_summary"),
+            (dashboard or {}).get("retry_insights"),
+        ),
         tool_usage_html=_tool_usage_html((dashboard or {}).get("tool_usage_summary")),
         dashboard_html=_dashboard_html(dashboard),
         evaluation_html=_evaluation_html(evaluation),
@@ -154,18 +157,29 @@ def _tool_usage_html(tool_usage: dict[str, Any] | None) -> str:
     )
 
 
-def _retry_html(retry_summary: dict[str, Any] | None) -> str:
+def _retry_html(retry_summary: dict[str, Any] | None, retry_insights: dict[str, Any] | None = None) -> str:
     if not retry_summary:
         return ""
     total_retries = int(retry_summary.get("total_retries", 0) or 0)
     if total_retries <= 0:
         return ""
+    retry_insights = retry_insights or {}
+    most_unstable = retry_insights.get("most_unstable_backend", {}) if isinstance(retry_insights, dict) else {}
+    top_categories = retry_insights.get("top_retry_categories", []) if isinstance(retry_insights, dict) else []
     return _json_section_html(
         "API Retries",
-        retry_summary,
+        {
+            "summary": retry_summary,
+            "insights": retry_insights,
+        },
         [
             ("Total retries", total_retries),
             ("Backends affected", len(retry_summary.get("per_backend", {}) or {})),
+            ("Most unstable backend", most_unstable.get("backend", "")),
+            (
+                "Top retry category",
+                top_categories[0].get("category", "") if top_categories and isinstance(top_categories[0], dict) else "",
+            ),
         ],
     )
 

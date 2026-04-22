@@ -113,6 +113,8 @@ def metrics_payload(
         "retry_summary": retry_summary or {
             "total_retries": 0,
             "per_backend": {},
+            "per_category": {},
+            "per_backend_category": {},
         },
         "tool_loop_summary": tool_loop_summary or {
             "runs": 0,
@@ -202,6 +204,7 @@ def dashboard_payload(
 ) -> dict[str, Any]:
     """Build the stakeholder-facing dashboard artifact payload."""
     tool_usage_summary = _tool_usage_summary(tool_loop_summary or {})
+    retry_insights = _retry_insights(retry_summary or {})
     return {
         "topic": topic,
         "goal": goal,
@@ -225,7 +228,10 @@ def dashboard_payload(
         "retry_summary": retry_summary or {
             "total_retries": 0,
             "per_backend": {},
+            "per_category": {},
+            "per_backend_category": {},
         },
+        "retry_insights": retry_insights,
         "tool_loop_summary": tool_loop_summary or {
             "runs": 0,
             "tool_calls": 0,
@@ -288,6 +294,29 @@ def _tool_usage_summary(tool_loop_summary: dict[str, Any]) -> dict[str, Any]:
     return {
         "top_tools": top_tools[:5],
         "failure_hotspots": failure_hotspots[:5],
+    }
+
+
+def _retry_insights(retry_summary: dict[str, Any]) -> dict[str, Any]:
+    """Build compact report-friendly retry highlights."""
+    per_backend = retry_summary.get("per_backend", {})
+    per_category = retry_summary.get("per_category", {})
+
+    unstable = [
+        {"backend": backend, "retries": int(count or 0)}
+        for backend, count in per_backend.items()
+    ]
+    unstable.sort(key=lambda item: (-item["retries"], item["backend"]))
+
+    categories = [
+        {"category": category, "count": int(count or 0)}
+        for category, count in per_category.items()
+    ]
+    categories.sort(key=lambda item: (-item["count"], item["category"]))
+
+    return {
+        "most_unstable_backend": unstable[0] if unstable else {},
+        "top_retry_categories": categories[:5],
     }
 
 

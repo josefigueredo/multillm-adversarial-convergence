@@ -189,6 +189,8 @@ class AutoResearcher:
         self._retry_summary: dict[str, Any] = {
             "total_retries": 0,
             "per_backend": {},
+            "per_category": {},
+            "per_backend_category": {},
         }
         self._tool_trace: list[dict[str, Any]] = []
 
@@ -381,14 +383,20 @@ class AutoResearcher:
             return backend.invoke(prompt, opts, timeout=timeout)
 
         attempt = 0
+        categories: dict[str, int] = {}
         while True:
             response = backend.invoke(prompt, opts, timeout=timeout)
             if not self._should_retry_response(response):
                 if attempt > 0:
                     response.raw["retry_attempts"] = attempt
+                    response.raw["retry_summary"] = {"categories": dict(categories)}
                 return response
+            category = self._response_error_category(response)
+            if category:
+                categories[category] = categories.get(category, 0) + 1
             if attempt >= max_retries:
                 response.raw["retry_attempts"] = attempt
+                response.raw["retry_summary"] = {"categories": dict(categories)}
                 return response
             attempt += 1
             time.sleep(self.config.execution.retry_backoff_seconds * (2 ** (attempt - 1)))
@@ -402,6 +410,16 @@ class AutoResearcher:
         if not isinstance(error, dict):
             return False
         return bool(error.get("retryable", False))
+
+    @staticmethod
+    def _response_error_category(response: AgentResponse) -> str:
+        """Return normalized error category from a response when available."""
+        if not isinstance(response.raw, dict):
+            return ""
+        error = response.raw.get("error", {})
+        if not isinstance(error, dict):
+            return ""
+        return str(error.get("category", "") or "")
 
     @staticmethod
     def _print_stream_event(backend: Backend, event: StreamEvent) -> None:
@@ -487,6 +505,15 @@ class AutoResearcher:
         name = str(backend_name or getattr(resp, "backend", "") or "unknown")
         self._retry_summary["total_retries"] += attempts
         self._retry_summary["per_backend"][name] = self._retry_summary["per_backend"].get(name, 0) + attempts
+        category_entry = self._retry_summary["per_backend_category"].setdefault(name, {})
+        retry_summary = resp.raw.get("retry_summary", {})
+        if isinstance(retry_summary, dict):
+            categories = retry_summary.get("categories", {})
+            if isinstance(categories, dict):
+                for category, count in categories.items():
+                    value = int(count or 0)
+                    self._retry_summary["per_category"][category] = self._retry_summary["per_category"].get(category, 0) + value
+                    category_entry[category] = category_entry.get(category, 0) + value
 
     # -- Public API --------------------------------------------------------
 

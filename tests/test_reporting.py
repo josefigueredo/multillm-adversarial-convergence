@@ -38,7 +38,16 @@ def test_render_html_report_renders_core_sections_and_escapes():
         semantic_review={"enabled": True, "grade": "good", "overall_score": 0.76, "judge_backend": "claude-cli"},
         dashboard={
             "current_strategy": "ensemble",
-            "retry_summary": {"total_retries": 2, "per_backend": {"litellm-api": 2}},
+            "retry_summary": {
+                "total_retries": 2,
+                "per_backend": {"litellm-api": 2},
+                "per_category": {"rate_limit": 2},
+                "per_backend_category": {"litellm-api": {"rate_limit": 2}},
+            },
+            "retry_insights": {
+                "most_unstable_backend": {"backend": "litellm-api", "retries": 2},
+                "top_retry_categories": [{"category": "rate_limit", "count": 2}],
+            },
             "tool_usage_summary": {
                 "top_tools": [{"name": "echo", "calls": 2, "failures": 1}],
                 "failure_hotspots": [{"backend": "codex-api", "tool_name": "echo", "failures": 1}],
@@ -105,8 +114,19 @@ def test_helper_html_sections_behave_as_expected():
     assert _dashboard_html(None) == ""
     assert "Benchmark:" in _evaluation_html({"benchmark_id": "bench-1", "summary": {"rubric_grade": "good"}})
     assert _evaluation_html(None) == ""
-    assert "Total retries:" in _retry_html({"total_retries": 2, "per_backend": {"litellm-api": 2}})
-    assert _retry_html({"total_retries": 0, "per_backend": {}}) == ""
+    assert "Total retries:" in _retry_html(
+        {
+            "total_retries": 2,
+            "per_backend": {"litellm-api": 2},
+            "per_category": {"rate_limit": 2},
+            "per_backend_category": {"litellm-api": {"rate_limit": 2}},
+        },
+        {
+            "most_unstable_backend": {"backend": "litellm-api", "retries": 2},
+            "top_retry_categories": [{"category": "rate_limit", "count": 2}],
+        },
+    )
+    assert _retry_html({"total_retries": 0, "per_backend": {}}, {}) == ""
     assert "Calibrated score:" in _semantic_html({"enabled": True, "grade": "reasonable", "calibrated_score": 0.7})
     assert _semantic_html({"enabled": False}) == ""
     assert "Overall score:" in _semantic_review_html(
