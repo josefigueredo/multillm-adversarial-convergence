@@ -1310,6 +1310,121 @@ class TestAutoResearcherCall:
         backend.invoke.assert_called_once()
         backend.invoke_stream.assert_not_called()
 
+    def test_call_with_retries_retryable_api_errors(self, researcher):
+        backend = MagicMock()
+        backend.name = "litellm-api"
+        backend.capabilities = get_backend("litellm-api").capabilities
+        researcher.config = ResearchConfig(
+            topic="Test topic",
+            goal="Test goal",
+            dimensions=("Dim A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                model="sonnet",
+                retry_api_errors=1,
+                retry_backoff_seconds=2.5,
+            ),
+        )
+        backend.invoke.side_effect = [
+            AgentResponse(
+                text="",
+                cost_usd=0.0,
+                is_error=True,
+                raw={"error": {"category": "rate_limit", "retryable": True, "provider_code": "rate_limit"}},
+            ),
+            AgentResponse(text="ok after retry", cost_usd=0.01, is_error=False, raw={}),
+        ]
+
+        with patch("src.orchestrator.time.sleep") as sleep_mock:
+            resp = researcher._call_with(backend, "prompt", model="openai/gpt-4.1-mini")
+
+        assert resp.text == "ok after retry"
+        assert resp.raw["retry_attempts"] == 1
+        backend.invoke.assert_called()
+        assert backend.invoke.call_count == 2
+        sleep_mock.assert_called_once_with(2.5)
+
+    def test_call_with_does_not_retry_non_retryable_api_errors(self, researcher):
+        backend = MagicMock()
+        backend.name = "litellm-api"
+        backend.capabilities = get_backend("litellm-api").capabilities
+        researcher.config = ResearchConfig(
+            topic="Test topic",
+            goal="Test goal",
+            dimensions=("Dim A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                model="sonnet",
+                retry_api_errors=2,
+                retry_backoff_seconds=2.5,
+            ),
+        )
+        backend.invoke.return_value = AgentResponse(
+            text="",
+            cost_usd=0.0,
+            is_error=True,
+            raw={"error": {"category": "auth", "retryable": False, "provider_code": "invalid_api_key"}},
+        )
+
+        with patch("src.orchestrator.time.sleep") as sleep_mock:
+            resp = researcher._call_with(backend, "prompt", model="openai/gpt-4.1-mini")
+
+        assert resp.is_error is True
+        assert backend.invoke.call_count == 1
+        sleep_mock.assert_not_called()
+
+    def test_call_with_does_not_retry_tool_loops_even_when_api_retries_enabled(self, researcher):
+        backend = get_backend("codex-api")
+        backend.invoke = MagicMock(return_value=AgentResponse(
+            text="",
+            cost_usd=0.0,
+            is_error=False,
+            raw={
+                "output": [
+                    {
+                        "id": "fc_123",
+                        "type": "function_call",
+                        "call_id": "call_123",
+                        "name": "missing_tool",
+                        "arguments": "{}",
+                    }
+                ]
+            },
+        ))
+        researcher.config = ResearchConfig(
+            topic="Test topic",
+            goal="Test goal",
+            dimensions=("Dim A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                model="sonnet",
+                retry_api_errors=2,
+                retry_backoff_seconds=2.5,
+            ),
+        )
+
+        with patch("src.orchestrator.time.sleep") as sleep_mock:
+            resp = researcher._call_with(
+                backend,
+                "Say hi",
+                model="gpt-5.4",
+                tools=(
+                    __import__("src.backends.types", fromlist=["ToolDefinition"]).ToolDefinition(
+                        type="function",
+                        name="echo",
+                    ),
+                ),
+                tool_registry={"echo": lambda args: "unused"},
+            )
+
+        assert resp.is_error is True
+        assert resp.raw["error"]["category"] == "tool_execution"
+        assert backend.invoke.call_count == 1
+        sleep_mock.assert_not_called()
+
     @pytest.mark.parametrize(
         ("backend_name", "model", "completed_payload", "expected_text"),
         [
@@ -1732,6 +1847,19 @@ class TestAutoResearcherCall:
         assert researcher._tool_loop_summary["per_backend"]["codex-api"]["tools"]["echo"]["calls"] == 1
         assert researcher._tool_loop_summary["per_tool"]["echo"]["calls"] == 1
         assert researcher._tool_trace[0]["tool_name"] == "echo"
+
+    def test_track_usage_accumulates_retry_summary(self, researcher):
+        researcher._track_usage(
+            AgentResponse(
+                text="ok",
+                cost_usd=0.0,
+                is_error=False,
+                raw={"retry_attempts": 2},
+            ),
+            "litellm-api",
+        )
+        assert researcher._retry_summary["total_retries"] == 2
+        assert researcher._retry_summary["per_backend"]["litellm-api"] == 2
 
     def test_write_tool_trace_artifact(self, researcher):
         researcher.output_dir.mkdir(parents=True, exist_ok=True)

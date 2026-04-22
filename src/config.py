@@ -125,6 +125,14 @@ def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
     if max_budget < 0:
         raise ValueError(f"max_budget_per_call must be non-negative, got {max_budget}")
 
+    retry_api_errors = raw.get("retry_api_errors", exec_defaults.retry_api_errors)
+    if retry_api_errors < 0:
+        raise ValueError(f"retry_api_errors must be non-negative, got {retry_api_errors}")
+
+    retry_backoff_seconds = raw.get("retry_backoff_seconds", exec_defaults.retry_backoff_seconds)
+    if retry_backoff_seconds <= 0:
+        raise ValueError(f"retry_backoff_seconds must be positive, got {retry_backoff_seconds}")
+
     model = raw.get("model", exec_defaults.model)
 
     return ExecutionConfig(
@@ -132,6 +140,8 @@ def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
         compress_every=raw.get("compress_every", exec_defaults.compress_every),
         system_prompt=raw.get("system_prompt", exec_defaults.system_prompt),
         stream=raw.get("stream", exec_defaults.stream),
+        retry_api_errors=retry_api_errors,
+        retry_backoff_seconds=retry_backoff_seconds,
         allowed_tools=raw.get("allowed_tools", exec_defaults.allowed_tools),
         max_turns=raw.get("max_turns", exec_defaults.max_turns),
         timeout_seconds=timeout,
@@ -311,6 +321,10 @@ class ExecutionConfig:
         system_prompt: Optional shared system/developer instruction.
         stream: Enable live backend streaming for research-phase calls when the
             selected backend supports it.
+        retry_api_errors: Maximum retry attempts for retryable non-streaming
+            API backend failures. Tool loops and streaming calls are excluded.
+        retry_backoff_seconds: Base retry delay in seconds for retryable API
+            failures; subsequent retries apply exponential backoff.
         allowed_tools: Comma-separated list of tools available to the agent.
         max_turns: Maximum agent turns per CLI invocation.
         timeout_seconds: Per-invocation timeout in seconds.
@@ -334,6 +348,8 @@ class ExecutionConfig:
     compress_every: int = 5
     system_prompt: str = ""
     stream: bool = False
+    retry_api_errors: int = 0
+    retry_backoff_seconds: float = 1.0
     allowed_tools: str = "WebSearch,WebFetch,Read,Bash,Glob,Grep"
     max_turns: int = 10
     timeout_seconds: int = 600
@@ -470,6 +486,14 @@ class ResearchConfig:
         if max_budget < 0:
             raise ValueError(f"max_budget_per_call must be non-negative, got {max_budget}")
 
+        retry_api_errors = exec_raw.get("retry_api_errors", exec_defaults.retry_api_errors)
+        if retry_api_errors < 0:
+            raise ValueError(f"retry_api_errors must be non-negative, got {retry_api_errors}")
+
+        retry_backoff_seconds = exec_raw.get("retry_backoff_seconds", exec_defaults.retry_backoff_seconds)
+        if retry_backoff_seconds <= 0:
+            raise ValueError(f"retry_backoff_seconds must be positive, got {retry_backoff_seconds}")
+
         timeout = exec_raw.get("timeout_seconds", exec_defaults.timeout_seconds)
         if timeout <= 0:
             raise ValueError(f"timeout_seconds must be positive, got {timeout}")
@@ -547,6 +571,8 @@ class ResearchConfig:
             compress_every=exec_raw.get("compress_every", exec_defaults.compress_every),
             system_prompt=exec_raw.get("system_prompt", exec_defaults.system_prompt),
             stream=exec_raw.get("stream", exec_defaults.stream),
+            retry_api_errors=retry_api_errors,
+            retry_backoff_seconds=retry_backoff_seconds,
             allowed_tools=exec_raw.get("allowed_tools", exec_defaults.allowed_tools),
             max_turns=exec_raw.get("max_turns", exec_defaults.max_turns),
             timeout_seconds=timeout,

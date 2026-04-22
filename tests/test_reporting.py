@@ -5,6 +5,7 @@ from src.reporting import (
     _dashboard_html,
     _dimensions_html,
     _evaluation_html,
+    _retry_html,
     _semantic_html,
     _semantic_review_html,
     _summary_cards_html,
@@ -37,6 +38,7 @@ def test_render_html_report_renders_core_sections_and_escapes():
         semantic_review={"enabled": True, "grade": "good", "overall_score": 0.76, "judge_backend": "claude-cli"},
         dashboard={
             "current_strategy": "ensemble",
+            "retry_summary": {"total_retries": 2, "per_backend": {"litellm-api": 2}},
             "tool_usage_summary": {
                 "top_tools": [{"name": "echo", "calls": 2, "failures": 1}],
                 "failure_hotspots": [{"backend": "codex-api", "tool_name": "echo", "failures": 1}],
@@ -54,6 +56,7 @@ def test_render_html_report_renders_core_sections_and_escapes():
     assert "Run Summary" in html
     assert "Semantic Calibration" in html
     assert "Semantic Judge Review" in html
+    assert "API Retries" in html
     assert "Dashboard Summary" in html
     assert "Tool Usage" in html
     assert "Consistency Comparison" in html
@@ -87,6 +90,7 @@ def test_render_html_report_omits_optional_sections_when_empty():
 
     assert "Semantic Calibration" not in html
     assert "Dashboard Summary" not in html
+    assert "API Retries" not in html
     assert "Tool Usage" not in html
     assert "Semantic Judge Review" not in html
     assert "Consistency Comparison" not in html
@@ -101,6 +105,8 @@ def test_helper_html_sections_behave_as_expected():
     assert _dashboard_html(None) == ""
     assert "Benchmark:" in _evaluation_html({"benchmark_id": "bench-1", "summary": {"rubric_grade": "good"}})
     assert _evaluation_html(None) == ""
+    assert "Total retries:" in _retry_html({"total_retries": 2, "per_backend": {"litellm-api": 2}})
+    assert _retry_html({"total_retries": 0, "per_backend": {}}) == ""
     assert "Calibrated score:" in _semantic_html({"enabled": True, "grade": "reasonable", "calibrated_score": 0.7})
     assert _semantic_html({"enabled": False}) == ""
     assert "Overall score:" in _semantic_review_html(

@@ -86,6 +86,7 @@ def render_html_report(
         rubric_json=json.dumps(rubric),
         semantic_html=_semantic_html(semantic_calibration),
         semantic_review_html=_semantic_review_html(semantic_review),
+        retry_html=_retry_html((dashboard or {}).get("retry_summary")),
         tool_usage_html=_tool_usage_html((dashboard or {}).get("tool_usage_summary")),
         dashboard_html=_dashboard_html(dashboard),
         evaluation_html=_evaluation_html(evaluation),
@@ -149,6 +150,22 @@ def _tool_usage_html(tool_usage: dict[str, Any] | None) -> str:
         [
             ("Top tools", ", ".join(str(item.get("name", "")) for item in top_tools if isinstance(item, dict))),
             ("Failure hotspots", len(failure_hotspots)),
+        ],
+    )
+
+
+def _retry_html(retry_summary: dict[str, Any] | None) -> str:
+    if not retry_summary:
+        return ""
+    total_retries = int(retry_summary.get("total_retries", 0) or 0)
+    if total_retries <= 0:
+        return ""
+    return _json_section_html(
+        "API Retries",
+        retry_summary,
+        [
+            ("Total retries", total_retries),
+            ("Backends affected", len(retry_summary.get("per_backend", {}) or {})),
         ],
     )
 

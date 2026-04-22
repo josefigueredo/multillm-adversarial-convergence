@@ -92,6 +92,7 @@ def metrics_payload(
     per_backend_costs: dict[str, float],
     per_backend_tokens: dict[str, dict[str, int]],
     results: list[dict[str, str]],
+    retry_summary: dict[str, Any] | None = None,
     tool_loop_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the machine-readable metrics payload."""
@@ -109,6 +110,10 @@ def metrics_payload(
         "per_backend_costs": per_backend_costs,
         "per_backend_tokens": per_backend_tokens,
         "results": results,
+        "retry_summary": retry_summary or {
+            "total_retries": 0,
+            "per_backend": {},
+        },
         "tool_loop_summary": tool_loop_summary or {
             "runs": 0,
             "tool_calls": 0,
@@ -192,6 +197,7 @@ def dashboard_payload(
     strategy_summary: dict[str, Any],
     semantic_calibration: dict[str, Any],
     semantic_review: dict[str, Any],
+    retry_summary: dict[str, Any] | None = None,
     tool_loop_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the stakeholder-facing dashboard artifact payload."""
@@ -216,6 +222,10 @@ def dashboard_payload(
         ),
         "semantic_calibration": semantic_calibration,
         "semantic_review": semantic_review,
+        "retry_summary": retry_summary or {
+            "total_retries": 0,
+            "per_backend": {},
+        },
         "tool_loop_summary": tool_loop_summary or {
             "runs": 0,
             "tool_calls": 0,
@@ -295,6 +305,7 @@ def pdf_run_summary_text(
 ) -> str:
     """Format core run summary text for PDF export."""
     tool_loop = metrics.get("tool_loop_summary", {}) if isinstance(metrics, dict) else {}
+    retry_summary = metrics.get("retry_summary", {}) if isinstance(metrics, dict) else {}
     tool_line = ""
     if isinstance(tool_loop, dict) and int(tool_loop.get("runs", 0) or 0) > 0:
         tool_line = (
@@ -302,6 +313,9 @@ def pdf_run_summary_text(
             f"{int(tool_loop.get('tool_calls', 0) or 0)} calls / "
             f"{int(tool_loop.get('tool_failures', 0) or 0)} failures\n"
         )
+    retry_line = ""
+    if isinstance(retry_summary, dict) and int(retry_summary.get("total_retries", 0) or 0) > 0:
+        retry_line = f"API retries: {int(retry_summary.get('total_retries', 0) or 0)}\n"
     return (
         f"Topic: {topic}\n"
         f"Goal: {goal}\n"
@@ -312,6 +326,7 @@ def pdf_run_summary_text(
         f"Evidence quality: {evidence_quality.get('average_evidence_quality_score', 0.0)}\n"
         f"Explored dimensions: {', '.join(metrics.get('explored_dimensions', explored_dimensions)) or '(none)'}\n"
         f"{tool_line}"
+        f"{retry_line}"
     )
 
 
@@ -462,6 +477,7 @@ def write_dashboard(
     best_score: float,
     iteration: int,
     explored_dimensions: list[str],
+    retry_summary: dict[str, Any] | None = None,
     tool_loop_summary: dict[str, Any] | None = None,
 ) -> None:
     """Write a stakeholder-friendly summary dashboard artifact."""
@@ -488,6 +504,7 @@ def write_dashboard(
         strategy_summary=strategy_summary,
         semantic_calibration=semantic_calibration,
         semantic_review=semantic_review,
+        retry_summary=retry_summary,
         tool_loop_summary=tool_loop_summary,
     )
     (output_dir / "dashboard.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")

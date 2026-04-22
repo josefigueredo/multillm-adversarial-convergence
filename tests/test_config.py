@@ -125,6 +125,8 @@ class TestExecutionConfig:
         assert ec.model == "sonnet"
         assert ec.system_prompt == ""
         assert ec.stream is False
+        assert ec.retry_api_errors == 0
+        assert ec.retry_backoff_seconds == 1.0
         assert ec.max_budget_per_call == 0.50
         assert ec.lightweight_mode is False
         assert ec.isolate_backend_context is True
@@ -265,6 +267,19 @@ class TestResearchConfigFromYaml:
         """), encoding="utf-8")
         cfg = ResearchConfig.from_yaml(p)
         assert cfg.execution.stream is True
+
+    def test_execution_api_retry_settings_parse(self, tmp_path: Path):
+        p = tmp_path / "retry.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Retry test"
+              execution:
+                retry_api_errors: 2
+                retry_backoff_seconds: 3.5
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.execution.retry_api_errors == 2
+        assert cfg.execution.retry_backoff_seconds == 3.5
 
     def test_goal_falls_back_to_topic(self, no_goal_yaml: Path):
         cfg = ResearchConfig.from_yaml(no_goal_yaml)

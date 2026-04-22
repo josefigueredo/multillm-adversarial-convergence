@@ -12,6 +12,7 @@ import json
 import logging
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -185,6 +186,10 @@ class AutoResearcher:
             "per_backend": {},
             "per_tool": {},
         }
+        self._retry_summary: dict[str, Any] = {
+            "total_retries": 0,
+            "per_backend": {},
+        }
         self._tool_trace: list[dict[str, Any]] = []
 
     def _call(self, prompt: str, **kwargs: Any) -> AgentResponse:
@@ -302,7 +307,7 @@ class AutoResearcher:
             )
         if opts.stream and hasattr(backend, "invoke_stream"):
             return self._invoke_streaming_backend(backend, prompt, opts, timeout=timeout)
-        return backend.invoke(prompt, opts, timeout=timeout)
+        return self._invoke_backend_with_retries(backend, prompt, opts, timeout=timeout)
 
     def _invoke_for_strategy(
         self,
@@ -362,6 +367,42 @@ class AutoResearcher:
             raw={"stream_completed": completed_payload or {}},
         )
 
+    def _invoke_backend_with_retries(
+        self,
+        backend: Backend,
+        prompt: str,
+        opts: CallOptions,
+        *,
+        timeout: int,
+    ) -> AgentResponse:
+        """Invoke a backend with bounded retries for retryable API failures."""
+        max_retries = max(0, int(self.config.execution.retry_api_errors))
+        if backend.capabilities.transport != "api" or max_retries <= 0:
+            return backend.invoke(prompt, opts, timeout=timeout)
+
+        attempt = 0
+        while True:
+            response = backend.invoke(prompt, opts, timeout=timeout)
+            if not self._should_retry_response(response):
+                if attempt > 0:
+                    response.raw["retry_attempts"] = attempt
+                return response
+            if attempt >= max_retries:
+                response.raw["retry_attempts"] = attempt
+                return response
+            attempt += 1
+            time.sleep(self.config.execution.retry_backoff_seconds * (2 ** (attempt - 1)))
+
+    @staticmethod
+    def _should_retry_response(response: AgentResponse) -> bool:
+        """Return True when a response represents a retryable backend failure."""
+        if not response.is_error or not isinstance(response.raw, dict):
+            return False
+        error = response.raw.get("error", {})
+        if not isinstance(error, dict):
+            return False
+        return bool(error.get("retryable", False))
+
     @staticmethod
     def _print_stream_event(backend: Backend, event: StreamEvent) -> None:
         """Emit a compact streaming progress trace for interactive runs."""
@@ -388,6 +429,7 @@ class AutoResearcher:
         self.total_output_tokens = self._usage.total_output_tokens
         self.per_backend_costs = self._usage.per_backend_costs
         self.per_backend_tokens = self._usage.per_backend_tokens
+        self._track_retries(resp, backend_name)
         self._track_tool_loop(resp, backend_name)
 
     def _track_candidate_usage(self, candidate: ResearchCandidate) -> None:
@@ -434,6 +476,17 @@ class AutoResearcher:
                 backend_tool = entry["tools"].setdefault(tool_name, {"calls": 0, "failures": 0})
                 backend_tool["calls"] += 1
                 backend_tool["failures"] += int(failed)
+
+    def _track_retries(self, resp: AgentResponse, backend_name: str = "") -> None:
+        """Accumulate retry counts from backend responses."""
+        if not isinstance(resp.raw, dict):
+            return
+        attempts = int(resp.raw.get("retry_attempts", 0) or 0)
+        if attempts <= 0:
+            return
+        name = str(backend_name or getattr(resp, "backend", "") or "unknown")
+        self._retry_summary["total_retries"] += attempts
+        self._retry_summary["per_backend"][name] = self._retry_summary["per_backend"].get(name, 0) + attempts
 
     # -- Public API --------------------------------------------------------
 
@@ -909,6 +962,7 @@ class AutoResearcher:
             per_backend_costs=self.per_backend_costs,
             per_backend_tokens=self.per_backend_tokens,
             results=self.results,
+            retry_summary=self._retry_summary,
             tool_loop_summary=self._tool_loop_summary,
         )
         self.metrics_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -1041,6 +1095,7 @@ class AutoResearcher:
             best_score=self.best_score,
             iteration=self.iteration,
             explored_dimensions=self.explored_dimensions,
+            retry_summary=self._retry_summary,
             tool_loop_summary=self._tool_loop_summary,
         )
 
