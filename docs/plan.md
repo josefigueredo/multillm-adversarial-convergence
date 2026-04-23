@@ -54,18 +54,18 @@ Refinement runs in three sequential phases:
 
 ```mermaid
 flowchart TD
-    START([plan --config topic.yaml]) --> INIT[Load PlanConfig\ncheck backends]
+    START([plan --config topic.yaml]) --> INIT[Load PlanConfig check backends]
     INIT --> P1
 
     subgraph P1 ["Phase 1 — Convergence"]
-        BUILDER[Builder\nApply patches → revised plan]
-        BUILDER --> CHALLENGER[Challenger\nFind structural gaps and ordering issues]
-        CHALLENGER --> PERSONAS[Personas\narchitect · tech_lead · qa_engineer\nai_engineer · data_engineer\nsecurity_engineer · devils_advocate]
-        PERSONAS --> VERIFIER[Verifier\nClassify each critique:\nvalid · stale · deferred]
-        VERIFIER --> ARBITRATOR[Arbitrator\nResolve conflicts → patch list]
-        ARBITRATOR --> CLEAN{All critiques\nstale or deferred?}
+        BUILDER[Builder Apply patches → revised plan]
+        BUILDER --> CHALLENGER[Challenger Find structural gaps and ordering issues]
+        CHALLENGER --> PERSONAS[Personas architect · tech_lead · qa_engineer ai_engineer · data_engineer security_engineer · devils_advocate]
+        PERSONAS --> VERIFIER[Verifier Classify each critique: valid · stale · deferred]
+        VERIFIER --> ARBITRATOR[Arbitrator Resolve conflicts → patch list]
+        ARBITRATOR --> CLEAN{All critiques stale or deferred?}
         CLEAN -->|No| BUILDER
-        CLEAN -->|Yes, streak++| STREAK{consecutive_clean\n≥ convergence_cycles?}
+        CLEAN -->|Yes, streak++| STREAK{consecutive_clean ≥ convergence_cycles?}
         STREAK -->|No| BUILDER
         STREAK -->|Yes| CONVERGED([Plan converged])
     end
@@ -73,9 +73,9 @@ flowchart TD
     CONVERGED --> P2
 
     subgraph P2 ["Phase 2 — Expansion"]
-        GEN[Generate each artifact\nfrom converged plan]
+        GEN[Generate each artifact from converged plan]
         GEN --> REV{artifact.review?}
-        REV -->|Yes| ARTREV[Challenger + Verifier\n+ Arbitrator pass]
+        REV -->|Yes| ARTREV[Challenger + Verifier + Arbitrator pass]
         REV -->|No| WRITE[Write artifact file]
         ARTREV --> WRITE
     end

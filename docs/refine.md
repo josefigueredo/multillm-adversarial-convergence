@@ -54,18 +54,18 @@ Refinement runs in three sequential phases:
 
 ```mermaid
 flowchart TD
-    START([refine --config topic.yaml]) --> INIT[Load DocumentConfig\ncheck backends]
+    START([refine --config topic.yaml]) --> INIT[Load DocumentConfig check backends]
     INIT --> P1
 
     subgraph P1 ["Phase 1 — Convergence"]
-        BUILDER[Builder\nApply patches → revised PRD]
-        BUILDER --> CHALLENGER[Challenger\nFind internal inconsistencies]
-        CHALLENGER --> PERSONAS[Personas\narchitect · scrum_master · product_owner]
-        PERSONAS --> VERIFIER[Verifier\nClassify each critique:\nvalid · stale · deferred]
-        VERIFIER --> ARBITRATOR[Arbitrator\nResolve conflicts → patch list]
-        ARBITRATOR --> CLEAN{All critiques\nstale or deferred?}
+        BUILDER[Builder Apply patches → revised PRD]
+        BUILDER --> CHALLENGER[Challenger Find internal inconsistencies]
+        CHALLENGER --> PERSONAS[Personas architect · scrum_master · product_owner]
+        PERSONAS --> VERIFIER[Verifier Classify each critique: valid · stale · deferred]
+        VERIFIER --> ARBITRATOR[Arbitrator Resolve conflicts → patch list]
+        ARBITRATOR --> CLEAN{All critiques stale or deferred?}
         CLEAN -->|No| BUILDER
-        CLEAN -->|Yes, streak++| STREAK{consecutive_clean\n≥ convergence_cycles?}
+        CLEAN -->|Yes, streak++| STREAK{consecutive_clean ≥ convergence_cycles?}
         STREAK -->|No| BUILDER
         STREAK -->|Yes| CONVERGED([PRD converged])
     end
@@ -73,9 +73,9 @@ flowchart TD
     CONVERGED --> P2
 
     subgraph P2 ["Phase 2 — Expansion"]
-        GEN[Generate each artifact\nfrom converged PRD]
+        GEN[Generate each artifact from converged PRD]
         GEN --> REV{artifact.review?}
-        REV -->|Yes| ARTREV[Challenger + Verifier\n+ Arbitrator pass]
+        REV -->|Yes| ARTREV[Challenger + Verifier + Arbitrator pass]
         REV -->|No| WRITE[Write artifact file]
         ARTREV --> WRITE
     end
