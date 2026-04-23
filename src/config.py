@@ -17,6 +17,7 @@ import yaml
 log = logging.getLogger("autoresearch")
 
 from .backends import VALID_BACKENDS
+from .output_style import VALID_OUTPUT_STYLES
 
 # Valid multi-backend strategy names.
 VALID_STRATEGIES = ("single", "ensemble", "adversarial", "parallel", "serial", "specialist")
@@ -306,6 +307,20 @@ class EvaluationConfig:
 
 
 @dataclass(frozen=True)
+class OutputStyleOverrides:
+    """Optional run-synthesis style overrides layered on top of output_style."""
+
+    include_executive_summary: bool | None = None
+    include_comparison_table: bool | None = None
+    include_methodology: bool | None = None
+    include_limitations: bool | None = None
+    include_next_actions: bool | None = None
+    section_order: str = ""  # "" | standard | recommendation_first | evidence_first
+    recommendation_mode: str = ""  # "" | ranked | decision_only
+    citation_mode: str = ""  # "" | inline_links | references_section
+
+
+@dataclass(frozen=True)
 class ReportingConfig:
     """Optional report rendering settings.
 
@@ -313,6 +328,9 @@ class ReportingConfig:
         export_html: Whether to emit a human-readable HTML report artifact.
         export_pdf: Whether to emit a human-readable PDF report artifact.
         report_title: Optional override for the HTML report title.
+        output_style: Run-mode synthesis prose/structure profile.
+        style_overrides: Optional run-mode synthesis override knobs layered on
+            top of the selected output style.
         capture_raw_backend_outputs: Whether future raw backend output capture
             is enabled. Default-off by policy.
         raw_backend_output_max_chars: Size cap for any future captured raw
@@ -324,6 +342,8 @@ class ReportingConfig:
     export_html: bool = True
     export_pdf: bool = False
     report_title: str = ""
+    output_style: str = "default"
+    style_overrides: OutputStyleOverrides = field(default_factory=OutputStyleOverrides)
     capture_raw_backend_outputs: bool = False
     raw_backend_output_max_chars: int = 20000
     raw_backend_output_redact: bool = True
@@ -476,10 +496,46 @@ class ResearchConfig:
             raise ValueError(
                 f"raw_backend_output_max_chars must be positive, got {raw_backend_output_max_chars}"
             )
+        output_style = reporting_raw.get("output_style", "default")
+        if output_style not in VALID_OUTPUT_STYLES:
+            raise ValueError(
+                f"Invalid reporting.output_style '{output_style}'. "
+                f"Must be one of: {', '.join(VALID_OUTPUT_STYLES)}"
+            )
+        style_overrides_raw: dict[str, Any] = reporting_raw.get("style_overrides", {})
+        recommendation_mode = style_overrides_raw.get("recommendation_mode", "")
+        if recommendation_mode not in ("", "ranked", "decision_only"):
+            raise ValueError(
+                "Invalid reporting.style_overrides.recommendation_mode "
+                f"'{recommendation_mode}'. Must be one of: ranked, decision_only"
+            )
+        citation_mode = style_overrides_raw.get("citation_mode", "")
+        if citation_mode not in ("", "inline_links", "references_section"):
+            raise ValueError(
+                "Invalid reporting.style_overrides.citation_mode "
+                f"'{citation_mode}'. Must be one of: inline_links, references_section"
+            )
+        section_order = style_overrides_raw.get("section_order", "")
+        if section_order not in ("", "standard", "recommendation_first", "evidence_first"):
+            raise ValueError(
+                "Invalid reporting.style_overrides.section_order "
+                f"'{section_order}'. Must be one of: standard, recommendation_first, evidence_first"
+            )
         reporting = ReportingConfig(
             export_html=reporting_raw.get("export_html", True),
             export_pdf=reporting_raw.get("export_pdf", False),
             report_title=reporting_raw.get("report_title", ""),
+            output_style=output_style,
+            style_overrides=OutputStyleOverrides(
+                include_executive_summary=style_overrides_raw.get("include_executive_summary"),
+                include_comparison_table=style_overrides_raw.get("include_comparison_table"),
+                include_methodology=style_overrides_raw.get("include_methodology"),
+                include_limitations=style_overrides_raw.get("include_limitations"),
+                include_next_actions=style_overrides_raw.get("include_next_actions"),
+                section_order=section_order,
+                recommendation_mode=recommendation_mode,
+                citation_mode=citation_mode,
+            ),
             capture_raw_backend_outputs=reporting_raw.get("capture_raw_backend_outputs", False),
             raw_backend_output_max_chars=raw_backend_output_max_chars,
             raw_backend_output_redact=reporting_raw.get("raw_backend_output_redact", True),

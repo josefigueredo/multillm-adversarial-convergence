@@ -44,6 +44,7 @@ from .constraints import (
 )
 from .comparison import benchmark_summary, reference_run_comparison
 from .evaluation_artifacts import write_evaluation_artifacts
+from .output_style import build_output_style_contract
 from .provenance import (
     extract_citations,
     extract_claims,
@@ -745,6 +746,10 @@ class AutoResearcher:
             topic=self.config.topic,
             goal=self.config.goal,
             methodology=self._methodology_summary(),
+            output_style_contract=build_output_style_contract(
+                self.config.reporting.output_style,
+                self.config.reporting.style_overrides,
+            ),
             goal_constraints=self._goal_constraints_summary(),
             lightweight_mode="yes" if self._is_lightweight_mode() else "no",
             knowledge_base=knowledge_context,

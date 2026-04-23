@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .output_style import summarize_output_style_overrides
 from .run_paths import RunPaths
 
 
@@ -30,6 +31,8 @@ def build_dry_run_summary(
         "topic": config.topic,
         "goal": config.goal,
         "strategy": config.execution.strategy,
+        "output_style": config.reporting.output_style,
+        "active_style_overrides": summarize_output_style_overrides(config.reporting.style_overrides),
         "primary_backend": config.execution.backends.primary,
         "backend_roles": {
             "primary": config.execution.backends.primary,
@@ -65,6 +68,7 @@ def render_dry_run_summary(summary: dict[str, Any]) -> str:
         f"config: {summary['config_path']}",
         f"topic: {summary['topic']}",
         f"strategy: {summary['strategy']}",
+        f"output style: {summary['output_style']}",
         f"primary backend: {summary['primary_backend']}",
         f"research backends: {', '.join(summary['backend_roles']['research'])}",
         f"resolved backends: {', '.join(summary['resolved_backends'])}",
@@ -76,6 +80,9 @@ def render_dry_run_summary(summary: dict[str, Any]) -> str:
         f"allowed_tools: {'configured' if summary['flags']['allowed_tools'] else 'absent'}",
         "planned artifacts:",
     ]
+    active_overrides = summary.get("active_style_overrides", [])
+    if active_overrides:
+        lines.insert(5, f"style overrides: {', '.join(active_overrides)}")
     if "primary_artifact" in summary:
         lines.insert(7, f"primary artifact: {summary['primary_artifact']}")
     for name, path in summary["artifacts"].items():
@@ -98,6 +105,8 @@ def build_convergence_dry_run_summary(
         "topic": config.topic,
         "goal": config.goal,
         "strategy": getattr(config, "execution", None).strategy if getattr(config, "execution", None) else "single",
+        "output_style": "n/a",
+        "active_style_overrides": [],
         "primary_backend": config.backends.primary,
         "backend_roles": {
             "primary": config.backends.primary,

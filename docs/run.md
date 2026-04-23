@@ -502,6 +502,60 @@ Key fields:
 
 Optional sections: `methodology:` (academic framing), `evaluation:` (baselines, benchmarks, semantic review), `reporting:` (HTML/PDF export).
 
+### Output style
+
+`run` synthesis now supports a first-class prose/profile selector:
+
+```yaml
+reporting:
+  output_style: default   # default | paper | technical_doc | executive_brief | decision_memo
+```
+
+Profiles:
+- `default` — current decision-support report style with summary, trade-offs, and recommendations
+- `paper` — more formal research-paper / whitepaper structure with abstract, methodology, discussion, and limitations
+- `technical_doc` — internal engineering-document structure with problem statement, options, decision, implementation considerations, and open questions
+- `executive_brief` — concise executive-facing brief with headline recommendation, key risks, and immediate next actions
+- `decision_memo` — memo-style structure focused on the decision, recommended option, rationale, and consequences
+
+This applies to **run synthesis only**. `refine` and `plan` keep their own document structures.
+
+Optional style overrides:
+
+```yaml
+reporting:
+  output_style: technical_doc
+  style_overrides:
+    include_executive_summary: false
+    include_comparison_table: true
+    include_methodology: false
+    include_limitations: true
+    include_next_actions: true
+    section_order: recommendation_first
+    recommendation_mode: decision_only
+    citation_mode: references_section
+```
+
+Supported overrides:
+- `include_executive_summary`: `true | false | null`
+- `include_comparison_table`: `true | false | null`
+- `include_methodology`: `true | false | null`
+- `include_limitations`: `true | false | null`
+- `include_next_actions`: `true | false | null`
+- `section_order`: `standard | recommendation_first | evidence_first`
+- `recommendation_mode`: `ranked | decision_only`
+- `citation_mode`: `inline_links | references_section`
+
+The selected `output_style` also affects HTML/PDF report presentation metadata:
+- style label shown in the HTML header
+- style-aware Methods/Synthesis section headings
+- style-aware PDF title suffixes for profiles like `paper`, `executive_brief`, and `decision_memo`
+
+The selected style also shows up in operator-facing artifacts:
+- `run --dry-run` includes the selected style plus active override labels
+- `run_manifest.json` includes `output_style_label` and `active_style_overrides`
+- `dashboard.json` includes `output_style`, `output_style_label`, and `active_style_overrides`
+
 ## Resilience
 
 - **Crash recovery**: Dimensions retried up to 3 times, then skipped

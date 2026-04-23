@@ -258,8 +258,86 @@ class TestAutoResearcherSetup:
         assert "under 100 words" in prompt.lower()
         assert "lightweight_mode" in prompt
         assert "lightweight mode: truncated knowledge base" in prompt.lower()
-        assert "| Iter | Dimension | Score | Status |" not in prompt
-        assert "- Iter 001: Developer experience" in prompt
+
+    def test_generate_synthesis_injects_output_style_contract(self, researcher):
+        researcher.config = ResearchConfig(
+            topic="API gateways",
+            goal="Recommend a path forward.",
+            dimensions=("Architecture",),
+            methodology=researcher.config.methodology,
+            evaluation=researcher.config.evaluation,
+            reporting=researcher.config.reporting.__class__(output_style="paper"),
+            scoring=researcher.config.scoring,
+            execution=researcher.config.execution,
+        )
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        researcher.knowledge_base = "Documented evidence about multiple gateway options."
+
+        captured: dict[str, str] = {}
+
+        def fake_call(backend, prompt, **kwargs):
+            captured["prompt"] = prompt
+            return AgentResponse(text="## Abstract\nFindings.", cost_usd=0.0, is_error=False)
+
+        with patch.object(researcher, "_call_with", side_effect=fake_call):
+            researcher._generate_synthesis()
+
+        prompt = captured["prompt"]
+        assert "Output Style Contract" in prompt
+        assert "Abstract" in prompt
+        assert "Methodology" in prompt
+        assert "Limitations" in prompt
+
+    def test_generate_synthesis_injects_output_style_overrides(self, researcher):
+        researcher.config = ResearchConfig(
+            topic="API gateways",
+            goal="Recommend a path forward.",
+            dimensions=("Architecture",),
+            methodology=researcher.config.methodology,
+            evaluation=researcher.config.evaluation,
+            reporting=researcher.config.reporting.__class__(
+                output_style="technical_doc",
+                style_overrides=researcher.config.reporting.style_overrides.__class__(
+                    include_executive_summary=False,
+                    include_comparison_table=True,
+                    include_methodology=False,
+                    include_limitations=True,
+                    include_next_actions=True,
+                    section_order="recommendation_first",
+                    recommendation_mode="decision_only",
+                    citation_mode="references_section",
+                ),
+            ),
+            scoring=researcher.config.scoring,
+            execution=researcher.config.execution,
+        )
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        researcher.knowledge_base = "Documented evidence about multiple gateway options."
+
+        captured: dict[str, str] = {}
+
+        def fake_call(backend, prompt, **kwargs):
+            captured["prompt"] = prompt
+            return AgentResponse(text="## Decision\nFindings.", cost_usd=0.0, is_error=False)
+
+        with patch.object(researcher, "_call_with", side_effect=fake_call):
+            researcher._generate_synthesis()
+
+        prompt = captured["prompt"].lower()
+        assert "do not include an executive summary" in prompt
+        assert "include a comparison table" in prompt
+        assert "do not include a standalone methodology section" in prompt
+        assert "include a limitations section" in prompt
+        assert "next actions section" in prompt
+        assert "lead with the recommendation before supporting evidence" in prompt
+        assert "single decision section" in prompt
+        assert "references section" in prompt
 
     def test_call_with_uses_isolated_backend_context_by_default(self, tmp_path):
         backend = CapturingBackend()

@@ -50,6 +50,16 @@ Important runtime rules:
 - `execution.retry_api_errors` retries retryable non-streaming API failures with exponential backoff; streaming calls and function-tool loops are intentionally excluded
 - `run --dry-run` validates config loading, strategy/backend resolution, provider wiring, backend availability, and planned artifact paths without executing the research loop or writing run artifacts
 - `refine --dry-run` and `plan --dry-run` validate config loading, backend/provider wiring, and planned artifact paths without executing convergence loops or writing run artifacts
+- `reporting.output_style` now lets `run` choose the synthesis prose/profile:
+  - `default`
+  - `paper`
+  - `technical_doc`
+  - `executive_brief`
+  - `decision_memo`
+- `reporting.style_overrides` now lets `run` refine that profile with optional controls like executive summary on/off, comparison table on/off, recommendation mode, and citation mode
+- `reporting.style_overrides` now also supports methodology/limitations/next-actions toggles plus section ordering (`standard`, `recommendation_first`, `evidence_first`)
+- HTML/PDF report presentation now follows the selected `run` output style with style-aware labels/titles (for example paper-style methodology labels or executive-brief framing)
+- dry-run summaries plus machine-readable run artifacts now surface the selected style label and active override labels for easier operator verification
 - retry activity is now surfaced into machine-readable artifacts and HTML reports so runs can show when API retries happened by backend
 - retry summaries now include dominant retry categories and the most unstable backend for a run
 - normalized API function-tool calling is currently implemented for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`, and only for non-streaming explicit tool-registered calls

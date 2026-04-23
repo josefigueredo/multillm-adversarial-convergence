@@ -13,6 +13,8 @@ from pathlib import Path
 from string import Template
 from typing import Any
 
+from .output_style import build_output_style_presentation
+
 
 _TEMPLATES_DIR = Path(__file__).with_name("templates")
 _TEMPLATE_PATH = _TEMPLATES_DIR / "report.html.tmpl"
@@ -28,6 +30,7 @@ _SECTION_COUNTER = 0
 def render_html_report(
     *,
     title: str,
+    output_style: str,
     topic: str,
     goal: str,
     manifest: dict[str, Any],
@@ -46,6 +49,7 @@ def render_html_report(
     """Render a standalone HTML report from a filesystem template."""
     global _SECTION_COUNTER
     _SECTION_COUNTER = 0
+    presentation = build_output_style_presentation(output_style)
 
     run = manifest.get("run", {})
     strategy = manifest.get("strategy", {})
@@ -66,6 +70,7 @@ def render_html_report(
         print_css=_PRINT_CSS_PATH.read_text(encoding="utf-8").strip(),
         header_html=header_template.safe_substitute(
             title=escape(title),
+            style_label=escape(presentation["style_label"]),
             topic=escape(topic),
             goal=escape(goal),
             strategy_name=escape(str(strategy.get("name", ""))),
@@ -75,12 +80,20 @@ def render_html_report(
         ),
         topic=escape(topic),
         goal=escape(goal),
+        style_label=escape(presentation["style_label"]),
         strategy_name=escape(str(strategy.get("name", ""))),
         run_status=escape(str(run.get("status", ""))),
         started_at=escape(str(run.get("started_at", ""))),
         completed_at=escape(str(run.get("completed_at", ""))),
         summary_cards_html=_summary_cards_html(summary_cards),
         dimensions_html=_dimensions_html(metrics.get("explored_dimensions", [])),
+        style_html=_style_html(
+            output_style=output_style,
+            style_label=presentation["style_label"],
+            active_overrides=(dashboard or {}).get("active_style_overrides"),
+        ),
+        methods_heading=escape(presentation["methods_heading"]),
+        synthesis_heading=escape(presentation["synthesis_heading"]),
         methods_json=json.dumps(methods_text),
         synthesis_json=json.dumps(synthesis_text),
         evidence_quality_json=json.dumps(evidence_quality),
@@ -113,6 +126,30 @@ def _summary_cards_html(summary_cards: dict[str, Any]) -> str:
 
 def _dimensions_html(dimensions: list[Any]) -> str:
     return "".join(f"<li>{escape(str(dim))}</li>" for dim in dimensions) or "<li>(none)</li>"
+
+
+def _style_html(
+    *,
+    output_style: str,
+    style_label: str,
+    active_overrides: list[str] | None,
+) -> str:
+    overrides = active_overrides or []
+    payload = {
+        "output_style": output_style,
+        "style_label": style_label,
+        "active_overrides": overrides,
+        "overrides_count": len(overrides),
+    }
+    return _json_section_html(
+        "Output Style",
+        payload,
+        [
+            ("Style", style_label),
+            ("Profile key", output_style),
+            ("Active overrides", ", ".join(overrides) or "none"),
+        ],
+    )
 
 
 def _evaluation_html(evaluation: dict[str, Any] | None) -> str:

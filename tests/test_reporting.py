@@ -20,6 +20,7 @@ from src.reporting import (
 def test_render_html_report_renders_core_sections_and_escapes():
     html = render_html_report(
         title="Report <Unsafe>",
+        output_style="paper",
         topic="Topic & Scope",
         goal="Goal > Outcome",
         manifest={
@@ -58,6 +59,10 @@ def test_render_html_report_renders_core_sections_and_escapes():
         },
         dashboard={
             "current_strategy": "ensemble",
+            "active_style_overrides": [
+                "include next actions",
+                "references section",
+            ],
             "certainty_summary": {
                 "conclusions_count": 2,
                 "certainty_counts": {"high": 1, "moderate": 1},
@@ -91,10 +96,15 @@ def test_render_html_report_renders_core_sections_and_escapes():
 
     # Title and header escape HTML entities
     assert "Report &lt;Unsafe&gt;" in html
+    assert "Paper Style" in html
     assert "Topic &amp; Scope" in html
     assert "Goal &gt; Outcome" in html
     # Core sections present
     assert "Run Summary" in html
+    assert "Output Style" in html
+    assert "Methodology" in html
+    assert "Paper Draft" in html
+    assert "include next actions, references section" in html
     assert "Semantic Calibration" in html
     assert "Semantic Judge Review" in html
     assert "Certainty Tables" in html
@@ -118,6 +128,7 @@ def test_render_html_report_renders_core_sections_and_escapes():
 def test_render_html_report_omits_optional_sections_when_empty():
     html = render_html_report(
         title="Plain",
+        output_style="technical_doc",
         topic="Topic",
         goal="Goal",
         manifest={"run": {}, "strategy": {}},
@@ -134,6 +145,7 @@ def test_render_html_report_omits_optional_sections_when_empty():
         synthesis_text="Synthesis",
     )
 
+    assert "Output Style" in html
     assert "Semantic Calibration" not in html
     assert "Dashboard Summary" not in html
     assert "API Retries" not in html
@@ -144,6 +156,7 @@ def test_render_html_report_omits_optional_sections_when_empty():
     assert "Consistency Comparison" not in html
     assert "Evaluation" not in html
     assert "<li>(none)</li>" in html
+    assert "Technical Documentation Style" in html
 
 
 def test_helper_html_sections_behave_as_expected():

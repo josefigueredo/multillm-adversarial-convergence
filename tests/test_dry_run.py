@@ -83,6 +83,66 @@ def test_render_dry_run_summary_mentions_flags(tmp_path: Path):
     assert "system_prompt: configured" in rendered
 
 
+def test_dry_run_summary_includes_output_style_metadata(tmp_path: Path):
+    config = _config()
+    config = ResearchConfig(
+        topic=config.topic,
+        goal=config.goal,
+        dimensions=config.dimensions,
+        methodology=config.methodology,
+        evaluation=config.evaluation,
+        reporting=config.reporting.__class__(output_style="executive_brief"),
+        scoring=config.scoring,
+        execution=config.execution,
+        providers=config.providers,
+    )
+    summary = build_dry_run_summary(
+        config=config,
+        config_path=tmp_path / "test.yaml",
+        output_dir=tmp_path / "out",
+        backends={"claude-cli": object(), "codex-cli": object()},
+    )
+
+    rendered = render_dry_run_summary(summary)
+
+    assert summary["output_style"] == "executive_brief"
+    assert "output style: executive_brief" in rendered
+
+
+def test_dry_run_summary_lists_active_style_overrides(tmp_path: Path):
+    config = _config()
+    config = ResearchConfig(
+        topic=config.topic,
+        goal=config.goal,
+        dimensions=config.dimensions,
+        methodology=config.methodology,
+        evaluation=config.evaluation,
+        reporting=config.reporting.__class__(
+            output_style="technical_doc",
+            style_overrides=config.reporting.style_overrides.__class__(
+                include_methodology=False,
+                include_next_actions=True,
+                recommendation_mode="decision_only",
+            ),
+        ),
+        scoring=config.scoring,
+        execution=config.execution,
+        providers=config.providers,
+    )
+    summary = build_dry_run_summary(
+        config=config,
+        config_path=tmp_path / "test.yaml",
+        output_dir=tmp_path / "out",
+        backends={"claude-cli": object(), "codex-cli": object()},
+    )
+
+    rendered = render_dry_run_summary(summary)
+
+    assert "no methodology section" in summary["active_style_overrides"]
+    assert "include next actions" in summary["active_style_overrides"]
+    assert "style overrides: no methodology section, include next actions, decision-only recommendations" in rendered
+
+
 def test_build_convergence_dry_run_summary_for_refine(tmp_path: Path):
     config = DocumentConfig(
         topic="Doc topic",

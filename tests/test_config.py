@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.config import BackendsConfig, EvaluationConfig, ExecutionConfig, MethodologyConfig, ProviderConfig, ReportingConfig, ResearchConfig, ScoringConfig, StrategyConfig
+from src.config import BackendsConfig, EvaluationConfig, ExecutionConfig, MethodologyConfig, OutputStyleOverrides, ProviderConfig, ReportingConfig, ResearchConfig, ScoringConfig, StrategyConfig
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +116,8 @@ class TestReportingConfig:
         assert rc.export_html is True
         assert rc.export_pdf is False
         assert rc.report_title == ""
+        assert rc.output_style == "default"
+        assert rc.style_overrides == OutputStyleOverrides()
         assert rc.capture_raw_backend_outputs is False
         assert rc.raw_backend_output_max_chars == 20000
         assert rc.raw_backend_output_redact is True
@@ -255,6 +257,16 @@ class TestResearchConfigFromYaml:
                 export_html: false
                 export_pdf: true
                 report_title: "Custom Research Report"
+                output_style: "paper"
+                style_overrides:
+                  include_executive_summary: false
+                  include_comparison_table: true
+                  include_methodology: true
+                  include_limitations: true
+                  include_next_actions: true
+                  section_order: "recommendation_first"
+                  recommendation_mode: "decision_only"
+                  citation_mode: "references_section"
                 capture_raw_backend_outputs: true
                 raw_backend_output_max_chars: 1234
                 raw_backend_output_redact: false
@@ -263,9 +275,76 @@ class TestResearchConfigFromYaml:
         assert cfg.reporting.export_html is False
         assert cfg.reporting.export_pdf is True
         assert cfg.reporting.report_title == "Custom Research Report"
+        assert cfg.reporting.output_style == "paper"
+        assert cfg.reporting.style_overrides.include_executive_summary is False
+        assert cfg.reporting.style_overrides.include_comparison_table is True
+        assert cfg.reporting.style_overrides.include_methodology is True
+        assert cfg.reporting.style_overrides.include_limitations is True
+        assert cfg.reporting.style_overrides.include_next_actions is True
+        assert cfg.reporting.style_overrides.section_order == "recommendation_first"
+        assert cfg.reporting.style_overrides.recommendation_mode == "decision_only"
+        assert cfg.reporting.style_overrides.citation_mode == "references_section"
         assert cfg.reporting.capture_raw_backend_outputs is True
         assert cfg.reporting.raw_backend_output_max_chars == 1234
         assert cfg.reporting.raw_backend_output_redact is False
+
+    def test_reporting_output_style_supports_new_profiles(self, tmp_path: Path):
+        p = tmp_path / "reporting_profiles.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              reporting:
+                output_style: "executive_brief"
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.reporting.output_style == "executive_brief"
+
+    def test_reporting_output_style_must_be_valid(self, tmp_path: Path):
+        p = tmp_path / "reporting_style_invalid.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              reporting:
+                output_style: "marketing_brochure"
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid reporting.output_style"):
+            ResearchConfig.from_yaml(p)
+
+    def test_reporting_style_override_recommendation_mode_must_be_valid(self, tmp_path: Path):
+        p = tmp_path / "reporting_override_invalid.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              reporting:
+                style_overrides:
+                  recommendation_mode: "narrative_poetry"
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid reporting.style_overrides.recommendation_mode"):
+            ResearchConfig.from_yaml(p)
+
+    def test_reporting_style_override_citation_mode_must_be_valid(self, tmp_path: Path):
+        p = tmp_path / "reporting_override_invalid_citation.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              reporting:
+                style_overrides:
+                  citation_mode: "footnotes"
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid reporting.style_overrides.citation_mode"):
+            ResearchConfig.from_yaml(p)
+
+    def test_reporting_style_override_section_order_must_be_valid(self, tmp_path: Path):
+        p = tmp_path / "reporting_override_invalid_order.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              reporting:
+                style_overrides:
+                  section_order: "chronological_epic"
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid reporting.style_overrides.section_order"):
+            ResearchConfig.from_yaml(p)
 
     def test_reporting_raw_backend_output_max_chars_must_be_positive(self, tmp_path: Path):
         p = tmp_path / "reporting_invalid.yaml"

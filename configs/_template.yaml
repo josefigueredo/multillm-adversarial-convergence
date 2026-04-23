@@ -34,6 +34,16 @@ research:
     export_html: true         # Generate report.html from final run artifacts
     export_pdf: false         # Generate report.pdf from final run artifacts
     report_title: ""          # Optional custom title for the HTML report
+    output_style: default     # Run-mode synthesis prose profile: default | paper | technical_doc | executive_brief | decision_memo
+    style_overrides:
+      include_executive_summary: null  # Optional: true | false | null
+      include_comparison_table: null   # Optional: true | false | null
+      include_methodology: null        # Optional: true | false | null
+      include_limitations: null        # Optional: true | false | null
+      include_next_actions: null       # Optional: true | false | null
+      section_order: ""               # Optional: "" | standard | recommendation_first | evidence_first
+      recommendation_mode: ""         # Optional: "" | ranked | decision_only
+      citation_mode: ""               # Optional: "" | inline_links | references_section
     capture_raw_backend_outputs: false # Reserved opt-in switch for future raw backend payload capture
     raw_backend_output_max_chars: 20000 # Planned size cap if raw payload capture is implemented later
     raw_backend_output_redact: true    # Planned redaction toggle if raw payload capture is implemented later

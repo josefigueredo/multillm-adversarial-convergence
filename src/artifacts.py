@@ -11,6 +11,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from .output_style import build_output_style_presentation, summarize_output_style_overrides
+
 
 def load_json_if_exists(path: Path, default: Any) -> Any:
     """Return parsed JSON from *path* when it exists, else *default*."""
@@ -64,6 +66,10 @@ def run_manifest_payload(
             "export_html": config.reporting.export_html,
             "export_pdf": config.reporting.export_pdf,
             "report_title": config.reporting.report_title,
+            "output_style": config.reporting.output_style,
+            "output_style_label": build_output_style_presentation(config.reporting.output_style)["style_label"],
+            "style_overrides": asdict(config.reporting.style_overrides),
+            "active_style_overrides": summarize_output_style_overrides(config.reporting.style_overrides),
         },
         "environment": {
             "python_version": __import__("platform").python_version(),
@@ -230,6 +236,9 @@ def dashboard_payload(
     goal: str,
     benchmark_id: str,
     current_strategy: str,
+    output_style: str,
+    output_style_label: str,
+    active_style_overrides: list[str] | None,
     best_score: float,
     iteration: int,
     explored_dimensions: list[str],
@@ -255,6 +264,9 @@ def dashboard_payload(
         "goal": goal,
         "benchmark_id": benchmark_id,
         "current_strategy": current_strategy,
+        "output_style": output_style,
+        "output_style_label": output_style_label,
+        "active_style_overrides": active_style_overrides or [],
         "best_score": best_score,
         "rubric_grade": rubric.get("grade", "insufficient"),
         "rubric_overall_score": rubric.get("overall_score", 0.0),
@@ -417,6 +429,9 @@ def pdf_run_summary_text(
     topic: str,
     goal: str,
     strategy: str,
+    output_style: str,
+    output_style_label: str,
+    active_style_overrides: list[str] | None,
     best_score: float,
     iteration: int,
     explored_dimensions: list[str],
@@ -453,6 +468,8 @@ def pdf_run_summary_text(
         f"Topic: {topic}\n"
         f"Goal: {goal}\n"
         f"Strategy: {strategy}\n"
+        f"Output style: {output_style} ({output_style_label})\n"
+        f"Style overrides: {', '.join(active_style_overrides or []) or 'none'}\n"
         f"Best score: {metrics.get('best_score', best_score)}\n"
         f"Iterations: {metrics.get('iterations', iteration)}\n"
         f"Rubric grade: {rubric.get('grade', 'insufficient')}\n"
@@ -574,6 +591,7 @@ def write_html_report(
     title = config.reporting.report_title or f"Autoresearch Report — {config.topic}"
     html = render_fn(
         title=title,
+        output_style=config.reporting.output_style,
         topic=config.topic,
         goal=config.goal,
         manifest=manifest,
@@ -605,7 +623,8 @@ def write_pdf_report(
     if not config.reporting.export_pdf:
         return
 
-    title = config.reporting.report_title or f"Autoresearch Report — {config.topic}"
+    presentation = build_output_style_presentation(config.reporting.output_style)
+    title = config.reporting.report_title or f"Autoresearch Report — {config.topic}{presentation['pdf_title_suffix']}"
     metrics = load_json_if_exists(output_dir / "metrics.json", {})
     rubric = load_json_if_exists(output_dir / "rubric.json", {})
     evidence_quality = load_json_if_exists(output_dir / "evidence_quality.json", {})
@@ -623,6 +642,9 @@ def write_pdf_report(
                 topic=config.topic,
                 goal=config.goal,
                 strategy=config.execution.strategy,
+                output_style=config.reporting.output_style,
+                output_style_label=presentation["style_label"],
+                active_style_overrides=summarize_output_style_overrides(config.reporting.style_overrides),
                 best_score=best_score,
                 iteration=iteration,
                 explored_dimensions=explored_dimensions,
@@ -632,8 +654,8 @@ def write_pdf_report(
             ),
         ),
         ("Certainty", certainty_pdf_text(certainty_tables)),
-        ("Methods", methods_text),
-        ("Synthesis", synthesis_text),
+        (presentation["methods_heading"], methods_text),
+        (presentation["synthesis_heading"], synthesis_text),
         ("Dashboard", json.dumps(dashboard, indent=2)),
         ("Evaluation", json.dumps(evaluation, indent=2)),
     ]
@@ -668,6 +690,9 @@ def write_dashboard(
         goal=config.goal,
         benchmark_id=config.evaluation.benchmark_id,
         current_strategy=config.execution.strategy,
+        output_style=config.reporting.output_style,
+        output_style_label=build_output_style_presentation(config.reporting.output_style)["style_label"],
+        active_style_overrides=summarize_output_style_overrides(config.reporting.style_overrides),
         best_score=best_score,
         iteration=iteration,
         explored_dimensions=explored_dimensions,

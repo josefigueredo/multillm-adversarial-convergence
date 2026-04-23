@@ -13,6 +13,10 @@ senior AWS cloud architect.
 
 {methodology}
 
+## Output Style Contract
+
+{output_style_contract}
+
 ## Output Constraints
 
 {goal_constraints}

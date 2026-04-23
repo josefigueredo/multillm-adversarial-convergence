@@ -15,6 +15,7 @@ from src.artifacts import (
     tool_trace_payload,
 )
 from src.config import EvaluationConfig, ExecutionConfig, ResearchConfig, ScoringConfig
+from src.config import OutputStyleOverrides, ReportingConfig
 
 
 def test_load_json_if_exists(tmp_path: Path):
@@ -78,6 +79,9 @@ def test_metrics_evaluation_and_dashboard_payloads():
         goal="Goal",
         benchmark_id="bench-1",
         current_strategy="single",
+        output_style="paper",
+        output_style_label="Paper Style",
+        active_style_overrides=["include methodology section"],
         best_score=88.0,
         iteration=2,
         explored_dimensions=["DX"],
@@ -100,6 +104,9 @@ def test_metrics_evaluation_and_dashboard_payloads():
         tool_loop_summary={"runs": 2, "tool_calls": 3, "tool_failures": 1, "per_tool": {"echo": {"calls": 2}}},
     )
     assert dashboard["consistency_level"] == "medium"
+    assert dashboard["output_style"] == "paper"
+    assert dashboard["output_style_label"] == "Paper Style"
+    assert dashboard["active_style_overrides"] == ["include methodology section"]
     assert dashboard["rubric_grade"] == "good"
     assert dashboard["tool_loop_summary"]["runs"] == 2
     assert dashboard["tool_loop_summary"]["per_tool"]["echo"]["calls"] == 2
@@ -142,6 +149,9 @@ def test_pdf_summary_and_should_write_evaluation():
         topic="Python",
         goal="Compare options",
         strategy="single",
+        output_style="decision_memo",
+        output_style_label="Decision Memo",
+        active_style_overrides=["decision-only recommendations"],
         best_score=88.0,
         iteration=2,
         explored_dimensions=["DX"],
@@ -170,6 +180,8 @@ def test_pdf_summary_and_should_write_evaluation():
     )
     assert "Topic: Python" in text
     assert "Rubric grade: good" in text
+    assert "Output style: decision_memo (Decision Memo)" in text
+    assert "Style overrides: decision-only recommendations" in text
     assert "Certainty: 2 conclusions / top band high / high-certainty recommendations 1" in text
     assert "Tool loops: 2 runs / 3 calls / 1 failures" in text
     assert "API retries: 2" in text
@@ -217,6 +229,49 @@ def test_pdf_summary_and_should_write_evaluation():
     assert should_write_evaluation(cfg) is True
 
 
+def test_write_pdf_report_uses_style_aware_title_and_sections(tmp_path: Path):
+    from src.artifacts import write_pdf_report
+    from src.config import ReportingConfig
+
+    captured: dict[str, object] = {}
+
+    def fake_render_pdf(title: str, sections: list[tuple[str, str]]) -> bytes:
+        captured["title"] = title
+        captured["sections"] = sections
+        return b"%PDF-FAKE"
+
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    (output_dir / "methods.md").write_text("# Methods", encoding="utf-8")
+    (output_dir / "synthesis.md").write_text("# Draft", encoding="utf-8")
+
+    cfg = ResearchConfig(
+        topic="Topic",
+        goal="Goal",
+        dimensions=("a",),
+        reporting=ReportingConfig(export_pdf=True, output_style="executive_brief"),
+        evaluation=EvaluationConfig(),
+        scoring=ScoringConfig(),
+        execution=ExecutionConfig(),
+    )
+
+    write_pdf_report(
+        output_dir,
+        config=cfg,
+        best_score=80.0,
+        iteration=1,
+        explored_dimensions=["DX"],
+        render_pdf_fn=fake_render_pdf,
+    )
+
+    assert captured["title"] == "Autoresearch Report — Topic (Executive Brief)"
+    section_names = [name for name, _ in captured["sections"]]
+    assert "Approach" in section_names
+    assert "Executive Brief" in section_names
+    run_summary = dict(captured["sections"])["Run Summary"]
+    assert "Output style: executive_brief (Executive Brief)" in run_summary
+
+
 def test_prompt_snapshot_payload_and_rerun_script(tmp_path: Path):
     payload = prompt_snapshot_payload(
         prompts=[
@@ -238,3 +293,44 @@ def test_prompt_snapshot_payload_and_rerun_script(tmp_path: Path):
     assert "autoresearch run" in script
     assert "--config" in script
     assert "--output" in script
+
+
+def test_run_manifest_payload_includes_output_style_metadata(tmp_path: Path):
+    from src.artifacts import run_manifest_payload
+
+    cfg = ResearchConfig(
+        topic="Topic",
+        goal="Goal",
+        dimensions=("a",),
+        reporting=ReportingConfig(
+            output_style="decision_memo",
+            style_overrides=OutputStyleOverrides(
+                include_executive_summary=False,
+                recommendation_mode="decision_only",
+            ),
+        ),
+        evaluation=EvaluationConfig(),
+        scoring=ScoringConfig(),
+        execution=ExecutionConfig(),
+    )
+    payload = run_manifest_payload(
+        config=cfg,
+        strategy_description="single",
+        backends={},
+        output_dir=tmp_path / "out",
+        resume=False,
+        config_path=None,
+        run_status="initialized",
+        run_started_at="2026-01-01T00:00:00Z",
+        run_completed_at=None,
+        package_version="1.0.0",
+        git_commit="abc123",
+        cli_version_resolver=lambda _: "1.0",
+    )
+    assert payload["reporting"]["output_style"] == "decision_memo"
+    assert payload["reporting"]["output_style_label"] == "Decision Memo"
+    assert payload["reporting"]["style_overrides"]["include_executive_summary"] is False
+    assert payload["reporting"]["active_style_overrides"] == [
+        "no executive summary",
+        "decision-only recommendations",
+    ]
