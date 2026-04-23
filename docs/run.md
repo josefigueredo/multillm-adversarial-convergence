@@ -33,6 +33,9 @@ uv run python -m src.cli run --config configs/aws_api_gateway.yaml --resume
 # Generate synthesis from existing iterations
 uv run python -m src.cli run --config configs/aws_api_gateway.yaml --synthesize
 
+# Validate config, backend wiring, and planned artifact paths only
+uv run python -m src.cli run --config configs/aws_api_gateway.yaml --dry-run
+
 # Example: GitHub Models + LiteLLM aggregators
 uv run python -m src.cli run --config configs/example_github_models.yaml
 
@@ -41,6 +44,36 @@ uv run python -m src.cli run --config configs/example_bedrock.yaml
 ```
 
 Copy `configs/_template.yaml` to create a new research topic.
+
+## Dry Run
+
+Use `--dry-run` when you want to validate a run configuration without executing the research loop.
+
+What it checks:
+- config parsing and schema validity
+- strategy resolution
+- backend/provider instantiation
+- backend availability checks
+- resolved output directory and planned artifact paths
+
+What it does **not** do:
+- invoke any backend research calls
+- enter the autoresearch loop
+- write normal run artifacts
+
+Important constraints:
+- `--dry-run` cannot be combined with `--resume`
+- `--dry-run` cannot be combined with `--synthesize`
+
+Exit codes:
+- `0` → configuration is ready to run
+- `1` → configuration or backend wiring is invalid
+
+Useful smoke command:
+
+```bash
+uv run python -m src.cli run --config configs/example_github_models.yaml --dry-run
+```
 
 ## The Pattern
 
@@ -282,6 +315,8 @@ Current scope:
 - raw backend payload capture remains intentionally deferred until an opt-in policy is defined
 - certainty tables are heuristic and GRADE-lite, not a full formal evidence-certainty implementation
 - PDF summaries and cross-run portfolio views now surface compact certainty rollups
+- portfolio views now expose certainty deltas versus the strongest certainty run and separate high-certainty recommendation counts
+- HTML and PDF reports now surface factor-level certainty details for current-run conclusions
 
 ### Streaming contract
 

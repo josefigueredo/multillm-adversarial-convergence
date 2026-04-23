@@ -1,12 +1,11 @@
 """Tests for src.cli — argument parsing, backend detection, logging setup."""
-
 import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.cli import _setup_logging, main
+from src.cli import _build_parser, _setup_logging, main
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +28,26 @@ class TestSetupLogging:
         root.setLevel(logging.WARNING)
         _setup_logging(verbose=False)
         assert root.level <= logging.INFO
+
+
+class TestParserSmoke:
+    def test_subcommand_help_lists_dry_run_flags(self, capsys):
+        parser = _build_parser()
+
+        with pytest.raises(SystemExit):
+            parser.parse_args(["run", "--help"])
+        run_help = capsys.readouterr().out
+        assert "--dry-run" in run_help
+
+        with pytest.raises(SystemExit):
+            parser.parse_args(["refine", "--help"])
+        refine_help = capsys.readouterr().out
+        assert "--dry-run" in refine_help
+
+        with pytest.raises(SystemExit):
+            parser.parse_args(["plan", "--help"])
+        plan_help = capsys.readouterr().out
+        assert "--dry-run" in plan_help
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +131,117 @@ class TestRunSubcommand:
         _, kwargs = mock_researcher_cls.call_args
         assert kwargs["resume"] is False
         assert kwargs["config_path"] == config_file
+
+    @patch("src.cli.get_strategy")
+    @patch("src.cli.get_backends")
+    @patch("src.cli.AutoResearcher")
+    @patch("src.cli.get_backend")
+    def test_dry_run_mode_skips_researcher_execution(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file):
+        mock_backend, mock_strategy = self._mock_cli_deps()
+        mock_get.return_value = mock_backend
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+        mock_get_strat.return_value = mock_strategy
+
+        result = main(["run", "--config", str(config_file), "--dry-run"])
+
+        assert result == 0
+        mock_researcher_cls.assert_not_called()
+
+    @patch("src.cli.get_strategy")
+    @patch("src.cli.get_backends")
+    @patch("src.cli.get_backend")
+    def test_dry_run_fails_when_backend_unavailable(self, mock_get, mock_get_backends, mock_get_strat, config_file):
+        mock_backend = MagicMock()
+        mock_backend.check_available.return_value = False
+        mock_backend.name = "claude-cli"
+        mock_backend.cli_executable.return_value = "claude-cli"
+        mock_get.return_value = mock_backend
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+        mock_get_strat.return_value = MagicMock()
+
+        result = main(["run", "--config", str(config_file), "--dry-run"])
+
+        assert result == 1
+
+    def test_dry_run_rejects_resume(self, config_file):
+        result = main(["run", "--config", str(config_file), "--dry-run", "--resume"])
+        assert result == 1
+
+    def test_dry_run_rejects_synthesize(self, config_file):
+        result = main(["run", "--config", str(config_file), "--dry-run", "--synthesize"])
+        assert result == 1
+
+    @patch("src.cli.get_strategy")
+    @patch("src.cli.get_backends")
+    @patch("src.cli.get_backend")
+    def test_dry_run_does_not_create_output_dir(self, mock_get, mock_get_backends, mock_get_strat, config_file, tmp_path):
+        mock_backend, mock_strategy = self._mock_cli_deps()
+        mock_get.return_value = mock_backend
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+        mock_get_strat.return_value = mock_strategy
+        output_dir = tmp_path / "dry-output"
+
+        result = main(["run", "--config", str(config_file), "--dry-run", "--output", str(output_dir)])
+
+        assert result == 0
+        assert not output_dir.exists()
+
+    @patch("src.cli.get_strategy")
+    @patch("src.cli.get_backends")
+    @patch("src.cli.get_backend")
+    def test_dry_run_logs_summary(self, mock_get, mock_get_backends, mock_get_strat, config_file, capsys):
+        mock_backend, mock_strategy = self._mock_cli_deps()
+        mock_get.return_value = mock_backend
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+        mock_get_strat.return_value = mock_strategy
+
+        result = main(["run", "--config", str(config_file), "--dry-run"])
+        captured = capsys.readouterr()
+
+        assert result == 0
+        assert "DRY RUN OK" in captured.err
+        assert "planned artifacts:" in captured.err
+        assert "resolved backends: claude-cli" in captured.err
+
+    @patch("src.cli.instantiate_provider_backends")
+    @patch("src.cli.AutoResearcher")
+    def test_dry_run_uses_provider_instances_when_declared(self, mock_researcher_cls, mock_instantiate, tmp_path):
+        config_file = tmp_path / "provider_run.yaml"
+        config_file.write_text(textwrap.dedent("""\
+            research:
+              topic: "Provider test"
+              execution:
+                strategy: ensemble
+                providers:
+                  primary_reasoner:
+                    adapter: claude-cli
+                    model: opus
+                  fast_research:
+                    adapter: codex-cli
+                    model: gpt-5.4
+                backends:
+                  primary: primary_reasoner
+                  research:
+                    - primary_reasoner
+                    - fast_research
+        """), encoding="utf-8")
+
+        be1 = MagicMock()
+        be1.check_available.return_value = True
+        be1.cli_executable.return_value = "claude"
+        be2 = MagicMock()
+        be2.check_available.return_value = True
+        be2.cli_executable.return_value = "codex"
+        mock_instantiate.return_value = {
+            "primary_reasoner": be1,
+            "fast_research": be2,
+        }
+
+        result = main(["run", "--config", str(config_file), "--dry-run"])
+
+        assert result == 0
+        mock_instantiate.assert_called_once()
+        mock_researcher_cls.assert_not_called()
 
     @patch("src.cli.get_strategy")
     @patch("src.cli.get_backends")
@@ -345,6 +475,47 @@ class TestRefineSubcommand:
         _, kwargs = mock_refiner_cls.call_args
         assert kwargs["output_dir"] == custom.resolve()
 
+    @patch("src.cli.get_backends")
+    @patch("src.cli.DocumentRefiner")
+    def test_refine_dry_run_skips_refiner_execution(self, mock_refiner_cls, mock_get_backends, doc_config_file):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
+
+        result = main(["refine", "--config", str(doc_config_file), "--dry-run"])
+
+        assert result == 0
+        mock_refiner_cls.assert_not_called()
+
+    @patch("src.cli.get_backends")
+    def test_refine_dry_run_does_not_create_output_dir(self, mock_get_backends, doc_config_file, tmp_path):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
+        output_dir = tmp_path / "refine-dry"
+
+        result = main(["refine", "--config", str(doc_config_file), "--dry-run", "--output", str(output_dir)])
+
+        assert result == 0
+        assert not output_dir.exists()
+
+    @patch("src.cli.get_backends")
+    def test_refine_dry_run_logs_summary(self, mock_get_backends, doc_config_file, capsys):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
+
+        result = main(["refine", "--config", str(doc_config_file), "--dry-run"])
+        captured = capsys.readouterr()
+
+        assert result == 0
+        assert "DRY RUN OK" in captured.err
+        assert "mode: refine" in captured.err
+        assert "resolved backends: claude-cli, gemini-cli" in captured.err
+
 
 # ---------------------------------------------------------------------------
 # plan subcommand
@@ -461,3 +632,44 @@ class TestPlanSubcommand:
         result = main(["plan", "--config", str(plan_config_file), "--no-interactive"])
 
         assert result == 2
+
+    @patch("src.cli.get_backends")
+    @patch("src.cli.PlanRefiner")
+    def test_plan_dry_run_skips_refiner_execution(self, mock_refiner_cls, mock_get_backends, plan_config_file):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
+
+        result = main(["plan", "--config", str(plan_config_file), "--dry-run"])
+
+        assert result == 0
+        mock_refiner_cls.assert_not_called()
+
+    @patch("src.cli.get_backends")
+    def test_plan_dry_run_does_not_create_output_dir(self, mock_get_backends, plan_config_file, tmp_path):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
+        output_dir = tmp_path / "plan-dry"
+
+        result = main(["plan", "--config", str(plan_config_file), "--dry-run", "--output", str(output_dir)])
+
+        assert result == 0
+        assert not output_dir.exists()
+
+    @patch("src.cli.get_backends")
+    def test_plan_dry_run_logs_summary(self, mock_get_backends, plan_config_file, capsys):
+        mock_be = MagicMock()
+        mock_be.check_available.return_value = True
+        mock_be.cli_executable.return_value = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_be, "gemini-cli": mock_be}
+
+        result = main(["plan", "--config", str(plan_config_file), "--dry-run"])
+        captured = capsys.readouterr()
+
+        assert result == 0
+        assert "DRY RUN OK" in captured.err
+        assert "mode: plan" in captured.err
+        assert "resolved backends: claude-cli, gemini-cli" in captured.err

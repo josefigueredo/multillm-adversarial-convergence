@@ -652,6 +652,21 @@ class TestAutoResearcherSetup:
             researcher._finalize_run_artifacts()
         finalize.assert_called_once_with(researcher)
 
+    def test_reporting_artifacts_delegate_to_report_exports_module(self, researcher):
+        with patch("src.orchestrator.write_reporting_artifacts") as writer:
+            researcher._write_reporting_artifacts()
+        writer.assert_called_once_with(researcher)
+
+    def test_run_metadata_artifacts_delegate_to_helper_module(self, researcher):
+        with patch("src.orchestrator.write_run_metadata_artifacts") as writer:
+            researcher._write_run_metadata_artifacts()
+        writer.assert_called_once_with(researcher)
+
+    def test_agreement_artifact_delegates_to_helper_module(self, researcher):
+        with patch("src.orchestrator.write_agreement_artifact") as writer:
+            researcher._write_agreement_artifact()
+        writer.assert_called_once_with(researcher)
+
     def test_resume_empty_dir(self, researcher):
         researcher._setup()
         researcher._resume()
@@ -1973,6 +1988,16 @@ class TestAutoResearcherCall:
         assert screening_log["summary"]["included_count"] == 1
         assert screening_log["summary"]["excluded_count"] == 1
         assert certainty["summary"]["conclusions_count"] >= 1
+
+    def test_write_provenance_artifacts_delegates_persistence(self, researcher):
+        researcher.output_dir.mkdir(parents=True, exist_ok=True)
+        researcher._claims = []
+        researcher._citations = []
+
+        with patch("src.orchestrator.write_provenance_artifacts_bundle") as writer:
+            researcher._write_provenance_artifacts()
+
+        writer.assert_called_once()
 
     def test_write_prompt_snapshot_artifact(self, researcher):
         researcher.output_dir.mkdir(parents=True, exist_ok=True)

@@ -16,9 +16,31 @@ uv run python -m src.cli refine --config configs/my_prd.yaml --resume
 
 # Write output to a custom directory
 uv run python -m src.cli refine --config configs/my_prd.yaml --output ./docs/output
+
+# Validate config, backend wiring, and planned outputs without running refinement
+uv run python -m src.cli refine --config configs/prd_template.yaml --dry-run
 ```
 
 Copy `configs/prd_template.yaml` to create a new document refinement config.
+
+## Dry Run
+
+Use `--dry-run` to validate:
+- config parsing
+- backend/provider wiring
+- backend availability
+- planned output paths
+
+without executing the convergence loop or writing run artifacts.
+
+Important constraint:
+- `--dry-run` cannot be combined with `--resume`
+
+Useful smoke command:
+
+```bash
+uv run python -m src.cli refine --config configs/prd_template.yaml --dry-run
+```
 
 ## How It Works
 

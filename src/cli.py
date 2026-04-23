@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .backends import VALID_BACKENDS, get_backend, get_backends
 from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
+from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
 from .document_refiner import DocumentRefiner
 from .orchestrator import AutoResearcher
 from .plan_refiner import PlanRefiner
@@ -79,6 +80,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Multi-backend strategy. Overrides the config file.",
     )
+    run_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate config, backend wiring, and planned outputs without running the research loop.",
+    )
 
     # ── refine subcommand ────────────────────────────────────────────────────
     refine_p = subparsers.add_parser(
@@ -107,6 +113,11 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="no_interactive",
         action="store_true",
         help="Disable interactive HITL prompts. Exit with code 2 when human input is needed.",
+    )
+    refine_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate config, backend wiring, and planned outputs without running refinement.",
     )
 
     # ── plan subcommand ──────────────────────────────────────────────────────
@@ -137,6 +148,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable interactive HITL prompts. Exit with code 2 when human input is needed.",
     )
+    plan_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate config, backend wiring, and planned outputs without running plan refinement.",
+    )
 
     return parser
 
@@ -156,6 +172,13 @@ def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
     backend_name = args.backend or config.execution.backend
     strategy_name = args.strategy or config.execution.strategy
     output_dir: Path = (args.output or Path("output") / config_path.stem).resolve()
+
+    if args.dry_run and args.resume:
+        log.error("--dry-run cannot be combined with --resume.")
+        return 1
+    if args.dry_run and args.synthesize:
+        log.error("--dry-run cannot be combined with --synthesize.")
+        return 1
 
     if not args.resume and not args.synthesize and output_dir.exists():
         iters_dir = output_dir / "iterations"
@@ -202,6 +225,16 @@ def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
         backends,
     )
 
+    if args.dry_run:
+        summary = build_dry_run_summary(
+            config=config,
+            config_path=config_path,
+            output_dir=output_dir,
+            backends=backends,
+        )
+        log.info("%s", render_dry_run_summary(summary))
+        return 0
+
     researcher = AutoResearcher(
         config=config,
         backend=backend,
@@ -238,6 +271,10 @@ def _run_refine(args: argparse.Namespace, log: logging.Logger) -> int:
 
     output_dir: Path = (args.output or Path("output") / config_path.stem).resolve()
 
+    if args.dry_run and args.resume:
+        log.error("--dry-run cannot be combined with --resume.")
+        return 1
+
     if config.providers:
         backends = instantiate_provider_backends(config.providers, config.backends)
     else:
@@ -252,6 +289,17 @@ def _run_refine(args: argparse.Namespace, log: logging.Logger) -> int:
                 name, be.cli_executable(),
             )
             return 1
+
+    if args.dry_run:
+        summary = build_convergence_dry_run_summary(
+            mode="refine",
+            config=config,
+            config_path=config_path,
+            output_dir=output_dir,
+            backends=backends,
+        )
+        log.info("%s", render_dry_run_summary(summary))
+        return 0
 
     refiner = DocumentRefiner(
         config=config,
@@ -281,6 +329,10 @@ def _run_plan(args: argparse.Namespace, log: logging.Logger) -> int:
 
     output_dir: Path = (args.output or Path("output") / config_path.stem).resolve()
 
+    if args.dry_run and args.resume:
+        log.error("--dry-run cannot be combined with --resume.")
+        return 1
+
     if config.providers:
         backends = instantiate_provider_backends(config.providers, config.backends)
     else:
@@ -295,6 +347,17 @@ def _run_plan(args: argparse.Namespace, log: logging.Logger) -> int:
                 name, be.cli_executable(),
             )
             return 1
+
+    if args.dry_run:
+        summary = build_convergence_dry_run_summary(
+            mode="plan",
+            config=config,
+            config_path=config_path,
+            output_dir=output_dir,
+            backends=backends,
+        )
+        log.info("%s", render_dry_run_summary(summary))
+        return 0
 
     refiner = PlanRefiner(
         config=config,

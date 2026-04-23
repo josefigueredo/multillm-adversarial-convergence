@@ -39,11 +39,29 @@ def test_render_html_report_renders_core_sections_and_escapes():
         comparison={"compared_runs_count": 1, "summary": {"consistency_level": "high"}},
         semantic_calibration={"enabled": True, "grade": "reasonable", "calibrated_score": 0.81},
         semantic_review={"enabled": True, "grade": "good", "overall_score": 0.76, "judge_backend": "claude-cli"},
+        certainty_tables={
+            "summary": {
+                "conclusions_count": 2,
+                "certainty_counts": {"high": 1, "moderate": 1},
+                "high_certainty_recommendation_count": 1,
+            },
+            "conclusions": [
+                {
+                    "dimension": "DX",
+                    "certainty": "high",
+                    "factors": {
+                        "risk_of_bias": {"level": "not_serious"},
+                        "inconsistency": {"level": "not_serious"},
+                    },
+                }
+            ],
+        },
         dashboard={
             "current_strategy": "ensemble",
             "certainty_summary": {
                 "conclusions_count": 2,
                 "certainty_counts": {"high": 1, "moderate": 1},
+                "high_certainty_recommendation_count": 1,
             },
             "retry_summary": {
                 "total_retries": 2,
@@ -80,6 +98,7 @@ def test_render_html_report_renders_core_sections_and_escapes():
     assert "Semantic Calibration" in html
     assert "Semantic Judge Review" in html
     assert "Certainty Tables" in html
+    assert "risk_of_bias" in html
     assert "API Retries" in html
     assert "Search &amp; Screening" in html
     assert "Dashboard Summary" in html
@@ -109,6 +128,7 @@ def test_render_html_report_omits_optional_sections_when_empty():
         comparison=None,
         semantic_calibration=None,
         semantic_review=None,
+        certainty_tables=None,
         dashboard=None,
         methods_text="Methods",
         synthesis_text="Synthesis",

@@ -25,6 +25,8 @@ class PortfolioRun:
     consistency_level: str
     certainty_conclusions: int
     high_certainty_conclusions: int
+    high_certainty_recommendations: int
+    certainty_delta_from_best: int
     total_retries: int
     tool_calls: int
     tool_failures: int
@@ -40,6 +42,7 @@ def build_portfolio(output_root: Path) -> dict[str, Any]:
         if not dashboard_path.exists():
             continue
         dashboard = json.loads(dashboard_path.read_text(encoding="utf-8"))
+        certainty_summary = dashboard.get("certainty_summary", {})
         runs.append(
             PortfolioRun(
                 name=child.name,
@@ -50,10 +53,12 @@ def build_portfolio(output_root: Path) -> dict[str, Any]:
                 best_score=float(dashboard.get("best_score", 0.0)),
                 rubric_grade=str(dashboard.get("rubric_grade", "insufficient")),
                 consistency_level=str(dashboard.get("consistency_level", "not_available")),
-                certainty_conclusions=int(dashboard.get("certainty_summary", {}).get("conclusions_count", 0) or 0),
-                high_certainty_conclusions=int(
-                    dashboard.get("certainty_summary", {}).get("certainty_counts", {}).get("high", 0) or 0
+                certainty_conclusions=int(certainty_summary.get("conclusions_count", 0) or 0),
+                high_certainty_conclusions=int(certainty_summary.get("certainty_counts", {}).get("high", 0) or 0),
+                high_certainty_recommendations=int(
+                    certainty_summary.get("high_certainty_recommendation_count", 0) or 0
                 ),
+                certainty_delta_from_best=0,
                 total_retries=int(dashboard.get("retry_summary", {}).get("total_retries", 0) or 0),
                 tool_calls=int(dashboard.get("tool_loop_summary", {}).get("tool_calls", 0) or 0),
                 tool_failures=int(dashboard.get("tool_loop_summary", {}).get("tool_failures", 0) or 0),
@@ -65,6 +70,17 @@ def build_portfolio(output_root: Path) -> dict[str, Any]:
     best_run = max(runs, key=lambda run: run.best_score) if runs else None
     best_certainty_run = max(runs, key=lambda run: run.high_certainty_conclusions) if runs else None
     most_unstable_run = max(runs, key=lambda run: run.total_retries) if runs else None
+    best_high = best_certainty_run.high_certainty_conclusions if best_certainty_run else 0
+    if best_high > 0:
+        runs = [
+            PortfolioRun(
+                **{
+                    **run.__dict__,
+                    "certainty_delta_from_best": run.high_certainty_conclusions - best_high,
+                }
+            )
+            for run in runs
+        ]
     certainty_counts: dict[str, int] = {}
     for run in runs:
         dashboard_path = Path(run.path) / "dashboard.json"
@@ -87,6 +103,7 @@ def build_portfolio(output_root: Path) -> dict[str, Any]:
         ),
         "most_unstable_run": most_unstable_run.__dict__ if most_unstable_run and most_unstable_run.total_retries > 0 else {},
         "total_certainty_conclusions": sum(run.certainty_conclusions for run in runs),
+        "total_high_certainty_recommendations": sum(run.high_certainty_recommendations for run in runs),
         "certainty_counts": certainty_counts,
         "total_retries": sum(run.total_retries for run in runs),
         "total_tool_calls": sum(run.tool_calls for run in runs),
@@ -110,6 +127,8 @@ def render_portfolio_html(title: str, portfolio: dict[str, Any]) -> str:
             f"<td>{escape(str(run['consistency_level']))}</td>"
             f"<td>{escape(str(run.get('certainty_conclusions', 0)))}</td>"
             f"<td>{escape(str(run.get('high_certainty_conclusions', 0)))}</td>"
+            f"<td>{escape(str(run.get('high_certainty_recommendations', 0)))}</td>"
+            f"<td>{escape(str(run.get('certainty_delta_from_best', 0)))}</td>"
             f"<td>{escape(str(run.get('total_retries', 0)))}</td>"
             f"<td>{escape(str(run.get('tool_calls', 0)))}</td>"
             f"<td>{escape(str(run.get('tool_failures', 0)))}</td>"
@@ -118,7 +137,7 @@ def render_portfolio_html(title: str, portfolio: dict[str, Any]) -> str:
         for run in portfolio.get("runs", [])
     )
     if not runs_html:
-        runs_html = '<tr><td colspan="12">(no runs)</td></tr>'
+        runs_html = '<tr><td colspan="14">(no runs)</td></tr>'
 
     best_run = portfolio.get("best_run", {})
     best_certainty_run = portfolio.get("best_certainty_run", {})
@@ -132,6 +151,9 @@ def render_portfolio_html(title: str, portfolio: dict[str, Any]) -> str:
         best_run_score=escape(str(best_run.get("best_score", ""))),
         total_certainty_conclusions=escape(str(portfolio.get("total_certainty_conclusions", 0))),
         certainty_counts=escape(json.dumps(portfolio.get("certainty_counts", {}), sort_keys=True)),
+        total_high_certainty_recommendations=escape(
+            str(portfolio.get("total_high_certainty_recommendations", 0))
+        ),
         best_certainty_run_name=escape(str(best_certainty_run.get("name", "(none)"))),
         best_certainty_run_high=escape(str(best_certainty_run.get("high_certainty_conclusions", ""))),
         total_retries=escape(str(portfolio.get("total_retries", 0))),

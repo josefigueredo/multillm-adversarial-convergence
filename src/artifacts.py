@@ -436,7 +436,8 @@ def pdf_run_summary_text(
             top_band = max(counts.items(), key=lambda item: int(item[1] or 0))[0]
         certainty_line = (
             f"Certainty: {int(certainty_summary.get('conclusions_count', 0) or 0)} "
-            f"conclusions / top band {top_band}\n"
+            f"conclusions / top band {top_band} / high-certainty recommendations "
+            f"{int(certainty_summary.get('high_certainty_recommendation_count', 0) or 0)}\n"
         )
     tool_line = ""
     if isinstance(tool_loop, dict) and int(tool_loop.get("runs", 0) or 0) > 0:
@@ -461,6 +462,38 @@ def pdf_run_summary_text(
         f"{tool_line}"
         f"{retry_line}"
     )
+
+
+def certainty_pdf_text(certainty_tables: dict[str, Any]) -> str:
+    """Format certainty-table details for PDF export."""
+    if not isinstance(certainty_tables, dict):
+        return ""
+    summary = certainty_tables.get("summary", {})
+    conclusions = certainty_tables.get("conclusions", [])
+    if not isinstance(summary, dict) or not isinstance(conclusions, list):
+        return ""
+    count = int(summary.get("conclusions_count", 0) or 0)
+    if count <= 0:
+        return ""
+    lines = [
+        f"Conclusions: {count}",
+        f"High-certainty recommendations: {int(summary.get('high_certainty_recommendation_count', 0) or 0)}",
+    ]
+    for conclusion in conclusions[:5]:
+        if not isinstance(conclusion, dict):
+            continue
+        lines.append(
+            f"- {conclusion.get('dimension', 'overall')}: {conclusion.get('certainty', 'unknown')}"
+        )
+        factors = conclusion.get("factors", {})
+        if isinstance(factors, dict):
+            for factor_name, factor in factors.items():
+                if not isinstance(factor, dict):
+                    continue
+                lines.append(
+                    f"  - {factor_name}: {factor.get('level', 'unknown')} — {factor.get('reason', '')}"
+                )
+    return "\n".join(lines)
 
 
 def git_commit() -> str | None:
@@ -532,6 +565,7 @@ def write_html_report(
     comparison = load_json_if_exists(output_dir / "comparison.json", None)
     semantic_calibration = load_json_if_exists(output_dir / "semantic_calibration.json", None)
     semantic_review = load_json_if_exists(output_dir / "semantic_review.json", None)
+    certainty_tables = load_json_if_exists(output_dir / "certainty_tables.json", None)
     dashboard = load_json_if_exists(output_dir / "dashboard.json", None)
     methods_path = output_dir / "methods.md"
     synthesis_path = output_dir / "synthesis.md"
@@ -550,6 +584,7 @@ def write_html_report(
         comparison=comparison,
         semantic_calibration=semantic_calibration,
         semantic_review=semantic_review,
+        certainty_tables=certainty_tables,
         dashboard=dashboard,
         methods_text=methods_text,
         synthesis_text=synthesis_text,
@@ -576,6 +611,7 @@ def write_pdf_report(
     evidence_quality = load_json_if_exists(output_dir / "evidence_quality.json", {})
     evaluation = load_json_if_exists(output_dir / "evaluation.json", {})
     dashboard = load_json_if_exists(output_dir / "dashboard.json", {})
+    certainty_tables = load_json_if_exists(output_dir / "certainty_tables.json", {})
     methods_path = output_dir / "methods.md"
     synthesis_path = output_dir / "synthesis.md"
     methods_text = methods_path.read_text(encoding="utf-8") if methods_path.exists() else ""
@@ -595,6 +631,7 @@ def write_pdf_report(
                 evidence_quality=evidence_quality,
             ),
         ),
+        ("Certainty", certainty_pdf_text(certainty_tables)),
         ("Methods", methods_text),
         ("Synthesis", synthesis_text),
         ("Dashboard", json.dumps(dashboard, indent=2)),

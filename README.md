@@ -18,6 +18,21 @@ Supports **Claude**, **Codex**, **Gemini**, and **Copilot** backends.
 ```bash
 uv sync
 uv run python -m src.cli run --config configs/aws_api_gateway.yaml
+
+# Validate config, backend wiring, and planned output paths without running research
+uv run python -m src.cli run --config configs/aws_api_gateway.yaml --dry-run
+
+# Validate refine / plan configs without executing convergence loops
+uv run python -m src.cli refine --config configs/prd_template.yaml --dry-run
+uv run python -m src.cli plan --config configs/plan_template.yaml --dry-run
+```
+
+Dry-run smoke commands are a good first check before a real run:
+
+```bash
+uv run python -m src.cli run --config configs/example_github_models.yaml --dry-run
+uv run python -m src.cli refine --config configs/prd_template.yaml --dry-run
+uv run python -m src.cli plan --config configs/plan_template.yaml --dry-run
 ```
 
 Copy `configs/_template.yaml` for research, `configs/prd_template.yaml` for document refinement, or `configs/plan_template.yaml` for plan refinement.
@@ -33,6 +48,8 @@ Important runtime rules:
 - `execution.system_prompt` is supported on the current API adapters and stripped automatically where unsupported
 - `execution.stream` currently enables live research-phase progress in `run` for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`
 - `execution.retry_api_errors` retries retryable non-streaming API failures with exponential backoff; streaming calls and function-tool loops are intentionally excluded
+- `run --dry-run` validates config loading, strategy/backend resolution, provider wiring, backend availability, and planned artifact paths without executing the research loop or writing run artifacts
+- `refine --dry-run` and `plan --dry-run` validate config loading, backend/provider wiring, and planned artifact paths without executing convergence loops or writing run artifacts
 - retry activity is now surfaced into machine-readable artifacts and HTML reports so runs can show when API retries happened by backend
 - retry summaries now include dominant retry categories and the most unstable backend for a run
 - normalized API function-tool calling is currently implemented for `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, and `bedrock-api`, and only for non-streaming explicit tool-registered calls
@@ -41,6 +58,8 @@ Important runtime rules:
 - reproducibility artifacts now include `prompt_snapshot.json` and a runnable `rerun.sh` script
 - first-pass certainty tables are now written to `certainty_tables.json` and summarized in run dashboards/reports
 - portfolio views now aggregate certainty rollups, including total and high-certainty conclusions across runs
+- portfolio views now include certainty deltas versus the best certainty run and separate high-certainty recommendation counts
+- HTML and PDF reports now include factor-level certainty detail for the current run
 - tool-loop observability is now captured in run metrics/dashboard artifacts when normalized API function tools are used, including per-backend and per-tool counts
 - per-run tool trace artifacts are now written to `tool_trace.json`, with redacted argument summaries and truncated output previews
 - dashboard/report views now surface compact tool-trace failure highlights without exposing raw payloads

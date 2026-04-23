@@ -58,7 +58,25 @@ Tasks:
 
 Tasks:
 - [x] extract core provenance/evidence computation into a helper module
-- [ ] extract provenance artifact persistence/write sequencing fully out of `src/orchestrator.py`
+- [x] extract provenance artifact persistence/write sequencing fully out of `src/orchestrator.py`
+
+### Batch O1C — report/export coordination extraction
+
+Tasks:
+- [x] extract dashboard/report/tool-trace/portfolio export coordination into a helper module
+- [x] decide whether manifest/metrics writing should also move out of `src/orchestrator.py`
+
+### Batch O1D — run metadata extraction
+
+Tasks:
+- [x] move manifest/metrics writing behind a shared helper module
+- [x] decide whether agreement artifact writing should also move out of `src/orchestrator.py`
+
+### Batch O1E — agreement artifact extraction
+
+Tasks:
+- [x] move agreement artifact persistence behind a shared helper module
+- [ ] decide whether evaluation artifact writing should also move out of `src/orchestrator.py`
 
 ### Batch R4B — richer certainty reporting
 

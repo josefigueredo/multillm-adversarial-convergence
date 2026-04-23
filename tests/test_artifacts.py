@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from src.artifacts import (
+    certainty_pdf_text,
     dashboard_payload,
     evaluation_payload,
     load_json_if_exists,
@@ -149,6 +150,7 @@ def test_pdf_summary_and_should_write_evaluation():
             "certainty_summary": {
                 "conclusions_count": 2,
                 "certainty_counts": {"high": 1, "moderate": 1},
+                "high_certainty_recommendation_count": 1,
             },
             "tool_loop_summary": {
                 "runs": 2,
@@ -168,9 +170,32 @@ def test_pdf_summary_and_should_write_evaluation():
     )
     assert "Topic: Python" in text
     assert "Rubric grade: good" in text
-    assert "Certainty: 2 conclusions / top band high" in text
+    assert "Certainty: 2 conclusions / top band high / high-certainty recommendations 1" in text
     assert "Tool loops: 2 runs / 3 calls / 1 failures" in text
     assert "API retries: 2" in text
+
+    certainty_text = certainty_pdf_text(
+        {
+            "summary": {
+                "conclusions_count": 2,
+                "certainty_counts": {"high": 1, "moderate": 1},
+                "high_certainty_recommendation_count": 1,
+            },
+            "conclusions": [
+                {
+                    "dimension": "DX",
+                    "certainty": "high",
+                    "factors": {
+                        "risk_of_bias": {"level": "not_serious", "reason": "Average evidence quality score was 0.91."},
+                        "inconsistency": {"level": "not_serious", "reason": "0 contradiction(s) were detected."},
+                    },
+                }
+            ],
+        }
+    )
+    assert "Conclusions: 2" in certainty_text
+    assert "DX: high" in certainty_text
+    assert "risk_of_bias: not_serious" in certainty_text
 
     cfg = ResearchConfig(
         topic="x",

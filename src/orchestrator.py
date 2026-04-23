@@ -34,6 +34,7 @@ from .artifacts import (
     write_pdf_report,
     write_portfolio,
 )
+from .agreement_artifacts import write_agreement_artifact
 from .config import ProviderConfig, ResearchConfig
 from .constraints import (
     format_results_table,
@@ -52,10 +53,13 @@ from .prompts import render as _render
 from . import research_loop as loop_mod
 from .pdf_report import render_simple_pdf
 from .portfolio import build_portfolio, render_portfolio_html
+from .provenance_artifacts import write_provenance_artifacts_bundle
 from .reporting import render_html_report as render_html_report_fn
+from .report_exports import write_reporting_artifacts
 from .reproducibility import write_prompt_snapshot, write_rerun_script
 from .run_finalize import finalize_run_artifacts
 from .run_io import setup_output_dir, write_results_header
+from .run_metadata_artifacts import write_run_metadata_artifacts
 from .run_paths import RunPaths
 from .run_state import UsageTotals, resume_state, track_candidate_usage, track_cost, track_usage
 from .runtime_telemetry import accumulate_retries, accumulate_tool_loop
@@ -201,6 +205,40 @@ class AutoResearcher:
         }
         self._tool_trace: list[dict[str, Any]] = []
         self._prompt_snapshots: list[dict[str, Any]] = []
+
+    def _sync_paths(self) -> None:
+        """Recompute derived artifact paths from the current output directory."""
+        self.paths = RunPaths.for_output_dir(self.output_dir)
+        self.iterations_dir = self.paths.iterations_dir
+        self.results_path = self.paths.results
+        self.kb_path = self.paths.knowledge_base
+        self.synthesis_path = self.paths.synthesis
+        self.methods_path = self.paths.methods
+        self.manifest_path = self.paths.manifest
+        self.metrics_path = self.paths.metrics
+        self.claims_path = self.paths.claims
+        self.citations_path = self.paths.citations
+        self.evidence_links_path = self.paths.evidence_links
+        self.evidence_quality_path = self.paths.evidence_quality
+        self.rubric_path = self.paths.rubric
+        self.contradictions_path = self.paths.contradictions
+        self.certainty_tables_path = self.paths.certainty_tables
+        self.search_log_path = self.paths.search_log
+        self.screening_log_path = self.paths.screening_log
+        self.baseline_path = self.paths.baseline
+        self.evaluation_path = self.paths.evaluation
+        self.comparison_path = self.paths.comparison
+        self.strategy_summary_path = self.paths.strategy_summary
+        self.dashboard_path = self.paths.dashboard
+        self.semantic_calibration_path = self.paths.semantic_calibration
+        self.semantic_review_path = self.paths.semantic_review
+        self.tool_trace_path = self.paths.tool_trace
+        self.prompt_snapshot_path = self.paths.prompt_snapshot
+        self.rerun_script_path = self.paths.rerun_script
+        self.report_html_path = self.paths.report_html
+        self.report_pdf_path = self.paths.report_pdf
+        self.portfolio_path = self.paths.portfolio
+        self.portfolio_html_path = self.paths.portfolio_html
 
     def _call(self, prompt: str, **kwargs: Any) -> AgentResponse:
         """Invoke the default backend with config defaults.
@@ -547,6 +585,7 @@ class AutoResearcher:
 
     def _setup(self) -> None:
         """Create output directories and initialise results.tsv if needed."""
+        self._sync_paths()
         setup_output_dir(self.output_dir, self.iterations_dir)
         self._ensure_backend_runtime_dir()
         if self._run_started_at is None:
@@ -950,12 +989,7 @@ class AutoResearcher:
 
     def _write_agreement_artifact(self) -> None:
         """Compute and write inter-rater agreement when multi-candidate data exists."""
-        from .scorer import compute_inter_rater_agreement
-
-        agreement = compute_inter_rater_agreement(self._candidate_assessments)
-        if agreement["dimensions_with_multiple_candidates"] > 0:
-            agreement_path = self.output_dir / "agreement.json"
-            agreement_path.write_text(json.dumps(agreement, indent=2), encoding="utf-8")
+        write_agreement_artifact(self)
 
     def _write_run_manifest(self) -> None:
         """Write a machine-readable manifest for reproducibility."""
@@ -995,6 +1029,10 @@ class AutoResearcher:
         )
         self.metrics_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
+    def _write_run_metadata_artifacts(self) -> None:
+        """Write manifest and metrics artifacts through the shared helper."""
+        write_run_metadata_artifacts(self)
+
     def _collect_provenance(self, text: str, *, scope: str, dimension: str = "") -> None:
         """Collect claims and citations from generated content."""
         retrieved_at = datetime.now(timezone.utc).isoformat()
@@ -1007,8 +1045,6 @@ class AutoResearcher:
 
     def _write_provenance_artifacts(self) -> None:
         """Write claim and citation artifacts."""
-        self.claims_path.write_text(json.dumps(self._claims, indent=2), encoding="utf-8")
-        self.citations_path.write_text(json.dumps(self._citations, indent=2), encoding="utf-8")
         benchmark_summary = self._benchmark_summary()
         reference_comparison = self._reference_run_comparison()
         bundle = build_provenance_bundle(
@@ -1035,19 +1071,13 @@ class AutoResearcher:
             benchmark_summary=benchmark_summary,
             reference_comparison=reference_comparison,
         )
-        certainty_tables = bundle["certainty_tables"]
-        self.evidence_links_path.write_text(json.dumps(evidence_links, indent=2), encoding="utf-8")
-        self.search_log_path.write_text(json.dumps(search_log, indent=2), encoding="utf-8")
-        self.screening_log_path.write_text(json.dumps(screening_log, indent=2), encoding="utf-8")
-        self.evidence_quality_path.write_text(json.dumps(evidence_quality, indent=2), encoding="utf-8")
-        self.rubric_path.write_text(json.dumps(rubric, indent=2), encoding="utf-8")
-        self.contradictions_path.write_text(json.dumps(contradictions, indent=2), encoding="utf-8")
-        self.certainty_tables_path = self.output_dir / "certainty_tables.json"
-        self.certainty_tables_path.write_text(json.dumps(certainty_tables, indent=2), encoding="utf-8")
-        self.semantic_review_path.write_text(json.dumps(semantic_review, indent=2), encoding="utf-8")
-        self.semantic_calibration_path.write_text(
-            json.dumps(semantic_calibration, indent=2),
-            encoding="utf-8",
+        write_provenance_artifacts_bundle(
+            self.paths,
+            claims=self._claims,
+            citations=self._citations,
+            bundle=bundle,
+            semantic_review=semantic_review,
+            semantic_calibration=semantic_calibration,
         )
         self._write_evaluation_artifact(
             evidence_quality,
@@ -1144,6 +1174,10 @@ class AutoResearcher:
 
     def _write_portfolio_artifacts(self) -> None:
         write_portfolio(self.output_dir, build_portfolio, render_portfolio_html)
+
+    def _write_reporting_artifacts(self) -> None:
+        """Write dashboard, trace, report, and portfolio artifacts."""
+        write_reporting_artifacts(self)
 
     def _semantic_review(
         self,

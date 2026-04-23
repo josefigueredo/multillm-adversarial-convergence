@@ -38,6 +38,7 @@ def render_html_report(
     comparison: dict[str, Any] | None,
     semantic_calibration: dict[str, Any] | None,
     semantic_review: dict[str, Any] | None,
+    certainty_tables: dict[str, Any] | None,
     dashboard: dict[str, Any] | None,
     methods_text: str,
     synthesis_text: str,
@@ -86,7 +87,7 @@ def render_html_report(
         rubric_json=json.dumps(rubric),
         semantic_html=_semantic_html(semantic_calibration),
         semantic_review_html=_semantic_review_html(semantic_review),
-        certainty_html=_certainty_html((dashboard or {}).get("certainty_summary")),
+        certainty_html=_certainty_html((dashboard or {}).get("certainty_summary"), certainty_tables),
         search_screening_html=_search_screening_html(
             (dashboard or {}).get("search_log_summary"),
             (dashboard or {}).get("screening_log_summary"),
@@ -267,7 +268,10 @@ def _semantic_review_html(semantic_review: dict[str, Any] | None) -> str:
     )
 
 
-def _certainty_html(certainty_summary: dict[str, Any] | None) -> str:
+def _certainty_html(
+    certainty_summary: dict[str, Any] | None,
+    certainty_tables: dict[str, Any] | None = None,
+) -> str:
     if not certainty_summary:
         return ""
     conclusions_count = int(certainty_summary.get("conclusions_count", 0) or 0)
@@ -277,9 +281,15 @@ def _certainty_html(certainty_summary: dict[str, Any] | None) -> str:
     top_band = ""
     if isinstance(certainty_counts, dict) and certainty_counts:
         top_band = max(certainty_counts.items(), key=lambda item: int(item[1] or 0))[0]
+    payload: dict[str, Any] = certainty_summary
+    if certainty_tables:
+        payload = {
+            "summary": certainty_summary,
+            "conclusions": certainty_tables.get("conclusions", []),
+        }
     return _json_section_html(
         "Certainty Tables",
-        certainty_summary,
+        payload,
         [
             ("Conclusions", conclusions_count),
             ("Top certainty band", top_band),
