@@ -313,11 +313,20 @@ class ReportingConfig:
         export_html: Whether to emit a human-readable HTML report artifact.
         export_pdf: Whether to emit a human-readable PDF report artifact.
         report_title: Optional override for the HTML report title.
+        capture_raw_backend_outputs: Whether future raw backend output capture
+            is enabled. Default-off by policy.
+        raw_backend_output_max_chars: Size cap for any future captured raw
+            backend payloads.
+        raw_backend_output_redact: Whether future raw payload capture should
+            redact sensitive fields before persistence.
     """
 
     export_html: bool = True
     export_pdf: bool = False
     report_title: str = ""
+    capture_raw_backend_outputs: bool = False
+    raw_backend_output_max_chars: int = 20000
+    raw_backend_output_redact: bool = True
 
 
 @dataclass(frozen=True)
@@ -462,10 +471,18 @@ class ResearchConfig:
 
         # --- Reporting --------------------------------------------------------
         reporting_raw: dict[str, Any] = research.get("reporting", {})
+        raw_backend_output_max_chars = reporting_raw.get("raw_backend_output_max_chars", 20000)
+        if raw_backend_output_max_chars <= 0:
+            raise ValueError(
+                f"raw_backend_output_max_chars must be positive, got {raw_backend_output_max_chars}"
+            )
         reporting = ReportingConfig(
             export_html=reporting_raw.get("export_html", True),
             export_pdf=reporting_raw.get("export_pdf", False),
             report_title=reporting_raw.get("report_title", ""),
+            capture_raw_backend_outputs=reporting_raw.get("capture_raw_backend_outputs", False),
+            raw_backend_output_max_chars=raw_backend_output_max_chars,
+            raw_backend_output_redact=reporting_raw.get("raw_backend_output_redact", True),
         )
 
         # --- Scoring ----------------------------------------------------------

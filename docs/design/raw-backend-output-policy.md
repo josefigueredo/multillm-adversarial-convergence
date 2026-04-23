@@ -36,6 +36,17 @@ If raw backend capture is implemented later, it should be:
 - **redacted before write**
 - **size-capped**
 
+## Agreed config boundary
+
+The config surface is now reserved as:
+
+- `reporting.capture_raw_backend_outputs` (default `false`)
+- `reporting.raw_backend_output_max_chars` (default `20000`)
+- `reporting.raw_backend_output_redact` (default `true`)
+
+These fields define the future implementation boundary, but they do **not**
+mean raw payload capture is active yet.
+
 ## Scope recommendation
 
 ### In scope for a first implementation

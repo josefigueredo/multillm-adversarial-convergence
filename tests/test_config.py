@@ -116,6 +116,9 @@ class TestReportingConfig:
         assert rc.export_html is True
         assert rc.export_pdf is False
         assert rc.report_title == ""
+        assert rc.capture_raw_backend_outputs is False
+        assert rc.raw_backend_output_max_chars == 20000
+        assert rc.raw_backend_output_redact is True
 
 
 # ---------------------------------------------------------------------------
@@ -252,11 +255,28 @@ class TestResearchConfigFromYaml:
                 export_html: false
                 export_pdf: true
                 report_title: "Custom Research Report"
+                capture_raw_backend_outputs: true
+                raw_backend_output_max_chars: 1234
+                raw_backend_output_redact: false
         """), encoding="utf-8")
         cfg = ResearchConfig.from_yaml(p)
         assert cfg.reporting.export_html is False
         assert cfg.reporting.export_pdf is True
         assert cfg.reporting.report_title == "Custom Research Report"
+        assert cfg.reporting.capture_raw_backend_outputs is True
+        assert cfg.reporting.raw_backend_output_max_chars == 1234
+        assert cfg.reporting.raw_backend_output_redact is False
+
+    def test_reporting_raw_backend_output_max_chars_must_be_positive(self, tmp_path: Path):
+        p = tmp_path / "reporting_invalid.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              reporting:
+                raw_backend_output_max_chars: 0
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="raw_backend_output_max_chars must be positive"):
+            ResearchConfig.from_yaml(p)
 
     def test_minimal_config_uses_defaults(self, minimal_yaml: Path):
         cfg = ResearchConfig.from_yaml(minimal_yaml)

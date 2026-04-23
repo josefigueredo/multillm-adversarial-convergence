@@ -44,7 +44,7 @@ Tasks:
 
 Tasks:
 - [x] decide whether raw backend outputs stay opt-in
-- [ ] add explicit config if raw capture becomes supported
+- [x] add explicit config if raw capture becomes supported
 - [x] document redaction/size constraints if raw capture is enabled
 
 ### Batch O1A — orchestrator cleanup
@@ -52,7 +52,7 @@ Tasks:
 Tasks:
 - [x] extract runtime telemetry aggregation helpers from `src/orchestrator.py`
 - [x] extract reproducibility artifact writing helpers from `src/orchestrator.py`
-- [ ] keep orchestration flow focused on control logic, not artifact plumbing
+- [x] keep orchestration flow focused on control logic, not artifact plumbing
 
 ### Batch O1B — provenance pipeline extraction
 
@@ -76,7 +76,12 @@ Tasks:
 
 Tasks:
 - [x] move agreement artifact persistence behind a shared helper module
-- [ ] decide whether evaluation artifact writing should also move out of `src/orchestrator.py`
+- [x] decide whether evaluation artifact writing should also move out of `src/orchestrator.py`
+
+### Batch O1F — evaluation artifact extraction
+
+Tasks:
+- [x] move evaluation/comparison/strategy-summary persistence behind a shared helper module
 
 ### Batch R4B — richer certainty reporting
 

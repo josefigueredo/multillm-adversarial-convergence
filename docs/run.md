@@ -312,7 +312,10 @@ Current scope:
 
 - prompt snapshots capture top-level orchestrator/backend invocations
 - they do **not** yet snapshot raw backend payloads
-- raw backend payload capture remains intentionally deferred until an opt-in policy is defined
+- raw backend payload capture remains intentionally deferred even though an explicit opt-in config boundary now exists:
+  - `reporting.capture_raw_backend_outputs`
+  - `reporting.raw_backend_output_max_chars`
+  - `reporting.raw_backend_output_redact`
 - certainty tables are heuristic and GRADE-lite, not a full formal evidence-certainty implementation
 - PDF summaries and cross-run portfolio views now surface compact certainty rollups
 - portfolio views now expose certainty deltas versus the strongest certainty run and separate high-certainty recommendation counts

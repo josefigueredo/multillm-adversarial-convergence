@@ -104,3 +104,10 @@ uv run pytest tests/ -v
 - `docs/design/streaming-contract.md` — current streaming contract and deferred follow-up work
 - `docs/design/api-tool-calling-contract.md` — proposed phased tool-calling contract
 - `docs/design/raw-backend-output-policy.md` — policy boundary for any future raw backend payload capture
+
+Raw backend output capture remains **default-off**. The config now reserves:
+- `reporting.capture_raw_backend_outputs`
+- `reporting.raw_backend_output_max_chars`
+- `reporting.raw_backend_output_redact`
+
+Those fields define the future boundary, but raw payload persistence is still not implemented.

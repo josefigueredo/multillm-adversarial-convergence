@@ -667,6 +667,18 @@ class TestAutoResearcherSetup:
             researcher._write_agreement_artifact()
         writer.assert_called_once_with(researcher)
 
+    def test_evaluation_artifact_delegates_to_helper_module(self, researcher):
+        with patch("src.orchestrator.write_evaluation_artifacts") as writer:
+            researcher._write_evaluation_artifact(
+                {"average_evidence_quality_score": 0.7},
+                {"grade": "good"},
+                benchmark_summary={},
+                reference_comparison={},
+                semantic_review={"grade": "good"},
+                semantic_calibration={"grade": "reasonable"},
+            )
+        writer.assert_called_once()
+
     def test_resume_empty_dir(self, researcher):
         researcher._setup()
         researcher._resume()

@@ -22,13 +22,11 @@ from .backend_options import apply_backend_capabilities, build_call_options
 from .artifacts import (
     cli_version,
     dashboard_payload,
-    evaluation_payload,
     git_commit,
     load_json_if_exists,
     metrics_payload,
     package_version,
     run_manifest_payload,
-    should_write_evaluation,
     write_dashboard,
     write_html_report,
     write_pdf_report,
@@ -45,6 +43,7 @@ from .constraints import (
     synthesis_results_summary,
 )
 from .comparison import benchmark_summary, reference_run_comparison
+from .evaluation_artifacts import write_evaluation_artifacts
 from .provenance import (
     extract_citations,
     extract_claims,
@@ -1119,26 +1118,14 @@ class AutoResearcher:
         semantic_calibration: dict[str, Any],
     ) -> None:
         """Write optional evaluation summary comparing iterative output to a baseline."""
-        if not should_write_evaluation(self.config):
-            return
-
-        payload = evaluation_payload(
-            benchmark_id=self.config.evaluation.benchmark_id,
-            baseline_exists=self.baseline_path.exists(),
-            claims=self._claims,
-            citations=self._citations,
+        write_evaluation_artifacts(
+            self,
             evidence_quality=evidence_quality,
             rubric=rubric,
             benchmark_summary=benchmark_summary,
             reference_comparison=reference_comparison,
             semantic_review=semantic_review,
             semantic_calibration=semantic_calibration,
-        )
-        self.evaluation_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        self.comparison_path.write_text(json.dumps(reference_comparison, indent=2), encoding="utf-8")
-        self.strategy_summary_path.write_text(
-            json.dumps(reference_comparison.get("strategy_summary", {}), indent=2),
-            encoding="utf-8",
         )
 
     def _write_html_report(self) -> None:
