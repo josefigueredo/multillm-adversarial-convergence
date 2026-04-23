@@ -5,7 +5,20 @@ from pathlib import Path
 
 import pytest
 
-from src.config import BackendsConfig, EvaluationConfig, ExecutionConfig, MethodologyConfig, OutputStyleOverrides, ProviderConfig, ReportingConfig, ResearchConfig, ScoringConfig, StrategyConfig
+from src.config import (
+    BackendsConfig,
+    DocumentConfig,
+    EvaluationConfig,
+    ExecutionConfig,
+    MethodologyConfig,
+    OutputStyleOverrides,
+    PlanConfig,
+    ProviderConfig,
+    ReportingConfig,
+    ResearchConfig,
+    ScoringConfig,
+    StrategyConfig,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +390,34 @@ class TestResearchConfigFromYaml:
         """), encoding="utf-8")
         cfg = ResearchConfig.from_yaml(p)
         assert cfg.execution.system_prompt == "You are precise."
+
+
+class TestConvergenceSmokeConfigs:
+    def test_smoke_test_refine_config_parses(self):
+        cfg = DocumentConfig.from_yaml(Path("configs/smoke_test_refine.yaml"))
+        assert cfg.topic == "Tiny PRD smoke test"
+        assert cfg.convergence_cycles == 1
+        assert cfg.max_cycles == 1
+        assert cfg.persona_mode == "serial"
+        assert [persona.name for persona in cfg.personas] == ["architect"]
+        assert cfg.backends.primary == "smoke_main"
+        assert cfg.backends.research == ("smoke_main",)
+        assert cfg.execution.allowed_tools == ""
+        assert cfg.execution.max_turns == 3
+        assert cfg.execution.lightweight_mode is True
+
+    def test_smoke_test_plan_config_parses(self):
+        cfg = PlanConfig.from_yaml(Path("configs/smoke_test_plan.yaml"))
+        assert cfg.topic == "Tiny plan smoke test"
+        assert cfg.convergence_cycles == 1
+        assert cfg.max_cycles == 1
+        assert cfg.persona_mode == "serial"
+        assert [persona.name for persona in cfg.personas] == ["tech_lead"]
+        assert cfg.backends.primary == "smoke_main"
+        assert cfg.backends.research == ("smoke_main",)
+        assert cfg.execution.allowed_tools == ""
+        assert cfg.execution.max_turns == 3
+        assert cfg.execution.lightweight_mode is True
 
     def test_execution_stream_parses(self, tmp_path: Path):
         p = tmp_path / "stream.yaml"

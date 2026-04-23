@@ -1,0 +1,45 @@
+# Lightweight non-dry smoke test for document refinement.
+# Intentionally uses a single backend, one persona, and one cycle.
+
+document:
+  topic: "Tiny PRD smoke test"
+  goal: >
+    Produce a concise one-page PRD draft for a tiny feature and verify that the
+    convergence loop runs end-to-end without human input for smoke validation.
+
+  primary_artifact: "PRD.md"
+  source_material: |
+    # Mini Feature Brief
+
+    Build a feature that lets a user rename a saved dashboard from the dashboard details page.
+
+    ## Requirements
+    - User can edit the dashboard name inline.
+    - Save validates that the name is not empty.
+    - Success and failure states are visible.
+
+  convergence_cycles: 1
+  max_cycles: 1
+  persona_mode: serial
+
+  personas:
+    - name: architect
+
+  providers:
+    smoke_main:
+      adapter: claude-cli
+      model: sonnet
+
+  backends:
+    primary: smoke_main
+    research:
+      - smoke_main
+    judge: smoke_main
+    utility: smoke_main
+
+  execution:
+    allowed_tools: ""
+    max_turns: 3
+    timeout_seconds: 180
+    max_budget_per_call: 1.00
+    lightweight_mode: true

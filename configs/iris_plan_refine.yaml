@@ -1,0 +1,65 @@
+# Plan refinement config for the Iris playground plan.
+# Seed inputs are copied into input/iris/ so the run is self-contained in this repo.
+
+plan:
+  topic: "Iris Playground alpha vertical slice"
+  goal: >
+    Refine the existing Iris playground implementation plan so it is internally
+    consistent, executable by a senior engineer without guesswork, and aligned
+    with the authoritative Iris PRD.
+
+  primary_artifact: "PLAN.md"
+
+  # Keep the builder anchored on the copied plan artifact and treat the copied
+  # PRD as the product source of truth for scope and requirements.
+  source_material: >
+    Use the copied PLAN.md in the reference files as the baseline plan to refine.
+    Preserve its intent and structure where possible, but fix ordering,
+    completeness, ambiguity, and missing implementation detail when critiques
+    justify it. Use the copied PRD.md as the authoritative product scope.
+
+  convergence_cycles: 2
+  max_cycles: 6
+  persona_mode: parallel
+
+  personas:
+    - name: architect
+    - name: tech_lead
+    - name: qa_engineer
+    - name: ai_engineer
+    - name: data_engineer
+    - name: security_engineer
+    - name: devils_advocate
+
+  source_files:
+    - path: ../input/iris/PLAN.md
+      roles: [all]
+    - path: ../input/iris/PRD.md
+      roles: [all]
+
+  artifacts: []
+
+  providers:
+    planner_main:
+      adapter: claude-cli
+      model: sonnet
+    verifier_fast:
+      adapter: gemini-cli
+      model: gemini-2.5-flash
+
+  backends:
+    primary: planner_main
+    research:
+      - planner_main
+      - verifier_fast
+    judge: planner_main
+    utility: verifier_fast
+
+  strategy_config:
+    critique_depth: standard
+
+  execution:
+    allowed_tools: ""
+    max_turns: 6
+    timeout_seconds: 600
+    max_budget_per_call: 1.00

@@ -1,0 +1,46 @@
+# Lightweight non-dry smoke test for plan refinement.
+# Intentionally uses a single backend, one persona, and one cycle.
+
+plan:
+  topic: "Tiny plan smoke test"
+  goal: >
+    Produce a concise implementation plan for a tiny feature and verify that the
+    plan convergence loop runs end-to-end without human input for smoke validation.
+
+  primary_artifact: "PLAN.md"
+  source_material: |
+    # Mini Delivery Brief
+
+    Add dashboard rename support to the dashboard details page.
+
+    ## Expected work
+    - Add editable name UI.
+    - Validate non-empty input.
+    - Persist the new name through the existing API.
+    - Add tests.
+
+  convergence_cycles: 1
+  max_cycles: 1
+  persona_mode: serial
+
+  personas:
+    - name: tech_lead
+
+  providers:
+    smoke_main:
+      adapter: claude-cli
+      model: sonnet
+
+  backends:
+    primary: smoke_main
+    research:
+      - smoke_main
+    judge: smoke_main
+    utility: smoke_main
+
+  execution:
+    allowed_tools: ""
+    max_turns: 3
+    timeout_seconds: 180
+    max_budget_per_call: 1.00
+    lightweight_mode: true

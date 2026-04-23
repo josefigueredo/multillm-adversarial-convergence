@@ -5,11 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+import logging
 
 from .backends import AgentResponse
 from .config import DocumentConfig
 from .hitl import DeferReason, HumanDecision, HumanInputRequest
 from .run_state import BaseContext
+
+
+log = logging.getLogger("autoresearch")
 
 
 # ---------------------------------------------------------------------------
@@ -109,8 +113,15 @@ def run_cycle(
         Tuple of (valid_count, stale_count, deferred_count).
     """
     state.cycle += 1
+    log.info("[refine][cycle %03d] starting convergence cycle", state.cycle)
 
     # 1. Builder — generate or apply pending patches
+    log.info(
+        "[refine][cycle %03d] builder starting (pending patches: %d, human decisions: %d)",
+        state.cycle,
+        len(state.pending_patches),
+        len(ctx.human_decisions),
+    )
     prd = strategy.run_builder(
         state.prd,
         state.pending_patches,
@@ -120,17 +131,45 @@ def run_cycle(
     state.prd = prd
     state.prd_versions.append(prd)
     state.pending_patches = []
+    log.info("[refine][cycle %03d] builder completed", state.cycle)
 
     # 2. Challenger
+    log.info("[refine][cycle %03d] challenger starting", state.cycle)
     raw_critiques = strategy.run_challenger(prd, ctx.call_with)
+    log.info(
+        "[refine][cycle %03d] challenger completed (%d critique(s))",
+        state.cycle,
+        len(raw_critiques),
+    )
 
     # 3. Personas
+    log.info(
+        "[refine][cycle %03d] personas starting (%d persona(s), mode=%s)",
+        state.cycle,
+        len(ctx.config.personas),
+        ctx.config.persona_mode,
+    )
     persona_critiques = strategy.run_personas(prd, ctx.call_with)
+    log.info(
+        "[refine][cycle %03d] personas completed (%d critique(s))",
+        state.cycle,
+        len(persona_critiques),
+    )
 
     all_raw = raw_critiques + persona_critiques
 
     # 4. Verifier
+    log.info(
+        "[refine][cycle %03d] verifier starting (%d critique(s) to classify)",
+        state.cycle,
+        len(all_raw),
+    )
     verified = strategy.run_verifier(prd, all_raw, ctx.call_with)
+    log.info(
+        "[refine][cycle %03d] verifier completed (%d classified critique(s))",
+        state.cycle,
+        len(verified),
+    )
 
     # 5. Classify
     valid = [v for v in verified if v.status == "valid"]
@@ -142,6 +181,11 @@ def run_cycle(
 
     # 6. HITL gate
     if human_required:
+        log.info(
+            "[refine][cycle %03d] human input required for %d critique(s)",
+            state.cycle,
+            len(human_required),
+        )
         requests = _make_human_requests(human_required, state.cycle, state.issue_registry)
         state.pending_human_inputs = requests
         if interactive:
@@ -152,8 +196,18 @@ def run_cycle(
             state.pending_human_inputs = []
 
     # 7. Arbitrator — patches for VALID only
+    log.info(
+        "[refine][cycle %03d] arbitrator starting (%d valid critique(s))",
+        state.cycle,
+        len(valid),
+    )
     new_patches = strategy.run_arbitrator(prd, valid, ctx.call_with)
     state.pending_patches = new_patches
+    log.info(
+        "[refine][cycle %03d] arbitrator completed (%d patch(es))",
+        state.cycle,
+        len(new_patches),
+    )
 
     # 8. Update issue registry
     _register_issues(state, verified)
@@ -163,6 +217,14 @@ def run_cycle(
         state,
         valid_count=len(valid),
         human_required_count=len(human_required),
+    )
+    log.info(
+        "[refine][cycle %03d] cycle complete (valid=%d stale=%d deferred=%d clean_streak=%d)",
+        state.cycle,
+        len(valid),
+        len(stale),
+        len(deferred),
+        state.consecutive_clean_cycles,
     )
 
     return len(valid), len(stale), len(deferred)

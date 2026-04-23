@@ -197,3 +197,26 @@ def test_run_plan_cycle_updates_plan_text():
 
     assert state.plan == "# New"
     assert state.plan_versions == ["# New"]
+
+
+def test_run_plan_cycle_emits_progress_logs(caplog):
+    cfg = _make_config()
+    state = PlanCycleState(plan="# Plan")
+    ctx = _make_ctx(cfg)
+    strategy = MagicMock()
+    strategy.run_builder.return_value = "# Revised Plan"
+    strategy.run_challenger.return_value = []
+    strategy.run_personas.return_value = []
+    strategy.run_verifier.return_value = []
+    strategy.run_arbitrator.return_value = []
+
+    with caplog.at_level("INFO", logger="autoresearch"):
+        run_plan_cycle(state, ctx, strategy, interactive=False)
+
+    text = caplog.text
+    assert "[plan][cycle 001] builder starting" in text
+    assert "[plan][cycle 001] challenger completed (0 critique(s))" in text
+    assert "[plan][cycle 001] personas starting" in text
+    assert "[plan][cycle 001] verifier completed (0 classified critique(s))" in text
+    assert "[plan][cycle 001] arbitrator completed (0 patch(es))" in text
+    assert "[plan][cycle 001] cycle complete (valid=0 stale=0 deferred=0 clean_streak=1)" in text

@@ -213,3 +213,19 @@ def test_run_cycle_adds_issues_to_registry():
     assert len(state.issue_registry) == 1
     assert state.issue_registry[0].status == "valid"
     assert state.issue_registry[0].id == "I-01"
+
+
+def test_run_cycle_emits_progress_logs(caplog):
+    state = CycleState()
+    strategy = _make_strategy_mock()
+
+    with caplog.at_level("INFO", logger="autoresearch"):
+        run_cycle(state, _make_ctx(), strategy, interactive=False)
+
+    text = caplog.text
+    assert "[refine][cycle 001] builder starting" in text
+    assert "[refine][cycle 001] challenger completed (0 critique(s))" in text
+    assert "[refine][cycle 001] personas starting" in text
+    assert "[refine][cycle 001] verifier completed (0 classified critique(s))" in text
+    assert "[refine][cycle 001] arbitrator completed (0 patch(es))" in text
+    assert "[refine][cycle 001] cycle complete (valid=0 stale=0 deferred=0 clean_streak=1)" in text
