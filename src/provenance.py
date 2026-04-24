@@ -65,6 +65,33 @@ def extract_citations(text: str, *, scope: str, retrieved_at: str) -> list[dict[
     return citations
 
 
+def build_source_file_provenance(source_files: Any) -> list[dict[str, Any]]:
+    """Create provenance records for operator-supplied local source files.
+
+    Each record carries ``trust_class="user_provided_source_material"`` —
+    local files are controlled by the operator, not fetched from external URLs.
+
+    Args:
+        source_files: Iterable of ``SourceFileConfig``-like objects with
+            ``path`` (str/Path) and ``roles`` (tuple/list) attributes.
+
+    Returns:
+        List of provenance dicts ready to be merged into ``citations.json``.
+    """
+    records: list[dict[str, Any]] = []
+    for sf in source_files:
+        entry: dict[str, Any] = {
+            "id": f"local-{len(records) + 1:03d}",
+            "scope": "source_file",
+            "path": str(sf.path),
+            "roles": list(sf.roles) if hasattr(sf, "roles") else [],
+            "source_type": "local_file",
+        }
+        entry["trust_class"] = classify_citation_trust(entry)
+        records.append(entry)
+    return records
+
+
 def extract_claims(text: str, *, scope: str, dimension: str = "") -> list[dict[str, Any]]:
     """Extract simple claim records from prose and bullet lists."""
     claims: list[dict[str, Any]] = []

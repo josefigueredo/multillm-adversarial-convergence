@@ -32,16 +32,20 @@ TRUST_CLASSES: frozenset[str] = frozenset(
 def classify_citation_trust(citation: dict[str, Any]) -> str:
     """Return the trust class for a citation record.
 
-    All URL-based citations are ``untrusted_web_content`` regardless of
-    source quality — even ``official_docs`` or ``paper`` types are fetched
-    from external sources the framework does not control.
+    - Records with a local ``path`` (no ``url``) are ``user_provided_source_material``
+      — they come from operator-supplied files injected into agent prompts.
+    - All URL-based citations are ``untrusted_web_content`` regardless of source
+      quality tier (even ``official_docs`` or ``paper`` types are fetched from
+      external sources the framework does not control).
 
     Args:
-        citation: A citation dict (must contain at least ``url``).
+        citation: A citation dict containing ``url`` and/or ``path``.
 
     Returns:
         A member of :data:`TRUST_CLASSES`.
     """
+    if citation.get("path") and not citation.get("url"):
+        return "user_provided_source_material"
     return "untrusted_web_content"
 
 

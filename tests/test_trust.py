@@ -42,6 +42,9 @@ class TestClassifyCitationTrust:
     def _citation(self, source_type: str = "web") -> dict:
         return {"url": "https://example.com", "source_type": source_type}
 
+    def _local_citation(self, path: str = "/docs/spec.pdf") -> dict:
+        return {"path": path, "source_type": "local_file"}
+
     def test_web_citation_is_untrusted_web_content(self):
         assert classify_citation_trust(self._citation("web")) == "untrusted_web_content"
 
@@ -58,8 +61,24 @@ class TestClassifyCitationTrust:
     def test_community_citation_is_untrusted_web_content(self):
         assert classify_citation_trust(self._citation("community")) == "untrusted_web_content"
 
+    def test_local_path_citation_is_user_provided_source_material(self):
+        assert classify_citation_trust(self._local_citation()) == "user_provided_source_material"
+
+    def test_local_path_without_url_is_user_provided(self):
+        result = classify_citation_trust({"path": "/input/prd.md", "source_type": "local_file"})
+        assert result == "user_provided_source_material"
+
+    def test_record_with_both_url_and_path_is_untrusted_web(self):
+        # URL takes precedence — if there's a URL it's a web fetch
+        result = classify_citation_trust({"url": "https://example.com", "path": "/also/local.pdf"})
+        assert result == "untrusted_web_content"
+
     def test_result_is_a_valid_trust_class(self):
         result = classify_citation_trust(self._citation())
+        assert result in TRUST_CLASSES
+
+    def test_local_result_is_a_valid_trust_class(self):
+        result = classify_citation_trust(self._local_citation())
         assert result in TRUST_CLASSES
 
     def test_missing_source_type_still_returns_valid_class(self):
@@ -241,3 +260,147 @@ class TestDashboardTrustSummary:
         # trust_summary key exists and is a dict (may be empty)
         assert "trust_summary" in result
         assert isinstance(result["trust_summary"], dict)
+
+
+# ---------------------------------------------------------------------------
+# build_source_file_provenance
+# ---------------------------------------------------------------------------
+
+class FakeSourceFile:
+    """Minimal SourceFileConfig-like for testing."""
+
+    def __init__(self, path: str, roles: tuple[str, ...] = ("builder",)) -> None:
+        self.path = path
+        self.roles = roles
+
+
+class TestBuildSourceFileProvenance:
+    def test_returns_list(self):
+        from src.provenance import build_source_file_provenance
+
+        result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
+        assert isinstance(result, list)
+
+    def test_one_record_per_source_file(self):
+        from src.provenance import build_source_file_provenance
+
+        files = [FakeSourceFile("/a.pdf"), FakeSourceFile("/b.md")]
+        result = build_source_file_provenance(files)
+        assert len(result) == 2
+
+    def test_each_record_has_trust_class(self):
+        from src.provenance import build_source_file_provenance
+
+        result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
+        for record in result:
+            assert "trust_class" in record
+
+    def test_trust_class_is_user_provided_source_material(self):
+        from src.provenance import build_source_file_provenance
+
+        result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
+        for record in result:
+            assert record["trust_class"] == "user_provided_source_material"
+
+    def test_records_have_path_field(self):
+        from src.provenance import build_source_file_provenance
+
+        result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
+        assert result[0]["path"] == "/docs/spec.pdf"
+
+    def test_records_have_source_type_local_file(self):
+        from src.provenance import build_source_file_provenance
+
+        result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
+        assert result[0]["source_type"] == "local_file"
+
+    def test_empty_source_files_returns_empty_list(self):
+        from src.provenance import build_source_file_provenance
+
+        assert build_source_file_provenance([]) == []
+
+    def test_trust_class_is_valid(self):
+        from src.provenance import build_source_file_provenance
+
+        result = build_source_file_provenance([FakeSourceFile("/x.pdf")])
+        assert result[0]["trust_class"] in TRUST_CLASSES
+
+
+# ---------------------------------------------------------------------------
+# Real integrated path: local source → citations.json → write_dashboard →
+# dashboard.json trust_summary contains user_provided_source_material
+# ---------------------------------------------------------------------------
+
+class TestLocalSourceTrustIntegration:
+    def _minimal_config(self):
+        from src.config import (
+            BackendsConfig, ExecutionConfig, ResearchConfig, ScoringConfig,
+        )
+        return ResearchConfig(
+            topic="Integration test",
+            goal="Verify trust flows through dashboard",
+            dimensions=("dim1",),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="WebSearch",
+            ),
+            scoring=ScoringConfig(),
+        )
+
+    def test_local_source_records_in_citations_appear_in_dashboard_trust_summary(self, tmp_path):
+        import json
+        from src.artifacts import write_dashboard
+        from src.provenance import build_source_file_provenance
+
+        # Build local source provenance records
+        records = build_source_file_provenance([
+            FakeSourceFile("/input/prd.md", roles=("builder",)),
+            FakeSourceFile("/input/spec.pdf", roles=("builder", "challenger")),
+        ])
+
+        # Write citations.json to the output dir (as orchestrator would)
+        (tmp_path / "citations.json").write_text(json.dumps(records), encoding="utf-8")
+
+        # write_dashboard loads citations.json and computes trust_summary
+        config = self._minimal_config()
+        write_dashboard(
+            tmp_path,
+            config=config,
+            best_score=0.0,
+            iteration=0,
+            explored_dimensions=[],
+        )
+
+        dashboard = json.loads((tmp_path / "dashboard.json").read_text(encoding="utf-8"))
+        assert "trust_summary" in dashboard
+        assert dashboard["trust_summary"].get("user_provided_source_material", 0) == 2
+
+    def test_mixed_local_and_url_citations_both_appear_in_trust_summary(self, tmp_path):
+        import json
+        from src.artifacts import write_dashboard
+        from src.provenance import build_source_file_provenance, extract_citations
+
+        local_records = build_source_file_provenance([FakeSourceFile("/input/doc.md")])
+        url_records = extract_citations(
+            "See [example](https://example.com) for details.",
+            scope="test",
+            retrieved_at="2024-01-01",
+        )
+        all_records = local_records + url_records
+        (tmp_path / "citations.json").write_text(json.dumps(all_records), encoding="utf-8")
+
+        config = self._minimal_config()
+        write_dashboard(
+            tmp_path,
+            config=config,
+            best_score=0.0,
+            iteration=0,
+            explored_dimensions=[],
+        )
+
+        dashboard = json.loads((tmp_path / "dashboard.json").read_text(encoding="utf-8"))
+        summary = dashboard["trust_summary"]
+        assert summary.get("user_provided_source_material", 0) >= 1
+        assert summary.get("untrusted_web_content", 0) >= 1
+
