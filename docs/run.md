@@ -462,8 +462,8 @@ Each run produces a directory under `output/<config-name>/`:
 
 | File | Description |
 |------|-------------|
-| `claims.json` | Extracted claims with type and confidence labels |
-| `citations.json` | Extracted URLs with source type classification |
+| `claims.json` | Extracted claims with type, confidence, and `trust_class` labels |
+| `citations.json` | Extracted URLs with source type classification and `trust_class` |
 | `search_log.json` | Source-consideration log derived from extracted citations |
 | `screening_log.json` | Inclusion/exclusion screening log derived from linked evidence |
 | `evidence_links.json` | Claim-to-citation links with support strength |
@@ -471,6 +471,20 @@ Each run produces a directory under `output/<config-name>/`:
 | `certainty_tables.json` | Conclusion-level certainty bands with factor-level downgrade reasons |
 | `rubric.json` | Research quality rubric (grade + 6 dimensions) |
 | `contradictions.json` | Detected recommendation conflicts |
+
+#### Citation and claim trust classification
+
+Every record in `citations.json` and `claims.json` carries a `trust_class` field that answers "where did this come from?" (origin), distinct from `source_quality_weight` (reliability).
+
+Active trust classes:
+
+| Class | Applied to | Meaning |
+|---|---|---|
+| `untrusted_web_content` | URL citations | Externally fetched web content |
+| `user_provided_source_material` | Local-path citations | Operator-supplied source files (local input material) |
+| `inferred_claim` | All LLM claims | Synthesized by the LLM from its context |
+
+`dashboard.json` includes a `trust_summary` object with counts per class, giving a quick origin breakdown for a run's evidence.
 
 **Agreement artifacts** (multi-backend runs only):
 
@@ -565,6 +579,19 @@ Supported overrides:
 - `recommendation_mode`: `ranked | decision_only`
 - `citation_mode`: `inline_links | references_section`
 
+#### Deterministic references (paper style only)
+
+When `output_style: paper`, `synthesis.md` automatically receives a deterministic `## References` section after synthesis is written:
+
+- Built from `citations.json` — only URL-bearing citations are included; local-source-material records are excluded
+- URLs are deduplicated by normalized URL (tracking parameters such as `utm_*`, `fbclid`, `gclid` stripped; trailing slashes and fragments removed)
+- References are numbered in discovery order; titled entries use `[title](url)` format, bare URLs used as fallback
+- If the LLM already generated a `## References` or `## Bibliography` heading, it is replaced with the deterministic version; any content after the references section (e.g. appendices) is preserved
+- Non-paper output styles (`default`, `technical_doc`, `executive_brief`, `decision_memo`) are not affected
+- Resumed and synthesize-only runs restore prior `citations.json` before building the references section so the output is complete
+
+`citation_mode: references_section` (in `style_overrides`) instructs the LLM to include its own citation list in the synthesis text; the deterministic injection step replaces that LLM-generated list with the normalized, deduped artifact-derived version.
+
 The selected `output_style` also affects HTML/PDF report presentation metadata:
 - style label shown in the HTML header
 - style-aware Methods/Synthesis section headings
@@ -632,6 +659,21 @@ Reason codes:
 
 The full resolved security policy is persisted in `effective_config.json` and surfaced by `explain config`.
 
+#### Security enforcement truth table
+
+`doctor config` reports which fields are actively enforced at runtime versus which are declared intent only:
+
+| Field | Status | Enforcement mechanism |
+|---|---|---|
+| `allow_host_bash: false` | **Enforced** | Hard-blocks Bash tool in `_call_with`; raises `PolicyDeniedError` |
+| `sandbox.filesystem_access` | **Enforced** | Write boundary checked by `guard_path_write` on every file write |
+| `allow_filesystem_write_outside_output` | **Enforced** | Relaxes write boundary when `true` |
+| `tool_execution_mode: sandboxed` | **Declared-only** | Declares intent; no real sandbox backend wired yet |
+| `sandbox.network_access` | **Declared-only** | Declares outbound policy; not yet OS-enforced |
+| `content_trust` | **Declared-only** | Declares content sanitization posture; enforcement deferred |
+
+Use `autoresearch doctor config --config <path>` to see this table for a specific config with live health status.
+
 ## Explain commands
 
 `explain` is a pure inspection subcommand. It does **not** create output directories, run backends, check backend availability, or instantiate `AutoResearcher`. Exit code `0` on success, `1` on bad input.
@@ -673,6 +715,55 @@ Inspects an existing run output directory and prints:
 
 Returns exit code `1` if the output directory does not exist.
 
+## Doctor commands
+
+`doctor` is a diagnostic subcommand for validating configs and inspecting run output health. Like `explain`, it does **not** execute research, write run artifacts, or instantiate backends. Exit code `0` (healthy) / `1` (warnings or errors present).
+
+### `doctor config`
+
+```bash
+uv run python -m src.cli doctor config --config configs/aws_api_gateway.yaml
+```
+
+Validates a config file and prints a structured diagnostic report covering:
+
+- **Config validity** — whether the YAML parses and passes schema validation
+- **Security enforcement truth table** — which security fields are actively enforced at runtime vs declared-only intent (see [Security enforcement truth table](#security-enforcement-truth-table))
+- **Backend validity** — whether declared backends are registered and available
+- **Operator risk notes** — explicit warnings for conditions that affect run safety:
+  - Host shell exposed (`allow_host_bash: true` with Bash in `allowed_tools`)
+  - Sandbox intent declared but not actually enforced (`tool_execution_mode: sandboxed` is declared-only)
+  - Network policy declared but not OS-enforced (`sandbox.network_access` is declared-only)
+
+**Health status:**
+
+| Output | Exit code | Meaning |
+|---|---|---|
+| `HEALTH: OK` | `0` | No warnings; config is clean |
+| `HEALTH: WARNINGS (N)` | `1` | At least one risk note or backend warning |
+
+Any printed warning drives a non-zero exit code — the doctor command does not print warnings and return `0`.
+
+### `doctor output`
+
+```bash
+uv run python -m src.cli doctor output --output output/aws_api_gateway
+```
+
+Inspects an existing run output directory and reports:
+
+- **Run classification** — `complete` / `partial (no synthesis)` / `partial (synthesis only)` / `empty`
+- **Artifact status table** — presence of each key artifact (`effective_config.json`, `synthesis.md`, `report.html`, `knowledge_base.md`, `results.tsv`, `claims.json`, `citations.json`, …)
+- **Resumability** — whether the run can be resumed and which artifacts are _actually_ reusable (derived from real artifact presence, not assumed)
+- **Synthesis readiness** — whether the run has enough state to regenerate synthesis
+
+**Health status:**
+
+| Output | Exit code | Meaning |
+|---|---|---|
+| `HEALTH: OK` | `0` | Complete run: all required artifacts present |
+| `HEALTH: WARNINGS (N)` | `1` | Partial or empty run; missing required artifacts |
+
 ## Resilience
 
 - **Crash recovery**: Dimensions retried up to 3 times, then skipped
@@ -691,6 +782,9 @@ src/
     cli.py                  Entry point
     config.py               YAML config loader (ResearchConfig)
     explain.py              Explain commands (config + resume inspection)
+    doctor.py               Doctor commands (config health + output run diagnostics)
+    trust.py                Citation/claim trust classification (origin labels for provenance)
+    references.py           Deterministic references assembly from citations.json (paper style)
     orchestrator.py         AutoResearcher — setup, synthesis, artifact wiring
     research_loop.py        Core iteration loop (hypothesis → research → score → decide)
     scorer.py               Heuristic scoring, LLM-as-judge, inter-rater agreement

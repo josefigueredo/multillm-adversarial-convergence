@@ -13,6 +13,7 @@ Supports **Claude**, **Codex**, **Gemini**, and **Copilot** backends.
 | [**refine**](docs/refine.md) | `src.cli refine` | Converge a PRD, spec, or technical proposal |
 | [**plan**](docs/plan.md) | `src.cli plan` | Converge an implementation plan |
 | **explain** | `src.cli explain` | Inspect config or resume state without executing |
+| **doctor** | `src.cli doctor` | Diagnose config health and output-run completeness |
 
 ## Quick Start
 
@@ -92,6 +93,11 @@ Important runtime rules:
 - portfolio views now aggregate retries and tool activity across runs so cross-run instability is visible
 - HTML/PDF reports now surface tool-usage highlights when tool loops are used in a run
 - API failures are normalized into stable categories such as `rate_limit`, `timeout`, `transport`, `quota`, and `server_error`
+- **Milestone 3 — diagnostics, trust, and deterministic references:**
+- `autoresearch doctor config --config <path>` validates a config file and prints a security enforcement truth table (enforced vs declared-only fields) plus operator risk notes; exit 0 (healthy) / 1 (warnings present); see [Doctor commands](docs/run.md#doctor-commands)
+- `autoresearch doctor output --output <dir>` inspects a run output directory and reports run classification (complete / partial / empty), artifact status, resumability (what artifacts are actually reusable), and synthesis readiness; exit 0 (complete) / 1 (warnings/incomplete)
+- every `citations.json` and `claims.json` record now carries a `trust_class` field; active classes: `untrusted_web_content` (URL citations), `user_provided_source_material` (local/operator-provided source files), `inferred_claim` (LLM-synthesized claims); `dashboard.json` includes a `trust_summary` count by class
+- when `reporting.output_style: paper`, `synthesis.md` receives a deterministic `## References` section built from `citations.json`; URLs are deduplicated by normalized URL (tracking params stripped), numbered, and formatted as markdown links; non-paper styles are unaffected
 
 ## Requirements
 
