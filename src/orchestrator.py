@@ -57,6 +57,7 @@ from . import research_loop as loop_mod
 from .pdf_report import render_simple_pdf
 from .portfolio import build_portfolio, render_portfolio_html
 from .provenance_artifacts import write_provenance_artifacts_bundle
+from .references import build_references_section, inject_references_section
 from .reporting import render_html_report as render_html_report_fn
 from .report_exports import write_reporting_artifacts
 from .reproducibility import write_prompt_snapshot, write_rerun_script
@@ -673,6 +674,17 @@ class AutoResearcher:
         self.knowledge_base = state["knowledge_base"]
         self.iteration = state["iteration"]
 
+        # Restore previously accumulated citations so that _generate_synthesis
+        # can build a deterministic References section from prior iterations.
+        if self.citations_path.exists():
+            try:
+                import json as _json
+                self._citations = _json.loads(
+                    self.citations_path.read_text(encoding="utf-8")
+                )
+            except Exception:
+                pass  # best-effort; synthesis will proceed with partial citations
+
     # -- Core loop ---------------------------------------------------------
 
     def _build_loop_context(self) -> "loop_mod.LoopContext":
@@ -829,8 +841,12 @@ class AutoResearcher:
 
         if not resp.is_error and resp.text:
             final_text = self._postprocess_goal_output(resp.text)
-            self.synthesis_path.write_text(final_text, encoding="utf-8")
+            # Collect provenance from LLM-generated text before injecting
+            # deterministic references (avoids re-extracting the injected URLs
+            # as new citations and inflating provenance artifacts).
             self._collect_provenance(final_text, scope="synthesis")
+            final_text = self._inject_deterministic_references(final_text)
+            self.synthesis_path.write_text(final_text, encoding="utf-8")
             log.info("Synthesis saved to %s", self.synthesis_path)
 
     # -- Helpers -----------------------------------------------------------
@@ -924,6 +940,16 @@ class AutoResearcher:
     def _postprocess_goal_output(self, text: str) -> str:
         """Deterministically repair short-form outputs to obey explicit goal constraints."""
         return postprocess_goal_output(text, goal=self.config.goal)
+
+    def _inject_deterministic_references(self, text: str) -> str:
+        """Append a deterministic References section built from tracked citations.
+
+        Deduplicates URL-bearing citations and replaces any existing
+        References/Bibliography heading.  Returns *text* unchanged when there
+        are no URL-bearing citations to inject.
+        """
+        refs_block = build_references_section(self._citations)
+        return inject_references_section(text, refs_block)
 
     def _synthesis_knowledge_context(self) -> str:
         """Return the knowledge context to send to synthesis."""
