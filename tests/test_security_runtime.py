@@ -69,9 +69,18 @@ class TestIsToolExecutionAllowed:
         policy = _policy(tmp_path, tool_execution_mode="sandboxed")
         assert policy.is_tool_execution_allowed() is True
 
-    def test_sandboxed_mode_flags_as_sandboxed(self, tmp_path: Path):
-        policy = _policy(tmp_path, tool_execution_mode="sandboxed")
+    def test_sandboxed_with_tool_calls_mode_is_sandbox_active(self, tmp_path: Path):
+        policy = _policy(tmp_path, tool_execution_mode="sandboxed", sandbox_mode="tool_calls")
         assert policy.sandbox_active is True
+
+    def test_sandboxed_with_sandbox_mode_off_is_not_active(self, tmp_path: Path):
+        # tool_execution_mode=sandboxed alone is insufficient; sandbox.mode must also be tool_calls
+        policy = _policy(tmp_path, tool_execution_mode="sandboxed", sandbox_mode="off")
+        assert policy.sandbox_active is False
+
+    def test_direct_mode_never_sandbox_active(self, tmp_path: Path):
+        policy = _policy(tmp_path, tool_execution_mode="direct", sandbox_mode="tool_calls")
+        assert policy.sandbox_active is False
 
     def test_direct_mode_not_sandboxed(self, tmp_path: Path):
         policy = _policy(tmp_path, tool_execution_mode="direct")
@@ -138,6 +147,24 @@ class TestAllowedWriteRoots:
         candidate = paths.output_dir / "results.tsv"  # output_dir root, not .workspace
         # workspace_only restricts to workspace subdir
         assert policy.is_write_allowed(candidate) is False
+
+    def test_writes_outside_output_allowed_returns_false_by_default(self, tmp_path: Path):
+        policy = _policy(tmp_path)
+        assert policy.writes_outside_output_allowed() is False
+
+    def test_writes_outside_output_allowed_when_flag_set(self, tmp_path: Path):
+        policy = _policy(tmp_path, allow_filesystem_write_outside_output=True)
+        assert policy.writes_outside_output_allowed() is True
+
+    def test_allow_filesystem_write_outside_output_permits_any_path(self, tmp_path: Path):
+        policy = _policy(tmp_path, allow_filesystem_write_outside_output=True)
+        # any path is now allowed because the operator explicitly declared broad write access
+        assert policy.is_write_allowed(tmp_path / "evil.sh") is True
+        assert policy.is_write_allowed(Path("/tmp/anything")) is True
+
+    def test_default_policy_still_denies_outside_paths(self, tmp_path: Path):
+        policy = _policy(tmp_path, allow_filesystem_write_outside_output=False)
+        assert policy.is_write_allowed(tmp_path / "outside.txt") is False
 
 
 # ---------------------------------------------------------------------------
