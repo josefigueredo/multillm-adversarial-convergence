@@ -635,6 +635,20 @@ class AutoResearcher:
             self._write_run_manifest()
             self._write_effective_config()
             self.paths.workspace_dir.mkdir(parents=True, exist_ok=True)
+            self._audit_trail.emit(
+                "sandbox_initialized",
+                output_dir=str(self.paths.output_dir),
+                workspace_dir=str(self.paths.workspace_dir),
+            )
+            _policy = resolve_runtime_security_policy(self.config.security, self.paths)
+            self._audit_trail.emit(
+                "sandbox_policy_applied",
+                tool_execution_mode=_policy.tool_execution_mode,
+                sandbox_active=_policy.sandbox_active,
+                filesystem_access=_policy.filesystem_access,
+                network_access=_policy.network_mode(),
+                allow_host_bash=_policy.is_host_bash_allowed(),
+            )
 
     def _resume(self) -> None:
         """Rebuild in-memory state from existing iteration files and TSV."""
@@ -1086,11 +1100,13 @@ class AutoResearcher:
         if not policy.is_host_bash_allowed():
             tools = {t.strip() for t in (opts.allowed_tools or "").split(",") if t.strip()}
             if "Bash" in tools:
-                raise PolicyDeniedError(
+                err = PolicyDeniedError(
                     reason_code="host_bash_disabled",
                     policy_field="allow_host_bash",
                     requested_action="execute_bash",
                 )
+                self._audit_trail.emit("policy_denied", **err.audit_payload())
+                raise err
 
     def guard_path_write(self, path: Path) -> None:
         """Raise :exc:`~src.policy_denial.PolicyDeniedError` if writing to *path* violates policy.
@@ -1105,13 +1121,15 @@ class AutoResearcher:
         """
         policy = resolve_runtime_security_policy(self.config.security, self.paths)
         if not policy.is_write_allowed(path):
-            raise PolicyDeniedError(
+            err = PolicyDeniedError(
                 reason_code="write_outside_allowed_roots",
                 policy_field="sandbox.filesystem_access",
                 requested_action="write",
                 requested_path=str(path),
                 allowed_boundary=policy.filesystem_access,
             )
+            self._audit_trail.emit("policy_denied", **err.audit_payload())
+            raise err
 
     def _write_metrics(self) -> None:
         """Write machine-readable run metrics."""

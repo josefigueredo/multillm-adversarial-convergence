@@ -256,7 +256,40 @@ class TestAutoResearcherSetup:
         workspace = tmp_path / ".workspace"
         assert not workspace.exists()
 
-    def test_generate_synthesis_uses_goal_constraints_and_lightweight_context(self, researcher):
+    def test_setup_emits_sandbox_initialized_event(self, researcher):
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        events = [
+            json.loads(line)
+            for line in (researcher.output_dir / "audit_trail.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        sandbox_init = [e for e in events if e.get("event") == "sandbox_initialized"]
+        assert len(sandbox_init) == 1
+        evt = sandbox_init[0]
+        assert "workspace_dir" in evt
+        assert str(researcher.paths.workspace_dir) in evt["workspace_dir"]
+
+    def test_setup_emits_sandbox_policy_applied_event(self, researcher):
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        events = [
+            json.loads(line)
+            for line in (researcher.output_dir / "audit_trail.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        policy_applied = [e for e in events if e.get("event") == "sandbox_policy_applied"]
+        assert len(policy_applied) == 1
+        evt = policy_applied[0]
+        assert "tool_execution_mode" in evt
+        assert "sandbox_active" in evt
+        assert "filesystem_access" in evt
+        assert "network_access" in evt
+        assert "allow_host_bash" in evt
+
+
         researcher.config = ResearchConfig(
             topic="What are three pros and cons of Python?",
             goal="A bullet-point list in under 100 words",
@@ -2292,3 +2325,53 @@ class TestAutoResearcherEnforcement:
         )
         # Even an arbitrary /tmp path must be allowed
         researcher.guard_path_write(Path("/tmp/anywhere/file.txt"))  # must not raise
+
+    # -- audit trail events for denials ------------------------------------
+
+    def _read_audit_events(self, researcher) -> list[dict]:
+        trail = researcher.paths.audit_trail
+        if not trail.exists():
+            return []
+        return [json.loads(line) for line in trail.read_text(encoding="utf-8").splitlines()]
+
+    def test_bash_denial_emits_policy_denied_audit_event(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_host_bash=False
+        )
+        with pytest.raises(PolicyDeniedError):
+            researcher._call_with(fake_backend, "prompt", allowed_tools="Bash")
+        events = self._read_audit_events(researcher)
+        denial_events = [e for e in events if e.get("event") == "policy_denied"]
+        assert len(denial_events) == 1
+        evt = denial_events[0]
+        assert evt["reason_code"] == "host_bash_disabled"
+        assert evt["policy_field"] == "allow_host_bash"
+
+    def test_write_denial_emits_policy_denied_audit_event(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_filesystem_write_outside_output=False
+        )
+        with pytest.raises(PolicyDeniedError):
+            researcher.guard_path_write(Path("/tmp/outside/evil.txt"))
+        events = self._read_audit_events(researcher)
+        denial_events = [e for e in events if e.get("event") == "policy_denied"]
+        assert len(denial_events) == 1
+        evt = denial_events[0]
+        assert evt["reason_code"] == "write_outside_allowed_roots"
+        assert evt["policy_field"] == "sandbox.filesystem_access"
+        assert evt["requested_path"] == "/tmp/outside/evil.txt"
+
+    def test_policy_denied_event_is_emitted_before_exception_propagates(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_host_bash=False
+        )
+        try:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="Bash")
+        except PolicyDeniedError:
+            pass
+        # Event must be in the trail even though the exception was raised
+        events = self._read_audit_events(researcher)
+        assert any(e.get("event") == "policy_denied" for e in events)
