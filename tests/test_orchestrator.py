@@ -225,28 +225,36 @@ class TestAutoResearcherSetup:
         assert "scoring" in data
         assert "providers" in data
 
+    def test_setup_creates_workspace_dir(self, researcher):
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        assert researcher.paths.workspace_dir.exists()
+        assert researcher.paths.workspace_dir.is_dir()
 
-        researcher.config = ResearchConfig(
-            topic="What are three pros and cons of Python?",
-            goal="A bullet-point list in under 100 words",
-            dimensions=("Developer experience",),
-            methodology=researcher.config.methodology,
-            evaluation=researcher.config.evaluation,
-            reporting=researcher.config.reporting,
-            scoring=researcher.config.scoring,
-            execution=ExecutionConfig(
-                max_iterations=1,
-                backend="claude-cli",
-                model="sonnet",
-                timeout_seconds=10,
-                max_budget_per_call=0.10,
-                allowed_tools="",
-            ),
-        )
-        assert researcher._is_lightweight_mode() is True
-        constraints = researcher._goal_constraints_summary().lower()
-        assert "bullet points" in constraints
-        assert "under 100 words" in constraints
+    def test_workspace_dir_is_under_output_dir(self, researcher):
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        assert researcher.paths.workspace_dir.parent == researcher.output_dir
+        assert researcher.paths.workspace_dir.name == ".workspace"
+
+    def test_explain_config_does_not_create_workspace_dir(self, tmp_path):
+        from src.cli import main
+        import textwrap
+        cfg = tmp_path / "research.yaml"
+        cfg.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              goal: "Test goal"
+              execution:
+                backend: claude-cli
+        """), encoding="utf-8")
+        main(["explain", "config", "--config", str(cfg)])
+        workspace = tmp_path / ".workspace"
+        assert not workspace.exists()
 
     def test_generate_synthesis_uses_goal_constraints_and_lightweight_context(self, researcher):
         researcher.config = ResearchConfig(

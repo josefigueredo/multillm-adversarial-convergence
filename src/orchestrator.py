@@ -631,6 +631,7 @@ class AutoResearcher:
             self._write_rerun_artifact()
             self._write_run_manifest()
             self._write_effective_config()
+            self.paths.workspace_dir.mkdir(parents=True, exist_ok=True)
 
     def _resume(self) -> None:
         """Rebuild in-memory state from existing iteration files and TSV."""

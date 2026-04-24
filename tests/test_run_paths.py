@@ -16,3 +16,18 @@ def test_run_paths_builds_expected_artifact_locations(tmp_path: Path):
     assert paths.prompt_snapshot == tmp_path / "run-a" / "prompt_snapshot.json"
     assert paths.rerun_script == tmp_path / "run-a" / "rerun.sh"
     assert paths.portfolio == tmp_path / "portfolio.json"
+
+
+def test_workspace_dir_is_under_output_dir(tmp_path: Path):
+    paths = RunPaths.for_output_dir(tmp_path / "run-a")
+    assert paths.workspace_dir == tmp_path / "run-a" / ".workspace"
+
+
+def test_workspace_dir_name_is_dotworkspace(tmp_path: Path):
+    paths = RunPaths.for_output_dir(tmp_path / "run-a")
+    assert paths.workspace_dir.name == ".workspace"
+
+
+def test_workspace_dir_parent_is_output_dir(tmp_path: Path):
+    paths = RunPaths.for_output_dir(tmp_path / "run-a")
+    assert paths.workspace_dir.parent == paths.output_dir
