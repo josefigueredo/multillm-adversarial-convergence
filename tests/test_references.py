@@ -347,11 +347,13 @@ class TestGenerateReferencesForSynthesis:
 class TestOrchestratorReferencesIntegration:
     """Prove _inject_deterministic_references is wired into _generate_synthesis."""
 
-    def _make_researcher_with_citations(self, tmp_path, citations: list[dict]):
+    def _make_researcher_with_citations(
+        self, tmp_path, citations: list[dict], output_style: str = "paper"
+    ):
         """Return a minimal AutoResearcher with pre-loaded citations."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
         from src.config import (
-            BackendsConfig, ExecutionConfig, ResearchConfig, ScoringConfig,
+            BackendsConfig, ExecutionConfig, ReportingConfig, ResearchConfig, ScoringConfig,
         )
         from src.orchestrator import AutoResearcher
 
@@ -364,6 +366,7 @@ class TestOrchestratorReferencesIntegration:
                 backends=BackendsConfig(primary="claude-cli"),
             ),
             scoring=ScoringConfig(),
+            reporting=ReportingConfig(output_style=output_style),
         )
         backend = MagicMock()
         backend.name = "claude-cli"
@@ -373,20 +376,30 @@ class TestOrchestratorReferencesIntegration:
         return researcher
 
     def test_inject_deterministic_references_returns_text_with_refs(self, tmp_path):
-        from src.orchestrator import AutoResearcher
-
         researcher = self._make_researcher_with_citations(tmp_path, [
             _cite("https://example.com", title="Test Source"),
-        ])
+        ], output_style="paper")
         synthesis_text = "# Report\n\nSome synthesis content.\n"
         result = researcher._inject_deterministic_references(synthesis_text)
         assert "References" in result
         assert "example.com" in result
 
+    def test_inject_skipped_for_non_paper_style(self, tmp_path):
+        """Non-paper output styles must NOT receive an auto-injected References block."""
+        for style in ("default", "technical_doc", "executive_brief", "decision_memo"):
+            researcher = self._make_researcher_with_citations(tmp_path, [
+                _cite("https://example.com", title="Test Source"),
+            ], output_style=style)
+            synthesis_text = "# Report\n\nContent.\n"
+            result = researcher._inject_deterministic_references(synthesis_text)
+            assert result == synthesis_text, (
+                f"Style '{style}' should not inject references, but got:\n{result}"
+            )
+
     def test_inject_returns_original_when_no_url_citations(self, tmp_path):
         researcher = self._make_researcher_with_citations(tmp_path, [
             _local_cite("/input/spec.pdf"),
-        ])
+        ], output_style="paper")
         synthesis_text = "# Report\n\nContent.\n"
         result = researcher._inject_deterministic_references(synthesis_text)
         assert result == synthesis_text

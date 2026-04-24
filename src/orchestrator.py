@@ -944,10 +944,13 @@ class AutoResearcher:
     def _inject_deterministic_references(self, text: str) -> str:
         """Append a deterministic References section built from tracked citations.
 
-        Deduplicates URL-bearing citations and replaces any existing
-        References/Bibliography heading.  Returns *text* unchanged when there
-        are no URL-bearing citations to inject.
+        Only applied for ``paper`` output style — other styles have their own
+        community conventions and should not have a References block forced in.
+        Returns *text* unchanged when the output style is not ``paper`` or when
+        there are no URL-bearing citations to inject.
         """
+        if self.config.reporting.output_style != "paper":
+            return text
         refs_block = build_references_section(self._citations)
         return inject_references_section(text, refs_block)
 
