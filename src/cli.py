@@ -15,6 +15,7 @@ from .backends import VALID_BACKENDS, get_backend, get_backends
 from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
 from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
 from .document_refiner import DocumentRefiner
+from .explain import explain_config_text
 from .orchestrator import AutoResearcher
 from .plan_refiner import PlanRefiner
 from .provider_instances import instantiate_provider_backends
@@ -157,6 +158,30 @@ def _build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Validate config, backend wiring, and planned outputs without running plan refinement.",
+    )
+
+    # ── explain subcommand ───────────────────────────────────────────────────
+    explain_p = subparsers.add_parser(
+        "explain",
+        help="Explain run configuration or saved run state without executing anything.",
+    )
+    explain_sub = explain_p.add_subparsers(dest="explain_subcommand", required=True)
+
+    explain_config_p = explain_sub.add_parser(
+        "config",
+        help="Print a human-readable explanation of a research config YAML.",
+    )
+    explain_config_p.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a research config YAML.",
+    )
+
+    # explain resume is reserved for Step 4
+    explain_sub.add_parser(
+        "resume",
+        help="Explain the state of a paused run (Step 4).",
     )
 
     return parser
@@ -387,6 +412,22 @@ def _run_plan(args: argparse.Namespace, log: logging.Logger) -> int:
         return 1
 
 
+def _run_explain_config(args: argparse.Namespace, log: logging.Logger) -> int:
+    config_path: Path = args.config
+    if not config_path.exists():
+        log.error("Config file not found: %s", config_path)
+        return 1
+
+    try:
+        config = ResearchConfig.from_yaml(config_path)
+    except (ValueError, OSError) as exc:
+        log.error("Failed to load config: %s", exc)
+        return 1
+
+    print(explain_config_text(config, config_path=config_path))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -399,6 +440,11 @@ def main(argv: list[str] | None = None) -> int:
         return _run_refine(args, log)
     if args.subcommand == "plan":
         return _run_plan(args, log)
+    if args.subcommand == "explain":
+        if args.explain_subcommand == "config":
+            return _run_explain_config(args, log)
+        log.error("explain subcommand %r is not yet implemented.", args.explain_subcommand)
+        return 1
 
     log.error("Unknown subcommand: %s", args.subcommand)
     return 1

@@ -702,3 +702,85 @@ class TestPlanSubcommand:
         assert "DRY RUN OK" in captured.err
         assert "mode: plan" in captured.err
         assert "resolved backends: claude-cli, gemini-cli" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# explain config subcommand
+# ---------------------------------------------------------------------------
+
+class TestExplainConfigSubcommand:
+    @pytest.fixture
+    def config_file(self, tmp_path: Path) -> Path:
+        p = tmp_path / "research.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Compare API gateways"
+              goal: "Architect-level decision"
+              dimensions:
+                - "REST vs HTTP"
+                - "Auth options"
+              execution:
+                backend: claude-cli
+                strategy: ensemble
+                backends:
+                  primary: claude-cli
+                  research:
+                    - claude-cli
+                    - codex-cli
+              reporting:
+                output_style: paper
+              security:
+                content_trust: permissive
+                tool_execution_mode: sandboxed
+        """), encoding="utf-8")
+        return p
+
+    def test_explain_config_returns_success(self, config_file: Path):
+        result = main(["explain", "config", "--config", str(config_file)])
+        assert result == 0
+
+    def test_explain_config_missing_file_returns_error(self, tmp_path: Path):
+        result = main(["explain", "config", "--config", str(tmp_path / "nonexistent.yaml")])
+        assert result == 1
+
+    def test_explain_config_malformed_config_returns_error(self, tmp_path: Path):
+        bad = tmp_path / "bad.yaml"
+        bad.write_text("not_research: true\n", encoding="utf-8")
+        result = main(["explain", "config", "--config", str(bad)])
+        assert result == 1
+
+    def test_explain_config_output_includes_topic_and_goal(self, config_file: Path, capsys):
+        main(["explain", "config", "--config", str(config_file)])
+        out = capsys.readouterr().out
+        assert "Compare API gateways" in out
+        assert "Architect-level decision" in out
+
+    def test_explain_config_output_includes_security_policy(self, config_file: Path, capsys):
+        main(["explain", "config", "--config", str(config_file)])
+        out = capsys.readouterr().out
+        assert "permissive" in out
+        assert "sandboxed" in out
+
+    def test_explain_config_output_includes_backend_role_mapping(self, config_file: Path, capsys):
+        main(["explain", "config", "--config", str(config_file)])
+        out = capsys.readouterr().out
+        assert "claude-cli" in out
+        assert "codex-cli" in out
+
+    def test_explain_config_output_includes_output_style(self, config_file: Path, capsys):
+        main(["explain", "config", "--config", str(config_file)])
+        out = capsys.readouterr().out
+        assert "paper" in out
+
+    def test_explain_config_does_not_create_output_dir(self, config_file: Path, tmp_path: Path):
+        output_dir = tmp_path / "output"
+        result = main(["explain", "config", "--config", str(config_file)])
+        assert result == 0
+        assert not output_dir.exists()
+
+    @patch("src.cli.AutoResearcher")
+    def test_explain_config_does_not_instantiate_researcher(
+        self, mock_researcher_cls: MagicMock, config_file: Path
+    ):
+        main(["explain", "config", "--config", str(config_file)])
+        mock_researcher_cls.assert_not_called()
