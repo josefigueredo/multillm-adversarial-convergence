@@ -91,7 +91,7 @@ LOOP:
 
 Each iteration produces a scored markdown file. Findings that beat the current best are merged into a growing knowledge base. The loop stops on Ctrl+C, `max_iterations`, or `target_dimensions_total`. On exit, a final synthesis report is generated along with quality metrics and provenance artifacts.
 
-## Runtime Logging & Bitácora
+## Runtime Logging & Audit Trail
 
 Real `run` executions now emit two runtime traces in the output directory:
 
