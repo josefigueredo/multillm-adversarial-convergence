@@ -477,6 +477,38 @@ class TestDoctorOutputText:
         assert "complete" in result.text.lower()
         assert "0.92" in result.text
 
+    def test_reused_artifacts_reflect_actual_presence(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_partial_run(tmp_path)
+        # _make_partial_run includes knowledge_base.md but NOT results.tsv
+        result = doctor_output_text(tmp_path)
+        reuse_line = next(
+            (l for l in result.text.splitlines() if "reused on resume" in l), ""
+        )
+        assert "knowledge_base.md" in reuse_line
+        assert "results.tsv" not in reuse_line
+
+    def test_reused_artifacts_omit_missing_knowledge_base(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_partial_run(tmp_path)
+        (tmp_path / "knowledge_base.md").unlink()
+        result = doctor_output_text(tmp_path)
+        reuse_line = next(
+            (l for l in result.text.splitlines() if "reused on resume" in l), ""
+        )
+        assert "knowledge_base.md" not in reuse_line
+
+    def test_reused_artifacts_include_results_when_present(self, tmp_path):
+        from src.doctor import doctor_output_text
+        from src.run_paths import RunPaths
+        _make_partial_run(tmp_path)
+        _write_file(RunPaths.for_output_dir(tmp_path).results, "score\t0.7")
+        result = doctor_output_text(tmp_path)
+        reuse_line = next(
+            (l for l in result.text.splitlines() if "reused on resume" in l), ""
+        )
+        assert "results.tsv" in reuse_line
+
 
 class TestDoctorOutputCLI:
     def test_cli_exits_0_for_complete_run(self, tmp_path):

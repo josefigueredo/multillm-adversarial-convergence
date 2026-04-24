@@ -341,7 +341,16 @@ def doctor_output_text(output_dir: Path) -> DoctorReport:
     parts.append(f"  resumable:        {'yes' if can_resume else 'no'}")
     parts.append(f"  iterations_found: {iteration_count}")
     if can_resume:
-        parts.append("  reused on resume: iteration files, knowledge_base.md, results.tsv")
+        reusable: list[str] = []
+        reusable.append(f"{iteration_count} iteration file(s) (iter_*.md)")
+        if artifact_status.get("knowledge_base", False):
+            reusable.append("knowledge_base.md")
+        if artifact_status.get("results", False):
+            reusable.append("results.tsv")
+        if reusable:
+            parts.append("  reused on resume: " + ", ".join(reusable))
+        else:
+            parts.append("  reused on resume: (nothing recoverable beyond iteration files)")
     parts.append("")
 
     # Synthesis readiness
