@@ -130,6 +130,11 @@ class RuntimeSecurityPolicy:
         """Return the resolved network access token."""
         return self._network_access
 
+    @property
+    def filesystem_access(self) -> str:
+        """Return the resolved filesystem access policy token."""
+        return self._filesystem_access
+
     def is_network_allowed(self, *, destination_type: str) -> bool:
         """Return ``True`` when outbound traffic to *destination_type* is permitted.
 

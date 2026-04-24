@@ -76,6 +76,8 @@ from .semantic_eval import (
 )
 from .strategy import ResearchCandidate, Strategy, get_strategy
 from .tool_runtime import run_function_tool_loop
+from .security_runtime import resolve_runtime_security_policy
+from .policy_denial import PolicyDeniedError
 
 log = logging.getLogger("autoresearch")
 
@@ -317,6 +319,7 @@ class AutoResearcher:
             sanitize_environment=opts.sanitize_environment,
         )
         opts = apply_backend_capabilities(backend, opts)
+        self._check_execution_policy(opts)
         self._record_prompt_snapshot(backend, prompt, opts)
         tool_registry = kwargs.pop("tool_registry", None)
         default_timeout = (
@@ -1067,6 +1070,48 @@ class AutoResearcher:
     def _write_effective_config(self) -> None:
         """Write the normalized effective config snapshot for this run."""
         write_effective_config(self.paths.effective_config, config=self.config)
+
+    # -- Security enforcement --------------------------------------------
+
+    def _check_execution_policy(self, opts: CallOptions) -> None:
+        """Raise :exc:`~src.policy_denial.PolicyDeniedError` if *opts* violates the active security policy.
+
+        This gate runs after :func:`~src.backend_options.apply_backend_capabilities`
+        so that ``allowed_tools`` reflects what the backend would actually use.
+        Currently enforces ``allow_host_bash``: if the flag is ``False`` and
+        ``"Bash"`` appears in the resolved ``allowed_tools``, the call is
+        denied before the backend is invoked.
+        """
+        policy = resolve_runtime_security_policy(self.config.security, self.paths)
+        if not policy.is_host_bash_allowed():
+            tools = {t.strip() for t in (opts.allowed_tools or "").split(",") if t.strip()}
+            if "Bash" in tools:
+                raise PolicyDeniedError(
+                    reason_code="host_bash_disabled",
+                    policy_field="allow_host_bash",
+                    requested_action="execute_bash",
+                )
+
+    def guard_path_write(self, path: Path) -> None:
+        """Raise :exc:`~src.policy_denial.PolicyDeniedError` if writing to *path* violates policy.
+
+        This is an explicit gate intended for agent-requested write operations.
+        Framework-internal writes (e.g. manifest, effective_config) are not
+        routed through this guard — they always target ``output_dir`` which is
+        within the allowed boundary by construction.
+
+        Callers should invoke this before any write that originates from an
+        agent tool invocation or any untrusted source.
+        """
+        policy = resolve_runtime_security_policy(self.config.security, self.paths)
+        if not policy.is_write_allowed(path):
+            raise PolicyDeniedError(
+                reason_code="write_outside_allowed_roots",
+                policy_field="sandbox.filesystem_access",
+                requested_action="write",
+                requested_path=str(path),
+                allowed_boundary=policy.filesystem_access,
+            )
 
     def _write_metrics(self) -> None:
         """Write machine-readable run metrics."""

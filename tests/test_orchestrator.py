@@ -2152,3 +2152,143 @@ class TestAutoResearcherCall:
         assert entry["model"] == "gpt-5.4"
         assert entry["prompt"] == "Investigate Python packaging."
         assert entry["prompt_sha256"]
+
+
+# ---------------------------------------------------------------------------
+# AutoResearcher — security policy enforcement
+# ---------------------------------------------------------------------------
+
+class TestAutoResearcherEnforcement:
+    """_check_execution_policy and guard_path_write gate correctly."""
+
+    def _make_researcher_with_security(self, research_config, fake_backend, tmp_path, **security_kwargs):
+        import dataclasses
+        from src.config import SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(**security_kwargs),
+        )
+        return AutoResearcher(
+            config=config,
+            backend=fake_backend,
+            output_dir=tmp_path / "output",
+        )
+
+    # -- host bash enforcement ---------------------------------------------
+
+    def test_bash_denied_when_allow_host_bash_false(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_host_bash=False
+        )
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="Bash,WebSearch")
+        assert exc_info.value.reason_code == "host_bash_disabled"
+        assert exc_info.value.policy_field == "allow_host_bash"
+
+    def test_denied_call_never_invokes_backend(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        invoke_called = []
+        class TrackingBackend(FakeBackend):
+            def invoke(self, prompt, opts, timeout=300):
+                invoke_called.append(True)
+                return AgentResponse(text="x", cost_usd=0.0, is_error=False)
+        backend = TrackingBackend()
+        researcher = self._make_researcher_with_security(
+            research_config, backend, tmp_path, allow_host_bash=False
+        )
+        with pytest.raises(PolicyDeniedError):
+            researcher._call_with(backend, "prompt", allowed_tools="Bash")
+        assert invoke_called == [], "backend.invoke must not be called when policy denies"
+
+    def test_bash_allowed_when_allow_host_bash_true(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_host_bash=True
+        )
+        # Should not raise — normal invocation proceeds
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="Bash,WebSearch")
+        assert result is not None
+
+    def test_no_denial_when_bash_not_in_tools(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_host_bash=False
+        )
+        # Bash not in tools — should not raise even though host bash is disabled
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="WebSearch,Grep")
+        assert result is not None
+
+    def test_no_denial_when_backend_strips_tools(self, research_config, tmp_path):
+        """Backend with supports_tools=False → allowed_tools cleared → no Bash denial."""
+        from src.policy_denial import PolicyDeniedError
+        from src.backends.types import BackendCapabilities
+        class NoToolsBackend(FakeBackend):
+            @property
+            def capabilities(self):
+                return BackendCapabilities(supports_tools=False)
+        backend = NoToolsBackend()
+        import dataclasses
+        from src.config import SecurityConfig
+        config = dataclasses.replace(research_config, security=SecurityConfig(allow_host_bash=False))
+        researcher = AutoResearcher(config=config, backend=backend, output_dir=tmp_path / "out")
+        # Even though allow_host_bash=False, backend strips tools → no denial
+        result = researcher._call_with(backend, "prompt", allowed_tools="Bash")
+        assert result is not None
+
+    # -- filesystem write guard --------------------------------------------
+
+    def test_guard_write_raises_outside_output_dir(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_filesystem_write_outside_output=False
+        )
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher.guard_path_write(Path("/tmp/outside_run/evil.txt"))
+        assert exc_info.value.reason_code == "write_outside_allowed_roots"
+        assert exc_info.value.policy_field == "sandbox.filesystem_access"
+
+    def test_guard_write_allows_within_output_dir(self, researcher):
+        # Default policy: filesystem_access=output_only, output_dir is allowed
+        from src.policy_denial import PolicyDeniedError
+        allowed_path = researcher.output_dir / "artifact.json"
+        # Should not raise
+        researcher.guard_path_write(allowed_path)
+
+    def test_guard_write_allows_workspace_when_workspace_only(self, research_config, fake_backend, tmp_path):
+        from src.config import SandboxConfig, SecurityConfig
+        import dataclasses
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                sandbox=SandboxConfig(filesystem_access="workspace_only"),
+            ),
+        )
+        researcher = AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+        # Path within workspace_dir → allowed
+        workspace_path = researcher.paths.workspace_dir / "scratch.txt"
+        researcher.guard_path_write(workspace_path)  # must not raise
+
+    def test_guard_write_blocks_output_dir_when_workspace_only(self, research_config, fake_backend, tmp_path):
+        from src.config import SandboxConfig, SecurityConfig
+        from src.policy_denial import PolicyDeniedError
+        import dataclasses
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                sandbox=SandboxConfig(filesystem_access="workspace_only"),
+            ),
+        )
+        researcher = AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+        # Path in output_dir but NOT workspace_dir → denied when workspace_only
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher.guard_path_write(researcher.output_dir / "results.tsv")
+        assert exc_info.value.reason_code == "write_outside_allowed_roots"
+
+    def test_guard_write_allows_any_path_when_outside_output_permitted(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_filesystem_write_outside_output=True
+        )
+        # Even an arbitrary /tmp path must be allowed
+        researcher.guard_path_write(Path("/tmp/anywhere/file.txt"))  # must not raise
