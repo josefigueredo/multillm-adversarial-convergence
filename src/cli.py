@@ -15,7 +15,7 @@ from .backends import VALID_BACKENDS, get_backend, get_backends
 from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
 from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
 from .document_refiner import DocumentRefiner
-from .explain import explain_config_text
+from .explain import explain_config_text, explain_resume_text
 from .orchestrator import AutoResearcher
 from .plan_refiner import PlanRefiner
 from .provider_instances import instantiate_provider_backends
@@ -179,9 +179,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # explain resume is reserved for Step 4
-    explain_sub.add_parser(
+    explain_resume_p = explain_sub.add_parser(
         "resume",
-        help="Explain the state of a paused run (Step 4).",
+        help="Explain the state of a paused or completed run.",
+    )
+    explain_resume_p.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Output directory of a previous run.",
     )
 
     return parser
@@ -428,6 +434,16 @@ def _run_explain_config(args: argparse.Namespace, log: logging.Logger) -> int:
     return 0
 
 
+def _run_explain_resume(args: argparse.Namespace, log: logging.Logger) -> int:
+    output_dir: Path = args.output
+    if not output_dir.exists():
+        log.error("Output directory not found: %s", output_dir)
+        return 1
+
+    print(explain_resume_text(output_dir))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -443,6 +459,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.subcommand == "explain":
         if args.explain_subcommand == "config":
             return _run_explain_config(args, log)
+        if args.explain_subcommand == "resume":
+            return _run_explain_resume(args, log)
         log.error("explain subcommand %r is not yet implemented.", args.explain_subcommand)
         return 1
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -111,6 +112,97 @@ def explain_config_text(config: Any, *, config_path: Path | None = None) -> str:
         f"  effective_config: {paths.effective_config}",
         f"  manifest:         {paths.manifest}",
         f"  report_html:      {paths.report_html}",
+    ]
+
+    return "\n".join(lines)
+
+
+def explain_resume_text(output_dir: Path) -> str:
+    """Inspect an existing output directory and explain its resume state.
+
+    Does NOT create directories, run backends, or instantiate any execution
+    machinery.  Pure filesystem inspection of the saved run state.
+    """
+    if not output_dir.exists():
+        return f"output directory not found: {output_dir}"
+
+    paths = RunPaths.for_output_dir(output_dir)
+
+    iter_files = (
+        sorted(paths.iterations_dir.glob("iter_*.md"))
+        if paths.iterations_dir.exists()
+        else []
+    )
+    iteration_count = len(iter_files)
+
+    artifact_checks = [
+        ("iterations", paths.iterations_dir.exists() and iteration_count > 0),
+        ("results.tsv", paths.results.exists()),
+        ("knowledge_base.md", paths.knowledge_base.exists()),
+        ("synthesis.md", paths.synthesis.exists()),
+        ("report.html", paths.report_html.exists()),
+        ("metrics.json", paths.metrics.exists()),
+        ("effective_config.json", paths.effective_config.exists()),
+        ("audit_trail.jsonl", paths.audit_trail.exists()),
+    ]
+    artifact_map = dict(artifact_checks)
+
+    best_score: float | None = None
+    run_status: str | None = None
+    if paths.metrics.exists():
+        try:
+            data = json.loads(paths.metrics.read_text(encoding="utf-8"))
+            best_score = data.get("best_score")
+            run_status = data.get("run_status")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    can_resume = iteration_count > 0
+    is_complete = artifact_map["synthesis.md"] and artifact_map["report.html"]
+
+    lines: list[str] = [f"output: {output_dir.resolve()}", ""]
+
+    lines += ["RESUME STATUS", f"  resumable:        {'yes' if can_resume else 'no (no iteration files found)'}"]
+    lines.append(f"  iterations_found: {iteration_count}")
+    if best_score is not None:
+        lines.append(f"  best_score:       {best_score}")
+    if run_status:
+        lines.append(f"  run_status:       {run_status}")
+    if is_complete:
+        lines.append("  note:             run appears complete (synthesis + report present)")
+
+    lines += ["", "ARTIFACTS"]
+    for name, present in artifact_checks:
+        mark = "\u2713" if present else "\u2717"
+        if name == "iterations":
+            label = f"iterations ({iteration_count} files)" if present else "iterations (none found)"
+        else:
+            label = name
+        lines.append(f"  {mark} {label}")
+
+    reused: list[str] = []
+    if iteration_count > 0:
+        reused.append(f"{iteration_count} iteration file(s) (iter_*.md)")
+    if artifact_map["results.tsv"]:
+        reused.append("results.tsv (score history)")
+    if artifact_map["knowledge_base.md"]:
+        reused.append("knowledge_base.md (accumulated findings)")
+
+    lines += ["", "ON RESUME — REUSED"]
+    if reused:
+        for item in reused:
+            lines.append(f"  - {item}")
+    else:
+        lines.append("  (nothing — no resumable state found)")
+
+    lines += [
+        "",
+        "ON RESUME — REGENERATED",
+        "  - synthesis.md",
+        "  - methods.md",
+        "  - dashboard.json",
+        "  - report.html",
+        "  - report.pdf",
     ]
 
     return "\n".join(lines)

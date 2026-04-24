@@ -122,3 +122,86 @@ class TestExplainConfigText:
         monkeypatch.chdir(tmp_path)
         explain_config_text(_make_config())
         assert not any(tmp_path.iterdir())
+
+
+# ---------------------------------------------------------------------------
+# explain_resume_text
+# ---------------------------------------------------------------------------
+
+from src.explain import explain_resume_text  # noqa: E402
+
+
+class TestExplainResumeText:
+    def test_nonexistent_dir_returns_error_text(self, tmp_path: Path):
+        result = explain_resume_text(tmp_path / "no-such-dir")
+        assert "not found" in result.lower() or "does not exist" in result.lower()
+
+    def test_empty_dir_reports_no_iterations(self, tmp_path: Path):
+        d = tmp_path / "empty-run"
+        d.mkdir()
+        result = explain_resume_text(d)
+        assert "0" in result
+
+    def test_partial_run_shows_iteration_count(self, tmp_path: Path):
+        d = tmp_path / "partial"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        for i in range(1, 4):
+            (iters / f"iter_00{i}.md").write_text("x", encoding="utf-8")
+        result = explain_resume_text(d)
+        assert "3" in result
+
+    def test_partial_run_shows_resumable(self, tmp_path: Path):
+        d = tmp_path / "partial"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        (iters / "iter_001.md").write_text("x", encoding="utf-8")
+        result = explain_resume_text(d)
+        assert "yes" in result.lower() or "resumable" in result.lower()
+
+    def test_completed_run_shows_synthesis_present(self, tmp_path: Path):
+        d = tmp_path / "done"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        (iters / "iter_001.md").write_text("x", encoding="utf-8")
+        (d / "synthesis.md").write_text("# S\n", encoding="utf-8")
+        result = explain_resume_text(d)
+        assert "synthesis" in result.lower()
+
+    def test_metrics_best_score_included_when_available(self, tmp_path: Path):
+        import json
+        d = tmp_path / "scored"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        (iters / "iter_001.md").write_text("x", encoding="utf-8")
+        (d / "metrics.json").write_text(
+            json.dumps({"best_score": 77.3, "run_status": "running"}), encoding="utf-8"
+        )
+        result = explain_resume_text(d)
+        assert "77.3" in result
+
+    def test_includes_reuse_section(self, tmp_path: Path):
+        d = tmp_path / "partial"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        (iters / "iter_001.md").write_text("x", encoding="utf-8")
+        (d / "knowledge_base.md").write_text("# KB", encoding="utf-8")
+        result = explain_resume_text(d)
+        assert "reused" in result.lower() or "reuse" in result.lower()
+
+    def test_includes_regenerated_section(self, tmp_path: Path):
+        d = tmp_path / "partial"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        (iters / "iter_001.md").write_text("x", encoding="utf-8")
+        result = explain_resume_text(d)
+        assert "regenerated" in result.lower() or "regenerate" in result.lower()
+
+    def test_does_not_create_files(self, tmp_path: Path):
+        d = tmp_path / "partial"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        (iters / "iter_001.md").write_text("x", encoding="utf-8")
+        before = set(d.rglob("*"))
+        explain_resume_text(d)
+        assert set(d.rglob("*")) == before

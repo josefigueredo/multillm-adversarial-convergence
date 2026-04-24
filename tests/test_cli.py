@@ -784,3 +784,101 @@ class TestExplainConfigSubcommand:
     ):
         main(["explain", "config", "--config", str(config_file)])
         mock_researcher_cls.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# explain resume subcommand
+# ---------------------------------------------------------------------------
+
+class TestExplainResumeSubcommand:
+    @pytest.fixture
+    def empty_output_dir(self, tmp_path: Path) -> Path:
+        d = tmp_path / "run-output"
+        d.mkdir()
+        return d
+
+    @pytest.fixture
+    def partial_run_dir(self, tmp_path: Path) -> Path:
+        """Output dir with 2 iteration files, results.tsv, knowledge_base.md."""
+        d = tmp_path / "partial-run"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        (iters / "iter_001.md").write_text("# iter 1\n", encoding="utf-8")
+        (iters / "iter_002.md").write_text("# iter 2\n", encoding="utf-8")
+        (d / "results.tsv").write_text("dim\tscore\n", encoding="utf-8")
+        (d / "knowledge_base.md").write_text("# KB\n", encoding="utf-8")
+        return d
+
+    @pytest.fixture
+    def completed_run_dir(self, tmp_path: Path) -> Path:
+        """Output dir that looks like a finished run."""
+        import json
+        d = tmp_path / "completed-run"
+        iters = d / "iterations"
+        iters.mkdir(parents=True)
+        for i in range(1, 4):
+            (iters / f"iter_00{i}.md").write_text(f"# iter {i}\n", encoding="utf-8")
+        (d / "results.tsv").write_text("dim\tscore\n", encoding="utf-8")
+        (d / "knowledge_base.md").write_text("# KB\n", encoding="utf-8")
+        (d / "synthesis.md").write_text("# Synthesis\n", encoding="utf-8")
+        (d / "report.html").write_text("<html/>", encoding="utf-8")
+        (d / "metrics.json").write_text(
+            json.dumps({"best_score": 92.5, "run_status": "completed"}), encoding="utf-8"
+        )
+        return d
+
+    def test_explain_resume_returns_success_for_partial_run(self, partial_run_dir: Path):
+        result = main(["explain", "resume", "--output", str(partial_run_dir)])
+        assert result == 0
+
+    def test_explain_resume_returns_success_for_completed_run(self, completed_run_dir: Path):
+        result = main(["explain", "resume", "--output", str(completed_run_dir)])
+        assert result == 0
+
+    def test_explain_resume_returns_error_for_nonexistent_dir(self, tmp_path: Path):
+        result = main(["explain", "resume", "--output", str(tmp_path / "no-such-dir")])
+        assert result == 1
+
+    def test_explain_resume_reports_iteration_count(self, partial_run_dir: Path, capsys):
+        main(["explain", "resume", "--output", str(partial_run_dir)])
+        out = capsys.readouterr().out
+        assert "2" in out
+
+    def test_explain_resume_reports_best_score_from_metrics(self, completed_run_dir: Path, capsys):
+        main(["explain", "resume", "--output", str(completed_run_dir)])
+        out = capsys.readouterr().out
+        assert "92.5" in out
+
+    def test_explain_resume_indicates_resumable_for_partial_run(self, partial_run_dir: Path, capsys):
+        main(["explain", "resume", "--output", str(partial_run_dir)])
+        out = capsys.readouterr().out
+        assert "yes" in out.lower() or "resumable" in out.lower()
+
+    def test_explain_resume_indicates_completed_for_finished_run(self, completed_run_dir: Path, capsys):
+        main(["explain", "resume", "--output", str(completed_run_dir)])
+        out = capsys.readouterr().out
+        assert "complete" in out.lower() or "synthesis" in out.lower()
+
+    def test_explain_resume_includes_reuse_summary(self, partial_run_dir: Path, capsys):
+        main(["explain", "resume", "--output", str(partial_run_dir)])
+        out = capsys.readouterr().out
+        assert "reused" in out.lower() or "reuse" in out.lower()
+
+    def test_explain_resume_includes_regenerated_summary(self, partial_run_dir: Path, capsys):
+        main(["explain", "resume", "--output", str(partial_run_dir)])
+        out = capsys.readouterr().out
+        assert "regenerated" in out.lower() or "regenerate" in out.lower()
+
+    def test_explain_resume_does_not_create_dirs(self, tmp_path: Path):
+        empty = tmp_path / "run-output"
+        empty.mkdir()
+        before = set(tmp_path.iterdir())
+        main(["explain", "resume", "--output", str(empty)])
+        assert set(tmp_path.iterdir()) == before
+
+    @patch("src.cli.AutoResearcher")
+    def test_explain_resume_does_not_instantiate_researcher(
+        self, mock_researcher_cls: MagicMock, partial_run_dir: Path
+    ):
+        main(["explain", "resume", "--output", str(partial_run_dir)])
+        mock_researcher_cls.assert_not_called()
