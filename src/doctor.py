@@ -193,6 +193,180 @@ def doctor_config_text(config: "ResearchConfig") -> DoctorReport:
     return DoctorReport(text="\n".join(parts), exit_code=exit_code)
 
 
+# ---------------------------------------------------------------------------
+# Output directory diagnostics
+# ---------------------------------------------------------------------------
+
+#: Core artifacts required for a run to be considered complete.
+_CORE_ARTIFACTS: list[tuple[str, str]] = [
+    ("effective_config.json", "effective_config"),
+    ("audit_trail.jsonl", "audit_trail"),
+    ("synthesis.md", "synthesis"),
+    ("report.html", "report_html"),
+    ("metrics.json", "metrics"),
+    ("knowledge_base.md", "knowledge_base"),
+    ("results.tsv", "results"),
+]
+
+#: The minimum set of artifacts whose absence turns health to WARNING.
+_REQUIRED_FOR_HEALTH = {"effective_config", "synthesis", "report_html"}
+
+
+def _read_metrics(metrics_path: Path) -> tuple[float | None, str | None]:
+    """Return (best_score, run_status) from metrics.json, or (None, None)."""
+    import json
+
+    if not metrics_path.exists():
+        return None, None
+    try:
+        data = json.loads(metrics_path.read_text(encoding="utf-8"))
+        return data.get("best_score"), data.get("run_status")
+    except (json.JSONDecodeError, OSError):
+        return None, None
+
+
+def _classify_run(
+    iteration_count: int,
+    has_synthesis: bool,
+    has_report: bool,
+) -> tuple[str, list[str]]:
+    """Return (classification_label, warning_list)."""
+    warnings: list[str] = []
+
+    if iteration_count == 0:
+        warnings.append("No iteration files found — run may not have started or is corrupt.")
+        return "empty / no iterations", warnings
+
+    if not has_synthesis and not has_report:
+        warnings.append(
+            f"Run has {iteration_count} iteration(s) but no synthesis or report"
+            " — interrupted before synthesis phase."
+        )
+        return "partial (no synthesis)", warnings
+
+    if has_synthesis and not has_report:
+        warnings.append(
+            "Synthesis present but report.html missing — report generation incomplete."
+        )
+        return "partial (synthesis only)", warnings
+
+    return "complete", warnings
+
+
+def doctor_output_text(output_dir: Path) -> DoctorReport:
+    """Inspect *output_dir* and return a DoctorReport for the run state.
+
+    Checks:
+    - Core artifact completeness
+    - Resumability integrity (iteration files present)
+    - Synthesis/report regeneration readiness
+    - Partial/corrupt run classification
+
+    Pure filesystem inspection — no backends, no dirs created, no network.
+
+    Args:
+        output_dir: Output directory of a previous run.
+
+    Returns:
+        DoctorReport with text and exit_code (0=healthy, 1=warnings/errors).
+    """
+    from src.run_paths import RunPaths
+
+    if not output_dir.exists():
+        text = f"HEALTH: ERROR\n\n  [ERROR] Output directory not found: {output_dir}\n"
+        return DoctorReport(text=text, exit_code=1)
+
+    paths = RunPaths.for_output_dir(output_dir)
+
+    # Collect artifact presence
+    artifact_status: dict[str, bool] = {}
+    for label, attr in _CORE_ARTIFACTS:
+        path = getattr(paths, attr)
+        artifact_status[attr] = path.exists()
+
+    # Iteration files
+    iter_files = (
+        sorted(paths.iterations_dir.glob("iter_*.md"))
+        if paths.iterations_dir.exists()
+        else []
+    )
+    iteration_count = len(iter_files)
+
+    best_score, run_status = _read_metrics(paths.metrics)
+
+    # Classify run state
+    run_class, run_warnings = _classify_run(
+        iteration_count=iteration_count,
+        has_synthesis=artifact_status["synthesis"],
+        has_report=artifact_status["report_html"],
+    )
+
+    # Required artifact warnings
+    issues: list[str] = list(run_warnings)
+    for attr in _REQUIRED_FOR_HEALTH:
+        if not artifact_status.get(attr, False):
+            fname = next(lbl for lbl, a in _CORE_ARTIFACTS if a == attr)
+            issues.append(f"Required artifact missing: {fname}")
+
+    health = "OK" if not issues else f"WARNINGS ({len(issues)} issue{'s' if len(issues) != 1 else ''})"
+    exit_code = 0 if not issues else 1
+
+    parts: list[str] = []
+    parts.append(f"output: {output_dir.resolve()}")
+    parts.append("")
+    parts.append(f"HEALTH: {health}")
+    parts.append(f"  run classification: {run_class}")
+    if run_status:
+        parts.append(f"  run_status:         {run_status}")
+    if best_score is not None:
+        parts.append(f"  best_score:         {best_score}")
+    parts.append("")
+
+    # Artifact status
+    parts.append("ARTIFACT STATUS")
+    iter_label = (
+        f"iterations ({iteration_count} files)" if iteration_count > 0
+        else "iterations (none found)"
+    )
+    iter_mark = "✓" if iteration_count > 0 else "✗"
+    parts.append(f"  {iter_mark} {iter_label}")
+    for label, attr in _CORE_ARTIFACTS:
+        mark = "✓" if artifact_status[attr] else "✗"
+        parts.append(f"  {mark} {label}")
+    parts.append("")
+
+    # Resumability
+    can_resume = iteration_count > 0 and not (artifact_status["synthesis"] and artifact_status["report_html"])
+    parts.append("RESUMABILITY")
+    parts.append(f"  resumable:        {'yes' if can_resume else 'no'}")
+    parts.append(f"  iterations_found: {iteration_count}")
+    if can_resume:
+        parts.append("  reused on resume: iteration files, knowledge_base.md, results.tsv")
+    parts.append("")
+
+    # Synthesis readiness
+    parts.append("SYNTHESIS READINESS")
+    synthesis_ready = iteration_count > 0 and artifact_status.get("effective_config", False)
+    parts.append(
+        f"  can regenerate synthesis: {'yes' if synthesis_ready else 'no'}"
+    )
+    if not synthesis_ready:
+        if iteration_count == 0:
+            parts.append("  [!] No iteration data — cannot regenerate synthesis.")
+        if not artifact_status.get("effective_config", False):
+            parts.append("  [!] effective_config.json missing — config context unavailable.")
+    parts.append("")
+
+    # Warnings section
+    if issues:
+        parts.append("WARNINGS")
+        for issue in issues:
+            parts.append(f"  [!] {issue}")
+        parts.append("")
+
+    return DoctorReport(text="\n".join(parts), exit_code=exit_code)
+
+
 def doctor_config_from_path(config_path: Path) -> DoctorReport:
     """Load config from *config_path* and run doctor_config_text.
 

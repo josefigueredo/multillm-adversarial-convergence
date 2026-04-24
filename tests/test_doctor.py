@@ -326,3 +326,181 @@ class TestDoctorConfigCLI:
         """)
         rc = main(["doctor", "config", "--config", str(cfg)])
         assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# doctor_output_text — output directory diagnostics
+# ---------------------------------------------------------------------------
+
+def _write_file(path: Path, content: str = "") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _make_complete_run(output_dir: Path) -> None:
+    """Populate output_dir with all artifacts of a successful run."""
+    from src.run_paths import RunPaths
+    import json
+
+    paths = RunPaths.for_output_dir(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths.iterations_dir.mkdir(parents=True, exist_ok=True)
+    _write_file(paths.iterations_dir / "iter_001.md", "# iteration 1")
+    _write_file(paths.iterations_dir / "iter_002.md", "# iteration 2")
+    _write_file(paths.synthesis, "# synthesis")
+    _write_file(paths.knowledge_base, "# kb")
+    _write_file(paths.results, "score\t0.85")
+    _write_file(paths.report_html, "<html/>")
+    _write_file(paths.audit_trail, '{"event":"run_started"}\n')
+    _write_file(paths.effective_config, json.dumps({"security": {}}))
+    _write_file(paths.metrics, json.dumps({"best_score": 0.85, "run_status": "complete"}))
+    _write_file(paths.manifest, json.dumps({"run_id": "test-run"}))
+
+
+def _make_partial_run(output_dir: Path) -> None:
+    """Populate output_dir with only iteration state (interrupted before synthesis)."""
+    from src.run_paths import RunPaths
+
+    paths = RunPaths.for_output_dir(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths.iterations_dir.mkdir(parents=True, exist_ok=True)
+    _write_file(paths.iterations_dir / "iter_001.md", "# iteration 1")
+    _write_file(paths.knowledge_base, "# kb")
+    _write_file(paths.effective_config, '{}')
+
+
+class TestDoctorOutputText:
+    def test_returns_doctor_report(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert isinstance(result, DoctorReport)
+
+    def test_complete_run_exits_0(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 0
+
+    def test_complete_run_health_ok(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert "HEALTH" in result.text
+        assert "OK" in result.text
+
+    def test_output_dir_not_found_exits_1(self, tmp_path):
+        from src.doctor import doctor_output_text
+        result = doctor_output_text(tmp_path / "no_such_dir")
+        assert result.exit_code == 1
+
+    def test_output_dir_not_found_has_error_text(self, tmp_path):
+        from src.doctor import doctor_output_text
+        result = doctor_output_text(tmp_path / "no_such_dir")
+        assert "not found" in result.text.lower() or "error" in result.text.lower()
+
+    def test_contains_artifact_status_section(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert "ARTIFACT" in result.text
+
+    def test_contains_resumability_section(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert "RESUM" in result.text
+
+    def test_contains_synthesis_readiness_section(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert "SYNTHESIS" in result.text or "REGENERAT" in result.text
+
+    def test_shows_iteration_count(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert "2" in result.text  # 2 iteration files
+
+    def test_partial_run_exits_1(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_partial_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 1
+
+    def test_partial_run_shows_warning(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_partial_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        text_lower = result.text.lower()
+        assert "partial" in text_lower or "warn" in text_lower or "incomplete" in text_lower
+
+    def test_empty_dir_exits_1(self, tmp_path):
+        from src.doctor import doctor_output_text
+        empty = tmp_path / "empty_run"
+        empty.mkdir()
+        result = doctor_output_text(empty)
+        assert result.exit_code == 1
+
+    def test_missing_effective_config_is_flagged(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        (tmp_path / "effective_config.json").unlink()
+        result = doctor_output_text(tmp_path)
+        text_lower = result.text.lower()
+        assert "effective_config" in text_lower
+
+    def test_missing_effective_config_exits_1(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        (tmp_path / "effective_config.json").unlink()
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 1
+
+    def test_synthesis_without_report_exits_1(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        (tmp_path / "report.html").unlink()
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 1
+
+    def test_run_status_shown_when_present(self, tmp_path):
+        from src.doctor import doctor_output_text
+        import json
+        _make_complete_run(tmp_path)
+        (tmp_path / "metrics.json").write_text(
+            json.dumps({"best_score": 0.92, "run_status": "complete"}),
+            encoding="utf-8",
+        )
+        result = doctor_output_text(tmp_path)
+        assert "complete" in result.text.lower()
+        assert "0.92" in result.text
+
+
+class TestDoctorOutputCLI:
+    def test_cli_exits_0_for_complete_run(self, tmp_path):
+        from src.cli import main
+        _make_complete_run(tmp_path)
+        rc = main(["doctor", "output", "--output", str(tmp_path)])
+        assert rc == 0
+
+    def test_cli_exits_1_for_missing_dir(self, tmp_path):
+        from src.cli import main
+        rc = main(["doctor", "output", "--output", str(tmp_path / "no_such")])
+        assert rc == 1
+
+    def test_cli_prints_output(self, tmp_path, capsys):
+        from src.cli import main
+        _make_complete_run(tmp_path)
+        main(["doctor", "output", "--output", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert "HEALTH" in out
+        assert "ARTIFACT" in out
+
+    def test_cli_exits_1_for_partial_run(self, tmp_path):
+        from src.cli import main
+        _make_partial_run(tmp_path)
+        rc = main(["doctor", "output", "--output", str(tmp_path)])
+        assert rc == 1
+

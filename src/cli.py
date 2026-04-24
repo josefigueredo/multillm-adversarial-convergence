@@ -15,7 +15,7 @@ from .backends import VALID_BACKENDS, get_backend, get_backends
 from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
 from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
 from .document_refiner import DocumentRefiner
-from .doctor import doctor_config_from_path
+from .doctor import doctor_config_from_path, doctor_output_text
 from .explain import explain_config_text, explain_resume_text
 from .orchestrator import AutoResearcher
 from .plan_refiner import PlanRefiner
@@ -207,6 +207,17 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="Path to a research config YAML.",
+    )
+
+    doctor_output_p = doctor_sub.add_parser(
+        "output",
+        help="Diagnose the health and completeness of a run output directory.",
+    )
+    doctor_output_p.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Output directory of a previous run.",
     )
 
     return parser
@@ -474,6 +485,12 @@ def _run_doctor_config(args: argparse.Namespace, log: logging.Logger) -> int:
     return report.exit_code
 
 
+def _run_doctor_output(args: argparse.Namespace, log: logging.Logger) -> int:
+    report = doctor_output_text(args.output)
+    print(report.text)
+    return report.exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -497,6 +514,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.subcommand == "doctor":
         if args.doctor_subcommand == "config":
             return _run_doctor_config(args, log)
+        if args.doctor_subcommand == "output":
+            return _run_doctor_output(args, log)
         log.error("doctor subcommand %r is not yet implemented.", args.doctor_subcommand)
         return 1
 
