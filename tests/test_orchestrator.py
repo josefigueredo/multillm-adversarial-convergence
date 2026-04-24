@@ -206,7 +206,21 @@ class TestAutoResearcherSetup:
         assert "configs/example.yaml" in content
         assert "--output" in content
 
-    def test_lightweight_mode_is_auto_detected_for_short_smoke_goal(self, researcher):
+    def test_setup_writes_effective_config(self, researcher):
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        effective_config_path = researcher.output_dir / "effective_config.json"
+        assert effective_config_path.exists()
+        data = json.loads(effective_config_path.read_text(encoding="utf-8"))
+        assert "security" in data
+        assert "execution" in data
+        assert "reporting" in data
+        assert "backends" in data
+        assert data["topic"] == "Test topic"
+
+
         researcher.config = ResearchConfig(
             topic="What are three pros and cons of Python?",
             goal="A bullet-point list in under 100 words",

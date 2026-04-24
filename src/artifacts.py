@@ -783,3 +783,88 @@ def write_portfolio(output_dir: Path, portfolio_fn: Any, portfolio_html_fn: Any)
         portfolio_html_fn("Autoresearch Portfolio", portfolio),
         encoding="utf-8",
     )
+
+
+def effective_config_payload(*, config: Any) -> dict[str, Any]:
+    """Build a normalized, machine-readable snapshot of the effective run config.
+
+    This artifact answers: *what config did we actually run with?*  It includes
+    the full resolved config — defaults applied, backend roles mapped, security
+    policy declared, style label resolved — so operators and automation can
+    understand exactly what was active for the run.
+
+    Args:
+        config: A ``ResearchConfig`` instance (fully resolved, with defaults).
+
+    Returns:
+        A JSON-serializable dict with sections for topic/goal, execution,
+        backends, reporting (with style label), and security.
+    """
+    reporting = config.reporting
+    style_label = build_output_style_presentation(reporting.output_style).get("style_label", "")
+    active_overrides = summarize_output_style_overrides(reporting.style_overrides)
+    style_overrides_dict = asdict(reporting.style_overrides)
+
+    backends = config.execution.backends
+    security = config.security
+    sandbox = security.sandbox
+
+    return {
+        "topic": config.topic,
+        "goal": config.goal,
+        "execution": {
+            "strategy": config.execution.strategy,
+            "model": config.execution.model,
+            "max_iterations": config.execution.max_iterations,
+            "compress_every": config.execution.compress_every,
+            "max_turns": config.execution.max_turns,
+            "timeout_seconds": config.execution.timeout_seconds,
+            "max_budget_per_call": config.execution.max_budget_per_call,
+            "allowed_tools": config.execution.allowed_tools,
+            "stream": config.execution.stream,
+            "lightweight_mode": config.execution.lightweight_mode,
+            "isolate_backend_context": config.execution.isolate_backend_context,
+            "sanitize_backend_env": config.execution.sanitize_backend_env,
+        },
+        "backends": {
+            "primary": backends.primary,
+            "research": list(backends.research),
+            "judge": backends.judge,
+            "utility": backends.utility,
+        },
+        "reporting": {
+            "output_style": reporting.output_style,
+            "output_style_label": style_label,
+            "export_html": reporting.export_html,
+            "export_pdf": reporting.export_pdf,
+            "report_title": reporting.report_title,
+            "style_overrides": style_overrides_dict,
+            "active_style_overrides": active_overrides,
+            "capture_raw_backend_outputs": reporting.capture_raw_backend_outputs,
+        },
+        "security": {
+            "content_trust": security.content_trust,
+            "tool_execution_mode": security.tool_execution_mode,
+            "allow_host_bash": security.allow_host_bash,
+            "allow_filesystem_write_outside_output": security.allow_filesystem_write_outside_output,
+            "sandbox": {
+                "mode": sandbox.mode,
+                "scope": sandbox.scope,
+                "filesystem_access": sandbox.filesystem_access,
+                "network_access": sandbox.network_access,
+            },
+        },
+    }
+
+
+def write_effective_config(output_dir: Path, *, config: Any) -> None:
+    """Write ``effective_config.json`` into *output_dir*.
+
+    Args:
+        output_dir: The run output directory.
+        config: A ``ResearchConfig`` instance.
+    """
+    payload = effective_config_payload(config=config)
+    (output_dir / "effective_config.json").write_text(
+        json.dumps(payload, indent=2), encoding="utf-8"
+    )

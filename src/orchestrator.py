@@ -23,12 +23,14 @@ from .audit_trail import AuditTrailWriter
 from .artifacts import (
     cli_version,
     dashboard_payload,
+    effective_config_payload,
     git_commit,
     load_json_if_exists,
     metrics_payload,
     package_version,
     run_manifest_payload,
     write_dashboard,
+    write_effective_config,
     write_html_report,
     write_pdf_report,
     write_portfolio,
@@ -628,6 +630,7 @@ class AutoResearcher:
             self._write_methods()
             self._write_rerun_artifact()
             self._write_run_manifest()
+            self._write_effective_config()
 
     def _resume(self) -> None:
         """Rebuild in-memory state from existing iteration files and TSV."""
@@ -1059,6 +1062,10 @@ class AutoResearcher:
             cli_version_resolver=cli_version,
         )
         self.manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def _write_effective_config(self) -> None:
+        """Write the normalized effective config snapshot for this run."""
+        write_effective_config(self.output_dir, config=self.config)
 
     def _write_metrics(self) -> None:
         """Write machine-readable run metrics."""

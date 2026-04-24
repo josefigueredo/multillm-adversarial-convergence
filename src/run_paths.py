@@ -43,6 +43,7 @@ class RunPaths:
     report_pdf: Path
     portfolio: Path
     portfolio_html: Path
+    effective_config: Path
 
     @classmethod
     def for_output_dir(cls, output_dir: Path) -> "RunPaths":
@@ -81,4 +82,5 @@ class RunPaths:
             report_pdf=output_dir / "report.pdf",
             portfolio=output_dir.parent / "portfolio.json",
             portfolio_html=output_dir.parent / "portfolio.html",
+            effective_config=output_dir / "effective_config.json",
         )

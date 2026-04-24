@@ -1,11 +1,13 @@
 """Direct tests for artifact payload helpers."""
 
+import json
 from pathlib import Path
 
 from src.artifacts import (
     certainty_pdf_text,
     dashboard_payload,
     derive_report_title,
+    effective_config_payload,
     evaluation_payload,
     load_json_if_exists,
     metrics_payload,
@@ -14,9 +16,19 @@ from src.artifacts import (
     rerun_script_text,
     should_write_evaluation,
     tool_trace_payload,
+    write_effective_config,
 )
-from src.config import EvaluationConfig, ExecutionConfig, ResearchConfig, ScoringConfig
-from src.config import OutputStyleOverrides, ReportingConfig
+from src.config import (
+    BackendsConfig,
+    EvaluationConfig,
+    ExecutionConfig,
+    OutputStyleOverrides,
+    ReportingConfig,
+    ResearchConfig,
+    SandboxConfig,
+    ScoringConfig,
+    SecurityConfig,
+)
 
 
 def test_load_json_if_exists(tmp_path: Path):
@@ -367,3 +379,157 @@ def test_run_manifest_payload_includes_output_style_metadata(tmp_path: Path):
         "no executive summary",
         "decision-only recommendations",
     ]
+
+
+# ---------------------------------------------------------------------------
+# effective_config_payload / write_effective_config
+# ---------------------------------------------------------------------------
+
+def _make_research_config(**kwargs) -> ResearchConfig:
+    defaults = dict(
+        topic="Test topic",
+        goal="Test goal",
+        dimensions=("Dim A",),
+        evaluation=EvaluationConfig(),
+        scoring=ScoringConfig(),
+        execution=ExecutionConfig(),
+    )
+    defaults.update(kwargs)
+    return ResearchConfig(**defaults)
+
+
+class TestEffectiveConfigPayload:
+    def test_includes_topic_and_goal(self):
+        cfg = _make_research_config(topic="Compare gateways", goal="Architect decision")
+        payload = effective_config_payload(config=cfg)
+        assert payload["topic"] == "Compare gateways"
+        assert payload["goal"] == "Architect decision"
+
+    def test_includes_security_config(self):
+        cfg = _make_research_config(
+            security=SecurityConfig(
+                content_trust="permissive",
+                tool_execution_mode="sandboxed",
+                allow_host_bash=False,
+                sandbox=SandboxConfig(mode="tool_calls", network_access="web_only"),
+            )
+        )
+        payload = effective_config_payload(config=cfg)
+        sec = payload["security"]
+        assert sec["content_trust"] == "permissive"
+        assert sec["tool_execution_mode"] == "sandboxed"
+        assert sec["allow_host_bash"] is False
+        assert sec["sandbox"]["mode"] == "tool_calls"
+        assert sec["sandbox"]["network_access"] == "web_only"
+
+    def test_includes_backend_role_mapping(self):
+        cfg = _make_research_config(
+            execution=ExecutionConfig(
+                strategy="ensemble",
+                backends=BackendsConfig(
+                    primary="claude-cli",
+                    research=("claude-cli", "codex-cli"),
+                    judge="claude-cli",
+                    utility="gemini-cli",
+                ),
+            )
+        )
+        payload = effective_config_payload(config=cfg)
+        backends = payload["backends"]
+        assert backends["primary"] == "claude-cli"
+        assert backends["research"] == ["claude-cli", "codex-cli"]
+        assert backends["judge"] == "claude-cli"
+        assert backends["utility"] == "gemini-cli"
+
+    def test_includes_output_style_and_label(self):
+        cfg = _make_research_config(
+            reporting=ReportingConfig(output_style="paper"),
+        )
+        payload = effective_config_payload(config=cfg)
+        rep = payload["reporting"]
+        assert rep["output_style"] == "paper"
+        assert rep["output_style_label"]  # non-empty label
+
+    def test_includes_active_style_overrides(self):
+        cfg = _make_research_config(
+            reporting=ReportingConfig(
+                output_style="default",
+                style_overrides=OutputStyleOverrides(recommendation_mode="decision_only"),
+            )
+        )
+        payload = effective_config_payload(config=cfg)
+        assert "decision-only recommendations" in payload["reporting"]["active_style_overrides"]
+
+    def test_includes_execution_config(self):
+        cfg = _make_research_config(
+            execution=ExecutionConfig(max_iterations=5, model="opus"),
+        )
+        payload = effective_config_payload(config=cfg)
+        assert payload["execution"]["max_iterations"] == 5
+        assert payload["execution"]["model"] == "opus"
+
+    def test_includes_reporting_export_flags(self):
+        cfg = _make_research_config(
+            reporting=ReportingConfig(export_html=True, export_pdf=False),
+        )
+        payload = effective_config_payload(config=cfg)
+        assert payload["reporting"]["export_html"] is True
+        assert payload["reporting"]["export_pdf"] is False
+
+    def test_security_defaults_serialized(self):
+        cfg = _make_research_config()
+        payload = effective_config_payload(config=cfg)
+        sec = payload["security"]
+        assert sec["content_trust"] == "strict"
+        assert sec["tool_execution_mode"] == "direct"
+        assert sec["allow_host_bash"] is True
+        assert sec["allow_filesystem_write_outside_output"] is False
+        assert sec["sandbox"]["mode"] == "off"
+
+
+class TestWriteEffectiveConfig:
+    def test_file_is_written_to_output_dir(self, tmp_path: Path):
+        output_dir = tmp_path / "run-001"
+        output_dir.mkdir()
+        cfg = _make_research_config()
+        write_effective_config(output_dir, config=cfg)
+        path = output_dir / "effective_config.json"
+        assert path.exists()
+
+    def test_file_is_valid_json(self, tmp_path: Path):
+        output_dir = tmp_path / "run-001"
+        output_dir.mkdir()
+        cfg = _make_research_config()
+        write_effective_config(output_dir, config=cfg)
+        data = json.loads((output_dir / "effective_config.json").read_text(encoding="utf-8"))
+        assert isinstance(data, dict)
+
+    def test_file_content_includes_security(self, tmp_path: Path):
+        output_dir = tmp_path / "run-001"
+        output_dir.mkdir()
+        cfg = _make_research_config(
+            security=SecurityConfig(content_trust="permissive"),
+        )
+        write_effective_config(output_dir, config=cfg)
+        data = json.loads((output_dir / "effective_config.json").read_text(encoding="utf-8"))
+        assert data["security"]["content_trust"] == "permissive"
+
+    def test_file_content_includes_reporting(self, tmp_path: Path):
+        output_dir = tmp_path / "run-001"
+        output_dir.mkdir()
+        cfg = _make_research_config(
+            reporting=ReportingConfig(output_style="technical_doc"),
+        )
+        write_effective_config(output_dir, config=cfg)
+        data = json.loads((output_dir / "effective_config.json").read_text(encoding="utf-8"))
+        assert data["reporting"]["output_style"] == "technical_doc"
+
+    def test_file_content_includes_execution(self, tmp_path: Path):
+        output_dir = tmp_path / "run-001"
+        output_dir.mkdir()
+        cfg = _make_research_config(
+            execution=ExecutionConfig(max_iterations=3, model="haiku"),
+        )
+        write_effective_config(output_dir, config=cfg)
+        data = json.loads((output_dir / "effective_config.json").read_text(encoding="utf-8"))
+        assert data["execution"]["max_iterations"] == 3
