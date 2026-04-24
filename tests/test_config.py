@@ -831,24 +831,37 @@ class TestSecurityConfigFromYaml:
               topic: "Security test"
               security:
                 content_trust: permissive
-                tool_execution_mode: direct
+                tool_execution_mode: sandboxed
                 allow_host_bash: false
                 allow_filesystem_write_outside_output: true
                 sandbox:
-                  mode: off
+                  mode: tool_calls
                   scope: run
-                  filesystem_access: output_only
-                  network_access: unrestricted
+                  filesystem_access: workspace_only
+                  network_access: web_only
         """), encoding="utf-8")
         cfg = ResearchConfig.from_yaml(p)
         assert cfg.security.content_trust == "permissive"
-        assert cfg.security.tool_execution_mode == "direct"
+        assert cfg.security.tool_execution_mode == "sandboxed"
         assert cfg.security.allow_host_bash is False
         assert cfg.security.allow_filesystem_write_outside_output is True
-        assert cfg.security.sandbox.mode == "off"
+        assert cfg.security.sandbox.mode == "tool_calls"
         assert cfg.security.sandbox.scope == "run"
-        assert cfg.security.sandbox.filesystem_access == "output_only"
-        assert cfg.security.sandbox.network_access == "unrestricted"
+        assert cfg.security.sandbox.filesystem_access == "workspace_only"
+        assert cfg.security.sandbox.network_access == "web_only"
+
+    def test_sandbox_mode_off_via_yaml_boolean(self, tmp_path: Path):
+        """YAML 1.1 coerces bare 'off' to False; verify it round-trips as 'off'."""
+        p = tmp_path / "sandbox_off.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  mode: off
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.security.sandbox.mode == "off"
 
     def test_invalid_content_trust_rejected(self, tmp_path: Path):
         p = tmp_path / "bad_trust.yaml"
@@ -872,6 +885,18 @@ class TestSecurityConfigFromYaml:
         with pytest.raises(ValueError, match="Invalid security.tool_execution_mode"):
             ResearchConfig.from_yaml(p)
 
+    def test_tool_execution_mode_disabled_rejected(self, tmp_path: Path):
+        """'disabled' was a premature Milestone 2 value — must not be accepted."""
+        p = tmp_path / "disabled.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                tool_execution_mode: disabled
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.tool_execution_mode"):
+            ResearchConfig.from_yaml(p)
+
     def test_invalid_sandbox_mode_rejected(self, tmp_path: Path):
         p = tmp_path / "bad_sandbox_mode.yaml"
         p.write_text(textwrap.dedent("""\
@@ -880,6 +905,19 @@ class TestSecurityConfigFromYaml:
               security:
                 sandbox:
                   mode: docker
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.sandbox.mode"):
+            ResearchConfig.from_yaml(p)
+
+    def test_sandbox_mode_process_rejected(self, tmp_path: Path):
+        """'process'/'container' are premature implementation-language values."""
+        p = tmp_path / "bad_sandbox_process.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  mode: process
         """), encoding="utf-8")
         with pytest.raises(ValueError, match="Invalid security.sandbox.mode"):
             ResearchConfig.from_yaml(p)
@@ -896,6 +934,19 @@ class TestSecurityConfigFromYaml:
         with pytest.raises(ValueError, match="Invalid security.sandbox.scope"):
             ResearchConfig.from_yaml(p)
 
+    def test_sandbox_scope_iteration_rejected(self, tmp_path: Path):
+        """'iteration'/'call' scopes are premature — only 'run' is valid in M1."""
+        p = tmp_path / "bad_sandbox_iter.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  scope: iteration
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.sandbox.scope"):
+            ResearchConfig.from_yaml(p)
+
     def test_invalid_sandbox_filesystem_access_rejected(self, tmp_path: Path):
         p = tmp_path / "bad_sandbox_fs.yaml"
         p.write_text(textwrap.dedent("""\
@@ -908,6 +959,19 @@ class TestSecurityConfigFromYaml:
         with pytest.raises(ValueError, match="Invalid security.sandbox.filesystem_access"):
             ResearchConfig.from_yaml(p)
 
+    def test_sandbox_filesystem_access_unrestricted_rejected(self, tmp_path: Path):
+        """'unrestricted' filesystem access is a premature broadening — not in M1."""
+        p = tmp_path / "bad_sandbox_unres.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  filesystem_access: unrestricted
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.sandbox.filesystem_access"):
+            ResearchConfig.from_yaml(p)
+
     def test_invalid_sandbox_network_access_rejected(self, tmp_path: Path):
         p = tmp_path / "bad_sandbox_net.yaml"
         p.write_text(textwrap.dedent("""\
@@ -916,6 +980,19 @@ class TestSecurityConfigFromYaml:
               security:
                 sandbox:
                   network_access: limited
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.sandbox.network_access"):
+            ResearchConfig.from_yaml(p)
+
+    def test_sandbox_network_access_restricted_rejected(self, tmp_path: Path):
+        """'restricted' is too vague — 'web_only' is the M1 operator vocabulary."""
+        p = tmp_path / "bad_sandbox_restricted.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  network_access: restricted
         """), encoding="utf-8")
         with pytest.raises(ValueError, match="Invalid security.sandbox.network_access"):
             ResearchConfig.from_yaml(p)

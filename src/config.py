@@ -22,13 +22,13 @@ from .output_style import VALID_OUTPUT_STYLES
 # Valid multi-backend strategy names.
 VALID_STRATEGIES = ("single", "ensemble", "adversarial", "parallel", "serial", "specialist")
 
-# Valid security policy enum values.
+# Valid security policy enum values — Milestone 1 contract.
 VALID_CONTENT_TRUST = ("strict", "permissive")
-VALID_TOOL_EXECUTION_MODES = ("direct", "sandboxed", "disabled")
-VALID_SANDBOX_MODES = ("off", "process", "container")
-VALID_SANDBOX_SCOPES = ("run", "iteration", "call")
-VALID_SANDBOX_FILESYSTEM_ACCESS = ("output_only", "project_only", "unrestricted")
-VALID_SANDBOX_NETWORK_ACCESS = ("unrestricted", "restricted", "none")
+VALID_TOOL_EXECUTION_MODES = ("direct", "sandboxed")
+VALID_SANDBOX_MODES = ("off", "tool_calls")
+VALID_SANDBOX_SCOPES = ("run",)
+VALID_SANDBOX_FILESYSTEM_ACCESS = ("output_only", "workspace_only")
+VALID_SANDBOX_NETWORK_ACCESS = ("unrestricted", "web_only", "none")
 
 
 def _validate_backend_name(name: str, role: str) -> None:
@@ -467,19 +467,19 @@ class SecurityConfig:
 def _parse_security_config(raw: dict[str, Any]) -> "SecurityConfig":
     """Parse and validate a ``security:`` mapping.
 
-    PyYAML (YAML 1.1) silently coerces bare ``off``/``on`` to Python
-    booleans.  ``_yaml_str`` restores the canonical string form for fields
-    that use those tokens as enum values (e.g. ``sandbox.mode: off``).
+    PyYAML (YAML 1.1) silently coerces the bare token ``off`` to the Python
+    boolean ``False``.  ``_yaml_str`` recovers the string ``"off"`` for that
+    specific case so that ``sandbox.mode: off`` round-trips correctly.
+    Any other unexpected boolean is stringified as-is and will fail enum
+    validation with a clear error message.
     """
 
     def _yaml_str(value: Any, default: str) -> str:
-        """Return a string from a YAML value, mapping Python bools produced by YAML 1.1."""
+        """Coerce a YAML-parsed value to str, recovering ``False -> "off"``."""
         if value is None:
             return default
         if value is False:
             return "off"
-        if value is True:
-            return "on"
         return str(value)
 
     content_trust = _yaml_str(raw.get("content_trust"), "strict")
