@@ -19,6 +19,7 @@ from typing import Any
 
 from .backends import CLAUDE_SHORTNAMES, AgentResponse, Backend, CallOptions, StreamEvent, get_backends
 from .backend_options import apply_backend_capabilities, build_call_options
+from .audit_trail import AuditTrailWriter
 from .artifacts import (
     cli_version,
     dashboard_payload,
@@ -126,6 +127,8 @@ class AutoResearcher:
         self.kb_path = self.paths.knowledge_base
         self.synthesis_path = self.paths.synthesis
         self.methods_path = self.paths.methods
+        self.run_log_path = self.paths.run_log
+        self.audit_trail_path = self.paths.audit_trail
         self.manifest_path = self.paths.manifest
         self.metrics_path = self.paths.metrics
         self.claims_path = self.paths.claims
@@ -205,6 +208,7 @@ class AutoResearcher:
         }
         self._tool_trace: list[dict[str, Any]] = []
         self._prompt_snapshots: list[dict[str, Any]] = []
+        self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="run", run_id=self.output_dir.name)
 
     def _sync_paths(self) -> None:
         """Recompute derived artifact paths from the current output directory."""
@@ -214,6 +218,8 @@ class AutoResearcher:
         self.kb_path = self.paths.knowledge_base
         self.synthesis_path = self.paths.synthesis
         self.methods_path = self.paths.methods
+        self.run_log_path = self.paths.run_log
+        self.audit_trail_path = self.paths.audit_trail
         self.manifest_path = self.paths.manifest
         self.metrics_path = self.paths.metrics
         self.claims_path = self.paths.claims
@@ -239,6 +245,7 @@ class AutoResearcher:
         self.report_pdf_path = self.paths.report_pdf
         self.portfolio_path = self.paths.portfolio
         self.portfolio_html_path = self.paths.portfolio_html
+        self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="run", run_id=self.output_dir.name)
 
     def _call(self, prompt: str, **kwargs: Any) -> AgentResponse:
         """Invoke the default backend with config defaults.
@@ -531,6 +538,12 @@ class AutoResearcher:
         if self.resume:
             self._resume()
         self._run_status = "running"
+        self._record_event(
+            "run_started",
+            topic=self.config.topic,
+            strategy=self.config.execution.strategy,
+            resume=self.resume,
+        )
 
         log.info(
             "Starting autoresearch [%s]: %s (%d dimensions configured)",
@@ -547,12 +560,28 @@ class AutoResearcher:
         except KeyboardInterrupt:
             log.info("Interrupted. Generating synthesis...")
             self._run_status = "interrupted"
+            self._record_event("run_interrupted", iteration=self.iteration)
+        except Exception as exc:
+            self._run_status = "failed"
+            self._record_event(
+                "run_failed",
+                iteration=self.iteration,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+            raise
         finally:
             if self._run_status == "running":
                 self._run_status = "completed"
             self._generate_synthesis()
             self._generate_baseline()
             self._finalize_run_artifacts()
+            self._record_event(
+                "run_completed",
+                iteration=self.iteration,
+                status=self._run_status,
+                explored_dimensions=len(self.explored_dimensions),
+            )
             self._print_summary()
 
     def synthesize_only(self) -> None:
@@ -560,9 +589,11 @@ class AutoResearcher:
         self._setup()
         self._resume()
         self._run_status = "synthesis_only"
+        self._record_event("synthesis_only_started", iteration=self.iteration)
         self._generate_synthesis()
         self._generate_baseline()
         self._finalize_run_artifacts()
+        self._record_event("synthesis_only_completed", iteration=self.iteration)
 
     def _should_stop(self) -> bool:
         """Return True when runtime stopping criteria have been met."""
@@ -585,17 +616,18 @@ class AutoResearcher:
 
     def _setup(self) -> None:
         """Create output directories and initialise results.tsv if needed."""
-        self._sync_paths()
-        setup_output_dir(self.output_dir, self.iterations_dir)
-        self._ensure_backend_runtime_dir()
-        if self._run_started_at is None:
-            self._run_started_at = datetime.now(timezone.utc).isoformat()
+        with self._audit_trail.step("setup_run", artifact_root=self.output_dir):
+            self._sync_paths()
+            setup_output_dir(self.output_dir, self.iterations_dir)
+            self._ensure_backend_runtime_dir()
+            if self._run_started_at is None:
+                self._run_started_at = datetime.now(timezone.utc).isoformat()
 
-        if not self.results_path.exists():
-            self._write_tsv_header()
-        self._write_methods()
-        self._write_rerun_artifact()
-        self._write_run_manifest()
+            if not self.results_path.exists():
+                self._write_tsv_header()
+            self._write_methods()
+            self._write_rerun_artifact()
+            self._write_run_manifest()
 
     def _resume(self) -> None:
         """Rebuild in-memory state from existing iteration files and TSV."""
@@ -610,6 +642,7 @@ class AutoResearcher:
             return
 
         log.info("Resuming from %d existing iterations.", state["iteration"])
+        self._record_event("run_resumed", iteration=state["iteration"])
         self.results = state["results"]
         self.best_score = state["best_score"]
         self.best_scores = state["best_scores"]
@@ -636,6 +669,8 @@ class AutoResearcher:
             kb_summary=self._kb_summary,
             format_dimension_list=self._format_dimension_list,
             goal_constraints_summary=self._goal_constraints_summary,
+            audit_trail=self._audit_trail,
+            artifact_root=self.output_dir,
         )
 
     def _build_loop_state(self) -> "loop_mod.LoopState":
@@ -676,6 +711,10 @@ class AutoResearcher:
         state = self._build_loop_state()
         loop_mod.run_iteration(ctx, state)
         self._sync_from_loop_state(state)
+
+    def _record_event(self, event: str, **fields: Any) -> None:
+        """Append one structured execution event to the run audit trail."""
+        self._audit_trail.emit(event, **fields)
 
     # -- Loop shims (delegate to research_loop, retained for compatibility) --
 
@@ -758,8 +797,14 @@ class AutoResearcher:
 
         log.info("Generating final synthesis report...")
         synth_backend = self.strategy.get_synthesize_backend()
-        resp = self._call_with(synth_backend, prompt, max_turns=5)
-        self._track_usage(resp, synth_backend.name)
+        with self._audit_trail.step(
+            "generate_synthesis",
+            artifact_root=self.output_dir,
+            iteration=self.iteration,
+            backend=synth_backend.name,
+        ):
+            resp = self._call_with(synth_backend, prompt, max_turns=5)
+            self._track_usage(resp, synth_backend.name)
 
         if not resp.is_error and resp.text:
             final_text = self._postprocess_goal_output(resp.text)
@@ -890,7 +935,8 @@ class AutoResearcher:
             f"- Target dimensions total: {self.config.scoring.target_dimensions_total}\n"
             f"- Allowed tools: {self.config.execution.allowed_tools or '(none)'}\n"
         )
-        self.methods_path.write_text(content, encoding="utf-8")
+        with self._audit_trail.step("write_methods", artifact_root=self.output_dir):
+            self.methods_path.write_text(content, encoding="utf-8")
 
     def _print_summary(self) -> None:
         """Print a session summary to stdout."""
@@ -979,7 +1025,8 @@ class AutoResearcher:
 
     def _finalize_run_artifacts(self) -> None:
         """Write final manifest and metrics artifacts."""
-        finalize_run_artifacts(self)
+        with self._audit_trail.step("finalize_run_artifacts", artifact_root=self.output_dir):
+            finalize_run_artifacts(self)
 
     def _write_prompt_snapshot_artifact(self) -> None:
         """Write captured prompt inputs for later audit and replay."""
@@ -1105,8 +1152,14 @@ class AutoResearcher:
             lightweight_mode="yes" if self._is_lightweight_mode() else "no",
         )
         baseline_backend = self.strategy.get_synthesize_backend()
-        resp = self._call_with(baseline_backend, prompt, max_turns=3)
-        self._track_usage(resp, baseline_backend.name)
+        with self._audit_trail.step(
+            "generate_baseline",
+            artifact_root=self.output_dir,
+            iteration=self.iteration,
+            backend=baseline_backend.name,
+        ):
+            resp = self._call_with(baseline_backend, prompt, max_turns=3)
+            self._track_usage(resp, baseline_backend.name)
         if not resp.is_error and resp.text:
             final_text = self._postprocess_goal_output(resp.text)
             self.baseline_path.write_text(final_text, encoding="utf-8")

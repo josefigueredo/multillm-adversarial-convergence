@@ -29,6 +29,18 @@ class TestSetupLogging:
         _setup_logging(verbose=False)
         assert root.level <= logging.INFO
 
+    def test_with_log_path_creates_run_log(self, tmp_path: Path):
+        import logging
+        root = logging.getLogger()
+        root.handlers.clear()
+        log_path = tmp_path / "run.log"
+        _setup_logging(verbose=False, log_path=log_path)
+        logging.getLogger("autoresearch").info("hello")
+        for handler in logging.getLogger().handlers:
+            handler.flush()
+        assert log_path.exists()
+        assert "hello" in log_path.read_text(encoding="utf-8")
+
 
 class TestParserSmoke:
     def test_subcommand_help_lists_dry_run_flags(self, capsys):
@@ -131,6 +143,23 @@ class TestRunSubcommand:
         _, kwargs = mock_researcher_cls.call_args
         assert kwargs["resume"] is False
         assert kwargs["config_path"] == config_file
+
+    @patch("src.cli.get_strategy")
+    @patch("src.cli.get_backends")
+    @patch("src.cli.AutoResearcher")
+    @patch("src.cli.get_backend")
+    def test_run_mode_creates_run_log(self, mock_get, mock_researcher_cls, mock_get_backends, mock_get_strat, config_file, tmp_path):
+        mock_backend, mock_strategy = self._mock_cli_deps()
+        mock_get.return_value = mock_backend
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+        mock_get_strat.return_value = mock_strategy
+        mock_researcher_cls.return_value = MagicMock()
+        output_dir = tmp_path / "run-output"
+
+        result = main(["run", "--config", str(config_file), "--output", str(output_dir)])
+
+        assert result == 0
+        assert (output_dir / "run.log").exists()
 
     @patch("src.cli.get_strategy")
     @patch("src.cli.get_backends")

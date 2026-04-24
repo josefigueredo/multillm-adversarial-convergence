@@ -13,7 +13,7 @@ from pathlib import Path
 from string import Template
 from typing import Any
 
-from .output_style import build_output_style_presentation
+from .output_style import build_output_style_presentation, build_output_style_report_policy
 
 
 _TEMPLATES_DIR = Path(__file__).with_name("templates")
@@ -50,6 +50,7 @@ def render_html_report(
     global _SECTION_COUNTER
     _SECTION_COUNTER = 0
     presentation = build_output_style_presentation(output_style)
+    policy = build_output_style_report_policy(output_style)
 
     run = manifest.get("run", {})
     strategy = manifest.get("strategy", {})
@@ -85,36 +86,76 @@ def render_html_report(
         run_status=escape(str(run.get("status", ""))),
         started_at=escape(str(run.get("started_at", ""))),
         completed_at=escape(str(run.get("completed_at", ""))),
-        summary_cards_html=_summary_cards_html(summary_cards),
-        dimensions_html=_dimensions_html(metrics.get("explored_dimensions", [])),
+        run_summary_html=_section_html("Run Summary", f'<div class="grid">{_summary_cards_html(summary_cards)}</div>')
+        if policy["show_run_summary"]
+        else "",
+        dimensions_section_html=_section_html("Dimensions Explored", f'<ul>{_dimensions_html(metrics.get("explored_dimensions", []))}</ul>')
+        if policy["show_dimensions"]
+        else "",
         style_html=_style_html(
             output_style=output_style,
             style_label=presentation["style_label"],
             active_overrides=(dashboard or {}).get("active_style_overrides"),
-        ),
+        )
+        if policy["show_style_section"]
+        else "",
+        methods_section_html=_section_html(
+            presentation["methods_heading"],
+            '<div class="markdown-body" id="methods-content"></div>',
+        )
+        if policy["show_methods"]
+        else "",
+        synthesis_section_html=_section_html(
+            presentation["synthesis_heading"],
+            '<div class="markdown-body" id="synthesis-content"></div>',
+        )
+        if policy["show_synthesis"]
+        else "",
+        evidence_quality_html=_section_html(
+            "Evidence Quality",
+            '<div class="json-view" id="evidence-quality-content"></div>',
+        )
+        if policy["show_evidence_quality"]
+        else "",
+        rubric_html=_section_html(
+            "Rubric",
+            '<div class="json-view" id="rubric-content"></div>',
+        )
+        if policy["show_rubric"]
+        else "",
         methods_heading=escape(presentation["methods_heading"]),
         synthesis_heading=escape(presentation["synthesis_heading"]),
         methods_json=json.dumps(methods_text),
         synthesis_json=json.dumps(synthesis_text),
         evidence_quality_json=json.dumps(evidence_quality),
         rubric_json=json.dumps(rubric),
-        semantic_html=_semantic_html(semantic_calibration),
-        semantic_review_html=_semantic_review_html(semantic_review),
-        certainty_html=_certainty_html((dashboard or {}).get("certainty_summary"), certainty_tables),
+        semantic_html=_semantic_html(semantic_calibration) if policy["show_semantic"] else "",
+        semantic_review_html=_semantic_review_html(semantic_review) if policy["show_semantic_review"] else "",
+        certainty_html=_certainty_html((dashboard or {}).get("certainty_summary"), certainty_tables)
+        if policy["show_certainty"]
+        else "",
         search_screening_html=_search_screening_html(
             (dashboard or {}).get("search_log_summary"),
             (dashboard or {}).get("screening_log_summary"),
-        ),
+        )
+        if policy["show_search_screening"]
+        else "",
         retry_html=_retry_html(
             (dashboard or {}).get("retry_summary"),
             (dashboard or {}).get("retry_insights"),
-        ),
-        tool_usage_html=_tool_usage_html((dashboard or {}).get("tool_usage_summary")),
-        tool_trace_html=_tool_trace_html((dashboard or {}).get("tool_trace_summary")),
-        dashboard_html=_dashboard_html(dashboard),
-        evaluation_html=_evaluation_html(evaluation),
-        comparison_html=_comparison_html(comparison),
+        )
+        if policy["show_retry"]
+        else "",
+        tool_usage_html=_tool_usage_html((dashboard or {}).get("tool_usage_summary")) if policy["show_tool_usage"] else "",
+        tool_trace_html=_tool_trace_html((dashboard or {}).get("tool_trace_summary")) if policy["show_tool_trace"] else "",
+        dashboard_html=_dashboard_html(dashboard) if policy["show_dashboard"] else "",
+        evaluation_html=_evaluation_html(evaluation) if policy["show_evaluation"] else "",
+        comparison_html=_comparison_html(comparison) if policy["show_comparison"] else "",
     )
+
+
+def _section_html(title: str, body_html: str) -> str:
+    return f"<section>\n    <h2>{escape(title)}</h2>\n    {body_html}\n  </section>"
 
 
 def _summary_cards_html(summary_cards: dict[str, Any]) -> str:

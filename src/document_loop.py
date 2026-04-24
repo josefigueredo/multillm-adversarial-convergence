@@ -66,6 +66,8 @@ class CycleContext(BaseContext):
     human_decisions: list[HumanDecision]
     read_prd_section: Callable[[str], str]
     update_issue_registry: Callable[[list[Any]], None]
+    audit_trail: Any
+    artifact_root: Path
 
 
 # ---------------------------------------------------------------------------
@@ -122,12 +124,18 @@ def run_cycle(
         len(state.pending_patches),
         len(ctx.human_decisions),
     )
-    prd = strategy.run_builder(
-        state.prd,
-        state.pending_patches,
-        ctx.call_with,
-        human_decisions=ctx.human_decisions,
-    )
+    with ctx.audit_trail.step(
+        "builder",
+        artifact_root=ctx.artifact_root,
+        cycle=state.cycle,
+        mode="refine",
+    ):
+        prd = strategy.run_builder(
+            state.prd,
+            state.pending_patches,
+            ctx.call_with,
+            human_decisions=ctx.human_decisions,
+        )
     state.prd = prd
     state.prd_versions.append(prd)
     state.pending_patches = []
@@ -135,7 +143,13 @@ def run_cycle(
 
     # 2. Challenger
     log.info("[refine][cycle %03d] challenger starting", state.cycle)
-    raw_critiques = strategy.run_challenger(prd, ctx.call_with)
+    with ctx.audit_trail.step(
+        "challenger",
+        artifact_root=ctx.artifact_root,
+        cycle=state.cycle,
+        mode="refine",
+    ):
+        raw_critiques = strategy.run_challenger(prd, ctx.call_with)
     log.info(
         "[refine][cycle %03d] challenger completed (%d critique(s))",
         state.cycle,
@@ -149,7 +163,13 @@ def run_cycle(
         len(ctx.config.personas),
         ctx.config.persona_mode,
     )
-    persona_critiques = strategy.run_personas(prd, ctx.call_with)
+    with ctx.audit_trail.step(
+        "personas",
+        artifact_root=ctx.artifact_root,
+        cycle=state.cycle,
+        mode="refine",
+    ):
+        persona_critiques = strategy.run_personas(prd, ctx.call_with)
     log.info(
         "[refine][cycle %03d] personas completed (%d critique(s))",
         state.cycle,
@@ -164,7 +184,13 @@ def run_cycle(
         state.cycle,
         len(all_raw),
     )
-    verified = strategy.run_verifier(prd, all_raw, ctx.call_with)
+    with ctx.audit_trail.step(
+        "verifier",
+        artifact_root=ctx.artifact_root,
+        cycle=state.cycle,
+        mode="refine",
+    ):
+        verified = strategy.run_verifier(prd, all_raw, ctx.call_with)
     log.info(
         "[refine][cycle %03d] verifier completed (%d classified critique(s))",
         state.cycle,
@@ -201,7 +227,13 @@ def run_cycle(
         state.cycle,
         len(valid),
     )
-    new_patches = strategy.run_arbitrator(prd, valid, ctx.call_with)
+    with ctx.audit_trail.step(
+        "arbitrator",
+        artifact_root=ctx.artifact_root,
+        cycle=state.cycle,
+        mode="refine",
+    ):
+        new_patches = strategy.run_arbitrator(prd, valid, ctx.call_with)
     state.pending_patches = new_patches
     log.info(
         "[refine][cycle %03d] arbitrator completed (%d patch(es))",

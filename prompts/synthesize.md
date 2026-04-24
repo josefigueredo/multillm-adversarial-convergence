@@ -39,16 +39,20 @@ If `lightweight_mode` is `yes`, prefer the shortest high-signal answer that
 still satisfies the goal. Avoid ceremonial sections unless the goal asks for
 them.
 
-When the goal does NOT demand brevity, produce a well-structured report that:
+When the goal does NOT demand brevity, produce a well-structured report that
+follows the Output Style Contract exactly.
 
-1. Opens with an executive summary (3-5 sentences).
-2. Presents a comparison table when multiple options were evaluated.
-3. Covers each important dimension with findings and trade-offs.
-4. Includes a decision framework when relevant: "Use X when... Use Y when..."
-5. Lists concrete recommendations ranked by confidence level.
-6. Closes with known gaps and areas for further investigation.
-7. Calls out unresolved questions or weakly-supported claims explicitly.
-8. States contradictions clearly instead of silently collapsing them.
+- Include only the sections that fit the selected output style and any active
+  overrides.
+- Do not add default decision-report sections when the selected style implies
+  they should be omitted.
+- For paper-style outputs, prefer evidence-first scholarly structure and avoid
+  executive-report framing unless the goal explicitly asks for it.
+- For technical-document outputs, prefer engineering-document conventions and
+  avoid academic-paper framing unless the goal explicitly asks for it.
+- Cover each important dimension with concrete findings and trade-offs.
+- State contradictions clearly instead of silently collapsing them.
+- Call out unresolved questions or weakly-supported claims explicitly.
 
 Write for an architect who will use this to make real decisions. Be specific
 and avoid generic advice.

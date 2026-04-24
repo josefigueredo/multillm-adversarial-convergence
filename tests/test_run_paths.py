@@ -10,6 +10,8 @@ def test_run_paths_builds_expected_artifact_locations(tmp_path: Path):
 
     assert paths.output_dir == tmp_path / "run-a"
     assert paths.iterations_dir == tmp_path / "run-a" / "iterations"
+    assert paths.run_log == tmp_path / "run-a" / "run.log"
+    assert paths.audit_trail == tmp_path / "run-a" / "audit_trail.jsonl"
     assert paths.manifest == tmp_path / "run-a" / "run_manifest.json"
     assert paths.prompt_snapshot == tmp_path / "run-a" / "prompt_snapshot.json"
     assert paths.rerun_script == tmp_path / "run-a" / "rerun.sh"

@@ -87,7 +87,7 @@ def goal_requires_bullets(goal: str) -> bool:
 
 def postprocess_goal_output(text: str, *, goal: str) -> str:
     """Deterministically repair short-form outputs to obey explicit goal constraints."""
-    text = text.strip()
+    text = _strip_meta_preamble(text.strip())
     if not text:
         return text
 
@@ -99,6 +99,30 @@ def postprocess_goal_output(text: str, *, goal: str) -> str:
         text = trim_to_word_limit(text, word_limit)
 
     return text.strip()
+
+
+_META_PREAMBLE_HINTS = (
+    "looking at the accumulated knowledge base",
+    "i'll produce the",
+    "i will produce the",
+    "proceeding directly",
+    "here's the full",
+    "here is the full",
+)
+
+
+def _strip_meta_preamble(text: str) -> str:
+    """Remove assistant meta-chatter that appears before the real document body."""
+    heading_match = re.search(r"(?m)^#{1,6}\s+", text)
+    if not heading_match:
+        return text
+    prefix = text[: heading_match.start()].strip()
+    if not prefix:
+        return text
+    normalized = " ".join(prefix.lower().split())
+    if any(hint in normalized for hint in _META_PREAMBLE_HINTS):
+        return text[heading_match.start() :].lstrip()
+    return text
 
 
 def trim_to_word_limit(text: str, word_limit: int) -> str:

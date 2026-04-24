@@ -59,6 +59,19 @@ def test_postprocess_goal_output_applies_bullets_and_word_limit():
     assert len(processed.split()) <= 8
 
 
+def test_postprocess_goal_output_strips_meta_preamble_before_heading():
+    text = (
+        "Looking at the accumulated knowledge base, I'll produce the formal research deliverable now.\n\n"
+        "---\n\n"
+        "# Local AWS Emulation Alternatives\n\n"
+        "## Abstract\n\n"
+        "Body."
+    )
+    processed = postprocess_goal_output(text, goal="Produce a formal paper.")
+    assert processed.startswith("# Local AWS Emulation Alternatives")
+    assert "Looking at the accumulated knowledge base" not in processed
+
+
 def test_bullet_helpers_and_synthesis_views():
     assert coerce_to_bullets("* one\n* two") == "- one\n- two"
     assert trim_to_word_limit("- one two three\n- four five six", 4).startswith("- one")

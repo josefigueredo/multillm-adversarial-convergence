@@ -49,6 +49,8 @@ class LoopContext(BaseContext):
     kb_summary: Callable[[], str]
     format_dimension_list: Callable[[list[str]], str]
     goal_constraints_summary: Callable[[], str]
+    audit_trail: Any
+    artifact_root: Path
 
 
 @dataclass
@@ -98,10 +100,16 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
     log.info("=" * 60)
     log.info("Iteration %03d", state.iteration)
     log.info("=" * 60)
+    ctx.audit_trail.emit("iteration_started", iteration=state.iteration)
 
     hypothesis = _generate_hypothesis(ctx, state)
     if not hypothesis:
         log.warning("Hypothesis generation failed, retrying next iteration.")
+        ctx.audit_trail.emit(
+            "iteration_aborted",
+            iteration=state.iteration,
+            reason="hypothesis_generation_failed",
+        )
         return
 
     dimension = hypothesis.get("dimension", "unknown")
@@ -115,8 +123,14 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
     findings = _execute_research(ctx, state, dimension, questions, approach)
     if not findings:
         log.warning("Research execution returned empty, logging crash.")
-        _log_result(state, dimension, IterationScore(), "", status="crash")
+        _log_result(ctx, state, dimension, IterationScore(), "", status="crash")
         _maybe_exhaust(state, dimension)
+        ctx.audit_trail.emit(
+            "iteration_aborted",
+            iteration=state.iteration,
+            dimension=dimension,
+            reason="research_execution_empty",
+        )
         return
 
     score = _score(ctx, state, dimension, findings)
@@ -137,22 +151,37 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         log.info("DISCARD — findings saved but not merged.")
         _maybe_exhaust(state, dimension)
 
-    write_iteration_markdown(
-        iterations_dir=state.iterations_dir,
+    with ctx.audit_trail.step(
+        "persist_iteration_markdown",
+        artifact_root=ctx.artifact_root,
         iteration=state.iteration,
         dimension=dimension,
-        findings=findings,
-        score=score,
-        kept=kept,
-    )
+        status="keep" if kept else "discard",
+    ):
+        write_iteration_markdown(
+            iterations_dir=state.iterations_dir,
+            iteration=state.iteration,
+            dimension=dimension,
+            findings=findings,
+            score=score,
+            kept=kept,
+        )
     ctx.collect_provenance(findings, scope=f"iteration-{state.iteration:03d}", dimension=dimension)
     _log_result(
-        state, dimension, score, hypothesis.get("rationale", ""),
+        ctx, state, dimension, score, hypothesis.get("rationale", ""),
         status="keep" if kept else "discard",
     )
 
     if state.iteration % ctx.config.execution.compress_every == 0:
         _compress_knowledge_base(ctx, state)
+
+    ctx.audit_trail.emit(
+        "iteration_completed",
+        iteration=state.iteration,
+        dimension=dimension,
+        status="keep" if kept else "discard",
+        total_score=score.total,
+    )
 
 
 def _generate_hypothesis(ctx: LoopContext, state: LoopState) -> dict[str, Any] | None:
@@ -172,7 +201,13 @@ def _generate_hypothesis(ctx: LoopContext, state: LoopState) -> dict[str, Any] |
     )
 
     hypo_backend = ctx.strategy.get_hypothesis_backend()
-    resp = ctx.call_with(hypo_backend, prompt, max_turns=3)
+    with ctx.audit_trail.step(
+        "generate_hypothesis",
+        artifact_root=ctx.artifact_root,
+        iteration=state.iteration,
+        backend=hypo_backend.name,
+    ):
+        resp = ctx.call_with(hypo_backend, prompt, max_turns=3)
 
     if resp.is_error or not resp.text:
         return None
@@ -218,14 +253,21 @@ def _execute_research(
     if hasattr(ctx.strategy, "route_dimension"):
         kwargs["dimension"] = dimension
 
-    result = ctx.strategy.execute_research(
-        prompt,
-        ctx.invoke_for_strategy,
-        allowed_tools=ctx.config.execution.allowed_tools,
-        max_turns=ctx.config.execution.max_turns,
-        timeout=ctx.config.execution.timeout_seconds,
-        **kwargs,
-    )
+    with ctx.audit_trail.step(
+        "execute_research",
+        artifact_root=ctx.artifact_root,
+        iteration=state.iteration,
+        dimension=dimension,
+        strategy=ctx.config.execution.strategy,
+    ):
+        result = ctx.strategy.execute_research(
+            prompt,
+            ctx.invoke_for_strategy,
+            allowed_tools=ctx.config.execution.allowed_tools,
+            max_turns=ctx.config.execution.max_turns,
+            timeout=ctx.config.execution.timeout_seconds,
+            **kwargs,
+        )
 
     if result.candidates is not None:
         for candidate in result.candidates:
@@ -243,10 +285,16 @@ def _execute_research(
         log.error("Research call failed.")
         return ""
 
-    critique = ctx.strategy.post_research(
-        findings, ctx.invoke_for_strategy,
-        timeout=ctx.config.execution.timeout_seconds,
-    )
+    with ctx.audit_trail.step(
+        "post_research_critique",
+        artifact_root=ctx.artifact_root,
+        iteration=state.iteration,
+        dimension=dimension,
+    ):
+        critique = ctx.strategy.post_research(
+            findings, ctx.invoke_for_strategy,
+            timeout=ctx.config.execution.timeout_seconds,
+        )
     if critique:
         ctx.track_cost(critique.cost_usd, critique.backend_name)
         findings += (
@@ -340,7 +388,14 @@ def _score(ctx: LoopContext, state: LoopState, dimension: str, findings: str) ->
         )
 
         judge_backend = ctx.strategy.get_judge_backend()
-        resp = ctx.call_with(judge_backend, prompt, max_turns=3)
+        with ctx.audit_trail.step(
+            "score_findings",
+            artifact_root=ctx.artifact_root,
+            iteration=state.iteration,
+            dimension=dimension,
+            backend=judge_backend.name,
+        ):
+            resp = ctx.call_with(judge_backend, prompt, max_turns=3)
         ctx.track_usage(resp, judge_backend.name)
 
         if not resp.is_error and resp.text:
@@ -363,22 +418,28 @@ def _score(ctx: LoopContext, state: LoopState, dimension: str, findings: str) ->
 
 def _merge(ctx: LoopContext, state: LoopState, dimension: str, findings: str, score: IterationScore) -> None:
     """Merge kept findings into the knowledge base."""
-    merged = merge_findings(
+    with ctx.audit_trail.step(
+        "merge_findings",
+        artifact_root=ctx.artifact_root,
+        iteration=state.iteration,
         dimension=dimension,
-        findings=findings,
-        gaps=score.gaps,
-        knowledge_base=state.knowledge_base,
-        explored_dimensions=state.explored_dimensions,
-        discovered_dimensions=state.discovered_dimensions,
-        configured_dimensions=ctx.config.dimensions,
-    )
-    state.knowledge_base = merged["knowledge_base"]
-    state.explored_dimensions = merged["explored_dimensions"]
-    state.discovered_dimensions = merged["discovered_dimensions"]
-    state.kb_path.write_text(state.knowledge_base, encoding="utf-8")
-    for gap in score.gaps:
-        if gap in state.discovered_dimensions:
-            log.info("New dimension discovered: %s", gap)
+    ):
+        merged = merge_findings(
+            dimension=dimension,
+            findings=findings,
+            gaps=score.gaps,
+            knowledge_base=state.knowledge_base,
+            explored_dimensions=state.explored_dimensions,
+            discovered_dimensions=state.discovered_dimensions,
+            configured_dimensions=ctx.config.dimensions,
+        )
+        state.knowledge_base = merged["knowledge_base"]
+        state.explored_dimensions = merged["explored_dimensions"]
+        state.discovered_dimensions = merged["discovered_dimensions"]
+        state.kb_path.write_text(state.knowledge_base, encoding="utf-8")
+        for gap in score.gaps:
+            if gap in state.discovered_dimensions:
+                log.info("New dimension discovered: %s", gap)
 
 
 def _maybe_exhaust(state: LoopState, dimension: str) -> None:
@@ -397,6 +458,7 @@ def _maybe_exhaust(state: LoopState, dimension: str) -> None:
 
 
 def _log_result(
+    ctx: LoopContext,
     state: LoopState,
     dimension: str,
     score: IterationScore,
@@ -405,18 +467,25 @@ def _log_result(
     status: str,
 ) -> None:
     """Append a row to results.tsv for this iteration."""
-    row = build_result_row(
+    with ctx.audit_trail.step(
+        "append_results_row",
+        artifact_root=ctx.artifact_root,
         iteration=state.iteration,
         dimension=dimension,
-        score=score,
-        hypothesis=hypothesis,
         status=status,
-        total_cost_usd=state.total_cost,
-        total_input_tokens=state.total_input_tokens,
-        total_output_tokens=state.total_output_tokens,
-    )
-    state.results.append(row)
-    append_result_row(state.results_path, row)
+    ):
+        row = build_result_row(
+            iteration=state.iteration,
+            dimension=dimension,
+            score=score,
+            hypothesis=hypothesis,
+            status=status,
+            total_cost_usd=state.total_cost,
+            total_input_tokens=state.total_input_tokens,
+            total_output_tokens=state.total_output_tokens,
+        )
+        state.results.append(row)
+        append_result_row(state.results_path, row)
 
 
 def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
@@ -438,7 +507,13 @@ def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
     )
 
     compress_backend = ctx.strategy.get_compress_backend()
-    resp = ctx.call_with(compress_backend, prompt, max_turns=3, timeout=120)
+    with ctx.audit_trail.step(
+        "compress_knowledge_base",
+        artifact_root=ctx.artifact_root,
+        iteration=state.iteration,
+        backend=compress_backend.name,
+    ):
+        resp = ctx.call_with(compress_backend, prompt, max_turns=3, timeout=120)
     ctx.track_usage(resp, compress_backend.name)
 
     if not resp.is_error and resp.text and len(resp.text) > 200:

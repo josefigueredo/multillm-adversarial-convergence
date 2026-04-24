@@ -16,6 +16,8 @@ class RunPaths:
     knowledge_base: Path
     synthesis: Path
     methods: Path
+    run_log: Path
+    audit_trail: Path
     manifest: Path
     metrics: Path
     claims: Path
@@ -52,6 +54,8 @@ class RunPaths:
             knowledge_base=output_dir / "knowledge_base.md",
             synthesis=output_dir / "synthesis.md",
             methods=output_dir / "methods.md",
+            run_log=output_dir / "run.log",
+            audit_trail=output_dir / "audit_trail.jsonl",
             manifest=output_dir / "run_manifest.json",
             metrics=output_dir / "metrics.json",
             claims=output_dir / "claims.json",

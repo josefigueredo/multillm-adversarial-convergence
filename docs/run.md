@@ -91,6 +91,20 @@ LOOP:
 
 Each iteration produces a scored markdown file. Findings that beat the current best are merged into a growing knowledge base. The loop stops on Ctrl+C, `max_iterations`, or `target_dimensions_total`. On exit, a final synthesis report is generated along with quality metrics and provenance artifacts.
 
+## Runtime Logging & Bitácora
+
+Real `run` executions now emit two runtime traces in the output directory:
+
+- `run.log` — human-readable operational log
+- `audit_trail.jsonl` — structured append-only audit trail
+
+`audit_trail.jsonl` records:
+- step start / completion / failure
+- iteration lifecycle events
+- files created or updated by each step
+
+This is especially useful for debugging long iterations, because you can see which step was active before a stall and which artifacts were produced after each step.
+
 ## Architecture
 
 ```mermaid

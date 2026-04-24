@@ -16,37 +16,13 @@ ${print_css}
 
   <nav id="toc" class="toc"></nav>
 
-  <section>
-    <h2>Run Summary</h2>
-    <div class="grid">${summary_cards_html}</div>
-  </section>
-
-  <section>
-    <h2>Dimensions Explored</h2>
-    <ul>${dimensions_html}</ul>
-  </section>
-
+  ${run_summary_html}
+  ${dimensions_section_html}
   ${style_html}
-
-  <section>
-    <h2>${methods_heading}</h2>
-    <div class="markdown-body" id="methods-content"></div>
-  </section>
-
-  <section>
-    <h2>${synthesis_heading}</h2>
-    <div class="markdown-body" id="synthesis-content"></div>
-  </section>
-
-  <section>
-    <h2>Evidence Quality</h2>
-    <div class="json-view" id="evidence-quality-content"></div>
-  </section>
-
-  <section>
-    <h2>Rubric</h2>
-    <div class="json-view" id="rubric-content"></div>
-  </section>
+  ${methods_section_html}
+  ${synthesis_section_html}
+  ${evidence_quality_html}
+  ${rubric_html}
 
   ${semantic_html}
   ${semantic_review_html}

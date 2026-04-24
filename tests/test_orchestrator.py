@@ -127,6 +127,18 @@ class TestAutoResearcherSetup:
         assert researcher.manifest_path.exists()
         assert researcher.methods_path.exists()
 
+    def test_setup_writes_audit_trail(self, researcher):
+        with patch("src.orchestrator.git_commit", return_value="abc123"), \
+             patch("src.orchestrator.cli_version", return_value="1.0"), \
+             patch("src.orchestrator.package_version", return_value="0.2.0"):
+            researcher._setup()
+        audit_trail_path = researcher.output_dir / "audit_trail.jsonl"
+        assert audit_trail_path.exists()
+        content = audit_trail_path.read_text(encoding="utf-8")
+        assert '"step": "setup_run"' in content
+        assert '"event": "step_started"' in content
+        assert '"event": "step_completed"' in content
+
     def test_setup_writes_tsv_header(self, researcher):
         with patch("src.orchestrator.git_commit", return_value="abc123"), \
              patch("src.orchestrator.cli_version", return_value="1.0"), \
@@ -290,6 +302,10 @@ class TestAutoResearcherSetup:
         assert "Abstract" in prompt
         assert "Methodology" in prompt
         assert "Limitations" in prompt
+        assert "Do not include an executive summary" in prompt
+        assert "Do not include a comparison table" in prompt
+        assert "dedicated References section" in prompt
+        assert "Present evidence and findings before stating the recommendation" in prompt
 
     def test_generate_synthesis_injects_output_style_overrides(self, researcher):
         researcher.config = ResearchConfig(

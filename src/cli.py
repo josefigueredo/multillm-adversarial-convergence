@@ -21,13 +21,18 @@ from .provider_instances import instantiate_provider_backends
 from .strategy import get_strategy
 
 
-def _setup_logging(verbose: bool) -> None:
+def _setup_logging(verbose: bool, *, log_path: Path | None = None) -> None:
     level = logging.DEBUG if verbose else logging.INFO
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if log_path is not None:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
     logging.basicConfig(
         level=level,
         format="%(asctime)s  %(levelname)-8s  %(message)s",
         datefmt="%H:%M:%S",
         force=True,
+        handlers=handlers,
     )
 
 
@@ -235,6 +240,9 @@ def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
         log.info("%s", render_dry_run_summary(summary))
         return 0
 
+    _setup_logging(args.verbose, log_path=output_dir / "run.log")
+    log = logging.getLogger("autoresearch")
+
     researcher = AutoResearcher(
         config=config,
         backend=backend,
@@ -301,6 +309,9 @@ def _run_refine(args: argparse.Namespace, log: logging.Logger) -> int:
         log.info("%s", render_dry_run_summary(summary))
         return 0
 
+    _setup_logging(args.verbose, log_path=output_dir / "run.log")
+    log = logging.getLogger("autoresearch")
+
     refiner = DocumentRefiner(
         config=config,
         output_dir=output_dir,
@@ -358,6 +369,9 @@ def _run_plan(args: argparse.Namespace, log: logging.Logger) -> int:
         )
         log.info("%s", render_dry_run_summary(summary))
         return 0
+
+    _setup_logging(args.verbose, log_path=output_dir / "run.log")
+    log = logging.getLogger("autoresearch")
 
     refiner = PlanRefiner(
         config=config,

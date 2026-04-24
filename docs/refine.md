@@ -36,6 +36,10 @@ without executing the convergence loop or writing run artifacts.
 Important constraint:
 - `--dry-run` cannot be combined with `--resume`
 
+Real `refine` runs now also emit:
+- `run.log` — human-readable runtime log
+- `audit_trail.jsonl` — structured cycle/step audit trail with file-change records
+
 Useful smoke command:
 
 ```bash

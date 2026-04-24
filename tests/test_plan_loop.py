@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from src.backends.types import AgentResponse
+from src.audit_trail import AuditTrailWriter, NullAuditTrailWriter
 from src.config import BackendsConfig, PlanConfig
 from src.document_loop import Issue
 from src.hitl import DeferReason, HumanDecision
@@ -29,7 +30,7 @@ def _make_invoke(text: str = "[]"):
     return invoke
 
 
-def _make_ctx(config=None) -> PlanCycleContext:
+def _make_ctx(config=None, *, artifact_root: Path | None = None, audit_trail=None) -> PlanCycleContext:
     cfg = config or _make_config()
     return PlanCycleContext(
         call_with=_make_invoke(),
@@ -39,6 +40,8 @@ def _make_ctx(config=None) -> PlanCycleContext:
         config=cfg,
         human_decisions=[],
         update_issue_registry=lambda issues: None,
+        audit_trail=audit_trail or NullAuditTrailWriter(),
+        artifact_root=artifact_root or Path("."),
     )
 
 
@@ -220,3 +223,23 @@ def test_run_plan_cycle_emits_progress_logs(caplog):
     assert "[plan][cycle 001] verifier completed (0 classified critique(s))" in text
     assert "[plan][cycle 001] arbitrator completed (0 patch(es))" in text
     assert "[plan][cycle 001] cycle complete (valid=0 stale=0 deferred=0 clean_streak=1)" in text
+
+
+def test_run_plan_cycle_writes_audit_trail_events(tmp_path: Path):
+    cfg = _make_config()
+    state = PlanCycleState(plan="# Plan")
+    audit_trail = AuditTrailWriter(tmp_path / "audit_trail.jsonl", mode="plan", run_id="plan-test")
+    ctx = _make_ctx(cfg, artifact_root=tmp_path, audit_trail=audit_trail)
+    strategy = MagicMock()
+    strategy.run_builder.return_value = "# Revised Plan"
+    strategy.run_challenger.return_value = []
+    strategy.run_personas.return_value = []
+    strategy.run_verifier.return_value = []
+    strategy.run_arbitrator.return_value = []
+
+    run_plan_cycle(state, ctx, strategy, interactive=False)
+
+    content = (tmp_path / "audit_trail.jsonl").read_text(encoding="utf-8")
+    assert '"step": "builder"' in content
+    assert '"step": "personas"' in content
+    assert '"event": "step_completed"' in content

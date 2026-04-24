@@ -11,6 +11,135 @@ VALID_OUTPUT_STYLES = (
 )
 
 
+def _style_defaults(style: str) -> dict[str, object]:
+    """Return opinionated defaults for a given output style profile."""
+    if style == "default":
+        return {}
+    if style == "paper":
+        return {
+            "include_executive_summary": False,
+            "include_comparison_table": False,
+            "include_methodology": True,
+            "include_limitations": True,
+            "include_next_actions": False,
+            "section_order": "evidence_first",
+            "recommendation_mode": "decision_only",
+            "citation_mode": "references_section",
+        }
+    if style == "technical_doc":
+        return {
+            "include_executive_summary": False,
+            "include_comparison_table": False,
+            "include_methodology": False,
+            "include_limitations": False,
+            "include_next_actions": False,
+            "section_order": "standard",
+            "recommendation_mode": "decision_only",
+            "citation_mode": "inline_links",
+        }
+    if style == "executive_brief":
+        return {
+            "include_executive_summary": True,
+            "include_comparison_table": False,
+            "include_methodology": False,
+            "include_limitations": False,
+            "include_next_actions": True,
+            "section_order": "recommendation_first",
+            "recommendation_mode": "decision_only",
+            "citation_mode": "inline_links",
+        }
+    if style == "decision_memo":
+        return {
+            "include_executive_summary": False,
+            "include_comparison_table": False,
+            "include_methodology": False,
+            "include_limitations": False,
+            "include_next_actions": True,
+            "section_order": "recommendation_first",
+            "recommendation_mode": "decision_only",
+            "citation_mode": "inline_links",
+        }
+    raise ValueError(f"Unknown output style: {style}")
+
+
+def _resolve_style_overrides(style: str, overrides: object | None) -> dict[str, object]:
+    """Merge style profile defaults with optional user overrides."""
+    resolved = dict(_style_defaults(style))
+    fields = (
+        "include_executive_summary",
+        "include_comparison_table",
+        "include_methodology",
+        "include_limitations",
+        "include_next_actions",
+        "section_order",
+        "recommendation_mode",
+        "citation_mode",
+    )
+    if overrides is None:
+        return resolved
+    for field in fields:
+        value = getattr(overrides, field, None)
+        if value is None or value == "":
+            continue
+        resolved[field] = value
+    return resolved
+
+
+def build_output_style_report_policy(style: str) -> dict[str, bool]:
+    """Return report rendering visibility rules for the selected style."""
+    base = {
+        "show_run_summary": True,
+        "show_dimensions": True,
+        "show_style_section": True,
+        "show_methods": True,
+        "show_synthesis": True,
+        "show_evidence_quality": True,
+        "show_rubric": True,
+        "show_semantic": True,
+        "show_semantic_review": True,
+        "show_certainty": True,
+        "show_search_screening": True,
+        "show_retry": True,
+        "show_tool_usage": True,
+        "show_tool_trace": True,
+        "show_dashboard": True,
+        "show_evaluation": True,
+        "show_comparison": True,
+    }
+    if style == "paper":
+        base.update(
+            {
+                "show_run_summary": False,
+                "show_dimensions": False,
+                "show_style_section": False,
+                "show_semantic": False,
+                "show_semantic_review": False,
+                "show_retry": False,
+                "show_tool_usage": False,
+                "show_tool_trace": False,
+                "show_dashboard": False,
+                "show_evaluation": False,
+                "show_comparison": False,
+            }
+        )
+        return base
+    if style == "technical_doc":
+        base.update(
+            {
+                "show_run_summary": False,
+                "show_style_section": False,
+                "show_retry": False,
+                "show_tool_usage": False,
+                "show_tool_trace": False,
+                "show_dashboard": False,
+            }
+        )
+        return base
+    if style in VALID_OUTPUT_STYLES:
+        return base
+    raise ValueError(f"Unknown output style: {style}")
+
+
 def summarize_output_style_overrides(overrides: object | None) -> list[str]:
     """Return compact human-readable labels for active style overrides."""
     if overrides is None:
@@ -113,14 +242,15 @@ def build_output_style_presentation(style: str) -> dict[str, str]:
 
 def build_output_style_contract(style: str, overrides: object | None = None) -> str:
     """Return prompt instructions for the requested synthesis output style."""
-    include_executive_summary = getattr(overrides, "include_executive_summary", None)
-    include_comparison_table = getattr(overrides, "include_comparison_table", None)
-    include_methodology = getattr(overrides, "include_methodology", None)
-    include_limitations = getattr(overrides, "include_limitations", None)
-    include_next_actions = getattr(overrides, "include_next_actions", None)
-    section_order = getattr(overrides, "section_order", "")
-    recommendation_mode = getattr(overrides, "recommendation_mode", "")
-    citation_mode = getattr(overrides, "citation_mode", "")
+    effective = _resolve_style_overrides(style, overrides)
+    include_executive_summary = effective.get("include_executive_summary", None)
+    include_comparison_table = effective.get("include_comparison_table", None)
+    include_methodology = effective.get("include_methodology", None)
+    include_limitations = effective.get("include_limitations", None)
+    include_next_actions = effective.get("include_next_actions", None)
+    section_order = effective.get("section_order", "")
+    recommendation_mode = effective.get("recommendation_mode", "")
+    citation_mode = effective.get("citation_mode", "")
     if style == "default":
         base = (
             "Use the standard decision-support report structure.\n"
@@ -134,14 +264,16 @@ def build_output_style_contract(style: str, overrides: object | None = None) -> 
             "Use a formal paper-style structure.\n"
             "- Include sections resembling: Abstract, Research Question, Methodology, Findings, Discussion, Limitations, Conclusion.\n"
             "- Prefer formal analytical prose over imperative recommendation language.\n"
-            "- Make limitations and evidence quality explicit."
+            "- Make limitations and evidence quality explicit.\n"
+            "- Follow scholarly conventions: let the abstract and findings carry the narrative, keep operational metadata out of the main body, and end with references."
         )
     elif style == "technical_doc":
         base = (
             "Use an internal technical documentation structure.\n"
             "- Include sections resembling: Context, Problem Statement, Options Considered, Technical Analysis, Decision, Implementation Considerations, Risks, Open Questions.\n"
             "- Prefer direct, implementation-oriented language.\n"
-            "- Keep recommendations actionable for engineering teams."
+            "- Keep recommendations actionable for engineering teams.\n"
+            "- Follow engineering-document conventions: avoid academic framing, prefer explicit decisions, and keep operational details only when they support implementation."
         )
     elif style == "executive_brief":
         base = (

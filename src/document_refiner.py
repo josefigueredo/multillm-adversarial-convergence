@@ -15,6 +15,7 @@ from typing import Any
 
 from .backends import AgentResponse, Backend
 from .backend_options import apply_backend_capabilities, build_call_options
+from .audit_trail import AuditTrailWriter
 from .config import ArtifactConfig, DocumentConfig, ProviderConfig
 from .document_loop import CycleContext, CycleState, _should_stop, run_cycle
 from .document_strategy import ConvergeStrategy
@@ -54,6 +55,7 @@ class DocumentRefiner:
         self._total_cost = 0.0
         self._total_input_tokens = 0
         self._total_output_tokens = 0
+        self._audit_trail = AuditTrailWriter(output_dir / "audit_trail.jsonl", mode="refine", run_id=output_dir.name)
 
     # ── Public entry point ──────────────────────────────────────────────────
 
@@ -73,6 +75,14 @@ class DocumentRefiner:
             human_decisions=state.human_decisions,
             read_prd_section=lambda ref: "",
             update_issue_registry=lambda issues: None,
+            audit_trail=self._audit_trail,
+            artifact_root=self._output_dir,
+        )
+
+        self._audit_trail.emit(
+            "run_started",
+            primary_artifact=self._config.primary_artifact,
+            resume=self._resume,
         )
 
         # Phase 1 — Convergence
@@ -90,6 +100,7 @@ class DocumentRefiner:
 
             if state.pending_human_inputs and not interactive:
                 self._handle_hitl_pause(state)
+                self._audit_trail.emit("run_paused_for_human_input", cycle=state.cycle)
                 return EXIT_HUMAN_REQUIRED
 
         # Write converged primary artifact
@@ -107,6 +118,7 @@ class DocumentRefiner:
 
         # Finalize
         self._write_run_manifest(cycles=state.cycle, total_cost=self._total_cost)
+        self._audit_trail.emit("run_completed", cycles=state.cycle, status="completed")
         log.info("[refine] Done. Output at: %s", self._output_dir)
         return 0
 
@@ -115,10 +127,16 @@ class DocumentRefiner:
     def _run_phase2(self, prd: str, strategy: ConvergeStrategy, ctx: CycleContext) -> None:
         for artifact in self._config.artifacts:
             log.info("[phase2] Generating %s ...", artifact.name)
-            content = self._generate_artifact(prd, artifact, strategy, ctx)
-            out_path = self._output_dir / artifact.name
-            out_path.write_text(content, encoding="utf-8")
-            log.info("[phase2] Wrote %s", artifact.name)
+            with self._audit_trail.step(
+                "phase2_generate_artifact",
+                artifact_root=self._output_dir,
+                artifact=artifact.name,
+                layer=artifact.layer,
+            ):
+                content = self._generate_artifact(prd, artifact, strategy, ctx)
+                out_path = self._output_dir / artifact.name
+                out_path.write_text(content, encoding="utf-8")
+                log.info("[phase2] Wrote %s", artifact.name)
 
     def _generate_artifact(
         self,
@@ -162,6 +180,10 @@ class DocumentRefiner:
     # ── Phase 3: Indexing ───────────────────────────────────────────────────
 
     def _run_phase3(self) -> None:
+        with self._audit_trail.step("phase3_generate_indexes", artifact_root=self._output_dir):
+            self._run_phase3_inner()
+
+    def _run_phase3_inner(self) -> None:
         manifest = self._build_artifact_manifest()
         builder_name = (
             self._config.backends.research[0]
@@ -220,27 +242,42 @@ class DocumentRefiner:
         (self._run_dir / "cycles").mkdir(exist_ok=True)
 
     def _write_primary_artifact(self, content: str) -> None:
-        (self._output_dir / self._config.primary_artifact).write_text(content, encoding="utf-8")
+        with self._audit_trail.step(
+            "write_primary_artifact",
+            artifact_root=self._output_dir,
+            artifact=self._config.primary_artifact,
+        ):
+            (self._output_dir / self._config.primary_artifact).write_text(content, encoding="utf-8")
 
     def _write_cycle_snapshot(self, state: CycleState) -> None:
-        snap = self._run_dir / "cycles" / f"cycle_{state.cycle:03d}.md"
-        snap.write_text(
-            f"# Cycle {state.cycle}\n\n"
-            f"Valid issues: {sum(1 for i in state.issue_registry if i.status == 'valid')}\n"
-            f"Clean streak: {state.consecutive_clean_cycles}\n\n"
-            f"## PRD snapshot\n\n{state.prd[:2000]}\n",
-            encoding="utf-8",
-        )
-        stem = Path(self._config.primary_artifact).stem
-        version_path = self._run_dir / f"{stem}_v{state.cycle}.md"
-        version_path.write_text(state.prd, encoding="utf-8")
+        with self._audit_trail.step(
+            "write_cycle_snapshot",
+            artifact_root=self._output_dir,
+            cycle=state.cycle,
+        ):
+            snap = self._run_dir / "cycles" / f"cycle_{state.cycle:03d}.md"
+            snap.write_text(
+                f"# Cycle {state.cycle}\n\n"
+                f"Valid issues: {sum(1 for i in state.issue_registry if i.status == 'valid')}\n"
+                f"Clean streak: {state.consecutive_clean_cycles}\n\n"
+                f"## PRD snapshot\n\n{state.prd[:2000]}\n",
+                encoding="utf-8",
+            )
+            stem = Path(self._config.primary_artifact).stem
+            version_path = self._run_dir / f"{stem}_v{state.cycle}.md"
+            version_path.write_text(state.prd, encoding="utf-8")
 
     def _write_issue_registry(self, state: CycleState) -> None:
-        path = self._run_dir / "issue_registry.json"
-        path.write_text(
-            json.dumps([dataclasses.asdict(i) for i in state.issue_registry], indent=2),
-            encoding="utf-8",
-        )
+        with self._audit_trail.step(
+            "write_issue_registry",
+            artifact_root=self._output_dir,
+            cycle=state.cycle,
+        ):
+            path = self._run_dir / "issue_registry.json"
+            path.write_text(
+                json.dumps([dataclasses.asdict(i) for i in state.issue_registry], indent=2),
+                encoding="utf-8",
+            )
 
     def _write_run_manifest(self, *, cycles: int, total_cost: float) -> None:
         manifest = {
@@ -254,9 +291,10 @@ class DocumentRefiner:
             "finished_at": datetime.now(timezone.utc).isoformat(),
             "artifacts": [a.name for a in self._config.artifacts],
         }
-        (self._run_dir / "run_manifest.json").write_text(
-            json.dumps(manifest, indent=2), encoding="utf-8"
-        )
+        with self._audit_trail.step("write_run_manifest", artifact_root=self._output_dir, cycles=cycles):
+            (self._run_dir / "run_manifest.json").write_text(
+                json.dumps(manifest, indent=2), encoding="utf-8"
+            )
 
     def _handle_hitl_pause(self, state: CycleState) -> None:
         pending_path = self._run_dir / "pending_questions.json"

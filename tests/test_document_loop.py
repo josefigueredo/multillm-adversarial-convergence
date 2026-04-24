@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.audit_trail import AuditTrailWriter, NullAuditTrailWriter
 from src.config import DocumentConfig
 from src.document_loop import (
     CycleContext,
@@ -24,7 +25,7 @@ def _make_config(**kwargs) -> DocumentConfig:
     return DocumentConfig(**defaults)
 
 
-def _make_ctx(config=None) -> CycleContext:
+def _make_ctx(config=None, *, artifact_root: Path | None = None, audit_trail=None) -> CycleContext:
     noop = lambda *a, **kw: None
     return CycleContext(
         call_with=noop,
@@ -35,6 +36,8 @@ def _make_ctx(config=None) -> CycleContext:
         human_decisions=[],
         read_prd_section=lambda s: "",
         update_issue_registry=noop,
+        audit_trail=audit_trail or NullAuditTrailWriter(),
+        artifact_root=artifact_root or Path("."),
     )
 
 
@@ -229,3 +232,22 @@ def test_run_cycle_emits_progress_logs(caplog):
     assert "[refine][cycle 001] verifier completed (0 classified critique(s))" in text
     assert "[refine][cycle 001] arbitrator completed (0 patch(es))" in text
     assert "[refine][cycle 001] cycle complete (valid=0 stale=0 deferred=0 clean_streak=1)" in text
+
+
+def test_run_cycle_writes_audit_trail_events(tmp_path: Path):
+    state = CycleState()
+    strategy = _make_strategy_mock()
+    audit_trail = AuditTrailWriter(tmp_path / "audit_trail.jsonl", mode="refine", run_id="refine-test")
+
+    run_cycle(
+        state,
+        _make_ctx(artifact_root=tmp_path, audit_trail=audit_trail),
+        strategy,
+        interactive=False,
+    )
+
+    content = (tmp_path / "audit_trail.jsonl").read_text(encoding="utf-8")
+    assert '"event": "step_started"' in content
+    assert '"step": "builder"' in content
+    assert '"step": "verifier"' in content
+    assert '"event": "step_completed"' in content

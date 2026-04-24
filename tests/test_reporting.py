@@ -100,21 +100,22 @@ def test_render_html_report_renders_core_sections_and_escapes():
     assert "Topic &amp; Scope" in html
     assert "Goal &gt; Outcome" in html
     # Core sections present
-    assert "Run Summary" in html
-    assert "Output Style" in html
+    assert "Run Summary" not in html
+    assert "Output Style" not in html
+    assert "Dimensions Explored" not in html
     assert "Methodology" in html
     assert "Paper Draft" in html
-    assert "include next actions, references section" in html
-    assert "Semantic Calibration" in html
-    assert "Semantic Judge Review" in html
+    assert "include next actions, references section" not in html
+    assert "Semantic Calibration" not in html
+    assert "Semantic Judge Review" not in html
     assert "Certainty Tables" in html
     assert "risk_of_bias" in html
-    assert "API Retries" in html
+    assert "API Retries" not in html
     assert "Search &amp; Screening" in html
-    assert "Dashboard Summary" in html
-    assert "Tool Usage" in html
-    assert "Tool Trace" in html
-    assert "Consistency Comparison" in html
+    assert "Dashboard Summary" not in html
+    assert "Tool Usage" not in html
+    assert "Tool Trace" not in html
+    assert "Consistency Comparison" not in html
     # Markdown content embedded as JS string, not HTML-escaped in <pre>
     assert "marked.parse" in html
     assert "SYNTHESIS_RAW" in html
@@ -145,7 +146,9 @@ def test_render_html_report_omits_optional_sections_when_empty():
         synthesis_text="Synthesis",
     )
 
-    assert "Output Style" in html
+    assert "Output Style" not in html
+    assert "Run Summary" not in html
+    assert "Dimensions Explored" in html
     assert "Semantic Calibration" not in html
     assert "Dashboard Summary" not in html
     assert "API Retries" not in html

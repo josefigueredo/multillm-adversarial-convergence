@@ -50,6 +50,8 @@ Important runtime rules:
 - `execution.retry_api_errors` retries retryable non-streaming API failures with exponential backoff; streaming calls and function-tool loops are intentionally excluded
 - `run --dry-run` validates config loading, strategy/backend resolution, provider wiring, backend availability, and planned artifact paths without executing the research loop or writing run artifacts
 - `refine --dry-run` and `plan --dry-run` validate config loading, backend/provider wiring, and planned artifact paths without executing convergence loops or writing run artifacts
+- real runs now write a human-readable `run.log` plus a structured `audit_trail.jsonl` audit trail in the output directory
+- `audit_trail.jsonl` records step start/completion/failure events and the files created or updated by each step, which is the foundation for future flow/sequence visualizations
 - `reporting.output_style` now lets `run` choose the synthesis prose/profile:
   - `default`
   - `paper`

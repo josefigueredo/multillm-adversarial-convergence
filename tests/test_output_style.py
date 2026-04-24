@@ -6,6 +6,7 @@ from src.config import OutputStyleOverrides
 from src.output_style import (
     VALID_OUTPUT_STYLES,
     build_output_style_contract,
+    build_output_style_report_policy,
     summarize_output_style_overrides,
 )
 
@@ -32,6 +33,10 @@ def test_paper_output_style_contract_mentions_formal_sections():
     assert "abstract" in lowered
     assert "methodology" in lowered
     assert "limitations" in lowered
+    assert "do not include an executive summary" in lowered
+    assert "do not include a comparison table" in lowered
+    assert "references section" in lowered
+    assert "present evidence and findings before stating the recommendation" in lowered
 
 
 def test_technical_doc_output_style_contract_mentions_operational_sections():
@@ -40,6 +45,9 @@ def test_technical_doc_output_style_contract_mentions_operational_sections():
     assert "problem statement" in lowered
     assert "implementation considerations" in lowered
     assert "open questions" in lowered
+    assert "do not include an executive summary" in lowered
+    assert "do not include a comparison table" in lowered
+    assert "single decision section" in lowered
 
 
 def test_unknown_output_style_raises():
@@ -130,3 +138,25 @@ def test_summarize_output_style_overrides_returns_human_readable_labels():
     assert "recommendation-first ordering" in summary
     assert "decision-only recommendations" in summary
     assert "references section" in summary
+
+
+def test_paper_report_policy_hides_operational_sections():
+    policy = build_output_style_report_policy("paper")
+
+    assert policy["show_run_summary"] is False
+    assert policy["show_dimensions"] is False
+    assert policy["show_style_section"] is False
+    assert policy["show_dashboard"] is False
+    assert policy["show_retry"] is False
+    assert policy["show_tool_usage"] is False
+    assert policy["show_tool_trace"] is False
+
+
+def test_technical_report_policy_hides_style_metadata_but_keeps_evidence_sections():
+    policy = build_output_style_report_policy("technical_doc")
+
+    assert policy["show_style_section"] is False
+    assert policy["show_run_summary"] is False
+    assert policy["show_dimensions"] is True
+    assert policy["show_evidence_quality"] is True
+    assert policy["show_rubric"] is True
