@@ -15,6 +15,7 @@ from .backends import VALID_BACKENDS, get_backend, get_backends
 from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
 from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
 from .document_refiner import DocumentRefiner
+from .doctor import doctor_config_from_path
 from .explain import explain_config_text, explain_resume_text
 from .orchestrator import AutoResearcher
 from .plan_refiner import PlanRefiner
@@ -188,6 +189,24 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="Output directory of a previous run.",
+    )
+
+    # ── doctor subcommand ────────────────────────────────────────────────────
+    doctor_p = subparsers.add_parser(
+        "doctor",
+        help="Diagnose config or run health without executing anything.",
+    )
+    doctor_sub = doctor_p.add_subparsers(dest="doctor_subcommand", required=True)
+
+    doctor_config_p = doctor_sub.add_parser(
+        "config",
+        help="Diagnose a research config YAML and report enforcement status.",
+    )
+    doctor_config_p.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a research config YAML.",
     )
 
     return parser
@@ -444,6 +463,17 @@ def _run_explain_resume(args: argparse.Namespace, log: logging.Logger) -> int:
     return 0
 
 
+def _run_doctor_config(args: argparse.Namespace, log: logging.Logger) -> int:
+    config_path: Path = args.config
+    if not config_path.exists():
+        log.error("Config file not found: %s", config_path)
+        return 1
+
+    report = doctor_config_from_path(config_path)
+    print(report.text)
+    return report.exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -462,6 +492,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.explain_subcommand == "resume":
             return _run_explain_resume(args, log)
         log.error("explain subcommand %r is not yet implemented.", args.explain_subcommand)
+        return 1
+
+    if args.subcommand == "doctor":
+        if args.doctor_subcommand == "config":
+            return _run_doctor_config(args, log)
+        log.error("doctor subcommand %r is not yet implemented.", args.doctor_subcommand)
         return 1
 
     log.error("Unknown subcommand: %s", args.subcommand)
