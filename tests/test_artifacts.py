@@ -468,6 +468,50 @@ class TestEffectiveConfigPayload:
         assert payload["execution"]["max_iterations"] == 5
         assert payload["execution"]["model"] == "opus"
 
+    def test_includes_dimensions(self):
+        cfg = _make_research_config(dimensions=("Cost", "Latency", "Security"))
+        payload = effective_config_payload(config=cfg)
+        assert payload["dimensions"] == ["Cost", "Latency", "Security"]
+
+    def test_includes_methodology(self):
+        from src.config import MethodologyConfig
+        cfg = _make_research_config(
+            methodology=MethodologyConfig(question="What is best?", scope="Arch decision"),
+        )
+        payload = effective_config_payload(config=cfg)
+        assert payload["methodology"]["question"] == "What is best?"
+        assert payload["methodology"]["scope"] == "Arch decision"
+
+    def test_includes_evaluation(self):
+        cfg = _make_research_config(
+            evaluation=EvaluationConfig(benchmark_id="bench-42", run_baselines=True),
+        )
+        payload = effective_config_payload(config=cfg)
+        assert payload["evaluation"]["benchmark_id"] == "bench-42"
+        assert payload["evaluation"]["run_baselines"] is True
+
+    def test_includes_scoring(self):
+        cfg = _make_research_config(
+            scoring=ScoringConfig(min_dimensions_per_iteration=3, target_dimensions_total=12),
+        )
+        payload = effective_config_payload(config=cfg)
+        assert payload["scoring"]["min_dimensions_per_iteration"] == 3
+        assert payload["scoring"]["target_dimensions_total"] == 12
+
+    def test_includes_providers(self):
+        from src.config import ProviderConfig
+        cfg = _make_research_config(
+            providers={"main": ProviderConfig(adapter="claude-cli", model="opus")},
+        )
+        payload = effective_config_payload(config=cfg)
+        assert payload["providers"]["main"]["adapter"] == "claude-cli"
+        assert payload["providers"]["main"]["model"] == "opus"
+
+    def test_empty_providers_serialized_as_empty_dict(self):
+        cfg = _make_research_config()
+        payload = effective_config_payload(config=cfg)
+        assert payload["providers"] == {}
+
     def test_includes_reporting_export_flags(self):
         cfg = _make_research_config(
             reporting=ReportingConfig(export_html=True, export_pdf=False),
@@ -488,48 +532,60 @@ class TestEffectiveConfigPayload:
 
 
 class TestWriteEffectiveConfig:
-    def test_file_is_written_to_output_dir(self, tmp_path: Path):
-        output_dir = tmp_path / "run-001"
-        output_dir.mkdir()
+    def test_file_is_written_to_path(self, tmp_path: Path):
+        path = tmp_path / "run-001" / "effective_config.json"
+        path.parent.mkdir()
         cfg = _make_research_config()
-        write_effective_config(output_dir, config=cfg)
-        path = output_dir / "effective_config.json"
+        write_effective_config(path, config=cfg)
         assert path.exists()
 
     def test_file_is_valid_json(self, tmp_path: Path):
-        output_dir = tmp_path / "run-001"
-        output_dir.mkdir()
+        path = tmp_path / "run-001" / "effective_config.json"
+        path.parent.mkdir()
         cfg = _make_research_config()
-        write_effective_config(output_dir, config=cfg)
-        data = json.loads((output_dir / "effective_config.json").read_text(encoding="utf-8"))
+        write_effective_config(path, config=cfg)
+        data = json.loads(path.read_text(encoding="utf-8"))
         assert isinstance(data, dict)
 
     def test_file_content_includes_security(self, tmp_path: Path):
-        output_dir = tmp_path / "run-001"
-        output_dir.mkdir()
+        path = tmp_path / "run-001" / "effective_config.json"
+        path.parent.mkdir()
         cfg = _make_research_config(
             security=SecurityConfig(content_trust="permissive"),
         )
-        write_effective_config(output_dir, config=cfg)
-        data = json.loads((output_dir / "effective_config.json").read_text(encoding="utf-8"))
+        write_effective_config(path, config=cfg)
+        data = json.loads(path.read_text(encoding="utf-8"))
         assert data["security"]["content_trust"] == "permissive"
 
     def test_file_content_includes_reporting(self, tmp_path: Path):
-        output_dir = tmp_path / "run-001"
-        output_dir.mkdir()
+        path = tmp_path / "run-001" / "effective_config.json"
+        path.parent.mkdir()
         cfg = _make_research_config(
             reporting=ReportingConfig(output_style="technical_doc"),
         )
-        write_effective_config(output_dir, config=cfg)
-        data = json.loads((output_dir / "effective_config.json").read_text(encoding="utf-8"))
+        write_effective_config(path, config=cfg)
+        data = json.loads(path.read_text(encoding="utf-8"))
         assert data["reporting"]["output_style"] == "technical_doc"
 
     def test_file_content_includes_execution(self, tmp_path: Path):
-        output_dir = tmp_path / "run-001"
-        output_dir.mkdir()
+        path = tmp_path / "run-001" / "effective_config.json"
+        path.parent.mkdir()
         cfg = _make_research_config(
             execution=ExecutionConfig(max_iterations=3, model="haiku"),
         )
-        write_effective_config(output_dir, config=cfg)
-        data = json.loads((output_dir / "effective_config.json").read_text(encoding="utf-8"))
+        write_effective_config(path, config=cfg)
+        data = json.loads(path.read_text(encoding="utf-8"))
         assert data["execution"]["max_iterations"] == 3
+
+    def test_file_content_includes_dimensions_and_methodology(self, tmp_path: Path):
+        from src.config import MethodologyConfig
+        path = tmp_path / "run-001" / "effective_config.json"
+        path.parent.mkdir()
+        cfg = _make_research_config(
+            dimensions=("Scalability", "Cost"),
+            methodology=MethodologyConfig(question="Which is cheaper?"),
+        )
+        write_effective_config(path, config=cfg)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["dimensions"] == ["Scalability", "Cost"]
+        assert data["methodology"]["question"] == "Which is cheaper?"

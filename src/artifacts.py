@@ -786,19 +786,20 @@ def write_portfolio(output_dir: Path, portfolio_fn: Any, portfolio_html_fn: Any)
 
 
 def effective_config_payload(*, config: Any) -> dict[str, Any]:
-    """Build a normalized, machine-readable snapshot of the effective run config.
+    """Build a normalized, machine-readable snapshot of the full effective run config.
 
-    This artifact answers: *what config did we actually run with?*  It includes
-    the full resolved config — defaults applied, backend roles mapped, security
-    policy declared, style label resolved — so operators and automation can
-    understand exactly what was active for the run.
+    This artifact answers: *what config did we actually run with?*  It is the
+    complete resolved config — all defaults applied, every section included —
+    so operators can reconstruct the run's intent without reopening the original
+    YAML.
 
     Args:
         config: A ``ResearchConfig`` instance (fully resolved, with defaults).
 
     Returns:
-        A JSON-serializable dict with sections for topic/goal, execution,
-        backends, reporting (with style label), and security.
+        A JSON-serializable dict covering topic/goal, dimensions, methodology,
+        evaluation, scoring, execution, backends, reporting (with style label
+        and active overrides), security, and providers.
     """
     reporting = config.reporting
     style_label = build_output_style_presentation(reporting.output_style).get("style_label", "")
@@ -812,6 +813,10 @@ def effective_config_payload(*, config: Any) -> dict[str, Any]:
     return {
         "topic": config.topic,
         "goal": config.goal,
+        "dimensions": list(config.dimensions),
+        "methodology": asdict(config.methodology),
+        "evaluation": asdict(config.evaluation),
+        "scoring": asdict(config.scoring),
         "execution": {
             "strategy": config.execution.strategy,
             "model": config.execution.model,
@@ -854,17 +859,18 @@ def effective_config_payload(*, config: Any) -> dict[str, Any]:
                 "network_access": sandbox.network_access,
             },
         },
+        "providers": {
+            name: asdict(pc) for name, pc in config.providers.items()
+        },
     }
 
 
-def write_effective_config(output_dir: Path, *, config: Any) -> None:
-    """Write ``effective_config.json`` into *output_dir*.
+def write_effective_config(path: Path, *, config: Any) -> None:
+    """Write ``effective_config.json`` to *path*.
 
     Args:
-        output_dir: The run output directory.
+        path: Destination file path (typically ``RunPaths.effective_config``).
         config: A ``ResearchConfig`` instance.
     """
     payload = effective_config_payload(config=config)
-    (output_dir / "effective_config.json").write_text(
-        json.dumps(payload, indent=2), encoding="utf-8"
-    )
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

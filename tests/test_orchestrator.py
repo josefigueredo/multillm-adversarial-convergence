@@ -211,14 +211,19 @@ class TestAutoResearcherSetup:
              patch("src.orchestrator.cli_version", return_value="1.0"), \
              patch("src.orchestrator.package_version", return_value="0.2.0"):
             researcher._setup()
-        effective_config_path = researcher.output_dir / "effective_config.json"
-        assert effective_config_path.exists()
-        data = json.loads(effective_config_path.read_text(encoding="utf-8"))
+        # Verify file is at the centralized RunPaths location
+        assert researcher.paths.effective_config.exists()
+        data = json.loads(researcher.paths.effective_config.read_text(encoding="utf-8"))
+        assert data["topic"] == "Test topic"
         assert "security" in data
         assert "execution" in data
         assert "reporting" in data
         assert "backends" in data
-        assert data["topic"] == "Test topic"
+        assert "dimensions" in data
+        assert "methodology" in data
+        assert "evaluation" in data
+        assert "scoring" in data
+        assert "providers" in data
 
 
         researcher.config = ResearchConfig(

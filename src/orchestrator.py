@@ -1065,7 +1065,7 @@ class AutoResearcher:
 
     def _write_effective_config(self) -> None:
         """Write the normalized effective config snapshot for this run."""
-        write_effective_config(self.output_dir, config=self.config)
+        write_effective_config(self.paths.effective_config, config=self.config)
 
     def _write_metrics(self) -> None:
         """Write machine-readable run metrics."""
