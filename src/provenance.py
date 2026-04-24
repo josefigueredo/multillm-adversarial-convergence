@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .trust import classify_citation_trust, classify_claim_trust
+
 
 _URL_PATTERN = re.compile(r"https?://[^\s)>\]]+")
 _MD_LINK_PATTERN = re.compile(r"\[([^\]]+)\]\((https?://[^)]+)\)")
@@ -32,33 +34,33 @@ def extract_citations(text: str, *, scope: str, retrieved_at: str) -> list[dict[
         if url in seen:
             continue
         seen.add(url)
-        citations.append(
-            {
-                "id": f"cite-{len(citations) + 1:03d}",
-                "scope": scope,
-                "title": title.strip(),
-                "url": url,
-                "source_type": infer_source_type(url),
-                "source_quality_weight": source_quality_weight(infer_source_type(url)),
-                "retrieved_at": retrieved_at,
-            }
-        )
+        entry: dict[str, Any] = {
+            "id": f"cite-{len(citations) + 1:03d}",
+            "scope": scope,
+            "title": title.strip(),
+            "url": url,
+            "source_type": infer_source_type(url),
+            "source_quality_weight": source_quality_weight(infer_source_type(url)),
+            "retrieved_at": retrieved_at,
+        }
+        entry["trust_class"] = classify_citation_trust(entry)
+        citations.append(entry)
 
     for url in _URL_PATTERN.findall(text):
         if url in seen:
             continue
         seen.add(url)
-        citations.append(
-            {
-                "id": f"cite-{len(citations) + 1:03d}",
-                "scope": scope,
-                "title": "",
-                "url": url,
-                "source_type": infer_source_type(url),
-                "source_quality_weight": source_quality_weight(infer_source_type(url)),
-                "retrieved_at": retrieved_at,
-            }
-        )
+        entry = {
+            "id": f"cite-{len(citations) + 1:03d}",
+            "scope": scope,
+            "title": "",
+            "url": url,
+            "source_type": infer_source_type(url),
+            "source_quality_weight": source_quality_weight(infer_source_type(url)),
+            "retrieved_at": retrieved_at,
+        }
+        entry["trust_class"] = classify_citation_trust(entry)
+        citations.append(entry)
 
     return citations
 
@@ -80,8 +82,7 @@ def extract_claims(text: str, *, scope: str, dimension: str = "") -> list[dict[s
         if confidence == "unlabeled" and pending_confidence is not None:
             confidence = pending_confidence
             pending_confidence = None
-        claims.append(
-            {
+        claim_dict = {
                 "id": f"claim-{len(claims) + 1:03d}",
                 "scope": scope,
                 "dimension": dimension,
@@ -90,7 +91,8 @@ def extract_claims(text: str, *, scope: str, dimension: str = "") -> list[dict[s
                 "confidence": confidence,
                 "cited_urls": cited_urls,
             }
-        )
+        claim_dict["trust_class"] = classify_claim_trust(claim_dict)
+        claims.append(claim_dict)
     return claims
 
 

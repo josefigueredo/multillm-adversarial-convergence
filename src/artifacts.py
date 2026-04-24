@@ -306,6 +306,7 @@ def dashboard_payload(
     retry_summary: dict[str, Any] | None = None,
     tool_loop_summary: dict[str, Any] | None = None,
     tool_trace_summary: dict[str, Any] | None = None,
+    trust_summary: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Build the stakeholder-facing dashboard artifact payload."""
     tool_usage_summary = _tool_usage_summary(tool_loop_summary or {})
@@ -368,6 +369,7 @@ def dashboard_payload(
             "status_counts": {},
             "top_failure_codes": [],
         },
+        "trust_summary": trust_summary or {},
     }
 
 
@@ -732,6 +734,8 @@ def write_dashboard(
     tool_loop_summary: dict[str, Any] | None = None,
 ) -> None:
     """Write a stakeholder-friendly summary dashboard artifact."""
+    from .trust import trust_summary as compute_trust_summary
+
     rubric = load_json_if_exists(output_dir / "rubric.json", {})
     evidence_quality = load_json_if_exists(output_dir / "evidence_quality.json", {})
     comparison = load_json_if_exists(output_dir / "comparison.json", {})
@@ -743,6 +747,13 @@ def write_dashboard(
     search_log = load_json_if_exists(output_dir / "search_log.json", {})
     screening_log = load_json_if_exists(output_dir / "screening_log.json", {})
     tool_trace = load_json_if_exists(output_dir / "tool_trace.json", {})
+
+    claims = load_json_if_exists(output_dir / "claims.json", [])
+    citations = load_json_if_exists(output_dir / "citations.json", [])
+    provenance_items = (claims if isinstance(claims, list) else []) + (
+        citations if isinstance(citations, list) else []
+    )
+    run_trust_summary = compute_trust_summary(provenance_items)
 
     payload = dashboard_payload(
         topic=config.topic,
@@ -768,6 +779,7 @@ def write_dashboard(
         retry_summary=retry_summary,
         tool_loop_summary=tool_loop_summary,
         tool_trace_summary=tool_trace.get("summary", {}) if isinstance(tool_trace, dict) else {},
+        trust_summary=run_trust_summary,
     )
     (output_dir / "dashboard.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
