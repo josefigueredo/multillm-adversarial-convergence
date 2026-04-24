@@ -60,9 +60,12 @@ Important runtime rules:
 - `explain config --config <path>` prints a human-readable explanation of the effective config (topic, strategy, backend roles, providers, output style, security policy, artifact paths) without touching the network, creating dirs, or running backends
 - `explain resume --output <dir>` inspects an existing run output directory and reports resume readiness (iteration count, artifact presence, best score, reuse vs regenerate breakdown) without executing anything
 - `security:` is now a first-class config section; Milestone 1 policy fields: `content_trust` (`strict` | `permissive`), `tool_execution_mode` (`direct` | `sandboxed`), and a `sandbox:` sub-section (`mode`, `scope`, `filesystem_access`, `network_access`); see [Security policy](docs/run.md#security-policy)
+- **Milestone 2 — runtime-enforced security:** `allow_host_bash: false` hard-blocks any backend call that includes `Bash` in `allowed_tools` (raises `PolicyDeniedError`, audit event emitted before exception); `sandbox.filesystem_access` controls the write boundary checked by `guard_path_write` (`output_only` → `output_dir`, `workspace_only` → `output_dir/.workspace/`); every real run creates `output_dir/.workspace/` as the run-scoped workspace boundary
+- `policy_denied` events in `audit_trail.jsonl` record every enforcement denial with `reason_code`, `policy_field`, `requested_action`, and (when applicable) `requested_path` / `allowed_boundary` — denial events are always written before the exception propagates
+- `sandbox_initialized` and `sandbox_policy_applied` events in `audit_trail.jsonl` record workspace creation and active runtime policy at setup time
 - `effective_config.json` is written at run start as a full normalized snapshot of the resolved config (topic, dimensions, methodology, evaluation, scoring, execution, security, reporting, providers, backends) — useful for auditing exactly what a run executed with
 - real runs now write a human-readable `run.log` plus a structured `audit_trail.jsonl` audit trail in the output directory
-- `audit_trail.jsonl` records step start/completion/failure events and the files created or updated by each step, which is the foundation for future flow/sequence visualizations
+- `audit_trail.jsonl` records step start/completion/failure events, files created or updated by each step, and sandbox/security events
 - `reporting.output_style` now lets `run` choose the synthesis prose/profile:
   - `default`
   - `paper`

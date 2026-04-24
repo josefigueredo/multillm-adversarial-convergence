@@ -102,8 +102,12 @@ Real `run` executions now emit two runtime traces in the output directory:
 - step start / completion / failure
 - iteration lifecycle events
 - files created or updated by each step
+- **sandbox and security events** (Milestone 2):
+  - `sandbox_initialized` — workspace path created at setup (`output_dir`, `workspace_dir`)
+  - `sandbox_policy_applied` — active runtime policy at setup (`tool_execution_mode`, `sandbox_active`, `filesystem_access`, `network_access`, `allow_host_bash`)
+  - `policy_denied` — denial event recorded before exception propagates (`reason_code`, `policy_field`, `requested_action`, and optionally `requested_path`, `allowed_boundary`)
 
-This is especially useful for debugging long iterations, because you can see which step was active before a stall and which artifacts were produced after each step.
+This is especially useful for debugging long iterations, because you can see which step was active before a stall and which artifacts were produced after each step.  Security events make it possible to audit exactly when and why a tool call or write was blocked.
 
 ## Architecture
 
@@ -576,27 +580,55 @@ Example persisted outputs and screenshots for the same research corpus are avail
 
 ### Security policy
 
-`security:` is a first-class config section declaring the policy for a run.  Milestone 1 fields are declarations only — enforcement is a future milestone.
+`security:` is a first-class config section declaring and enforcing the runtime security policy for a run.
 
 ```yaml
 research:
   security:
     content_trust: strict        # strict | permissive
     tool_execution_mode: direct  # direct | sandboxed
+    allow_host_bash: true        # false blocks Bash tool in all backend calls
+    allow_filesystem_write_outside_output: false  # true relaxes write boundary
     sandbox:
       mode: off                  # off | tool_calls
-      scope: run                 # run (only valid value in Milestone 1)
+      scope: run
       filesystem_access: output_only   # output_only | workspace_only
       network_access: unrestricted     # unrestricted | web_only | none
 ```
 
-Defaults: `content_trust: strict`, `tool_execution_mode: direct`, sandbox fully off.
+Defaults: `content_trust: strict`, `tool_execution_mode: direct`, `allow_host_bash: true`, sandbox fully off.
 
-- `content_trust: strict` — conservative sanitization and provenance checks on backend-returned content
-- `content_trust: permissive` — relaxed checks (useful for known-safe internal backends)
-- `tool_execution_mode: sandboxed` — declares intent to route tool calls through sandbox when enforcement is added
-- `sandbox.mode: tool_calls` — sandbox scope limited to tool call dispatch; `off` disables all sandboxing
-- `sandbox.network_access: web_only` — declares web-only outbound traffic policy; `none` blocks all
+**Declared-only fields** (enforced in future milestones):
+- `content_trust` — sanitization posture for backend-returned content
+- `tool_execution_mode: sandboxed` — declares intent to sandbox tool calls; enforcement requires a real sandbox backend
+- `sandbox.network_access` — declares outbound traffic policy; not yet network-enforced at the OS level
+
+**Runtime-enforced fields** (Milestone 2):
+- `allow_host_bash: false` — hard-blocks any backend call that includes `Bash` in `allowed_tools`; denial raises `PolicyDeniedError` and is recorded in `audit_trail.jsonl` before the backend is invoked
+- `sandbox.filesystem_access` — controls the allowed write roots checked by `guard_path_write`:
+  - `output_only` (default) — writes must be within the run `output_dir`
+  - `workspace_only` — writes must be within `output_dir/.workspace/`
+- `allow_filesystem_write_outside_output: true` — explicitly permits writes anywhere (disables filesystem write policy)
+
+#### Run-scoped workspace
+
+Every real `run` creates a dedicated workspace directory at:
+
+```
+output/<run>/.workspace/
+```
+
+This directory is the write root when `sandbox.filesystem_access: workspace_only`.  It is created during setup and its path is recorded in `audit_trail.jsonl` (`sandbox_initialized` event).  Inspect-only commands (`explain config`, `explain resume`) never create it.
+
+#### Denial behavior
+
+When a policy check fails, the platform:
+1. emits a `policy_denied` event to `audit_trail.jsonl` with `reason_code`, `policy_field`, `requested_action`, and (when applicable) `requested_path` and `allowed_boundary`
+2. raises `PolicyDeniedError` — the run is aborted at that point
+
+Reason codes:
+- `host_bash_disabled` — `Bash` was in `allowed_tools` but `allow_host_bash: false`
+- `write_outside_allowed_roots` — write target was outside the declared filesystem boundary
 
 The full resolved security policy is persisted in `effective_config.json` and surfaced by `explain config`.
 
