@@ -12,6 +12,7 @@ Supports **Claude**, **Codex**, **Gemini**, and **Copilot** backends.
 | [**run**](docs/run.md) | `src.cli run` | Autonomous iterative research on any topic |
 | [**refine**](docs/refine.md) | `src.cli refine` | Converge a PRD, spec, or technical proposal |
 | [**plan**](docs/plan.md) | `src.cli plan` | Converge an implementation plan |
+| **explain** | `src.cli explain` | Inspect config or resume state without executing |
 
 ## Quick Start
 
@@ -25,6 +26,12 @@ uv run python -m src.cli run --config configs/aws_api_gateway.yaml --dry-run
 # Validate refine / plan configs without executing convergence loops
 uv run python -m src.cli refine --config configs/prd_template.yaml --dry-run
 uv run python -m src.cli plan --config configs/plan_template.yaml --dry-run
+
+# Inspect effective config before running (no backends, no dirs created)
+uv run python -m src.cli explain config --config configs/aws_api_gateway.yaml
+
+# Inspect a paused run's resume state (no backends, pure filesystem inspection)
+uv run python -m src.cli explain resume --output output/aws_api_gateway
 ```
 
 Dry-run smoke commands are a good first check before a real run:
@@ -50,6 +57,10 @@ Important runtime rules:
 - `execution.retry_api_errors` retries retryable non-streaming API failures with exponential backoff; streaming calls and function-tool loops are intentionally excluded
 - `run --dry-run` validates config loading, strategy/backend resolution, provider wiring, backend availability, and planned artifact paths without executing the research loop or writing run artifacts
 - `refine --dry-run` and `plan --dry-run` validate config loading, backend/provider wiring, and planned artifact paths without executing convergence loops or writing run artifacts
+- `explain config --config <path>` prints a human-readable explanation of the effective config (topic, strategy, backend roles, providers, output style, security policy, artifact paths) without touching the network, creating dirs, or running backends
+- `explain resume --output <dir>` inspects an existing run output directory and reports resume readiness (iteration count, artifact presence, best score, reuse vs regenerate breakdown) without executing anything
+- `security:` is now a first-class config section; Milestone 1 policy fields: `content_trust` (`strict` | `permissive`), `tool_execution_mode` (`direct` | `sandboxed`), and a `sandbox:` sub-section (`mode`, `scope`, `filesystem_access`, `network_access`); see [Security policy](#security-policy) in `docs/run.md`
+- `effective_config.json` is written at run start as a full normalized snapshot of the resolved config (topic, dimensions, methodology, evaluation, scoring, execution, security, reporting, providers, backends) — useful for auditing exactly what a run executed with
 - real runs now write a human-readable `run.log` plus a structured `audit_trail.jsonl` audit trail in the output directory
 - `audit_trail.jsonl` records step start/completion/failure events and the files created or updated by each step, which is the foundation for future flow/sequence visualizations
 - `reporting.output_style` now lets `run` choose the synthesis prose/profile:

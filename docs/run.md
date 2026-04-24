@@ -443,6 +443,7 @@ Each run produces a directory under `output/<config-name>/`:
 
 | File | Description |
 |------|-------------|
+| `effective_config.json` | Full normalized snapshot of the resolved config written at run start |
 | `results.tsv` | Experiment log (scores, gaps, cumulative cost/tokens) |
 | `knowledge_base.md` | Accumulated research findings |
 | `iterations/iter_NNN.md` | Per-iteration markdown files |
@@ -573,6 +574,73 @@ The selected style also shows up in operator-facing artifacts:
 Example persisted outputs and screenshots for the same research corpus are available in:
 - [`docs/showcase/localstack-alternatives/`](./showcase/localstack-alternatives/README.md)
 
+### Security policy
+
+`security:` is a first-class config section declaring the policy for a run.  Milestone 1 fields are declarations only — enforcement is a future milestone.
+
+```yaml
+research:
+  security:
+    content_trust: strict        # strict | permissive
+    tool_execution_mode: direct  # direct | sandboxed
+    sandbox:
+      mode: off                  # off | tool_calls
+      scope: run                 # run (only valid value in Milestone 1)
+      filesystem_access: output_only   # output_only | workspace_only
+      network_access: unrestricted     # unrestricted | web_only | none
+```
+
+Defaults: `content_trust: strict`, `tool_execution_mode: direct`, sandbox fully off.
+
+- `content_trust: strict` — conservative sanitization and provenance checks on backend-returned content
+- `content_trust: permissive` — relaxed checks (useful for known-safe internal backends)
+- `tool_execution_mode: sandboxed` — declares intent to route tool calls through sandbox when enforcement is added
+- `sandbox.mode: tool_calls` — sandbox scope limited to tool call dispatch; `off` disables all sandboxing
+- `sandbox.network_access: web_only` — declares web-only outbound traffic policy; `none` blocks all
+
+The full resolved security policy is persisted in `effective_config.json` and surfaced by `explain config`.
+
+## Explain commands
+
+`explain` is a pure inspection subcommand. It does **not** create output directories, run backends, check backend availability, or instantiate `AutoResearcher`. Exit code `0` on success, `1` on bad input.
+
+### `explain config`
+
+```bash
+uv run python -m src.cli explain config --config configs/aws_api_gateway.yaml
+```
+
+Prints a human-readable summary of the resolved research config:
+
+- research topic, goal, and dimensions
+- strategy and execution flags
+- backend role mapping (primary / research / judge / utility)
+- provider instances (adapter + model)
+- output style and active overrides
+- reporting outputs (HTML, PDF)
+- full security policy (all `security:` fields)
+- default artifact paths preview
+
+Useful for verifying a config is wired correctly before committing to a run.
+
+### `explain resume`
+
+```bash
+uv run python -m src.cli explain resume --output output/aws_api_gateway
+```
+
+Inspects an existing run output directory and prints:
+
+- whether the run is resumable (`yes` / `no`)
+- number of iteration files found
+- best score (from `metrics.json` when present)
+- run status (from `metrics.json` when present)
+- per-artifact presence table (`effective_config.json`, `results.tsv`, `knowledge_base.md`, `synthesis.md`, `report.html`, …)
+- explicit **reused** list: iteration files, `results.tsv`, `knowledge_base.md`
+- explicit **regenerated** list: `synthesis.md`, `methods.md`, `dashboard.json`, `report.html`, `report.pdf`
+
+Returns exit code `1` if the output directory does not exist.
+
 ## Resilience
 
 - **Crash recovery**: Dimensions retried up to 3 times, then skipped
@@ -590,6 +658,7 @@ Example persisted outputs and screenshots for the same research corpus are avail
 src/
     cli.py                  Entry point
     config.py               YAML config loader (ResearchConfig)
+    explain.py              Explain commands (config + resume inspection)
     orchestrator.py         AutoResearcher — setup, synthesis, artifact wiring
     research_loop.py        Core iteration loop (hypothesis → research → score → decide)
     scorer.py               Heuristic scoring, LLM-as-judge, inter-rater agreement
