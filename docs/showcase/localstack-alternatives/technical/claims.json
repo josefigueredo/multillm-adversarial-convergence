@@ -1,0 +1,11 @@
+[
+  {
+    "id": "synthesis-claim-001",
+    "scope": "synthesis",
+    "dimension": "",
+    "text": "You've hit your org's monthly usage limit",
+    "claim_type": "factual",
+    "confidence": "unlabeled",
+    "cited_urls": []
+  }
+]

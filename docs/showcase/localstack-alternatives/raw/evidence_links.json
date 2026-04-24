@@ -1,0 +1,2941 @@
+[
+  {
+    "claim_id": "iteration-007-claim-001",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-002",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-003",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-004",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-005",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-006",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-007",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-008",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-009",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-010",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-011",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-012",
+    "citation_ids": [
+      "iteration-007-cite-025"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-007-claim-013",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-014",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-015",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-016",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-017",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-018",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-019",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-020",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-021",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-022",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-023",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-024",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-025",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-026",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-027",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-028",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-029",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-030",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-031",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-032",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-033",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-034",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-035",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-036",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-037",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-038",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-039",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-040",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-041",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-042",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-043",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-044",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-045",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-046",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-047",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-048",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-049",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-050",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-051",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-052",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-053",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-054",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-055",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-056",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-057",
+    "citation_ids": [
+      "iteration-007-cite-026"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-007-claim-058",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-059",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-060",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-061",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-062",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-063",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-064",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-065",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-066",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-067",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-068",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-069",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-070",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-071",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-072",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-073",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-074",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-075",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-076",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-077",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-078",
+    "citation_ids": [
+      "iteration-007-cite-021"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-007-claim-079",
+    "citation_ids": [
+      "synthesis-cite-001",
+      "synthesis-cite-001",
+      "synthesis-cite-001",
+      "synthesis-cite-001",
+      "synthesis-cite-001",
+      "synthesis-cite-001",
+      "synthesis-cite-001",
+      "iteration-007-cite-001"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.64
+  },
+  {
+    "claim_id": "iteration-007-claim-080",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-081",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-082",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-083",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-084",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-085",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-086",
+    "citation_ids": [
+      "iteration-007-cite-002",
+      "iteration-007-cite-023"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-007-claim-087",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-088",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-089",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-090",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-091",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-092",
+    "citation_ids": [
+      "iteration-007-cite-024"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-007-claim-093",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-094",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-095",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-096",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-097",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-098",
+    "citation_ids": [
+      "iteration-007-cite-024"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-007-claim-099",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-100",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-101",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-102",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-103",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-104",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-105",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-106",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-107",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-108",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-109",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-110",
+    "citation_ids": [
+      "iteration-007-cite-024"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-007-claim-111",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-112",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-113",
+    "citation_ids": [
+      "iteration-007-cite-026",
+      "iteration-007-cite-024",
+      "iteration-007-cite-027",
+      "iteration-007-cite-024"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.53
+  },
+  {
+    "claim_id": "iteration-007-claim-114",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-115",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-116",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-117",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-118",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-119",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-120",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-121",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-122",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-123",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-124",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-125",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-126",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-127",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-007-claim-128",
+    "citation_ids": [
+      "iteration-007-cite-012",
+      "iteration-007-cite-013",
+      "iteration-008-cite-023",
+      "iteration-008-cite-024",
+      "iteration-007-cite-016",
+      "iteration-007-cite-002",
+      "iteration-007-cite-012",
+      "iteration-008-cite-024",
+      "iteration-007-cite-012",
+      "iteration-007-cite-013",
+      "iteration-007-cite-017",
+      "iteration-007-cite-018",
+      "iteration-008-cite-023",
+      "iteration-007-cite-019",
+      "iteration-007-cite-020"
+    ],
+    "support_strength": "strong",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.66
+  },
+  {
+    "claim_id": "iteration-008-claim-001",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-002",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-003",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-004",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-005",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-006",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-007",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-008",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-009",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-010",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-011",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-012",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-013",
+    "citation_ids": [
+      "iteration-008-cite-009"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-014",
+    "citation_ids": [
+      "iteration-008-cite-010"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-015",
+    "citation_ids": [
+      "iteration-008-cite-011"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-016",
+    "citation_ids": [
+      "iteration-008-cite-004"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-017",
+    "citation_ids": [
+      "iteration-008-cite-005"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-018",
+    "citation_ids": [
+      "iteration-008-cite-006"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-019",
+    "citation_ids": [
+      "iteration-008-cite-007"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-020",
+    "citation_ids": [
+      "iteration-008-cite-008"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-021",
+    "citation_ids": [
+      "iteration-008-cite-002"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-022",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-023",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-024",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-025",
+    "citation_ids": [
+      "iteration-008-cite-012"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-026",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-027",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-028",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-029",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-030",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-031",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-032",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-033",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-034",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-035",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-036",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-037",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-038",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-039",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-040",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-041",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-042",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-043",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-044",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-045",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-046",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-047",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-048",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-049",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-050",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-051",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-052",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-053",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-054",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-055",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-056",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-057",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-058",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-059",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-060",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-061",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-062",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-063",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-064",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-065",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-066",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-067",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-068",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-069",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-070",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-071",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-072",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-073",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-074",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-075",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-076",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-077",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-078",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-079",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-080",
+    "citation_ids": [
+      "iteration-008-cite-014"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-008-claim-081",
+    "citation_ids": [
+      "iteration-008-cite-006"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-082",
+    "citation_ids": [
+      "iteration-008-cite-015"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.63
+  },
+  {
+    "claim_id": "iteration-008-claim-083",
+    "citation_ids": [
+      "iteration-008-cite-016"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.63
+  },
+  {
+    "claim_id": "iteration-008-claim-084",
+    "citation_ids": [
+      "iteration-008-cite-017"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.63
+  },
+  {
+    "claim_id": "iteration-008-claim-085",
+    "citation_ids": [
+      "iteration-008-cite-018"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.63
+  },
+  {
+    "claim_id": "iteration-008-claim-086",
+    "citation_ids": [
+      "iteration-008-cite-019"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.63
+  },
+  {
+    "claim_id": "iteration-008-claim-087",
+    "citation_ids": [
+      "iteration-008-cite-020"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.63
+  },
+  {
+    "claim_id": "iteration-008-claim-088",
+    "citation_ids": [
+      "iteration-008-cite-021"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.63
+  },
+  {
+    "claim_id": "iteration-008-claim-089",
+    "citation_ids": [
+      "iteration-008-cite-022"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.63
+  },
+  {
+    "claim_id": "iteration-008-claim-090",
+    "citation_ids": [
+      "iteration-008-cite-023"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-008-claim-091",
+    "citation_ids": [
+      "iteration-008-cite-024"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-008-claim-092",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-093",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-094",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-095",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-096",
+    "citation_ids": [
+      "iteration-008-cite-001"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-097",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-098",
+    "citation_ids": [
+      "iteration-008-cite-002"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-099",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-100",
+    "citation_ids": [
+      "iteration-008-cite-003"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-101",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-102",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-103",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-104",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-105",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-106",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-107",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-108",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-109",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-110",
+    "citation_ids": [
+      "iteration-008-cite-004"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-111",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-112",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-113",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-114",
+    "citation_ids": [
+      "iteration-008-cite-005"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-115",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-116",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-117",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-118",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-119",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-120",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-121",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-122",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-123",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-124",
+    "citation_ids": [
+      "iteration-008-cite-006"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-125",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-126",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-127",
+    "citation_ids": [
+      "iteration-008-cite-013"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.41
+  },
+  {
+    "claim_id": "iteration-008-claim-128",
+    "citation_ids": [
+      "iteration-008-cite-007"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-129",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-130",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-131",
+    "citation_ids": [
+      "iteration-008-cite-008"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.49
+  },
+  {
+    "claim_id": "iteration-008-claim-132",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-133",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-134",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-135",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-136",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-137",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-138",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-139",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-140",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-141",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-142",
+    "citation_ids": [],
+    "support_strength": "moderate",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.3
+  },
+  {
+    "claim_id": "iteration-008-claim-143",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-144",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-145",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-146",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-147",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-148",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-149",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-150",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-151",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-152",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-153",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-154",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "iteration-008-claim-155",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-001",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-002",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-003",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-004",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-005",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-006",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-007",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-008",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-009",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-010",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-011",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-012",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-013",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-014",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-015",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-016",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-017",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-018",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-019",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-020",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-021",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-022",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-023",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-024",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-025",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-026",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-027",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-028",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-029",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-030",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-031",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-032",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-033",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-034",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-035",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-036",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-037",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-038",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-039",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-040",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-041",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-042",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-043",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-044",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-045",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-046",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-047",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-048",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-049",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-050",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-051",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-052",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-053",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-054",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-055",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-056",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-057",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-058",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-059",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-060",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-061",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-062",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-063",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-064",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-065",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-066",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-067",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-068",
+    "citation_ids": [
+      "synthesis-cite-001",
+      "synthesis-cite-001",
+      "synthesis-cite-001"
+    ],
+    "support_strength": "basic",
+    "has_direct_citation": true,
+    "evidence_quality_score": 0.53
+  },
+  {
+    "claim_id": "synthesis-claim-069",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-070",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-071",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-072",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-073",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-074",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-075",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-076",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-077",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-078",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-079",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-080",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-081",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-082",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-083",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-084",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-085",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-086",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-087",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-088",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-089",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-090",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-091",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-092",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-093",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-094",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-095",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-096",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-097",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-098",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-099",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-100",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-101",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-102",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.1
+  },
+  {
+    "claim_id": "synthesis-claim-103",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-104",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-105",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-106",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-107",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-108",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-109",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-110",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-111",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-112",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-113",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-114",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-115",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-116",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-117",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-118",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-119",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-120",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  },
+  {
+    "claim_id": "synthesis-claim-121",
+    "citation_ids": [],
+    "support_strength": "weak",
+    "has_direct_citation": false,
+    "evidence_quality_score": 0.15
+  }
+]

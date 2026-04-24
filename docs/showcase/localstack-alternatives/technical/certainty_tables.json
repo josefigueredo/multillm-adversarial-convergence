@@ -1,0 +1,44 @@
+{
+  "summary": {
+    "conclusions_count": 1,
+    "certainty_counts": {
+      "very_low": 1
+    },
+    "high_certainty_factual_count": 0,
+    "high_certainty_recommendation_count": 0
+  },
+  "conclusions": [
+    {
+      "dimension": "overall",
+      "certainty": "very_low",
+      "downgrade_points": 6,
+      "claim_ids": [
+        "synthesis-claim-001"
+      ],
+      "claim_count": 1,
+      "citation_count": 0,
+      "factors": {
+        "risk_of_bias": {
+          "level": "very_serious",
+          "reason": "Average evidence quality score was 0.15."
+        },
+        "inconsistency": {
+          "level": "not_serious",
+          "reason": "0 contradiction(s) were detected for this conclusion."
+        },
+        "indirectness": {
+          "level": "not_serious",
+          "reason": "0 of 1 claim(s) are interpretive or recommendation-oriented."
+        },
+        "imprecision": {
+          "level": "very_serious",
+          "reason": "1 of 1 claim(s) have low, unresolved, or unlabeled confidence."
+        },
+        "publication_bias": {
+          "level": "very_serious",
+          "reason": "Evidence spans 0 distinct source type(s)."
+        }
+      }
+    }
+  ]
+}

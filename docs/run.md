@@ -570,6 +570,9 @@ The selected style also shows up in operator-facing artifacts:
 - `run_manifest.json` includes `output_style_label` and `active_style_overrides`
 - `dashboard.json` includes `output_style`, `output_style_label`, and `active_style_overrides`
 
+Example persisted outputs and screenshots for the same research corpus are available in:
+- [`docs/showcase/localstack-alternatives/`](./showcase/localstack-alternatives/README.md)
+
 ## Resilience
 
 - **Crash recovery**: Dimensions retried up to 3 times, then skipped

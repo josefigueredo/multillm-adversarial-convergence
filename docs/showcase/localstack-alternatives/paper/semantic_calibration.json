@@ -1,0 +1,24 @@
+{
+  "enabled": true,
+  "calibrated_score": 0.52,
+  "grade": "tentative",
+  "profile": "benchmark_weighted+decision",
+  "weights": {
+    "rubric_score": 0.2842,
+    "evidence_score": 0.2105,
+    "benchmark_score": 0.2421,
+    "consistency_score": 0.0526,
+    "uncertainty_score": 0.0526,
+    "contradiction_score": 0.0526,
+    "actionability_score": 0.1053
+  },
+  "components": {
+    "rubric_score": 0.44,
+    "evidence_score": 0.17,
+    "benchmark_score": 1.0,
+    "consistency_score": 0.5,
+    "uncertainty_score": 0.0,
+    "contradiction_score": 1.0,
+    "actionability_score": 0.39
+  }
+}

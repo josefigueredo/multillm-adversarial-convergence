@@ -1,0 +1,851 @@
+{
+  "summary": {
+    "sources_screened": 52,
+    "included_count": 40,
+    "excluded_count": 12
+  },
+  "entries": [
+    {
+      "citation_id": "iteration-007-cite-001",
+      "scope": "iteration-007",
+      "title": "`compat-terraform`",
+      "url": "https://github.com/floci-io/floci/tree/main/compatibility-tests/compat-terraform",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-079"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-002",
+      "scope": "iteration-007",
+      "title": "`compat-cdk/run.sh`",
+      "url": "https://raw.githubusercontent.com/floci-io/floci/main/compatibility-tests/compat-cdk/run.sh",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-086",
+        "iteration-007-claim-128"
+      ],
+      "support_strengths": [
+        "basic",
+        "strong"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-003",
+      "scope": "iteration-007",
+      "title": "floci/floci README",
+      "url": "https://github.com/hectorvent/floci",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-004",
+      "scope": "iteration-007",
+      "title": "ministackorg/ministack README",
+      "url": "https://github.com/ministackorg/ministack",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-005",
+      "scope": "iteration-007",
+      "title": "ministack.org",
+      "url": "https://ministack.org",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-006",
+      "scope": "iteration-007",
+      "title": "compat-terraform/run.sh",
+      "url": "https://raw.githubusercontent.com/floci-io/floci/main/compatibility-tests/compat-terraform/run.sh",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-007",
+      "scope": "iteration-007",
+      "title": "compat-cdk/test/cdk.bats",
+      "url": "https://raw.githubusercontent.com/floci-io/floci/main/compatibility-tests/compat-cdk/test/cdk.bats",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-008",
+      "scope": "iteration-007",
+      "title": "floci.io configuration",
+      "url": "https://floci.io/floci/configuration/application-yml/",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-009",
+      "scope": "iteration-007",
+      "title": "testcontainers-ministack",
+      "url": "https://github.com/ministackorg/testcontainers-ministack",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-010",
+      "scope": "iteration-007",
+      "title": "testcontainers-floci",
+      "url": "https://github.com/floci-io/testcontainers-floci",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-011",
+      "scope": "iteration-007",
+      "title": "Docker Compose docs",
+      "url": "https://floci.io/floci/configuration/docker-compose/",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-012",
+      "scope": "iteration-007",
+      "title": "Floci homepage",
+      "url": "https://floci.io/",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128",
+        "iteration-007-claim-128",
+        "iteration-007-claim-128"
+      ],
+      "support_strengths": [
+        "strong",
+        "strong",
+        "strong"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-013",
+      "scope": "iteration-007",
+      "title": "Floci Quick Start",
+      "url": "https://floci.io/floci/getting-started/quick-start/",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128",
+        "iteration-007-claim-128"
+      ],
+      "support_strengths": [
+        "strong",
+        "strong"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-014",
+      "scope": "iteration-007",
+      "title": "MiniStack docs",
+      "url": "https://ministack.org/docs",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-015",
+      "scope": "iteration-007",
+      "title": "MiniStack PyPI",
+      "url": "https://pypi.org/project/ministack/",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-016",
+      "scope": "iteration-007",
+      "title": "aws-cdk-local docs",
+      "url": "https://github.com/localstack/aws-cdk-local",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128"
+      ],
+      "support_strengths": [
+        "strong"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-017",
+      "scope": "iteration-007",
+      "title": "MiniStack homepage",
+      "url": "https://ministack.org/",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128"
+      ],
+      "support_strengths": [
+        "strong"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-018",
+      "scope": "iteration-007",
+      "title": "Maven Central",
+      "url": "https://central.sonatype.com/artifact/org.ministack/testcontainers-ministack",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128"
+      ],
+      "support_strengths": [
+        "strong"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-019",
+      "scope": "iteration-007",
+      "title": "SAM deploy docs",
+      "url": "https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-cli-command-reference-sam-deploy.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128"
+      ],
+      "support_strengths": [
+        "strong"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-020",
+      "scope": "iteration-007",
+      "title": "SAM package docs",
+      "url": "https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-cli-command-reference-sam-package.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128"
+      ],
+      "support_strengths": [
+        "strong"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-021",
+      "scope": "iteration-007",
+      "title": "",
+      "url": "http://localhost:4566`.",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-078"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-022",
+      "scope": "iteration-007",
+      "title": "",
+      "url": "http://localhost:4566\"",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "excluded",
+      "reason": "no_claim_links",
+      "linked_claim_ids": [],
+      "support_strengths": []
+    },
+    {
+      "citation_id": "iteration-007-cite-023",
+      "scope": "iteration-007",
+      "title": "",
+      "url": "http://}\"",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-086"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-024",
+      "scope": "iteration-007",
+      "title": "",
+      "url": "http://localhost:4566",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-092",
+        "iteration-007-claim-098",
+        "iteration-007-claim-110",
+        "iteration-007-claim-113",
+        "iteration-007-claim-113"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic",
+        "basic",
+        "basic",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-025",
+      "scope": "iteration-007",
+      "title": "",
+      "url": "http://localhost:4566`",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-012"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-026",
+      "scope": "iteration-007",
+      "title": "",
+      "url": "http://localhost:4566/",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-057",
+        "iteration-007-claim-113"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-007-cite-027",
+      "scope": "iteration-007",
+      "title": "",
+      "url": "http://localhost:4566/_ministack/health",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:37:05.098333+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-113"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-001",
+      "scope": "iteration-008",
+      "title": "#556",
+      "url": "https://github.com/floci-io/floci/issues/556",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-096"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-002",
+      "scope": "iteration-008",
+      "title": "#447",
+      "url": "https://github.com/ministackorg/ministack/issues/447",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-021",
+        "iteration-008-claim-098"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-003",
+      "scope": "iteration-008",
+      "title": "#428",
+      "url": "https://github.com/ministackorg/ministack/issues/428",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-100"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-004",
+      "scope": "iteration-008",
+      "title": "filed April 24, 2026",
+      "url": "https://github.com/floci-io/floci/issues/587",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-016",
+        "iteration-008-claim-110"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-005",
+      "scope": "iteration-008",
+      "title": "filed April 23, 2026",
+      "url": "https://github.com/floci-io/floci/issues/571",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-017",
+        "iteration-008-claim-114"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-006",
+      "scope": "iteration-008",
+      "title": "April 14, 2026",
+      "url": "https://github.com/floci-io/floci/issues/432",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-018",
+        "iteration-008-claim-081",
+        "iteration-008-claim-124"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-007",
+      "scope": "iteration-008",
+      "title": "April 16, 2026",
+      "url": "https://github.com/floci-io/floci/issues/485",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-019",
+        "iteration-008-claim-128"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-008",
+      "scope": "iteration-008",
+      "title": "April 20, 2026",
+      "url": "https://github.com/floci-io/floci/issues/547",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-020",
+        "iteration-008-claim-131"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-009",
+      "scope": "iteration-008",
+      "title": "README.md",
+      "url": "https://github.com/floci-io/floci/blob/main/README.md",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-013"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-010",
+      "scope": "iteration-008",
+      "title": "[issues",
+      "url": "https://github.com/floci-io/floci/issues",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-014"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-011",
+      "scope": "iteration-008",
+      "title": "[issues",
+      "url": "https://github.com/ministackorg/ministack/issues",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-015"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-012",
+      "scope": "iteration-008",
+      "title": "[test_sqs.py",
+      "url": "https://github.com/ministackorg/ministack/blob/main/tests/test_sqs.py",
+      "source_type": "repository",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-025"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-013",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "http://floci:4566`",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-127"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-014",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://raw.githubusercontent.com/floci-io/floci/main/README.md",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-080"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-015",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-082"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-016",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/API/API_Bucket.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-083"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-017",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_TagResource.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-084"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-018",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://docs.aws.amazon.com/boto3/latest/reference/services/s3/objectsummary/e_tag.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-085"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-019",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-086"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-020",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://docs.aws.amazon.com/sdkfornet/v4/apidocs/items/SQS/MSQSDeleteMessageDeleteMessageRequest.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-087"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-021",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithItems.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-088"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-022",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html",
+      "source_type": "official_docs",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-008-claim-089"
+      ],
+      "support_strengths": [
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-023",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://ministack.org/docs",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128",
+        "iteration-007-claim-128",
+        "iteration-008-claim-090"
+      ],
+      "support_strengths": [
+        "strong",
+        "strong",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "iteration-008-cite-024",
+      "scope": "iteration-008",
+      "title": "",
+      "url": "https://pypi.org/project/ministack/",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:48:14.543293+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-128",
+        "iteration-007-claim-128",
+        "iteration-008-claim-091"
+      ],
+      "support_strengths": [
+        "strong",
+        "strong",
+        "basic"
+      ]
+    },
+    {
+      "citation_id": "synthesis-cite-001",
+      "scope": "synthesis",
+      "title": "",
+      "url": "http://localhost:4566\"",
+      "source_type": "web",
+      "retrieved_at": "2026-04-24T12:52:50.564463+00:00",
+      "decision": "included",
+      "reason": "linked_to_claims",
+      "linked_claim_ids": [
+        "iteration-007-claim-079",
+        "iteration-007-claim-079",
+        "iteration-007-claim-079",
+        "iteration-007-claim-079",
+        "iteration-007-claim-079",
+        "iteration-007-claim-079",
+        "iteration-007-claim-079",
+        "synthesis-claim-068",
+        "synthesis-claim-068",
+        "synthesis-claim-068"
+      ],
+      "support_strengths": [
+        "basic",
+        "basic",
+        "basic",
+        "basic",
+        "basic",
+        "basic",
+        "basic",
+        "basic",
+        "basic",
+        "basic"
+      ]
+    }
+  ]
+}

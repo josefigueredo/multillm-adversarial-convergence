@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import re
 import shlex
 import subprocess
 from dataclasses import asdict
@@ -12,6 +13,56 @@ from pathlib import Path
 from typing import Any
 
 from .output_style import build_output_style_presentation, summarize_output_style_overrides
+
+
+def derive_report_title(*, report_title: str, topic: str, synthesis_text: str) -> str:
+    """Derive a concise report title from explicit config, synthesis heading, or topic."""
+    if report_title.strip():
+        return report_title.strip()
+
+    synthesis_heading = _extract_markdown_heading(synthesis_text)
+    if synthesis_heading:
+        return synthesis_heading
+
+    return _shorten_topic_title(topic)
+
+
+def _extract_markdown_heading(text: str) -> str:
+    match = re.search(r"(?m)^#\s+(.+?)\s*$", text or "")
+    return match.group(1).strip() if match else ""
+
+
+def _shorten_topic_title(topic: str) -> str:
+    cleaned = " ".join((topic or "").split()).strip()
+    if not cleaned:
+        return "Autoresearch Report"
+    for phrase in (", given that", ", focusing on", ", evaluate", ", assess", ", compare"):
+        idx = cleaned.lower().find(phrase)
+        if idx > 0:
+            candidate = cleaned[:idx].strip(" ,")
+            if candidate:
+                return candidate
+    for delimiter in (". ", "; ", ": ", " — ", " - "):
+        if delimiter in cleaned:
+            candidate = cleaned.split(delimiter, 1)[0].strip()
+            if candidate:
+                return candidate
+    if "," in cleaned:
+        candidate = cleaned.split(",", 1)[0].strip()
+        if candidate:
+            return candidate
+    if len(cleaned) <= 80:
+        return cleaned
+    words = cleaned.split()
+    out: list[str] = []
+    total = 0
+    for word in words:
+        extra = len(word) + (1 if out else 0)
+        if total + extra > 80:
+            break
+        out.append(word)
+        total += extra
+    return " ".join(out) if out else cleaned[:80].rstrip()
 
 
 def load_json_if_exists(path: Path, default: Any) -> Any:
@@ -588,7 +639,11 @@ def write_html_report(
     synthesis_path = output_dir / "synthesis.md"
     methods_text = methods_path.read_text(encoding="utf-8") if methods_path.exists() else ""
     synthesis_text = synthesis_path.read_text(encoding="utf-8") if synthesis_path.exists() else ""
-    title = config.reporting.report_title or f"Autoresearch Report — {config.topic}"
+    title = derive_report_title(
+        report_title=config.reporting.report_title,
+        topic=config.topic,
+        synthesis_text=synthesis_text,
+    )
     html = render_fn(
         title=title,
         output_style=config.reporting.output_style,
@@ -624,7 +679,6 @@ def write_pdf_report(
         return
 
     presentation = build_output_style_presentation(config.reporting.output_style)
-    title = config.reporting.report_title or f"Autoresearch Report — {config.topic}{presentation['pdf_title_suffix']}"
     metrics = load_json_if_exists(output_dir / "metrics.json", {})
     rubric = load_json_if_exists(output_dir / "rubric.json", {})
     evidence_quality = load_json_if_exists(output_dir / "evidence_quality.json", {})
@@ -635,6 +689,11 @@ def write_pdf_report(
     synthesis_path = output_dir / "synthesis.md"
     methods_text = methods_path.read_text(encoding="utf-8") if methods_path.exists() else ""
     synthesis_text = synthesis_path.read_text(encoding="utf-8") if synthesis_path.exists() else ""
+    title = derive_report_title(
+        report_title=config.reporting.report_title,
+        topic=config.topic,
+        synthesis_text=synthesis_text,
+    ) + presentation["pdf_title_suffix"]
     sections = [
         (
             "Run Summary",

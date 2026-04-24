@@ -124,6 +124,9 @@ def test_render_html_report_renders_core_sections_and_escapes():
     assert "EVIDENCE_QUALITY_DATA" in html
     assert "RUBRIC_DATA" in html
     assert "renderJsonTable" in html
+    assert 'class="report report-paper"' in html
+    assert "Georgia, \"Times New Roman\", serif" in html
+    assert ".report-paper .toc" in html
 
 
 def test_render_html_report_omits_optional_sections_when_empty():
@@ -160,6 +163,10 @@ def test_render_html_report_omits_optional_sections_when_empty():
     assert "Evaluation" not in html
     assert "<li>(none)</li>" in html
     assert "Technical Documentation Style" in html
+    assert 'class="report report-technical_doc"' in html
+    assert "background: #f5f7fb;" in html
+    assert ".report-technical_doc .page-shell" in html
+    assert ".report-technical_doc .toc { background: #ffffff;" in html
 
 
 def test_helper_html_sections_behave_as_expected():

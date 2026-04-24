@@ -1,0 +1,20 @@
+{
+  "overall_score": 0.37,
+  "grade": "insufficient",
+  "dimensions": {
+    "evidence_quality": 0.15,
+    "citation_coverage": 0.01,
+    "source_diversity": 0.33,
+    "uncertainty_reporting": 0.03,
+    "actionability": 0.68,
+    "contradiction_handling": 1.0
+  },
+  "summary": {
+    "synthesis_claim_count": 121,
+    "synthesis_citation_count": 1,
+    "contradiction_count": 0,
+    "high_confidence_claims": 0,
+    "unresolved_claims": 1,
+    "recommendation_claims": 13
+  }
+}

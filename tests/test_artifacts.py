@@ -5,6 +5,7 @@ from pathlib import Path
 from src.artifacts import (
     certainty_pdf_text,
     dashboard_payload,
+    derive_report_title,
     evaluation_payload,
     load_json_if_exists,
     metrics_payload,
@@ -264,7 +265,7 @@ def test_write_pdf_report_uses_style_aware_title_and_sections(tmp_path: Path):
         render_pdf_fn=fake_render_pdf,
     )
 
-    assert captured["title"] == "Autoresearch Report — Topic (Executive Brief)"
+    assert captured["title"] == "Draft (Executive Brief)"
     section_names = [name for name, _ in captured["sections"]]
     assert "Approach" in section_names
     assert "Executive Brief" in section_names
@@ -293,6 +294,38 @@ def test_prompt_snapshot_payload_and_rerun_script(tmp_path: Path):
     assert "autoresearch run" in script
     assert "--config" in script
     assert "--output" in script
+
+
+def test_derive_report_title_prefers_explicit_title_then_synthesis_heading_then_short_topic():
+    assert (
+        derive_report_title(
+            report_title="Custom Research Report",
+            topic="This topic should not matter",
+            synthesis_text="# Better Title\n\nBody",
+        )
+        == "Custom Research Report"
+    )
+    assert (
+        derive_report_title(
+            report_title="",
+            topic="This topic should not matter",
+            synthesis_text="# Local AWS Emulation Alternatives Assessment\n\nBody",
+        )
+        == "Local AWS Emulation Alternatives Assessment"
+    )
+    assert (
+        derive_report_title(
+            report_title="",
+            topic=(
+                "Compare alternatives to LocalStack for local AWS service emulation, "
+                "given that LocalStack is moving to a fully paid/subscription model "
+                "for commercial use. Evaluate nahuelnucera/ministack, "
+                "hectorvent/floci, and any other viable open-source alternatives."
+            ),
+            synthesis_text="Body only",
+        )
+        == "Compare alternatives to LocalStack for local AWS service emulation"
+    )
 
 
 def test_run_manifest_payload_includes_output_style_metadata(tmp_path: Path):

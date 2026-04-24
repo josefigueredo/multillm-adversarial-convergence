@@ -1,0 +1,15 @@
+{
+  "entries_count": 0,
+  "summary": {
+    "entries_count": 0,
+    "status_counts": {},
+    "top_failure_codes": []
+  },
+  "redaction_policy": {
+    "sensitive_values": "redacted",
+    "argument_string_preview_chars": 120,
+    "output_preview_chars": 240,
+    "sequence_preview_items": 5
+  },
+  "entries": []
+}

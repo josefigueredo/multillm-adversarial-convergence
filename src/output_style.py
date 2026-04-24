@@ -240,6 +240,55 @@ def build_output_style_presentation(style: str) -> dict[str, str]:
     raise ValueError(f"Unknown output style: {style}")
 
 
+def build_output_style_theme(style: str) -> dict[str, str]:
+    """Return HTML/CSS theming metadata for the selected run output style."""
+    if style == "paper":
+        return {
+            "report_class": "report report-paper",
+            "style_css": (
+                '.report-paper { font-family: Georgia, "Times New Roman", serif; max-width: 820px; color: #222222; }\n'
+                ".report-paper header { border-bottom: 1px solid #d6d0c4; margin-bottom: 2rem; padding-bottom: 1rem; }\n"
+                ".report-paper .subtitle { font-style: italic; letter-spacing: 0.02em; }\n"
+                ".report-paper .meta { font-size: 0.92rem; color: #5d564f; }\n"
+                ".report-paper .toc { background: #fffdf9; border: 1px solid #e2dbd0; box-shadow: none; }\n"
+                ".report-paper .markdown-body { font-size: 1.03rem; line-height: 1.72; }\n"
+                ".report-paper .markdown-body h1, .report-paper .markdown-body h2, .report-paper .markdown-body h3 { font-family: Georgia, \"Times New Roman\", serif; }\n"
+                ".report-paper .markdown-body h1 { border-bottom: 2px solid #d6d0c4; }\n"
+                ".report-paper .markdown-body h2 { border-bottom: 1px solid #e2dbd0; }\n"
+                ".report-paper .markdown-body table { font-size: 0.96rem; }\n"
+                ".report-paper .markdown-body th { background: #f7f2ea; }\n"
+                ".report-paper pre, .report-paper code { font-family: \"SFMono-Regular\", Consolas, monospace; }\n"
+            ),
+        }
+    if style == "technical_doc":
+        return {
+            "report_class": "report report-technical_doc",
+            "style_css": (
+                ".report-technical_doc { font-family: Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; max-width: none; color: #172033; background: #f5f7fb; }\n"
+                ".report-technical_doc .page-shell { max-width: 1180px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }\n"
+                ".report-technical_doc header { background: #ffffff; border: 1px solid #dbe4f0; border-radius: 14px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06); margin-bottom: 0.25rem; padding: 1.25rem 1.5rem; }\n"
+                ".report-technical_doc .subtitle { font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #3d5a80; font-size: 0.82rem; }\n"
+                ".report-technical_doc .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem 1rem; font-size: 0.95rem; }\n"
+                ".report-technical_doc .toc { background: #ffffff; border: 1px solid #dbe4f0; border-radius: 14px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05); }\n"
+                ".report-technical_doc section { margin-bottom: 0; background: #ffffff; border: 1px solid #dbe4f0; border-radius: 14px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04); padding: 1.1rem 1.25rem; }\n"
+                ".report-technical_doc section > h2 { margin-top: 0; }\n"
+                ".report-technical_doc .markdown-body h1, .report-technical_doc .markdown-body h2 { font-family: Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; }\n"
+                ".report-technical_doc .markdown-body h1 { border-bottom: 2px solid #c8d5e6; margin-top: 0.25rem; }\n"
+                ".report-technical_doc .markdown-body h2 { border-bottom: 1px solid #dbe4f0; }\n"
+                ".report-technical_doc .markdown-body table { font-size: 0.95rem; }\n"
+                ".report-technical_doc .markdown-body th { background: #eef4fb; }\n"
+                ".report-technical_doc .markdown-body blockquote { background: #f8fbff; border-left: 4px solid #7aa2d6; border-radius: 0 10px 10px 0; }\n"
+                ".report-technical_doc pre { border-left: 4px solid #7aa2d6; background: #f6f9fc; border-radius: 10px; }\n"
+            ),
+        }
+    if style in VALID_OUTPUT_STYLES:
+        return {
+            "report_class": f"report report-{style}",
+            "style_css": "",
+        }
+    raise ValueError(f"Unknown output style: {style}")
+
+
 def build_output_style_contract(style: str, overrides: object | None = None) -> str:
     """Return prompt instructions for the requested synthesis output style."""
     effective = _resolve_style_overrides(style, overrides)

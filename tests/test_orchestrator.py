@@ -647,7 +647,7 @@ class TestAutoResearcherSetup:
         researcher._collect_provenance(synthesis_text, scope="synthesis")
         researcher._finalize_run_artifacts()
         html = researcher.report_html_path.read_text(encoding="utf-8")
-        assert "Autoresearch Report" in html
+        assert "<title>Test topic</title>" in html
         assert "Developer experience" in html
         assert "Recommend Python for orchestration-heavy workloads." in html
         assert "Rubric" in html

@@ -13,7 +13,11 @@ from pathlib import Path
 from string import Template
 from typing import Any
 
-from .output_style import build_output_style_presentation, build_output_style_report_policy
+from .output_style import (
+    build_output_style_presentation,
+    build_output_style_report_policy,
+    build_output_style_theme,
+)
 
 
 _TEMPLATES_DIR = Path(__file__).with_name("templates")
@@ -51,6 +55,7 @@ def render_html_report(
     _SECTION_COUNTER = 0
     presentation = build_output_style_presentation(output_style)
     policy = build_output_style_report_policy(output_style)
+    theme = build_output_style_theme(output_style)
 
     run = manifest.get("run", {})
     strategy = manifest.get("strategy", {})
@@ -68,7 +73,9 @@ def render_html_report(
     return template.safe_substitute(
         title=escape(title),
         main_css=_MAIN_CSS_PATH.read_text(encoding="utf-8").strip(),
+        style_css=theme["style_css"],
         print_css=_PRINT_CSS_PATH.read_text(encoding="utf-8").strip(),
+        report_class=escape(theme["report_class"]),
         header_html=header_template.safe_substitute(
             title=escape(title),
             style_label=escape(presentation["style_label"]),
