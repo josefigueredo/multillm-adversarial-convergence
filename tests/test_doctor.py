@@ -202,6 +202,18 @@ class TestOperatorRiskNotes:
             or "note" in text_lower
         )
 
+    def test_bash_exposure_risk_exits_1(self):
+        config = _make_config(
+            security=SecurityConfig(allow_host_bash=True),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="Bash,WebSearch",
+            ),
+        )
+        result = doctor_config_text(config)
+        assert result.exit_code == 1
+
     def test_allow_host_bash_false_with_bash_in_tools_no_risk(self):
         config = _make_config(
             security=SecurityConfig(allow_host_bash=False),
@@ -227,6 +239,25 @@ class TestOperatorRiskNotes:
         text_lower = result.text.lower()
         assert "declared" in text_lower
         assert "sandbox" in text_lower
+
+    def test_sandboxed_declared_only_exits_1(self):
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls"),
+            ),
+        )
+        result = doctor_config_text(config)
+        assert result.exit_code == 1
+
+    def test_network_policy_declared_only_exits_1(self):
+        config = _make_config(
+            security=SecurityConfig(
+                sandbox=SandboxConfig(network_access="web_only"),
+            ),
+        )
+        result = doctor_config_text(config)
+        assert result.exit_code == 1
 
     def test_no_risk_notes_section_when_clean(self):
         config = _make_config(
@@ -255,6 +286,9 @@ class TestDoctorConfigCLI:
               goal: "Test goal"
               execution:
                 backend: claude-cli
+                allowed_tools: "WebSearch,Grep"
+              security:
+                allow_host_bash: false
         """)
         rc = main(["doctor", "config", "--config", str(cfg)])
         assert rc == 0
@@ -272,6 +306,9 @@ class TestDoctorConfigCLI:
               goal: "Test goal"
               execution:
                 backend: claude-cli
+                allowed_tools: "WebSearch,Grep"
+              security:
+                allow_host_bash: false
         """)
         main(["doctor", "config", "--config", str(cfg)])
         captured = capsys.readouterr()

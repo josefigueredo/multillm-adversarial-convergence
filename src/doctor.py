@@ -101,34 +101,44 @@ def _enforcement_table_lines(config: "ResearchConfig") -> list[str]:
     return lines
 
 
-def _risk_note_lines(config: "ResearchConfig") -> list[str]:
-    """Return operator risk note lines (empty list = clean)."""
+def _risk_note_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
+    """Return (note_lines, issues) for operator warnings.
+
+    Every risk note is also added to *issues* so that it drives exit_code = 1.
+    """
     sec = config.security
     tools = _parse_tools(config.execution.allowed_tools)
     notes: list[str] = []
+    issues: list[str] = []
 
     if sec.allow_host_bash and "Bash" in tools:
-        notes.append(
-            "  [!] allow_host_bash is true AND Bash is in allowed_tools"
+        msg = (
+            "allow_host_bash is true AND Bash is in allowed_tools"
             " — host shell is exposed to the agent."
         )
+        notes.append(f"  [!] {msg}")
+        issues.append(msg)
 
     if (
         sec.tool_execution_mode == "sandboxed"
         and sec.sandbox.mode == "tool_calls"
     ):
-        notes.append(
-            "  [!] sandbox declared (tool_execution_mode=sandboxed, mode=tool_calls)"
+        msg = (
+            "sandbox declared (tool_execution_mode=sandboxed, mode=tool_calls)"
             " but not yet OS-enforced — treat as audit-mode declaration only."
         )
+        notes.append(f"  [!] {msg}")
+        issues.append(msg)
 
     if sec.sandbox.network_access != "unrestricted":
-        notes.append(
-            f"  [!] sandbox.network_access={sec.sandbox.network_access}"
+        msg = (
+            f"sandbox.network_access={sec.sandbox.network_access}"
             " is declared but not enforced at the OS level."
         )
+        notes.append(f"  [!] {msg}")
+        issues.append(msg)
 
-    return notes
+    return notes, issues
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +162,8 @@ def doctor_config_text(config: "ResearchConfig") -> DoctorReport:
     issues.extend(backend_warns)
 
     enforcement_lines = _enforcement_table_lines(config)
-    risk_lines = _risk_note_lines(config)
+    risk_lines, risk_warns = _risk_note_lines(config)
+    issues.extend(risk_warns)
 
     health = "OK" if not issues else f"WARNINGS ({len(issues)} issue{'s' if len(issues) != 1 else ''})"
     exit_code = 0 if not issues else 1
