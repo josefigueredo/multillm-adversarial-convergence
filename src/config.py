@@ -22,6 +22,14 @@ from .output_style import VALID_OUTPUT_STYLES
 # Valid multi-backend strategy names.
 VALID_STRATEGIES = ("single", "ensemble", "adversarial", "parallel", "serial", "specialist")
 
+# Valid security policy enum values.
+VALID_CONTENT_TRUST = ("strict", "permissive")
+VALID_TOOL_EXECUTION_MODES = ("direct", "sandboxed", "disabled")
+VALID_SANDBOX_MODES = ("off", "process", "container")
+VALID_SANDBOX_SCOPES = ("run", "iteration", "call")
+VALID_SANDBOX_FILESYSTEM_ACCESS = ("output_only", "project_only", "unrestricted")
+VALID_SANDBOX_NETWORK_ACCESS = ("unrestricted", "restricted", "none")
+
 
 def _validate_backend_name(name: str, role: str) -> None:
     """Raise ``ValueError`` when *name* is not a known backend."""
@@ -404,6 +412,133 @@ class ExecutionConfig:
 
 
 @dataclass(frozen=True)
+class SandboxConfig:
+    """Sandbox isolation settings (policy declaration; enforcement is a later milestone).
+
+    Attributes:
+        mode: Sandbox mechanism to use.  ``"off"`` disables isolation;
+            ``"process"`` uses process-level isolation; ``"container"`` uses
+            container-level isolation.
+        scope: Granularity at which isolation is applied.  ``"run"`` wraps
+            the whole run; ``"iteration"`` wraps each research iteration;
+            ``"call"`` wraps each backend call.
+        filesystem_access: Permitted filesystem surface.  ``"output_only"``
+            restricts writes to the run output directory; ``"project_only"``
+            allows reads/writes within the project root; ``"unrestricted"``
+            imposes no restriction.
+        network_access: Permitted network surface.  ``"unrestricted"`` allows
+            all outbound traffic; ``"restricted"`` blocks non-allow-listed
+            destinations; ``"none"`` blocks all outbound traffic.
+    """
+
+    mode: str = "off"
+    scope: str = "run"
+    filesystem_access: str = "output_only"
+    network_access: str = "unrestricted"
+
+
+@dataclass(frozen=True)
+class SecurityConfig:
+    """Security policy model for a research run (policy declaration phase).
+
+    Attributes:
+        content_trust: Trust level applied to content returned by backends.
+            ``"strict"`` applies conservative sanitization and provenance
+            checks; ``"permissive"`` relaxes those checks.
+        tool_execution_mode: How tool calls are dispatched.  ``"direct"``
+            executes tools without interception; ``"sandboxed"`` routes calls
+            through a sandbox; ``"disabled"`` blocks all tool execution.
+        allow_host_bash: Whether backend agents are permitted to execute
+            host shell commands.  Defaults to ``True`` to match current
+            behavior.
+        allow_filesystem_write_outside_output: Whether agents may write
+            files outside the designated run output directory.  Defaults to
+            ``False`` (output-directory-only writes).
+        sandbox: Nested sandbox isolation policy.
+    """
+
+    content_trust: str = "strict"
+    tool_execution_mode: str = "direct"
+    allow_host_bash: bool = True
+    allow_filesystem_write_outside_output: bool = False
+    sandbox: SandboxConfig = field(default_factory=SandboxConfig)
+
+
+def _parse_security_config(raw: dict[str, Any]) -> "SecurityConfig":
+    """Parse and validate a ``security:`` mapping.
+
+    PyYAML (YAML 1.1) silently coerces bare ``off``/``on`` to Python
+    booleans.  ``_yaml_str`` restores the canonical string form for fields
+    that use those tokens as enum values (e.g. ``sandbox.mode: off``).
+    """
+
+    def _yaml_str(value: Any, default: str) -> str:
+        """Return a string from a YAML value, mapping Python bools produced by YAML 1.1."""
+        if value is None:
+            return default
+        if value is False:
+            return "off"
+        if value is True:
+            return "on"
+        return str(value)
+
+    content_trust = _yaml_str(raw.get("content_trust"), "strict")
+    if content_trust not in VALID_CONTENT_TRUST:
+        raise ValueError(
+            f"Invalid security.content_trust '{content_trust}'. "
+            f"Must be one of: {', '.join(VALID_CONTENT_TRUST)}"
+        )
+
+    tool_execution_mode = _yaml_str(raw.get("tool_execution_mode"), "direct")
+    if tool_execution_mode not in VALID_TOOL_EXECUTION_MODES:
+        raise ValueError(
+            f"Invalid security.tool_execution_mode '{tool_execution_mode}'. "
+            f"Must be one of: {', '.join(VALID_TOOL_EXECUTION_MODES)}"
+        )
+
+    sandbox_raw: dict[str, Any] = raw.get("sandbox", {})
+    sandbox_mode = _yaml_str(sandbox_raw.get("mode"), "off")
+    if sandbox_mode not in VALID_SANDBOX_MODES:
+        raise ValueError(
+            f"Invalid security.sandbox.mode '{sandbox_mode}'. "
+            f"Must be one of: {', '.join(VALID_SANDBOX_MODES)}"
+        )
+    sandbox_scope = _yaml_str(sandbox_raw.get("scope"), "run")
+    if sandbox_scope not in VALID_SANDBOX_SCOPES:
+        raise ValueError(
+            f"Invalid security.sandbox.scope '{sandbox_scope}'. "
+            f"Must be one of: {', '.join(VALID_SANDBOX_SCOPES)}"
+        )
+    filesystem_access = _yaml_str(sandbox_raw.get("filesystem_access"), "output_only")
+    if filesystem_access not in VALID_SANDBOX_FILESYSTEM_ACCESS:
+        raise ValueError(
+            f"Invalid security.sandbox.filesystem_access '{filesystem_access}'. "
+            f"Must be one of: {', '.join(VALID_SANDBOX_FILESYSTEM_ACCESS)}"
+        )
+    network_access = _yaml_str(sandbox_raw.get("network_access"), "unrestricted")
+    if network_access not in VALID_SANDBOX_NETWORK_ACCESS:
+        raise ValueError(
+            f"Invalid security.sandbox.network_access '{network_access}'. "
+            f"Must be one of: {', '.join(VALID_SANDBOX_NETWORK_ACCESS)}"
+        )
+
+    return SecurityConfig(
+        content_trust=content_trust,
+        tool_execution_mode=tool_execution_mode,
+        allow_host_bash=raw.get("allow_host_bash", True),
+        allow_filesystem_write_outside_output=raw.get(
+            "allow_filesystem_write_outside_output", False
+        ),
+        sandbox=SandboxConfig(
+            mode=sandbox_mode,
+            scope=sandbox_scope,
+            filesystem_access=filesystem_access,
+            network_access=network_access,
+        ),
+    )
+
+
+@dataclass(frozen=True)
 class ResearchConfig:
     """Top-level research configuration loaded from a YAML file.
 
@@ -413,6 +548,7 @@ class ResearchConfig:
         dimensions: Tuple of dimensions to explore.
         scoring: Scoring parameters.
         execution: Execution / runtime parameters.
+        security: Security policy for the run.
     """
 
     topic: str
@@ -423,6 +559,7 @@ class ResearchConfig:
     reporting: ReportingConfig = field(default_factory=ReportingConfig)
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    security: SecurityConfig = field(default_factory=SecurityConfig)
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
 
     @classmethod
@@ -681,6 +818,10 @@ class ResearchConfig:
             strategy_config=strategy_config,
         )
 
+        # --- Security ---------------------------------------------------------
+        security_raw: dict[str, Any] = research.get("security", {})
+        security = _parse_security_config(security_raw)
+
         return cls(
             topic=research["topic"],
             goal=research.get("goal", research["topic"]),
@@ -690,6 +831,7 @@ class ResearchConfig:
             reporting=reporting,
             scoring=scoring,
             execution=execution,
+            security=security,
             providers=providers,
         )
 

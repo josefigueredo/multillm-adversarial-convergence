@@ -16,7 +16,9 @@ from src.config import (
     ProviderConfig,
     ReportingConfig,
     ResearchConfig,
+    SandboxConfig,
     ScoringConfig,
+    SecurityConfig,
     StrategyConfig,
 )
 
@@ -782,3 +784,138 @@ class TestMultiBackendConfig:
         """), encoding="utf-8")
         cfg = ResearchConfig.from_yaml(p)
         assert cfg.execution.backends.research == ("codex-cli",)
+
+
+# ---------------------------------------------------------------------------
+# SecurityConfig / SandboxConfig defaults
+# ---------------------------------------------------------------------------
+
+class TestSandboxConfig:
+    def test_defaults(self):
+        sc = SandboxConfig()
+        assert sc.mode == "off"
+        assert sc.scope == "run"
+        assert sc.filesystem_access == "output_only"
+        assert sc.network_access == "unrestricted"
+
+    def test_frozen(self):
+        sc = SandboxConfig()
+        with pytest.raises(AttributeError):
+            sc.mode = "process"
+
+
+class TestSecurityConfig:
+    def test_defaults(self):
+        sc = SecurityConfig()
+        assert sc.content_trust == "strict"
+        assert sc.tool_execution_mode == "direct"
+        assert sc.allow_host_bash is True
+        assert sc.allow_filesystem_write_outside_output is False
+        assert sc.sandbox == SandboxConfig()
+
+    def test_frozen(self):
+        sc = SecurityConfig()
+        with pytest.raises(AttributeError):
+            sc.content_trust = "permissive"
+
+
+class TestSecurityConfigFromYaml:
+    def test_security_defaults_when_not_specified(self, minimal_yaml: Path):
+        cfg = ResearchConfig.from_yaml(minimal_yaml)
+        assert cfg.security == SecurityConfig()
+
+    def test_security_full_config(self, tmp_path: Path):
+        p = tmp_path / "security.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Security test"
+              security:
+                content_trust: permissive
+                tool_execution_mode: direct
+                allow_host_bash: false
+                allow_filesystem_write_outside_output: true
+                sandbox:
+                  mode: off
+                  scope: run
+                  filesystem_access: output_only
+                  network_access: unrestricted
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.security.content_trust == "permissive"
+        assert cfg.security.tool_execution_mode == "direct"
+        assert cfg.security.allow_host_bash is False
+        assert cfg.security.allow_filesystem_write_outside_output is True
+        assert cfg.security.sandbox.mode == "off"
+        assert cfg.security.sandbox.scope == "run"
+        assert cfg.security.sandbox.filesystem_access == "output_only"
+        assert cfg.security.sandbox.network_access == "unrestricted"
+
+    def test_invalid_content_trust_rejected(self, tmp_path: Path):
+        p = tmp_path / "bad_trust.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                content_trust: lax
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.content_trust"):
+            ResearchConfig.from_yaml(p)
+
+    def test_invalid_tool_execution_mode_rejected(self, tmp_path: Path):
+        p = tmp_path / "bad_exec_mode.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                tool_execution_mode: magic
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.tool_execution_mode"):
+            ResearchConfig.from_yaml(p)
+
+    def test_invalid_sandbox_mode_rejected(self, tmp_path: Path):
+        p = tmp_path / "bad_sandbox_mode.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  mode: docker
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.sandbox.mode"):
+            ResearchConfig.from_yaml(p)
+
+    def test_invalid_sandbox_scope_rejected(self, tmp_path: Path):
+        p = tmp_path / "bad_sandbox_scope.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  scope: global
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.sandbox.scope"):
+            ResearchConfig.from_yaml(p)
+
+    def test_invalid_sandbox_filesystem_access_rejected(self, tmp_path: Path):
+        p = tmp_path / "bad_sandbox_fs.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  filesystem_access: full
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.sandbox.filesystem_access"):
+            ResearchConfig.from_yaml(p)
+
+    def test_invalid_sandbox_network_access_rejected(self, tmp_path: Path):
+        p = tmp_path / "bad_sandbox_net.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test"
+              security:
+                sandbox:
+                  network_access: limited
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="Invalid security.sandbox.network_access"):
+            ResearchConfig.from_yaml(p)
