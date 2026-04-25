@@ -23,20 +23,31 @@ class DoctorReport:
 
 
 # ---------------------------------------------------------------------------
-# Security enforcement truth table (Milestone 2 ground-truth)
+# Security enforcement truth table (Milestone 4 ground-truth)
 # ---------------------------------------------------------------------------
 
 #: Fields that are *actively enforced* in runtime code (AutoResearcher).
 _ENFORCED: dict[str, str] = {
     "allow_host_bash": "hard-blocks Bash tool in _call_with",
-    "sandbox.filesystem_access": "explicit write gate via guard_path_write",
+    "sandbox.filesystem_access": "write gate via guard_path_write + SandboxExecutor",
     "allow_filesystem_write_outside_output": "broadens write boundary in is_write_allowed",
 }
 
-#: Fields that are *declared in config* but not yet OS/kernel-enforced.
+#: Fields enforced at *dispatch level* when ``sandbox_active=True``.
+#: Not OS/kernel-level — enforced at execution-dispatch time.
+_DISPATCH_ENFORCED: dict[str, str] = {
+    "tool_execution_mode: sandboxed": (
+        "workspace cwd + write boundary + network gate at executor-dispatch level "
+        "(not OS/kernel-level) when sandbox_active=True"
+    ),
+    "sandbox.network_access": (
+        "WebSearch and WebFetch gated at dispatch level; "
+        "not OS firewalling; requires sandbox_active=True"
+    ),
+}
+
+#: Fields that are *declared in config* but not yet operationally enforced.
 _DECLARED_ONLY: dict[str, str] = {
-    "tool_execution_mode: sandboxed": "requires a real sandbox backend (not yet implemented)",
-    "sandbox.network_access": "not enforced at OS level; treat as audit-mode only",
     "content_trust": "not yet evaluated at runtime",
 }
 
@@ -71,34 +82,129 @@ def _enforcement_table_lines(config: "ResearchConfig") -> list[str]:
     """Return the security enforcement truth table lines."""
     sec = config.security
     sb = sec.sandbox
+    sandbox_active = sec.tool_execution_mode == "sandboxed" and sb.mode == "tool_calls"
     lines: list[str] = []
 
     lines.append("  Field                                   Status")
     lines.append("  " + "-" * 66)
 
-    # always enforced
+    # Always-enforced fields
     bash_status = "ENFORCED" if not sec.allow_host_bash else "ENFORCED (allow_host_bash=true → Bash permitted)"
     lines.append(f"  {'allow_host_bash':<39} {bash_status}")
-    lines.append(f"  {'sandbox.filesystem_access':<39} ENFORCED  (guard_path_write)")
+    lines.append(f"  {'sandbox.filesystem_access':<39} ENFORCED  (guard_path_write + executor)")
     lines.append(
         f"  {'allow_filesystem_write_outside_output':<39} "
         f"{'ENFORCED  (broadens write roots)' if sec.allow_filesystem_write_outside_output else 'ENFORCED  (default: output_only)'}"
     )
 
-    # declared-only
+    # tool_execution_mode
     if sec.tool_execution_mode == "sandboxed":
-        lines.append(
-            f"  {'tool_execution_mode: sandboxed':<39} declared-only  (requires real sandbox backend)"
-        )
+        if sandbox_active:
+            lines.append(
+                f"  {'tool_execution_mode: sandboxed':<39} dispatch-enforced  (workspace cwd + executor routing)"
+            )
+        else:
+            lines.append(
+                f"  {'tool_execution_mode: sandboxed':<39} declared intent  (sandbox.mode≠tool_calls; not active)"
+            )
     else:
         lines.append(
             f"  {'tool_execution_mode: direct':<39} direct  (no sandbox layer)"
         )
 
+    # sandbox.network_access
     net_label = f"sandbox.network_access: {sb.network_access}"
-    lines.append(f"  {net_label:<39} declared-only  (not OS-enforced)")
+    if sb.network_access == "unrestricted":
+        lines.append(f"  {net_label:<39} unrestricted  (no gating)")
+    elif sandbox_active:
+        lines.append(f"  {net_label:<39} dispatch-enforced  (WebSearch/WebFetch; not OS-level)")
+    else:
+        lines.append(f"  {net_label:<39} declared intent  (no effect without sandbox_active)")
+
     lines.append(f"  {'content_trust':<39} declared-only  (not yet runtime-evaluated)")
     return lines
+
+
+def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
+    """Return (lines, issues) for the sandbox tool coverage section.
+
+    Surfaces:
+    - env shaping status (active vs inactive)
+    - dispatch-level network enforcement scope
+    - unclassified tool policy (deny in sandbox, pass in direct)
+    - per-tool classification table with capability annotations
+
+    Issues are emitted when ``sandbox_active=True`` and unclassified tools
+    exist in ``allowed_tools`` — those tools will be denied at runtime.
+    """
+    from src.tool_capabilities import classify_tool
+
+    sec = config.security
+    sandbox_active = sec.tool_execution_mode == "sandboxed" and sec.sandbox.mode == "tool_calls"
+    tools = sorted(_parse_tools(config.execution.allowed_tools))
+
+    lines: list[str] = []
+    issues: list[str] = []
+
+    # Env shaping status
+    if sandbox_active:
+        lines.append(
+            "  env shaping:              ACTIVE"
+            "  (build_environment filters to allowlist; process-level, not container-grade)"
+        )
+    else:
+        lines.append(
+            "  env shaping:              inactive  (direct mode — ambient env inherited)"
+        )
+
+    # Network enforcement scope
+    lines.append(
+        "  network enforcement:      dispatch-level"
+        "  (WebSearch, WebFetch; not OS-level firewall)"
+    )
+
+    # Unclassified tool policy
+    if sandbox_active:
+        lines.append(
+            "  unclassified tool policy: denied (tool_unclassified) when sandbox_active=True"
+        )
+    else:
+        lines.append(
+            "  unclassified tool policy: allowed in direct mode"
+            "  (sandbox mode would deny unclassified tools)"
+        )
+
+    # Per-tool classification table
+    lines.append("")
+    lines.append("  Tool                    Classification")
+    lines.append("  " + "-" * 52)
+
+    unclassified: list[str] = []
+    for name in tools:
+        caps = classify_tool(name)
+        if caps is None:
+            lines.append(f"  {name:<24} UNCLASSIFIED")
+            unclassified.append(name)
+        else:
+            cap_parts: list[str] = []
+            if caps.uses_host_shell:
+                cap_parts.append("host-shell")
+            if caps.uses_network:
+                cap_parts.append(f"network ({caps.destination_type or 'any'})")
+            if caps.may_write:
+                cap_parts.append("write")
+            cap_str = ", ".join(cap_parts) if cap_parts else "none"
+            lines.append(f"  {name:<24} classified  [{cap_str}]")
+
+    # Emit issues for sandbox + unclassified tool combinations
+    if sandbox_active:
+        for name in unclassified:
+            issues.append(
+                f"'{name}' is unclassified and will be denied at dispatch"
+                " when sandbox_active=True (tool_unclassified)."
+            )
+
+    return lines, issues
 
 
 def _risk_note_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
@@ -108,6 +214,7 @@ def _risk_note_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
     """
     sec = config.security
     tools = _parse_tools(config.execution.allowed_tools)
+    sandbox_active = sec.tool_execution_mode == "sandboxed" and sec.sandbox.mode == "tool_calls"
     notes: list[str] = []
     issues: list[str] = []
 
@@ -119,21 +226,20 @@ def _risk_note_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
         notes.append(f"  [!] {msg}")
         issues.append(msg)
 
-    if (
-        sec.tool_execution_mode == "sandboxed"
-        and sec.sandbox.mode == "tool_calls"
-    ):
+    if sec.tool_execution_mode == "sandboxed" and not sandbox_active:
         msg = (
-            "sandbox declared (tool_execution_mode=sandboxed, mode=tool_calls)"
-            " but not yet OS-enforced — treat as audit-mode declaration only."
+            "tool_execution_mode=sandboxed but sandbox.mode is not tool_calls"
+            " — sandbox enforcement is not active."
+            " Set sandbox.mode: tool_calls to enable executor-dispatch enforcement."
         )
         notes.append(f"  [!] {msg}")
         issues.append(msg)
 
-    if sec.sandbox.network_access != "unrestricted":
+    if sec.sandbox.network_access != "unrestricted" and not sandbox_active:
         msg = (
-            f"sandbox.network_access={sec.sandbox.network_access}"
-            " is declared but not enforced at the OS level."
+            f"sandbox.network_access={sec.sandbox.network_access} declared"
+            " but has no operational effect — requires sandbox_active"
+            " (tool_execution_mode=sandboxed AND sandbox.mode=tool_calls)."
         )
         notes.append(f"  [!] {msg}")
         issues.append(msg)
@@ -162,6 +268,8 @@ def doctor_config_text(config: "ResearchConfig") -> DoctorReport:
     issues.extend(backend_warns)
 
     enforcement_lines = _enforcement_table_lines(config)
+    coverage_lines, coverage_issues = _tool_coverage_lines(config)
+    issues.extend(coverage_issues)
     risk_lines, risk_warns = _risk_note_lines(config)
     issues.extend(risk_warns)
 
@@ -175,6 +283,11 @@ def doctor_config_text(config: "ResearchConfig") -> DoctorReport:
     # Security enforcement truth table (first-class section)
     parts.append("SECURITY ENFORCEMENT STATUS")
     parts.extend(enforcement_lines)
+    parts.append("")
+
+    # Sandbox tool coverage (M5: env shaping, classification, dispatch scope)
+    parts.append("SANDBOX TOOL COVERAGE")
+    parts.extend(coverage_lines)
     parts.append("")
 
     # Backend validity

@@ -106,7 +106,8 @@ class TestSecurityEnforcementTable:
         assert "filesystem_access" in result.text
         assert "enforced" in result.text.lower()
 
-    def test_tool_execution_mode_sandboxed_shown_as_declared_only(self):
+    def test_tool_execution_mode_sandboxed_shown_as_dispatch_enforced_when_active(self):
+        """sandbox_active=True → truth table must show dispatch-enforced, not declared-only."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -114,17 +115,55 @@ class TestSecurityEnforcementTable:
             )
         )
         result = doctor_config_text(config)
-        assert "declared-only" in result.text.lower() or "declared only" in result.text.lower()
+        assert "dispatch-enforced" in result.text.lower() or "dispatch enforced" in result.text.lower()
 
-    def test_network_access_shown_as_declared_only(self):
+    def test_tool_execution_mode_sandboxed_not_active_shows_declared_intent(self):
+        """sandbox mode=off + tool_execution_mode=sandboxed → declared intent (no active enforcement)."""
         config = _make_config(
             security=SecurityConfig(
-                sandbox=SandboxConfig(network_access="web_only"),
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="off"),  # NOT active
+            )
+        )
+        result = doctor_config_text(config)
+        # should say declared intent, not dispatch-enforced
+        assert "dispatch-enforced" not in result.text.lower()
+
+    def test_network_access_dispatch_enforced_when_sandbox_active(self):
+        """sandbox_active=True + non-unrestricted network_access → dispatch-enforced in table."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access="web_only"),
             )
         )
         result = doctor_config_text(config)
         assert "network_access" in result.text
-        assert "declared-only" in result.text.lower() or "declared only" in result.text.lower()
+        assert "dispatch-enforced" in result.text.lower() or "dispatch enforced" in result.text.lower()
+
+    def test_network_access_dispatch_enforced_is_healthy(self):
+        """sandbox_active=True + non-unrestricted → healthy run (exit_code=0)."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access="none"),
+            )
+        )
+        result = doctor_config_text(config)
+        assert result.exit_code == 0
+
+    def test_network_access_no_effect_note_when_not_sandbox_active(self):
+        """sandbox_active=False + non-unrestricted network_access → warning about no effect."""
+        config = _make_config(
+            security=SecurityConfig(
+                sandbox=SandboxConfig(network_access="web_only"),  # direct mode → sandbox_active=False
+            )
+        )
+        result = doctor_config_text(config)
+        assert "network_access" in result.text
+        text_lower = result.text.lower()
+        # Must indicate the policy has no effect without sandbox_active
+        assert "sandbox_active" in text_lower or "no effect" in text_lower or "without" in text_lower
 
     def test_each_enforced_field_has_label(self):
         result = doctor_config_text(_make_config())
@@ -228,32 +267,35 @@ class TestOperatorRiskNotes:
         text_lower = result.text.lower()
         assert "host shell exposed" not in text_lower
 
-    def test_sandboxed_declared_only_note_appears(self):
+    def test_sandboxed_active_is_healthy_no_warning(self):
+        """sandbox_active=True with default (unrestricted) network → no risk notes → exit_code=0."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
-                sandbox=SandboxConfig(mode="tool_calls"),
+                sandbox=SandboxConfig(mode="tool_calls"),  # sandbox_active=True
+            ),
+        )
+        result = doctor_config_text(config)
+        assert result.exit_code == 0
+
+    def test_sandboxed_mode_off_produces_warning(self):
+        """tool_execution_mode=sandboxed but mode=off → sandbox not active → warning."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="off"),
             ),
         )
         result = doctor_config_text(config)
         text_lower = result.text.lower()
-        assert "declared" in text_lower
         assert "sandbox" in text_lower
-
-    def test_sandboxed_declared_only_exits_1(self):
-        config = _make_config(
-            security=SecurityConfig(
-                tool_execution_mode="sandboxed",
-                sandbox=SandboxConfig(mode="tool_calls"),
-            ),
-        )
-        result = doctor_config_text(config)
         assert result.exit_code == 1
 
-    def test_network_policy_declared_only_exits_1(self):
+    def test_network_policy_no_effect_without_sandbox_active_exits_1(self):
+        """network_access set but sandbox_active=False → no operational effect → warning → exit_code=1."""
         config = _make_config(
             security=SecurityConfig(
-                sandbox=SandboxConfig(network_access="web_only"),
+                sandbox=SandboxConfig(network_access="web_only"),  # direct mode → sandbox_active=False
             ),
         )
         result = doctor_config_text(config)
@@ -270,6 +312,156 @@ class TestOperatorRiskNotes:
         )
         result = doctor_config_text(config)
         # Healthy config → exit 0
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# M5 Step 4: diagnostics for env shaping, tool coverage, unclassified tools
+# ---------------------------------------------------------------------------
+
+class TestDoctorM5Coverage:
+    """Doctor surfaces M5 sandbox coverage: env shaping, tool classification, gaps."""
+
+    # -- env shaping status ------------------------------------------------
+
+    def test_env_shaping_shown_as_active_when_sandbox_active(self):
+        """sandbox_active=True → doctor output surfaces env shaping as active."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls"),
+            ),
+        )
+        result = doctor_config_text(config)
+        text_lower = result.text.lower()
+        assert "env shaping" in text_lower or "environment shaping" in text_lower
+        # Must indicate it is active
+        assert "active" in text_lower
+
+    def test_env_shaping_shown_as_inactive_in_direct_mode(self):
+        """sandbox_active=False → doctor output surfaces env shaping as inactive."""
+        config = _make_config(
+            security=SecurityConfig(tool_execution_mode="direct"),
+        )
+        result = doctor_config_text(config)
+        text_lower = result.text.lower()
+        assert "env shaping" in text_lower or "environment shaping" in text_lower
+        assert "inactive" in text_lower or "direct" in text_lower
+
+    # -- tool coverage section ---------------------------------------------
+
+    def test_tool_coverage_section_present(self):
+        """Doctor output contains a tool coverage or capability section."""
+        result = doctor_config_text(_make_config())
+        text_lower = result.text.lower()
+        assert "tool" in text_lower and ("coverage" in text_lower or "classif" in text_lower)
+
+    def test_classified_tools_appear_in_coverage(self):
+        """Tools from allowed_tools that are in the registry appear in coverage output."""
+        config = _make_config(
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="WebSearch,Grep",
+            ),
+        )
+        result = doctor_config_text(config)
+        assert "WebSearch" in result.text
+        assert "Grep" in result.text
+
+    def test_unclassified_tool_shown_in_coverage(self):
+        """A tool not in the registry appears in coverage output with unclassified label."""
+        config = _make_config(
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="WebSearch,FancyNewTool",
+            ),
+        )
+        result = doctor_config_text(config)
+        assert "FancyNewTool" in result.text
+        text_lower = result.text.lower()
+        assert "unclassified" in text_lower
+
+    # -- unclassified tool risk note ---------------------------------------
+
+    def test_unclassified_tool_in_sandbox_exits_1(self):
+        """sandbox_active=True + unclassified tool → doctor exits 1 (will be denied at runtime)."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls"),
+            ),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="Read,FancyNewTool",
+            ),
+        )
+        result = doctor_config_text(config)
+        assert result.exit_code == 1
+
+    def test_unclassified_tool_in_sandbox_shows_warning(self):
+        """sandbox_active=True + unclassified tool → doctor shows warning about denial."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls"),
+            ),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="Read,FancyNewTool",
+            ),
+        )
+        result = doctor_config_text(config)
+        text_lower = result.text.lower()
+        assert "FancyNewTool".lower() in text_lower
+        assert "unclassified" in text_lower or "denied" in text_lower
+
+    def test_unclassified_tool_in_direct_mode_is_healthy(self):
+        """sandbox_active=False + unclassified tool → no warning (direct mode passes through)."""
+        config = _make_config(
+            security=SecurityConfig(tool_execution_mode="direct"),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="Read,FancyNewTool",
+            ),
+        )
+        result = doctor_config_text(config)
+        # Direct mode: unclassified tools pass through → no warning about them
+        assert result.exit_code == 0
+
+    # -- network coverage honesty ------------------------------------------
+
+    def test_network_enforcement_dispatch_level_noted(self):
+        """Doctor output mentions that network enforcement is dispatch-level (not OS-level)."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access="web_only"),
+            ),
+        )
+        result = doctor_config_text(config)
+        text_lower = result.text.lower()
+        assert "dispatch" in text_lower
+
+    def test_all_classified_tools_no_unclassified_warning(self):
+        """All tools classified → no unclassified warning even in sandbox mode."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls"),
+            ),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="WebSearch,Read,Grep",  # all classified
+            ),
+        )
+        result = doctor_config_text(config)
+        # No unclassified tools → exit 0 (no warnings)
         assert result.exit_code == 0
 
 
