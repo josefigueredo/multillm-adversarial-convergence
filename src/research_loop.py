@@ -28,6 +28,7 @@ from .scorer import (
 )
 from .strategy import ResearchCandidate
 from .workflows.research_states import ResearchState
+from .workflows.decisions import IterationDecision
 from .workflows.transitions import WorkflowTransitionEmitter
 
 log = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
     findings = _execute_research(ctx, state, dimension, questions, approach)
     if not findings:
         log.warning("Research execution returned empty, logging crash.")
-        _log_result(ctx, state, dimension, IterationScore(), "", status="crash")
+        _log_result(ctx, state, dimension, IterationScore(), "", status=IterationDecision.CRASH)
         _maybe_exhaust(state, dimension)
         ctx.audit_trail.emit(
             "iteration_aborted",
@@ -160,7 +161,7 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         ResearchState.DECIDE,
         iteration=state.iteration,
         dimension=dimension,
-        status="keep" if kept else "discard",
+        status=IterationDecision.KEEP if kept else IterationDecision.DISCARD,
     )
     if kept:
         state.best_scores[dimension] = score.total
@@ -173,12 +174,14 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         log.info("DISCARD — findings saved but not merged.")
         _maybe_exhaust(state, dimension)
 
+    _decision = IterationDecision.KEEP if kept else IterationDecision.DISCARD
+
     with ctx.audit_trail.step(
         "persist_iteration_markdown",
         artifact_root=ctx.artifact_root,
         iteration=state.iteration,
         dimension=dimension,
-        status="keep" if kept else "discard",
+        status=_decision,
     ):
         write_iteration_markdown(
             iterations_dir=state.iterations_dir,
@@ -191,7 +194,7 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
     ctx.collect_provenance(findings, scope=f"iteration-{state.iteration:03d}", dimension=dimension)
     _log_result(
         ctx, state, dimension, score, hypothesis.get("rationale", ""),
-        status="keep" if kept else "discard",
+        status=_decision,
     )
 
     if state.iteration % ctx.config.execution.compress_every == 0:
@@ -201,7 +204,7 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         "iteration_completed",
         iteration=state.iteration,
         dimension=dimension,
-        status="keep" if kept else "discard",
+        status=_decision,
         total_score=score.total,
     )
 

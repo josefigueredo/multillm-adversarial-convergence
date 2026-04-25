@@ -26,6 +26,7 @@ from .document_strategy import (
 )
 from .hitl import HumanDecision
 from .prompts import render
+from .workflows.decisions import CritiqueStatus
 
 log = logging.getLogger("autoresearch")
 
@@ -203,7 +204,7 @@ class PlanStrategy:
         self, plan: str, critiques: list[VerifiedCritique], invoke: InvokeFn
     ) -> list[Patch]:
         """Generate patch proposals for all VALID critiques."""
-        valid = [c for c in critiques if c.status == "valid"]
+        valid = [c for c in critiques if c.status == CritiqueStatus.VALID]
         if not valid:
             return []
         critiques_json = json.dumps(

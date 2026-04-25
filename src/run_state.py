@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from .backends import AgentResponse
 from .strategy import ResearchCandidate
+from .workflows.decisions import IterationDecision, classify_iteration_decision
 
 
 @dataclass
@@ -111,7 +112,8 @@ def resume_state(
                 if dim:
                     dimension_attempts[dim] = dimension_attempts.get(dim, 0) + 1
 
-                if status == "keep":
+                decision = classify_iteration_decision(status, default=IterationDecision.DISCARD)
+                if decision == IterationDecision.KEEP:
                     try:
                         score = float(row.get("total_score", 0))
                     except (ValueError, TypeError):

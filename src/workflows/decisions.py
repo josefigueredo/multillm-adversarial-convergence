@@ -82,3 +82,73 @@ WORKFLOW_DECISION_TYPES: dict[str, type] = {
     "refine": CritiqueStatus,
     "plan": CritiqueStatus,
 }
+
+
+# ---------------------------------------------------------------------------
+# Classification helpers
+# ---------------------------------------------------------------------------
+
+
+def classify_iteration_decision(
+    status: str,
+    default: IterationDecision | None = None,
+) -> IterationDecision:
+    """Return the ``IterationDecision`` for *status*.
+
+    If *status* is not a recognised value and *default* is given, *default*
+    is returned instead.  Without a default an unrecognised value raises
+    ``ValueError``.
+    """
+    try:
+        return IterationDecision(status)
+    except ValueError:
+        if default is not None:
+            return default
+        raise
+
+
+def classify_critique_status(
+    status: str,
+    default: CritiqueStatus = CritiqueStatus.STALE,
+) -> CritiqueStatus:
+    """Return the ``CritiqueStatus`` for *status*.
+
+    Unknown model-produced values fall back to *default* (``STALE`` by
+    convention: not actionable but not a crash).
+    """
+    try:
+        return CritiqueStatus(status)
+    except ValueError:
+        return default
+
+
+def classify_issue_status(
+    status: str,
+    default: IssueStatus = IssueStatus.OPEN,
+) -> IssueStatus:
+    """Return the ``IssueStatus`` for *status*.
+
+    Unknown values fall back to *default* (``OPEN`` by convention: not yet
+    classified).
+    """
+    try:
+        return IssueStatus(status)
+    except ValueError:
+        return default
+
+
+def semantic_group(status: str) -> str:
+    """Return the cross-mode semantic group name for a decision status string.
+
+    Returns one of ``"accepted"``, ``"rejected"``, ``"pending"``, or
+    ``"abnormal"``.  Raises ``ValueError`` for unknown strings.
+    """
+    if status in ACCEPTED:
+        return "accepted"
+    if status in REJECTED:
+        return "rejected"
+    if status in PENDING:
+        return "pending"
+    if status in ABNORMAL:
+        return "abnormal"
+    raise ValueError(f"Unknown decision status: {status!r}")

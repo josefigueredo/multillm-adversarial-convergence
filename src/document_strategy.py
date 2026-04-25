@@ -18,6 +18,7 @@ from .backends import AgentResponse, Backend, CallOptions
 from .config import DocumentConfig
 from .hitl import DeferReason, HumanDecision, HumanInputRequest
 from .prompts import render
+from .workflows.decisions import CritiqueStatus, classify_critique_status
 
 log = logging.getLogger("autoresearch")
 
@@ -219,7 +220,7 @@ class ConvergeStrategy:
         self, prd: str, critiques: list[VerifiedCritique], invoke: InvokeFn
     ) -> list[Patch]:
         """Generate patch proposals for all VALID critiques."""
-        valid = [c for c in critiques if c.status == "valid"]
+        valid = [c for c in critiques if c.status == CritiqueStatus.VALID]
         if not valid:
             return []
         critiques_json = json.dumps(
@@ -274,7 +275,7 @@ def _parse_verified_critiques(text: str) -> list[VerifiedCritique]:
             description=item.get("description", ""),
             section_ref=item.get("section_ref", ""),
             raised_by=item.get("raised_by", ""),
-            status=item.get("status", "stale"),
+            status=classify_critique_status(item.get("status", "")).value,
             defer_reason=item.get("defer_reason"),
             question=item.get("question"),
             suggested_answer=item.get("suggested_answer"),

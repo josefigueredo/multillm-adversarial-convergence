@@ -15,6 +15,10 @@ from src.workflows.decisions import (
     PENDING,
     REJECTED,
     WORKFLOW_DECISION_TYPES,
+    classify_critique_status,
+    classify_issue_status,
+    classify_iteration_decision,
+    semantic_group,
 )
 
 
@@ -202,3 +206,125 @@ class TestWorkflowDecisionTypes:
 
     def test_all_three_modes_present(self):
         assert set(WORKFLOW_DECISION_TYPES.keys()) == {"research", "refine", "plan"}
+
+
+# ---------------------------------------------------------------------------
+# Classification helpers
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyIterationDecision:
+    def test_returns_enum_for_keep(self):
+        assert classify_iteration_decision("keep") is IterationDecision.KEEP
+
+    def test_returns_enum_for_discard(self):
+        assert classify_iteration_decision("discard") is IterationDecision.DISCARD
+
+    def test_returns_enum_for_crash(self):
+        assert classify_iteration_decision("crash") is IterationDecision.CRASH
+
+    def test_unknown_raises_without_default(self):
+        with pytest.raises(ValueError):
+            classify_iteration_decision("bogus")
+
+    def test_unknown_returns_default_when_given(self):
+        result = classify_iteration_decision("bogus", default=IterationDecision.DISCARD)
+        assert result is IterationDecision.DISCARD
+
+    def test_result_is_iteration_decision(self):
+        assert isinstance(classify_iteration_decision("keep"), IterationDecision)
+
+
+class TestClassifyCritiqueStatus:
+    def test_returns_enum_for_valid(self):
+        assert classify_critique_status("valid") is CritiqueStatus.VALID
+
+    def test_returns_enum_for_stale(self):
+        assert classify_critique_status("stale") is CritiqueStatus.STALE
+
+    def test_returns_enum_for_deferred(self):
+        assert classify_critique_status("deferred") is CritiqueStatus.DEFERRED
+
+    def test_unknown_falls_back_to_stale(self):
+        assert classify_critique_status("garbage_from_model") is CritiqueStatus.STALE
+
+    def test_empty_string_falls_back_to_stale(self):
+        assert classify_critique_status("") is CritiqueStatus.STALE
+
+    def test_custom_default_honoured(self):
+        assert classify_critique_status("bad", default=CritiqueStatus.DEFERRED) is CritiqueStatus.DEFERRED
+
+    def test_result_is_critique_status(self):
+        assert isinstance(classify_critique_status("valid"), CritiqueStatus)
+
+
+class TestClassifyIssueStatus:
+    def test_returns_enum_for_open(self):
+        assert classify_issue_status("open") is IssueStatus.OPEN
+
+    def test_returns_enum_for_valid(self):
+        assert classify_issue_status("valid") is IssueStatus.VALID
+
+    def test_returns_enum_for_resolved(self):
+        assert classify_issue_status("resolved") is IssueStatus.RESOLVED
+
+    def test_unknown_falls_back_to_open(self):
+        assert classify_issue_status("mystery") is IssueStatus.OPEN
+
+
+class TestSemanticGroup:
+    def test_keep_is_accepted(self):
+        assert semantic_group("keep") == "accepted"
+
+    def test_valid_is_accepted(self):
+        assert semantic_group("valid") == "accepted"
+
+    def test_resolved_is_accepted(self):
+        assert semantic_group("resolved") == "accepted"
+
+    def test_discard_is_rejected(self):
+        assert semantic_group("discard") == "rejected"
+
+    def test_stale_is_rejected(self):
+        assert semantic_group("stale") == "rejected"
+
+    def test_deferred_is_pending(self):
+        assert semantic_group("deferred") == "pending"
+
+    def test_open_is_pending(self):
+        assert semantic_group("open") == "pending"
+
+    def test_crash_is_abnormal(self):
+        assert semantic_group("crash") == "abnormal"
+
+    def test_unknown_raises(self):
+        with pytest.raises(ValueError, match="Unknown decision status"):
+            semantic_group("not_a_real_status")
+
+    def test_all_known_statuses_have_group(self):
+        all_statuses = ITERATION_OUTCOMES | CRITIQUE_STATUSES | ISSUE_STATUSES
+        for status in all_statuses:
+            # should not raise
+            result = semantic_group(status)
+            assert result in {"accepted", "rejected", "pending", "abnormal"}
+
+
+class TestIngresClassificationIntegration:
+    """Prove that classification helpers behave correctly at parse boundaries."""
+
+    def test_model_output_valid_maps_to_accepted(self):
+        status = classify_critique_status("valid")
+        assert semantic_group(status) == "accepted"
+
+    def test_model_output_unknown_maps_to_rejected(self):
+        # Unknown model output → STALE → rejected
+        status = classify_critique_status("hallucinated_status")
+        assert semantic_group(status) == "rejected"
+
+    def test_research_keep_maps_to_accepted(self):
+        decision = classify_iteration_decision("keep")
+        assert semantic_group(decision) == "accepted"
+
+    def test_research_crash_maps_to_abnormal(self):
+        decision = classify_iteration_decision("crash")
+        assert semantic_group(decision) == "abnormal"
