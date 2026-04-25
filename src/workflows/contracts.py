@@ -6,29 +6,66 @@ machine-readable :class:`PhaseContract` that captures:
 - what inputs the phase consumes
 - what outputs it produces
 - the done criterion (human-readable)
-- whether a soft failure allows the outer loop to retry
-- the maximum number of additional retry attempts
+- how failure is recovered (:data:`RecoveryMode`)
 - whether this phase may trigger a human-input gate
 
 Usage
 -----
 ::
 
-    from src.workflows.contracts import get_contract
+    from src.workflows.contracts import get_contract, RecoveryMode
 
     contract = get_contract("research", "hypothesis")
-    if contract and contract.human_gate:
+    if contract and contract.recovery_mode == RecoveryMode.OUTER_LOOP_CONTINUE:
         ...
 
 Contracts are defined only for **active** phases — not for terminal states
 (``converged``, ``interrupted``), pause states (``paused_for_human``), or
 the ``idle`` pseudo-state.  :func:`get_contract` returns ``None`` for any
 phase without a contract.
+
+Recovery semantics
+------------------
+:class:`RecoveryMode` explicitly distinguishes two different kinds of
+recoverability that earlier models conflated:
+
+``NONE``
+    Failure is unrecoverable at both the phase and workflow level.  The run
+    terminates and the workflow transitions to ``interrupted``.
+
+``PHASE_RETRY``
+    The phase is retried immediately (reserved for future backend retry
+    logic; not yet used in the current runtime).
+
+``OUTER_LOOP_CONTINUE``
+    A soft failure in this phase does **not** kill the workflow.  The outer
+    loop records the failure, skips the current iteration/cycle, and
+    continues on the next attempt.  No immediate phase-level retry occurs.
+    This is how ``hypothesis`` and ``execute`` failures work in the research
+    loop today.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
+
+
+class RecoveryMode(str, Enum):
+    """Explicit recovery semantics for a workflow phase.
+
+    Using a ``str`` enum means the value can be serialised to JSON
+    audit events without extra conversion.
+    """
+
+    NONE = "none"
+    """Failure is unrecoverable — the workflow terminates."""
+
+    PHASE_RETRY = "phase_retry"
+    """The phase is retried immediately (not yet used in current runtime)."""
+
+    OUTER_LOOP_CONTINUE = "outer_loop_continue"
+    """Soft failure — the outer loop skips this iteration and continues."""
 
 
 @dataclass(frozen=True)
@@ -47,13 +84,8 @@ class PhaseContract:
     done_criterion:
         Human-readable description of the condition that marks this phase
         as successfully completed.
-    retryable:
-        ``True`` if a soft failure in this phase allows the outer loop to
-        continue (e.g. skip the iteration and try again next time).
-        ``False`` if failure is unrecoverable at the phase level.
-    max_retries:
-        Number of additional retry attempts after the first failure
-        (``0`` means no explicit retry beyond the first attempt).
+    recovery_mode:
+        How a failure in this phase is handled.  See :class:`RecoveryMode`.
     human_gate:
         ``True`` if this phase may produce outputs that trigger a
         human-input pause before the next phase runs.
@@ -63,8 +95,7 @@ class PhaseContract:
     inputs: tuple[str, ...]
     outputs: tuple[str, ...]
     done_criterion: str
-    retryable: bool
-    max_retries: int
+    recovery_mode: RecoveryMode
     human_gate: bool
 
 
@@ -78,8 +109,7 @@ RESEARCH_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("knowledge_base", "explored_dimensions", "dimension_attempts", "topic", "goal"),
         outputs=("dimension", "questions", "approach", "rationale"),
         done_criterion="Non-empty hypothesis dict containing dimension and questions",
-        retryable=True,
-        max_retries=0,
+        recovery_mode=RecoveryMode.OUTER_LOOP_CONTINUE,
         human_gate=False,
     ),
     "execute": PhaseContract(
@@ -87,8 +117,7 @@ RESEARCH_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("dimension", "questions", "approach", "knowledge_base"),
         outputs=("findings",),
         done_criterion="Non-empty findings string from backend research execution",
-        retryable=True,
-        max_retries=0,
+        recovery_mode=RecoveryMode.OUTER_LOOP_CONTINUE,
         human_gate=False,
     ),
     "score": PhaseContract(
@@ -96,8 +125,7 @@ RESEARCH_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("dimension", "findings", "knowledge_base"),
         outputs=("iteration_score",),
         done_criterion="IterationScore with coverage, quality, and total fields computed",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
     "decide": PhaseContract(
@@ -105,8 +133,7 @@ RESEARCH_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("iteration_score", "prev_best_score"),
         outputs=("kept",),
         done_criterion="Keep/discard decision recorded based on score threshold",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
     "merge": PhaseContract(
@@ -114,8 +141,7 @@ RESEARCH_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("findings", "knowledge_base", "iteration_score"),
         outputs=("knowledge_base",),
         done_criterion="Accepted findings merged into knowledge base",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
 }
@@ -130,8 +156,7 @@ REFINE_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("prd", "pending_patches"),
         outputs=("prd",),
         done_criterion="PRD updated with all pending patches applied",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
     "challenger": PhaseContract(
@@ -139,8 +164,7 @@ REFINE_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("prd",),
         outputs=("raw_critiques",),
         done_criterion="Challenger critique generated against current PRD",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
     "personas": PhaseContract(
@@ -148,8 +172,7 @@ REFINE_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("prd", "persona_configs"),
         outputs=("persona_critiques",),
         done_criterion="Critiques gathered from all configured personas",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
     "verifier": PhaseContract(
@@ -157,8 +180,7 @@ REFINE_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("prd", "raw_critiques", "persona_critiques"),
         outputs=("valid_issues", "stale_issues", "deferred_issues", "human_required_issues"),
         done_criterion="All critiques classified as valid, stale, deferred, or human-required",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=True,
     ),
     "arbitrator": PhaseContract(
@@ -166,8 +188,7 @@ REFINE_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("prd", "valid_issues", "human_decisions"),
         outputs=("patches",),
         done_criterion="Patches generated for all valid issues to be applied next cycle",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
 }
@@ -184,8 +205,7 @@ PLAN_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("plan", "pending_patches"),
         outputs=("plan",),
         done_criterion="Plan updated with all pending patches applied",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
     "challenger": PhaseContract(
@@ -193,8 +213,7 @@ PLAN_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("plan",),
         outputs=("raw_critiques",),
         done_criterion="Challenger critique generated against current plan",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
     "personas": PhaseContract(
@@ -202,8 +221,7 @@ PLAN_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("plan", "persona_configs"),
         outputs=("persona_critiques",),
         done_criterion="Critiques gathered from all configured personas",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
     "verifier": PhaseContract(
@@ -211,8 +229,7 @@ PLAN_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("plan", "raw_critiques", "persona_critiques"),
         outputs=("valid_issues", "stale_issues", "deferred_issues", "human_required_issues"),
         done_criterion="All critiques classified as valid, stale, deferred, or human-required",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=True,
     ),
     "arbitrator": PhaseContract(
@@ -220,8 +237,7 @@ PLAN_CONTRACTS: dict[str, PhaseContract] = {
         inputs=("plan", "valid_issues", "human_decisions"),
         outputs=("patches",),
         done_criterion="Patches generated for all valid issues to be applied next cycle",
-        retryable=False,
-        max_retries=0,
+        recovery_mode=RecoveryMode.NONE,
         human_gate=False,
     ),
 }
@@ -255,3 +271,4 @@ def get_contract(workflow: str, phase: str) -> PhaseContract | None:
         The phase string value (e.g. ``"hypothesis"``, ``"builder"``).
     """
     return _WORKFLOW_CONTRACTS.get(workflow, {}).get(phase)
+

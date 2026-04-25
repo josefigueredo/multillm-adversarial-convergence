@@ -8,6 +8,7 @@ import pytest
 
 from src.workflows.contracts import (
     PhaseContract,
+    RecoveryMode,
     RESEARCH_CONTRACTS,
     REFINE_CONTRACTS,
     PLAN_CONTRACTS,
@@ -34,8 +35,7 @@ class TestPhaseContractModel:
             inputs=("a",),
             outputs=("b",),
             done_criterion="b is set",
-            retryable=False,
-            max_retries=0,
+            recovery_mode=RecoveryMode.NONE,
             human_gate=False,
         )
         with pytest.raises((dataclasses.FrozenInstanceError, AttributeError)):
@@ -47,15 +47,13 @@ class TestPhaseContractModel:
             inputs=("knowledge_base",),
             outputs=("dimension", "questions"),
             done_criterion="non-empty hypothesis dict",
-            retryable=True,
-            max_retries=0,
+            recovery_mode=RecoveryMode.OUTER_LOOP_CONTINUE,
             human_gate=False,
         )
         assert contract.phase == "hypothesis"
         assert "knowledge_base" in contract.inputs
         assert "dimension" in contract.outputs
-        assert contract.retryable is True
-        assert contract.max_retries == 0
+        assert contract.recovery_mode == RecoveryMode.OUTER_LOOP_CONTINUE
         assert contract.human_gate is False
 
     def test_inputs_and_outputs_are_tuples(self):
@@ -64,16 +62,15 @@ class TestPhaseContractModel:
             inputs=("a", "b"),
             outputs=("c",),
             done_criterion="done",
-            retryable=False,
-            max_retries=0,
+            recovery_mode=RecoveryMode.NONE,
             human_gate=False,
         )
         assert isinstance(contract.inputs, tuple)
         assert isinstance(contract.outputs, tuple)
 
     def test_equality(self):
-        a = PhaseContract("p", ("x",), ("y",), "done", False, 0, False)
-        b = PhaseContract("p", ("x",), ("y",), "done", False, 0, False)
+        a = PhaseContract("p", ("x",), ("y",), "done", RecoveryMode.NONE, False)
+        b = PhaseContract("p", ("x",), ("y",), "done", RecoveryMode.NONE, False)
         assert a == b
 
 
@@ -105,20 +102,25 @@ class TestResearchContracts:
         assert len(c.inputs) > 0
         assert len(c.outputs) > 0
         assert c.done_criterion
-        assert c.retryable is True
+        assert c.recovery_mode == RecoveryMode.OUTER_LOOP_CONTINUE
         assert c.human_gate is False
 
-    def test_execute_contract_is_retryable(self):
-        assert RESEARCH_CONTRACTS["execute"].retryable is True
+    def test_execute_contract_is_outer_loop_recoverable(self):
+        assert RESEARCH_CONTRACTS["execute"].recovery_mode == RecoveryMode.OUTER_LOOP_CONTINUE
 
-    def test_score_contract_not_retryable(self):
-        assert RESEARCH_CONTRACTS["score"].retryable is False
+    def test_score_contract_recovery_mode_is_none(self):
+        assert RESEARCH_CONTRACTS["score"].recovery_mode == RecoveryMode.NONE
 
-    def test_decide_contract_not_retryable(self):
-        assert RESEARCH_CONTRACTS["decide"].retryable is False
+    def test_decide_contract_recovery_mode_is_none(self):
+        assert RESEARCH_CONTRACTS["decide"].recovery_mode == RecoveryMode.NONE
 
-    def test_merge_contract_not_retryable(self):
-        assert RESEARCH_CONTRACTS["merge"].retryable is False
+    def test_merge_contract_recovery_mode_is_none(self):
+        assert RESEARCH_CONTRACTS["merge"].recovery_mode == RecoveryMode.NONE
+
+    def test_outer_loop_recoverable_differs_from_unrecoverable(self):
+        # Hypothesis and execute are recoverable; score is not — explicitly distinguishable.
+        assert RESEARCH_CONTRACTS["hypothesis"].recovery_mode != RESEARCH_CONTRACTS["score"].recovery_mode
+        assert RESEARCH_CONTRACTS["execute"].recovery_mode != RESEARCH_CONTRACTS["decide"].recovery_mode
 
     def test_no_research_phase_has_human_gate(self):
         for name, c in RESEARCH_CONTRACTS.items():
