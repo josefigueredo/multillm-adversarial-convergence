@@ -339,14 +339,32 @@ class TestDoctorM5Coverage:
         assert "active" in text_lower
 
     def test_env_shaping_shown_as_inactive_in_direct_mode(self):
-        """sandbox_active=False → doctor output surfaces env shaping as inactive."""
+        """tool_execution_mode=direct → doctor labels env shaping inactive with 'direct mode'."""
         config = _make_config(
             security=SecurityConfig(tool_execution_mode="direct"),
         )
         result = doctor_config_text(config)
         text_lower = result.text.lower()
         assert "env shaping" in text_lower or "environment shaping" in text_lower
-        assert "inactive" in text_lower or "direct" in text_lower
+        assert "inactive" in text_lower
+        assert "direct" in text_lower
+
+    def test_env_shaping_shown_as_inactive_sandbox_declared_but_not_active(self):
+        """sandboxed + mode=off → inactive; must NOT say 'direct mode'."""
+        config = _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="off"),  # declared but not active
+            ),
+        )
+        result = doctor_config_text(config)
+        text_lower = result.text.lower()
+        assert "env shaping" in text_lower or "environment shaping" in text_lower
+        assert "inactive" in text_lower
+        # Must distinguish from direct mode — sandbox intent is declared
+        assert "not active" in text_lower or "declared" in text_lower or "sandbox" in text_lower
+        # Must NOT claim this is direct mode
+        assert "direct mode" not in text_lower
 
     # -- tool coverage section ---------------------------------------------
 

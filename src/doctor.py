@@ -146,15 +146,21 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
     lines: list[str] = []
     issues: list[str] = []
 
-    # Env shaping status
+    # Env shaping status — three distinct states
     if sandbox_active:
         lines.append(
             "  env shaping:              ACTIVE"
             "  (build_environment filters to allowlist; process-level, not container-grade)"
         )
-    else:
+    elif sec.tool_execution_mode == "direct":
         lines.append(
             "  env shaping:              inactive  (direct mode — ambient env inherited)"
+        )
+    else:
+        # sandboxed declared but sandbox.mode != tool_calls → not active
+        lines.append(
+            "  env shaping:              inactive  (sandbox declared but not active"
+            " — ambient env inherited; set sandbox.mode: tool_calls to enable)"
         )
 
     # Network enforcement scope
@@ -163,15 +169,20 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
         "  (WebSearch, WebFetch; not OS-level firewall)"
     )
 
-    # Unclassified tool policy
+    # Unclassified tool policy — three distinct states mirror env shaping
     if sandbox_active:
         lines.append(
             "  unclassified tool policy: denied (tool_unclassified) when sandbox_active=True"
         )
-    else:
+    elif sec.tool_execution_mode == "direct":
         lines.append(
             "  unclassified tool policy: allowed in direct mode"
             "  (sandbox mode would deny unclassified tools)"
+        )
+    else:
+        lines.append(
+            "  unclassified tool policy: allowed (sandbox not active"
+            " — would be denied if sandbox enabled)"
         )
 
     # Per-tool classification table
