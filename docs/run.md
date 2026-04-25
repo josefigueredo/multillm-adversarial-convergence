@@ -753,7 +753,7 @@ uv run python -m src.cli doctor output --output output/aws_api_gateway
 Inspects an existing run output directory and reports:
 
 - **Run classification** — `complete` / `partial (no synthesis)` / `partial (synthesis only)` / `empty`
-- **Artifact status table** — presence of each key artifact (`effective_config.json`, `synthesis.md`, `report.html`, `knowledge_base.md`, `results.tsv`, `claims.json`, `citations.json`, …)
+- **Artifact status table** — presence of each key artifact (`effective_config.json`, `audit_trail.jsonl`, `synthesis.md`, `report.html`, `metrics.json`, `knowledge_base.md`, `results.tsv`)
 - **Resumability** — whether the run can be resumed and which artifacts are _actually_ reusable (derived from real artifact presence, not assumed)
 - **Synthesis readiness** — whether the run has enough state to regenerate synthesis
 
