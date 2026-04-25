@@ -2375,3 +2375,127 @@ class TestAutoResearcherEnforcement:
         # Event must be in the trail even though the exception was raised
         events = self._read_audit_events(researcher)
         assert any(e.get("event") == "policy_denied" for e in events)
+
+    # -- network policy enforcement (M4 Step 3) ----------------------------
+
+    def _make_sandboxed_researcher(self, research_config, fake_backend, tmp_path, *, network_access="none"):
+        """Return a researcher with sandbox active (tool_execution_mode=sandboxed, mode=tool_calls)."""
+        import dataclasses
+        from src.config import SandboxConfig, SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access=network_access),
+            ),
+        )
+        return AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+
+    def test_web_tool_denied_when_sandbox_active_and_network_none(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="WebSearch,Read")
+        err = exc_info.value
+        assert err.reason_code == "network_access_disallowed"
+        assert err.policy_field == "sandbox.network_access"
+
+    def test_webfetch_denied_when_sandbox_active_and_network_none(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="WebFetch")
+        assert exc_info.value.reason_code == "network_access_disallowed"
+
+    def test_web_tool_allowed_when_sandbox_active_and_network_web_only(self, research_config, fake_backend, tmp_path):
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="web_only")
+        # web_only → WebSearch (web destination) must pass
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="WebSearch")
+        assert result is not None
+
+    def test_web_tool_allowed_when_sandbox_active_and_network_unrestricted(self, research_config, fake_backend, tmp_path):
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="unrestricted")
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="WebSearch,WebFetch")
+        assert result is not None
+
+    def test_web_tool_allowed_in_direct_mode_even_with_network_none(self, research_config, fake_backend, tmp_path):
+        """sandbox_active=False (direct mode) → no network enforcement at _check_execution_policy."""
+        import dataclasses
+        from src.config import SandboxConfig, SecurityConfig
+        # direct mode + network_access=none but sandbox NOT active
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                tool_execution_mode="direct",
+                sandbox=SandboxConfig(mode="off", network_access="none"),
+            ),
+        )
+        researcher = AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="WebSearch")
+        assert result is not None
+
+    def test_backend_strips_tools_no_network_denial(self, research_config, tmp_path):
+        """Backend with supports_tools=False → allowed_tools cleared → no network denial."""
+        import dataclasses
+        from src.backends.types import BackendCapabilities
+        from src.config import SandboxConfig, SecurityConfig
+
+        class NoToolsBackend(FakeBackend):
+            @property
+            def capabilities(self):
+                return BackendCapabilities(supports_tools=False)
+
+        backend = NoToolsBackend()
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access="none"),
+            ),
+        )
+        researcher = AutoResearcher(config=config, backend=backend, output_dir=tmp_path / "output")
+        result = researcher._call_with(backend, "prompt", allowed_tools="WebSearch")
+        assert result is not None
+
+    def test_network_denied_call_never_invokes_backend(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        invoke_called = []
+
+        class TrackingBackend(FakeBackend):
+            def invoke(self, prompt, opts, timeout=300):
+                invoke_called.append(True)
+                return AgentResponse(text="x", cost_usd=0.0, is_error=False)
+
+        backend = TrackingBackend()
+        researcher = self._make_sandboxed_researcher(research_config, backend, tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError):
+            researcher._call_with(backend, "prompt", allowed_tools="WebSearch")
+        assert invoke_called == [], "backend.invoke must not be called when network policy denies"
+
+    def test_network_denial_emits_policy_denied_audit_event(self, research_config, fake_backend, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError):
+            researcher._call_with(fake_backend, "prompt", allowed_tools="WebSearch")
+        events = self._read_audit_events(researcher)
+        denial_events = [e for e in events if e.get("event") == "policy_denied"]
+        assert len(denial_events) == 1
+        assert denial_events[0]["reason_code"] == "network_access_disallowed"
+
+    def test_bash_denial_precedes_network_denial_when_both_blocked(self, research_config, fake_backend, tmp_path):
+        """allow_host_bash=False + sandbox_active + network=none + Bash,WebSearch → bash denial wins."""
+        import dataclasses
+        from src.config import SandboxConfig, SecurityConfig
+        from src.policy_denial import PolicyDeniedError
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                allow_host_bash=False,
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access="none"),
+            ),
+        )
+        researcher = AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="Bash,WebSearch")
+        assert exc_info.value.reason_code == "host_bash_disabled"

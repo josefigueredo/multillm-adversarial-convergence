@@ -305,8 +305,12 @@ class TestValidateToolRequestCombined:
 # Orchestrator integration — executor wired into AutoResearcher
 # ---------------------------------------------------------------------------
 
-def _make_researcher(tmp_path: Path, security_overrides: dict | None = None):
-    """Return a minimal AutoResearcher with optional security config overrides."""
+def _make_researcher(tmp_path: Path, security_overrides: dict | None = None, **kwargs):
+    """Return a minimal AutoResearcher with optional security config overrides.
+
+    *kwargs* are passed directly as ``SandboxConfig`` fields (e.g.
+    ``network_access="none"``).
+    """
     from unittest.mock import MagicMock
     from src.config import (
         BackendsConfig, ExecutionConfig, ResearchConfig, ScoringConfig,
@@ -314,7 +318,7 @@ def _make_researcher(tmp_path: Path, security_overrides: dict | None = None):
     )
     from src.orchestrator import AutoResearcher
 
-    sandbox_kwargs = {}
+    sandbox_kwargs = dict(kwargs)
     security_kwargs = {}
     if security_overrides:
         for k, v in security_overrides.items():
@@ -403,3 +407,123 @@ class TestOrchestratorSandboxIntegration:
         # payload must match executor contract: policy token, not path basename
         assert exc_info.value.allowed_boundary == "output_only"
         assert exc_info.value.policy_field == "sandbox.filesystem_access"
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator network policy integration — guard_network_action (M4 Step 3)
+# ---------------------------------------------------------------------------
+
+def _make_sandboxed_researcher(tmp_path: Path, *, network_access: str = "none") -> object:
+    """Return an AutoResearcher with sandbox active and the given network_access."""
+    from src.config import (
+        BackendsConfig, ExecutionConfig, ResearchConfig, ScoringConfig,
+        SecurityConfig, SandboxConfig,
+    )
+    from src.orchestrator import AutoResearcher
+    from unittest.mock import MagicMock
+
+    sandbox = SandboxConfig(mode="tool_calls", network_access=network_access)
+    security = SecurityConfig(tool_execution_mode="sandboxed", sandbox=sandbox)
+    config = ResearchConfig(
+        topic="t",
+        goal="g",
+        dimensions=("d1",),
+        execution=ExecutionConfig(
+            backend="claude-cli",
+            backends=BackendsConfig(primary="claude-cli"),
+        ),
+        scoring=ScoringConfig(),
+        security=security,
+    )
+    backend = MagicMock()
+    backend.name = "claude-cli"
+    backend.supports_tools = False
+    return AutoResearcher(config, backend, tmp_path)
+
+
+class TestOrchestratorNetworkPolicyIntegration:
+    """Prove guard_network_action is wired and enforces network policy."""
+
+    def test_guard_network_action_method_exists(self, tmp_path):
+        researcher = _make_researcher(tmp_path)
+        assert hasattr(researcher, "guard_network_action")
+        assert callable(researcher.guard_network_action)
+
+    # -- unrestricted allows everything ------------------------------------
+
+    def test_unrestricted_allows_web_destination(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="unrestricted")
+        researcher.guard_network_action("fetch_url", "web")  # must not raise
+
+    def test_unrestricted_allows_other_destination(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="unrestricted")
+        researcher.guard_network_action("tcp_connect", "other")  # must not raise
+
+    # -- none denies everything -------------------------------------------
+
+    def test_none_denies_web_destination(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher.guard_network_action("fetch_url", "web")
+        err = exc_info.value
+        assert err.reason_code == "network_access_disallowed"
+        assert err.policy_field == "sandbox.network_access"
+
+    def test_none_denies_other_destination(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher.guard_network_action("tcp_connect", "other")
+        assert exc_info.value.reason_code == "network_access_disallowed"
+
+    # -- web_only: web passes, other denied --------------------------------
+
+    def test_web_only_allows_web_destination(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="web_only")
+        researcher.guard_network_action("web_search", "web")  # must not raise
+
+    def test_web_only_denies_other_destination(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="web_only")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher.guard_network_action("tcp_connect", "other")
+        assert exc_info.value.reason_code == "network_access_disallowed"
+
+    # -- denial payload ----------------------------------------------------
+
+    def test_denial_carries_allowed_boundary_none(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher.guard_network_action("fetch_url", "web")
+        assert exc_info.value.allowed_boundary == "none"
+
+    def test_denial_carries_allowed_boundary_web_only(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="web_only")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher.guard_network_action("tcp_connect", "other")
+        assert exc_info.value.allowed_boundary == "web_only"
+
+    def test_denial_carries_requested_action(self, tmp_path):
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher.guard_network_action("my_action", "web")
+        assert exc_info.value.requested_action == "my_action"
+
+    # -- direct mode: no enforcement ---------------------------------------
+
+    def test_direct_mode_does_not_enforce_even_with_network_none(self, tmp_path):
+        """sandbox_active=False → guard_network_action is a no-op regardless of config."""
+        researcher = _make_researcher(tmp_path, network_access="none")
+        # direct mode: no PolicyDeniedError
+        researcher.guard_network_action("fetch_url", "web")  # must not raise
+
+    # -- audit event -------------------------------------------------------
+
+    def test_network_denial_emits_policy_denied_audit_event(self, tmp_path):
+        import json
+        researcher = _make_sandboxed_researcher(tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError):
+            researcher.guard_network_action("fetch_url", "web")
+        trail = researcher.paths.audit_trail
+        events = [json.loads(l) for l in trail.read_text(encoding="utf-8").splitlines()]
+        denial_events = [e for e in events if e.get("event") == "policy_denied"]
+        assert len(denial_events) == 1
+        assert denial_events[0]["reason_code"] == "network_access_disallowed"

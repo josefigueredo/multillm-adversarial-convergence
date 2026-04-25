@@ -86,6 +86,10 @@ log = logging.getLogger("autoresearch")
 KB_MAX_WORDS = 4000
 LIGHTWEIGHT_KB_WORDS = 800
 
+# Tool names that declare a "web" network destination (HTTP/HTTPS).
+# Used by _check_execution_policy to enforce sandbox.network_access when sandbox is active.
+_WEB_TOOL_NAMES: frozenset[str] = frozenset({"WebSearch", "WebFetch"})
+
 
 # ---------------------------------------------------------------------------
 # AutoResearcher
@@ -1124,21 +1128,59 @@ class AutoResearcher:
 
         This gate runs after :func:`~src.backend_options.apply_backend_capabilities`
         so that ``allowed_tools`` reflects what the backend would actually use.
-        Currently enforces ``allow_host_bash``: if the flag is ``False`` and
-        ``"Bash"`` appears in the resolved ``allowed_tools``, the call is
-        denied before the backend is invoked.
+
+        Enforces:
+        - ``allow_host_bash``: denied when ``False`` and ``"Bash"`` appears in tools.
+        - ``sandbox.network_access``: when ``sandbox_active`` is ``True`` and a
+          web-capable tool (``WebSearch``, ``WebFetch``) is requested, the call is
+          validated against the network policy via :meth:`guard_network_action`.
+          Bash denial always takes precedence over network denial.
         """
-        policy = resolve_runtime_security_policy(self.config.security, self.paths)
-        if not policy.is_host_bash_allowed():
-            tools = {t.strip() for t in (opts.allowed_tools or "").split(",") if t.strip()}
-            if "Bash" in tools:
-                err = PolicyDeniedError(
-                    reason_code="host_bash_disabled",
-                    policy_field="allow_host_bash",
-                    requested_action="execute_bash",
-                )
-                self._audit_trail.emit("policy_denied", **err.audit_payload())
-                raise err
+        sandbox = self._sandbox or self._make_transient_sandbox()
+        policy = sandbox.policy
+        tools = {t.strip() for t in (opts.allowed_tools or "").split(",") if t.strip()}
+
+        # Bash check (runs before network check; bash denial takes precedence).
+        if not policy.is_host_bash_allowed() and "Bash" in tools:
+            err = PolicyDeniedError(
+                reason_code="host_bash_disabled",
+                policy_field="allow_host_bash",
+                requested_action="execute_bash",
+            )
+            self._audit_trail.emit("policy_denied", **err.audit_payload())
+            raise err
+
+        # Network check: only fires when sandboxing is operationally active.
+        if policy.sandbox_active:
+            web_tools_in_use = tools & _WEB_TOOL_NAMES
+            if web_tools_in_use:
+                tool_name = next(iter(sorted(web_tools_in_use)))
+                self.guard_network_action(f"tool_dispatch:{tool_name}", "web")
+
+    def guard_network_action(self, action: str, destination_type: str) -> None:
+        """Raise :exc:`~src.policy_denial.PolicyDeniedError` if a networked action violates policy.
+
+        This is **dispatch-level enforcement only** — not OS-level firewalling.
+        Enforcement is active only when :attr:`sandbox_active` is ``True`` on
+        the resolved policy (i.e. ``tool_execution_mode: sandboxed`` and
+        ``sandbox.mode: tool_calls``).  Direct-mode runs are not affected.
+
+        Parameters
+        ----------
+        action:
+            Short label for the requested network action (used in denial messages
+            and audit events).
+        destination_type:
+            ``"web"`` for HTTP/HTTPS destinations, ``"other"`` for anything else.
+        """
+        sandbox = self._sandbox or self._make_transient_sandbox()
+        if not sandbox.policy.sandbox_active:
+            return
+        try:
+            sandbox.validate_tool_request(action=action, destination_type=destination_type)
+        except PolicyDeniedError as err:
+            self._audit_trail.emit("policy_denied", **err.audit_payload())
+            raise
 
     def guard_path_write(self, path: Path) -> None:
         """Raise :exc:`~src.policy_denial.PolicyDeniedError` if writing to *path* violates policy.
