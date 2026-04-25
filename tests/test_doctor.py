@@ -746,3 +746,62 @@ class TestDoctorOutputCLI:
         rc = main(["doctor", "output", "--output", str(tmp_path)])
         assert rc == 1
 
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 4 — capability-based host-shell risk note
+# ---------------------------------------------------------------------------
+
+class TestDispatchContractRiskNotes:
+    """Risk notes must use capability metadata, not hardcoded tool names."""
+
+    def test_custom_host_shell_tool_triggers_risk_note(self, monkeypatch):
+        """A non-Bash tool with uses_host_shell=True must trigger the host-shell risk note."""
+        from src import tool_capabilities as tc
+        monkeypatch.setitem(
+            tc._TOOL_CAPABILITIES,
+            "CustomShell",
+            tc.ToolCapabilities(uses_host_shell=True),
+        )
+        config = _make_config(
+            security=SecurityConfig(allow_host_bash=True),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="CustomShell,Read",
+            ),
+        )
+        result = doctor_config_text(config)
+        text_lower = result.text.lower()
+        assert "host shell" in text_lower or "exposed" in text_lower or "host-shell" in text_lower
+        assert result.exit_code == 1
+
+    def test_bash_still_triggers_risk_note_via_capability(self, monkeypatch):
+        """Bash still triggers the risk note after the capability-based fix."""
+        config = _make_config(
+            security=SecurityConfig(allow_host_bash=True),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="Bash,Read",
+            ),
+        )
+        result = doctor_config_text(config)
+        assert result.exit_code == 1
+        assert "host shell" in result.text.lower() or "exposed" in result.text.lower()
+
+    def test_non_shell_tool_does_not_trigger_host_shell_risk(self):
+        """A non-host-shell tool must not trigger the host-shell risk note."""
+        config = _make_config(
+            security=SecurityConfig(allow_host_bash=True),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="WebSearch,Read",
+            ),
+        )
+        result = doctor_config_text(config)
+        # With allow_host_bash=True but no shell-capable tools, no host-shell risk note
+        text_lower = result.text.lower()
+        assert "host shell is exposed" not in text_lower
+        assert "host shell exposed" not in text_lower

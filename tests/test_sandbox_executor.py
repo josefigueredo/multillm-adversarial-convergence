@@ -702,3 +702,50 @@ class TestResolveEnv:
         opts = CallOptions(process_env=explicit_env, sanitize_environment=True)
         result = backend._resolve_env(opts)
         assert result is explicit_env
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 4 — destination_type validation in _check_network
+# ---------------------------------------------------------------------------
+
+class TestValidateToolRequestDestinationTypeValidation:
+    """Invalid destination_type values must fail with a clear denial reason."""
+
+    def test_invalid_destination_type_raises_policy_denied(self, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        policy = _make_policy(tmp_path, network_access="unrestricted")
+        executor = SandboxExecutor(policy, policy.workspace_dir)
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            executor.validate_tool_request(action="dispatch", destination_type="invalid_stuff")
+        assert exc_info.value.reason_code == "invalid_destination_type"
+
+    def test_invalid_destination_type_denied_even_in_unrestricted_mode(self, tmp_path):
+        """Invalid destination_type must fail even when network policy is unrestricted."""
+        from src.policy_denial import PolicyDeniedError
+        policy = _make_policy(tmp_path, network_access="unrestricted")
+        executor = SandboxExecutor(policy, policy.workspace_dir)
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            executor.validate_tool_request(action="dispatch", destination_type="weeb")
+        assert exc_info.value.reason_code == "invalid_destination_type"
+        assert exc_info.value.policy_field == "sandbox.network_access"
+
+    def test_invalid_destination_type_carries_requested_action(self, tmp_path):
+        from src.policy_denial import PolicyDeniedError
+        policy = _make_policy(tmp_path, network_access="unrestricted")
+        executor = SandboxExecutor(policy, policy.workspace_dir)
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            executor.validate_tool_request(action="tool_dispatch:BrokenTool", destination_type="http")
+        assert exc_info.value.requested_action == "tool_dispatch:BrokenTool"
+
+    def test_valid_web_destination_type_passes(self, tmp_path):
+        """'web' is a valid destination_type and must not raise invalid_destination_type."""
+        policy = _make_policy(tmp_path, network_access="unrestricted")
+        executor = SandboxExecutor(policy, policy.workspace_dir)
+        # Should not raise — valid destination type in unrestricted mode
+        executor.validate_tool_request(action="dispatch", destination_type="web")
+
+    def test_valid_other_destination_type_passes(self, tmp_path):
+        """'other' is a valid destination_type and must not raise invalid_destination_type."""
+        policy = _make_policy(tmp_path, network_access="unrestricted")
+        executor = SandboxExecutor(policy, policy.workspace_dir)
+        executor.validate_tool_request(action="dispatch", destination_type="other")

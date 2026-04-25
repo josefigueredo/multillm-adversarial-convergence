@@ -39,6 +39,10 @@ if TYPE_CHECKING:
     from .security_runtime import RuntimeSecurityPolicy
 
 
+#: Valid destination_type values for dispatch-level network checks.
+_KNOWN_DISPATCH_DESTINATION_TYPES: frozenset[str] = frozenset({"web", "other"})
+
+
 class SandboxExecutor:
     """Policy-bound execution boundary for tool-capable actions.
 
@@ -197,7 +201,20 @@ class SandboxExecutor:
         )
 
     def _check_network(self, action: str, destination_type: str) -> None:
-        """Raise PolicyDeniedError when *destination_type* violates network policy."""
+        """Raise PolicyDeniedError when *destination_type* violates network policy.
+
+        Validates that *destination_type* is a recognised value before evaluating
+        the network policy.  Unknown values fail immediately with
+        ``reason_code="invalid_destination_type"`` regardless of the active network
+        policy — this prevents misuse of the dispatch API from silently bypassing
+        or mis-categorising network enforcement.
+        """
+        if destination_type not in _KNOWN_DISPATCH_DESTINATION_TYPES:
+            raise PolicyDeniedError(
+                reason_code="invalid_destination_type",
+                policy_field="sandbox.network_access",
+                requested_action=action,
+            )
         if self._policy.is_network_allowed(destination_type=destination_type):
             return
         raise PolicyDeniedError(

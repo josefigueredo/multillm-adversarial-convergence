@@ -1209,6 +1209,16 @@ class AutoResearcher:
                 self._audit_trail.emit("policy_denied", **err.audit_payload())
                 raise err
 
+        # Write-intent: when sandbox is active, surface write-capable tools explicitly
+        # in the audit trail.  Actual write-boundary enforcement happens later in
+        # guard_path_write() at the point of the real write operation.
+        if policy.sandbox_active:
+            write_tools = sorted(
+                name for name, caps in classified if caps and caps.may_write
+            )
+            if write_tools:
+                self._audit_trail.emit("dispatch_write_intent", tools=write_tools)
+
     def guard_network_action(self, action: str, destination_type: str) -> None:
         """Raise :exc:`~src.policy_denial.PolicyDeniedError` if a networked action violates policy.
 

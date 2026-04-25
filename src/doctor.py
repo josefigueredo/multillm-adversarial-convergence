@@ -223,16 +223,25 @@ def _risk_note_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
 
     Every risk note is also added to *issues* so that it drives exit_code = 1.
     """
+    from src.tool_capabilities import classify_allowed_tools
+
     sec = config.security
     tools = _parse_tools(config.execution.allowed_tools)
     sandbox_active = sec.tool_execution_mode == "sandboxed" and sec.sandbox.mode == "tool_calls"
     notes: list[str] = []
     issues: list[str] = []
 
-    if sec.allow_host_bash and "Bash" in tools:
+    # Host-shell risk: use capability metadata, not hardcoded tool names.
+    # Any tool classified with uses_host_shell=True triggers this warning.
+    host_shell_tools = sorted(
+        name for name, caps in classify_allowed_tools(list(tools))
+        if caps and caps.uses_host_shell
+    )
+    if sec.allow_host_bash and host_shell_tools:
+        tool_list = ", ".join(host_shell_tools)
         msg = (
-            "allow_host_bash is true AND Bash is in allowed_tools"
-            " — host shell is exposed to the agent."
+            f"allow_host_bash is true AND host-shell tool(s) in allowed_tools"
+            f" ({tool_list}) — host shell is exposed to the agent."
         )
         notes.append(f"  [!] {msg}")
         issues.append(msg)

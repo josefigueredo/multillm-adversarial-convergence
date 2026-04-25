@@ -2749,3 +2749,63 @@ class TestSandboxedEnvShaping:
         researcher._call_with(backend, "prompt")
         assert backend.last_opts is not None
         assert backend.last_opts.process_env is None
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 4 — write-intent dispatch contract
+# ---------------------------------------------------------------------------
+
+class TestDispatchWriteIntentAudit:
+    """_check_execution_policy must emit dispatch_write_intent for may_write tools."""
+
+    def _make_sandboxed_researcher(self, research_config, fake_backend, tmp_path,
+                                   *, network_access="unrestricted"):
+        import dataclasses
+        from src.config import SandboxConfig, SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access=network_access),
+            ),
+        )
+        return AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+
+    def _read_audit_events(self, researcher) -> list[dict]:
+        trail = researcher.paths.audit_trail
+        if not trail.exists():
+            return []
+        return [json.loads(line) for line in trail.read_text(encoding="utf-8").splitlines()]
+
+    def test_write_tools_emit_dispatch_write_intent_event(self, research_config, fake_backend, tmp_path):
+        """When sandbox active and write-capable tools are present, audit trail includes dispatch_write_intent."""
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path)
+        researcher._call_with(fake_backend, "prompt", allowed_tools="Read,Write,Edit")
+        events = self._read_audit_events(researcher)
+        write_events = [e for e in events if e.get("event") == "dispatch_write_intent"]
+        assert len(write_events) >= 1
+        first_event = write_events[0]
+        assert "tools" in first_event
+        assert set(first_event["tools"]) >= {"Write", "Edit"}
+
+    def test_non_write_tools_do_not_emit_dispatch_write_intent(self, research_config, fake_backend, tmp_path):
+        """Sandbox active + read-only tools → no dispatch_write_intent event."""
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path)
+        researcher._call_with(fake_backend, "prompt", allowed_tools="Read,Glob,Grep")
+        events = self._read_audit_events(researcher)
+        write_events = [e for e in events if e.get("event") == "dispatch_write_intent"]
+        assert write_events == []
+
+    def test_direct_mode_no_dispatch_write_intent_event(self, research_config, fake_backend, tmp_path):
+        """In direct mode (sandbox_active=False), no dispatch_write_intent event even with write tools."""
+        import dataclasses
+        from src.config import SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(tool_execution_mode="direct"),
+        )
+        researcher = AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+        researcher._call_with(fake_backend, "prompt", allowed_tools="Write,Edit")
+        events = self._read_audit_events(researcher)
+        write_events = [e for e in events if e.get("event") == "dispatch_write_intent"]
+        assert write_events == []
