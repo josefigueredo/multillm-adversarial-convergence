@@ -625,14 +625,16 @@ research:
 
 Defaults: `content_trust: strict`, `tool_execution_mode: direct`, `allow_host_bash: true`, sandbox fully off.
 
-**Declared-only fields** (enforced in future milestones):
+**Declared-only fields** (not yet operationally enforced):
 - `content_trust` — sanitization posture for backend-returned content
-- `tool_execution_mode: sandboxed` — declares intent to sandbox tool calls; enforcement requires a real sandbox backend
-- `sandbox.network_access` — declares outbound traffic policy; not yet network-enforced at the OS level
 
-**Runtime-enforced fields** (Milestone 2):
+**Dispatch-enforced fields** (Milestone 4, when `sandbox_active=True`):
+- `tool_execution_mode: sandboxed` + `sandbox.mode: tool_calls` — activates the sandbox executor: backend subprocesses run from the workspace cwd, writes go through the executor boundary, and network policy is gate-enforced at dispatch level
+- `sandbox.network_access` — enforced at executor-dispatch level when `sandbox_active=True`: `web_only` restricts networked tool calls (`WebSearch`, `WebFetch`) to web destinations; `none` blocks them entirely. **This is dispatch-level enforcement only — not OS-level firewalling.**
+
+**Runtime-enforced fields** (Milestone 2+):
 - `allow_host_bash: false` — hard-blocks any backend call that includes `Bash` in `allowed_tools`; denial raises `PolicyDeniedError` and is recorded in `audit_trail.jsonl` before the backend is invoked
-- `sandbox.filesystem_access` — controls the allowed write roots checked by `guard_path_write`:
+- `sandbox.filesystem_access` — controls the allowed write roots checked by `guard_path_write` and the `SandboxExecutor`:
   - `output_only` (default) — writes must be within the run `output_dir`
   - `workspace_only` — writes must be within `output_dir/.workspace/`
 - `allow_filesystem_write_outside_output: true` — explicitly permits writes anywhere (disables filesystem write policy)
@@ -645,7 +647,7 @@ Every real `run` creates a dedicated workspace directory at:
 output/<run>/.workspace/
 ```
 
-This directory is the write root when `sandbox.filesystem_access: workspace_only`.  It is created during setup and its path is recorded in `audit_trail.jsonl` (`sandbox_initialized` event).  Inspect-only commands (`explain config`, `explain resume`) never create it.
+This directory is the write root when `sandbox.filesystem_access: workspace_only`.  When `sandbox_active=True` (i.e. `tool_execution_mode: sandboxed` + `sandbox.mode: tool_calls`), it also becomes the working directory for all backend subprocesses — the sandbox executor calls `prepare_workspace()` before each invocation.  The workspace path is recorded in `audit_trail.jsonl` (`sandbox_initialized` event).  Inspect-only commands (`explain config`, `explain resume`) never create it.
 
 #### Denial behavior
 
@@ -656,6 +658,7 @@ When a policy check fails, the platform:
 Reason codes:
 - `host_bash_disabled` — `Bash` was in `allowed_tools` but `allow_host_bash: false`
 - `write_outside_allowed_roots` — write target was outside the declared filesystem boundary
+- `network_access_disallowed` — networked tool call blocked by `sandbox.network_access` policy (dispatch-level enforcement)
 
 The full resolved security policy is persisted in `effective_config.json` and surfaced by `explain config`.
 
@@ -666,10 +669,12 @@ The full resolved security policy is persisted in `effective_config.json` and su
 | Field | Status | Enforcement mechanism |
 |---|---|---|
 | `allow_host_bash: false` | **Enforced** | Hard-blocks Bash tool in `_call_with`; raises `PolicyDeniedError` |
-| `sandbox.filesystem_access` | **Enforced** | Write boundary checked by `guard_path_write` on every file write |
+| `sandbox.filesystem_access` | **Enforced** | Write boundary checked by `guard_path_write` + `SandboxExecutor` on every file write |
 | `allow_filesystem_write_outside_output` | **Enforced** | Relaxes write boundary when `true` |
-| `tool_execution_mode: sandboxed` | **Declared-only** | Declares intent; no real sandbox backend wired yet |
-| `sandbox.network_access` | **Declared-only** | Declares outbound policy; not yet OS-enforced |
+| `tool_execution_mode: sandboxed` (sandbox_active=True) | **Dispatch-enforced** | Workspace cwd for backend subprocesses; executor routing for writes and network |
+| `sandbox.network_access` (sandbox_active=True) | **Dispatch-enforced** | `WebSearch`/`WebFetch` gated at executor-dispatch level; `none` blocks them, `web_only` limits to web — **not OS-level firewalling** |
+| `tool_execution_mode: sandboxed` (sandbox_active=False) | **Declared intent** | `sandbox.mode` must be `tool_calls` to activate enforcement |
+| `sandbox.network_access` (sandbox_active=False) | **Declared intent** | No operational effect without `sandbox_active`; set `mode: tool_calls` to activate |
 | `content_trust` | **Declared-only** | Declares content sanitization posture; enforcement deferred |
 
 Use `autoresearch doctor config --config <path>` to see this table for a specific config with live health status.
@@ -732,8 +737,8 @@ Validates a config file and prints a structured diagnostic report covering:
 - **Backend validity** — whether declared backends are registered and available
 - **Operator risk notes** — explicit warnings for conditions that affect run safety:
   - Host shell exposed (`allow_host_bash: true` with Bash in `allowed_tools`)
-  - Sandbox intent declared but not actually enforced (`tool_execution_mode: sandboxed` is declared-only)
-  - Network policy declared but not OS-enforced (`sandbox.network_access` is declared-only)
+  - Sandbox declared but not active (`tool_execution_mode: sandboxed` without `sandbox.mode: tool_calls`)
+  - Network policy set but sandbox not active (`sandbox.network_access` has no effect without `sandbox_active`)
 
 **Health status:**
 
