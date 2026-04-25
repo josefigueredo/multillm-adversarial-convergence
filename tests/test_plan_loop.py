@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -15,6 +16,7 @@ from src.plan_loop import (
     _update_plan_convergence,
     run_plan_cycle,
 )
+from src.workflows.plan_states import PlanState
 
 
 def _make_config(**kwargs) -> PlanConfig:
@@ -243,3 +245,88 @@ def test_run_plan_cycle_writes_audit_trail_events(tmp_path: Path):
     assert '"step": "builder"' in content
     assert '"step": "personas"' in content
     assert '"event": "step_completed"' in content
+
+
+# ── Workflow transition emission ─────────────────────────────────────────────
+
+class CapturingAudit:
+    """In-memory audit writer for transition tests."""
+
+    def __init__(self) -> None:
+        self.events: list[dict] = []
+
+    def emit(self, event: str, **fields) -> None:
+        self.events.append({"event": event, **fields})
+
+    @contextmanager
+    def step(self, step: str, *, artifact_root=None, **fields):
+        self.emit("step_started", step=step, **fields)
+        yield
+        self.emit("step_completed", step=step, **fields)
+
+    def transitions(self) -> list[dict]:
+        return [e for e in self.events if e["event"] == "workflow_transition"]
+
+
+def _make_clean_strategy() -> MagicMock:
+    strategy = MagicMock()
+    strategy.run_builder.return_value = "# Plan"
+    strategy.run_challenger.return_value = []
+    strategy.run_personas.return_value = []
+    strategy.run_verifier.return_value = []
+    strategy.run_arbitrator.return_value = []
+    return strategy
+
+
+class TestPlanWorkflowTransitionEmission:
+
+    def _make_capturing_ctx(self):
+        audit = CapturingAudit()
+        ctx = _make_ctx(audit_trail=audit)
+        return ctx, audit
+
+    def test_run_plan_cycle_emits_all_five_phase_transitions(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = PlanCycleState()
+        run_plan_cycle(state, ctx, _make_clean_strategy(), interactive=False)
+        to_states = [t["to_state"] for t in audit.transitions()]
+        for phase in ("builder", "challenger", "personas", "verifier", "arbitrator"):
+            assert phase in to_states, f"Missing transition to {phase}"
+
+    def test_run_plan_cycle_transitions_in_order(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = PlanCycleState()
+        run_plan_cycle(state, ctx, _make_clean_strategy(), interactive=False)
+        to_states = [t["to_state"] for t in audit.transitions()]
+        expected_order = ["builder", "challenger", "personas", "verifier", "arbitrator"]
+        indices = [to_states.index(p) for p in expected_order]
+        assert indices == sorted(indices)
+
+    def test_run_plan_cycle_workflow_field_is_plan(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = PlanCycleState()
+        run_plan_cycle(state, ctx, _make_clean_strategy(), interactive=False)
+        for t in audit.transitions():
+            assert t["workflow"] == "plan"
+
+    def test_run_plan_cycle_first_from_state_is_idle(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = PlanCycleState()
+        run_plan_cycle(state, ctx, _make_clean_strategy(), interactive=False)
+        assert audit.transitions()[0]["from_state"] == "idle"
+
+    def test_run_plan_cycle_persists_workflow_state_as_arbitrator(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = PlanCycleState()
+        run_plan_cycle(state, ctx, _make_clean_strategy(), interactive=False)
+        assert state.current_workflow_state == PlanState.ARBITRATOR
+
+    def test_run_plan_cycle_second_call_transitions_from_arbitrator(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = PlanCycleState()
+        run_plan_cycle(state, ctx, _make_clean_strategy(), interactive=False)
+        audit.events.clear()
+        run_plan_cycle(state, ctx, _make_clean_strategy(), interactive=False)
+        first = audit.transitions()[0]
+        assert first["from_state"] == "arbitrator"
+        assert first["to_state"] == "builder"

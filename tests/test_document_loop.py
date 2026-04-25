@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -17,6 +18,7 @@ from src.document_loop import (
     run_cycle,
 )
 from src.hitl import DeferReason, HumanDecision, HumanInputRequest
+from src.workflows.refine_states import RefineState
 
 
 def _make_config(**kwargs) -> DocumentConfig:
@@ -251,3 +253,107 @@ def test_run_cycle_writes_audit_trail_events(tmp_path: Path):
     assert '"step": "builder"' in content
     assert '"step": "verifier"' in content
     assert '"event": "step_completed"' in content
+
+
+# ── Workflow transition emission ─────────────────────────────────────────────
+
+class CapturingAudit:
+    """In-memory audit writer for transition tests."""
+
+    def __init__(self) -> None:
+        self.events: list[dict] = []
+
+    def emit(self, event: str, **fields) -> None:
+        self.events.append({"event": event, **fields})
+
+    @contextmanager
+    def step(self, step: str, *, artifact_root=None, **fields):
+        self.emit("step_started", step=step, **fields)
+        yield
+        self.emit("step_completed", step=step, **fields)
+
+    def transitions(self) -> list[dict]:
+        return [e for e in self.events if e["event"] == "workflow_transition"]
+
+
+class TestWorkflowTransitionEmission:
+
+    def _make_capturing_ctx(self):
+        audit = CapturingAudit()
+        ctx = _make_ctx(audit_trail=audit)
+        return ctx, audit
+
+    def test_run_cycle_emits_all_five_phase_transitions(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = CycleState()
+        run_cycle(state, ctx, _make_strategy_mock(), interactive=False)
+        to_states = [t["to_state"] for t in audit.transitions()]
+        for phase in ("builder", "challenger", "personas", "verifier", "arbitrator"):
+            assert phase in to_states, f"Missing transition to {phase}"
+
+    def test_run_cycle_transitions_are_in_order(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = CycleState()
+        run_cycle(state, ctx, _make_strategy_mock(), interactive=False)
+        to_states = [t["to_state"] for t in audit.transitions()]
+        expected_order = ["builder", "challenger", "personas", "verifier", "arbitrator"]
+        # Each expected phase appears in order (other phases may be interleaved in edge cases)
+        indices = [to_states.index(p) for p in expected_order]
+        assert indices == sorted(indices)
+
+    def test_run_cycle_workflow_field_is_refine(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = CycleState()
+        run_cycle(state, ctx, _make_strategy_mock(), interactive=False)
+        for t in audit.transitions():
+            assert t["workflow"] == "refine"
+
+    def test_run_cycle_first_from_state_is_idle(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = CycleState()
+        run_cycle(state, ctx, _make_strategy_mock(), interactive=False)
+        first = audit.transitions()[0]
+        assert first["from_state"] == "idle"
+
+    def test_run_cycle_persists_workflow_state_as_arbitrator(self):
+        ctx, audit = self._make_capturing_ctx()
+        state = CycleState()
+        run_cycle(state, ctx, _make_strategy_mock(), interactive=False)
+        assert state.current_workflow_state == RefineState.ARBITRATOR
+
+    def test_run_cycle_second_call_transitions_from_arbitrator(self):
+        """Cross-cycle: second cycle must start from ARBITRATOR, not IDLE."""
+        ctx, audit = self._make_capturing_ctx()
+        state = CycleState()
+        run_cycle(state, ctx, _make_strategy_mock(), interactive=False)
+        audit.events.clear()  # reset for second cycle
+        run_cycle(state, ctx, _make_strategy_mock(), interactive=False)
+        first = audit.transitions()[0]
+        assert first["from_state"] == "arbitrator"
+        assert first["to_state"] == "builder"
+
+    def test_run_cycle_emits_paused_for_human_transition(self):
+        from src.document_strategy import VerifiedCritique
+        state = CycleState()
+        ctx, audit = self._make_capturing_ctx()
+        verified = [VerifiedCritique(
+            description="d", section_ref="§5", raised_by="architect",
+            status="deferred", defer_reason=DeferReason.HUMAN_REQUIRED,
+            question="Q?", suggested_answer="A",
+        )]
+        run_cycle(state, ctx, _make_strategy_mock(verified=verified), interactive=False)
+        to_states = [t["to_state"] for t in audit.transitions()]
+        assert "paused_for_human" in to_states
+
+    def test_run_cycle_paused_for_human_before_arbitrator(self):
+        from src.document_strategy import VerifiedCritique
+        state = CycleState()
+        ctx, audit = self._make_capturing_ctx()
+        verified = [VerifiedCritique(
+            description="d", section_ref="§5", raised_by="architect",
+            status="deferred", defer_reason=DeferReason.HUMAN_REQUIRED,
+            question="Q?", suggested_answer="A",
+        )]
+        run_cycle(state, ctx, _make_strategy_mock(verified=verified), interactive=False)
+        to_states = [t["to_state"] for t in audit.transitions()]
+        assert to_states.index("paused_for_human") < to_states.index("arbitrator")

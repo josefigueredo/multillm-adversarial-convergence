@@ -11,6 +11,8 @@ from .backends import AgentResponse
 from .config import DocumentConfig
 from .hitl import DeferReason, HumanDecision, HumanInputRequest
 from .run_state import BaseContext
+from .workflows.refine_states import RefineState
+from .workflows.transitions import WorkflowTransitionEmitter
 
 
 log = logging.getLogger("autoresearch")
@@ -52,6 +54,7 @@ class CycleState:
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     results_path: Path = field(default_factory=lambda: Path("results.tsv"))
+    current_workflow_state: RefineState = RefineState.IDLE
 
 
 @dataclass
@@ -117,6 +120,8 @@ def run_cycle(
     state.cycle += 1
     log.info("[refine][cycle %03d] starting convergence cycle", state.cycle)
 
+    emitter = WorkflowTransitionEmitter(ctx.audit_trail, "refine", state.current_workflow_state)
+
     # 1. Builder — generate or apply pending patches
     log.info(
         "[refine][cycle %03d] builder starting (pending patches: %d, human decisions: %d)",
@@ -124,6 +129,7 @@ def run_cycle(
         len(state.pending_patches),
         len(ctx.human_decisions),
     )
+    emitter.transition(RefineState.BUILDER, cycle=state.cycle)
     with ctx.audit_trail.step(
         "builder",
         artifact_root=ctx.artifact_root,
@@ -143,6 +149,7 @@ def run_cycle(
 
     # 2. Challenger
     log.info("[refine][cycle %03d] challenger starting", state.cycle)
+    emitter.transition(RefineState.CHALLENGER, cycle=state.cycle)
     with ctx.audit_trail.step(
         "challenger",
         artifact_root=ctx.artifact_root,
@@ -163,6 +170,7 @@ def run_cycle(
         len(ctx.config.personas),
         ctx.config.persona_mode,
     )
+    emitter.transition(RefineState.PERSONAS, cycle=state.cycle)
     with ctx.audit_trail.step(
         "personas",
         artifact_root=ctx.artifact_root,
@@ -184,6 +192,7 @@ def run_cycle(
         state.cycle,
         len(all_raw),
     )
+    emitter.transition(RefineState.VERIFIER, cycle=state.cycle)
     with ctx.audit_trail.step(
         "verifier",
         artifact_root=ctx.artifact_root,
@@ -214,6 +223,7 @@ def run_cycle(
         )
         requests = _make_human_requests(human_required, state.cycle, state.issue_registry)
         state.pending_human_inputs = requests
+        emitter.transition(RefineState.PAUSED_FOR_HUMAN, cycle=state.cycle)
         if interactive:
             from .hitl import collect_interactive
             decisions = collect_interactive(requests)
@@ -227,6 +237,7 @@ def run_cycle(
         state.cycle,
         len(valid),
     )
+    emitter.transition(RefineState.ARBITRATOR, cycle=state.cycle)
     with ctx.audit_trail.step(
         "arbitrator",
         artifact_root=ctx.artifact_root,
@@ -259,6 +270,7 @@ def run_cycle(
         state.consecutive_clean_cycles,
     )
 
+    state.current_workflow_state = emitter.current_state
     return len(valid), len(stale), len(deferred)
 
 

@@ -27,6 +27,8 @@ from .scorer import (
     quality_score_from_judge,
 )
 from .strategy import ResearchCandidate
+from .workflows.research_states import ResearchState
+from .workflows.transitions import WorkflowTransitionEmitter
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +91,7 @@ class LoopState:
     iterations_dir: Path = field(default_factory=lambda: Path("iterations"))
     results_path: Path = field(default_factory=lambda: Path("results.tsv"))
     candidate_assessments: list[CandidateAssessment] = field(default_factory=list)
+    current_workflow_state: ResearchState = ResearchState.IDLE
 
     MAX_ATTEMPTS_PER_DIMENSION: int = 3
     KB_MAX_WORDS: int = 8000
@@ -102,6 +105,8 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
     log.info("=" * 60)
     ctx.audit_trail.emit("iteration_started", iteration=state.iteration)
 
+    emitter = WorkflowTransitionEmitter(ctx.audit_trail, "research", state.current_workflow_state)
+
     hypothesis = _generate_hypothesis(ctx, state)
     if not hypothesis:
         log.warning("Hypothesis generation failed, retrying next iteration.")
@@ -110,7 +115,11 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
             iteration=state.iteration,
             reason="hypothesis_generation_failed",
         )
+        # Hypothesis did not succeed — no phase transition emitted; state unchanged.
         return
+
+    # Hypothesis phase completed successfully.
+    emitter.transition(ResearchState.HYPOTHESIS, iteration=state.iteration)
 
     dimension = hypothesis.get("dimension", "unknown")
     questions = hypothesis.get("questions", [])
@@ -131,7 +140,12 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
             dimension=dimension,
             reason="research_execution_empty",
         )
+        # Execute did not succeed — persist HYPOTHESIS as current state (hypothesis was done).
+        state.current_workflow_state = emitter.current_state
         return
+
+    # Execute phase completed successfully.
+    emitter.transition(ResearchState.EXECUTE, iteration=state.iteration, dimension=dimension)
 
     score = _score(ctx, state, dimension, findings)
     prev_best = state.best_scores.get(dimension, 0.0)
@@ -139,14 +153,22 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         "Scores — coverage: %.1f, quality: %.1f, total: %.1f (dim best: %.1f, global best: %.1f)",
         score.coverage, score.quality, score.total, prev_best, state.best_score,
     )
+    emitter.transition(ResearchState.SCORE, iteration=state.iteration, dimension=dimension)
 
     kept = score.total > prev_best and score.total >= 30.0
+    emitter.transition(
+        ResearchState.DECIDE,
+        iteration=state.iteration,
+        dimension=dimension,
+        status="keep" if kept else "discard",
+    )
     if kept:
         state.best_scores[dimension] = score.total
         if score.total > state.best_score:
             state.best_score = score.total
         _merge(ctx, state, dimension, findings, score)
         log.info("KEEP — merged into knowledge base.")
+        emitter.transition(ResearchState.MERGE, iteration=state.iteration, dimension=dimension)
     else:
         log.info("DISCARD — findings saved but not merged.")
         _maybe_exhaust(state, dimension)
@@ -182,6 +204,8 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         status="keep" if kept else "discard",
         total_score=score.total,
     )
+
+    state.current_workflow_state = emitter.current_state
 
 
 def _generate_hypothesis(ctx: LoopContext, state: LoopState) -> dict[str, Any] | None:

@@ -15,6 +15,8 @@ from .document_loop import (
 )
 from .hitl import DeferReason, HumanDecision, HumanInputRequest
 from .run_state import BaseContext
+from .workflows.plan_states import PlanState
+from .workflows.transitions import WorkflowTransitionEmitter
 
 
 log = logging.getLogger("autoresearch")
@@ -36,6 +38,7 @@ class PlanCycleState:
     total_cost: float = 0.0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    current_workflow_state: PlanState = PlanState.IDLE
 
 
 @dataclass
@@ -92,6 +95,8 @@ def run_plan_cycle(
     state.cycle += 1
     log.info("[plan][cycle %03d] starting convergence cycle", state.cycle)
 
+    emitter = WorkflowTransitionEmitter(ctx.audit_trail, "plan", state.current_workflow_state)
+
     # 1. Builder — apply pending patches and produce revised plan
     log.info(
         "[plan][cycle %03d] builder starting (pending patches: %d, human decisions: %d)",
@@ -99,6 +104,7 @@ def run_plan_cycle(
         len(state.pending_patches),
         len(ctx.human_decisions),
     )
+    emitter.transition(PlanState.BUILDER, cycle=state.cycle)
     with ctx.audit_trail.step(
         "builder",
         artifact_root=ctx.artifact_root,
@@ -118,6 +124,7 @@ def run_plan_cycle(
 
     # 2. Challenger
     log.info("[plan][cycle %03d] challenger starting", state.cycle)
+    emitter.transition(PlanState.CHALLENGER, cycle=state.cycle)
     with ctx.audit_trail.step(
         "challenger",
         artifact_root=ctx.artifact_root,
@@ -138,6 +145,7 @@ def run_plan_cycle(
         len(ctx.config.personas),
         ctx.config.persona_mode,
     )
+    emitter.transition(PlanState.PERSONAS, cycle=state.cycle)
     with ctx.audit_trail.step(
         "personas",
         artifact_root=ctx.artifact_root,
@@ -159,6 +167,7 @@ def run_plan_cycle(
         state.cycle,
         len(all_raw),
     )
+    emitter.transition(PlanState.VERIFIER, cycle=state.cycle)
     with ctx.audit_trail.step(
         "verifier",
         artifact_root=ctx.artifact_root,
@@ -189,6 +198,7 @@ def run_plan_cycle(
         )
         requests = _make_human_requests(human_required, state.cycle, state.issue_registry)
         state.pending_human_inputs = requests
+        emitter.transition(PlanState.PAUSED_FOR_HUMAN, cycle=state.cycle)
         if interactive:
             from .hitl import collect_interactive
             decisions = collect_interactive(requests)
@@ -202,6 +212,7 @@ def run_plan_cycle(
         state.cycle,
         len(valid),
     )
+    emitter.transition(PlanState.ARBITRATOR, cycle=state.cycle)
     with ctx.audit_trail.step(
         "arbitrator",
         artifact_root=ctx.artifact_root,
@@ -236,4 +247,5 @@ def run_plan_cycle(
         state.consecutive_clean_cycles,
     )
 
+    state.current_workflow_state = emitter.current_state
     return len(valid), len(stale), len(deferred)
