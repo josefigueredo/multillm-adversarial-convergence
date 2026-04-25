@@ -7,136 +7,71 @@ Design contract
 ---------------
 - :class:`~src.security_runtime.RuntimeSecurityPolicy` stays **pure** and
   immutable.  No enforcement logic lives there.
-- :class:`SandboxExecutor` owns all execution behavior: cwd, env shaping,
-  write-boundary validation, and network-dispatch validation.
+- :class:`SandboxExecutor` owns policy authorization: write-boundary
+  validation, network-dispatch validation, and routing to the backend.
+- :class:`~src.sandbox.backends.base.SandboxBackend` owns substrate
+  mechanics: workspace creation and environment shaping.  Swapping the
+  backend (e.g. container vs local-process) does not change the policy
+  contract.
 - :class:`~src.policy_denial.PolicyDeniedError` is the only denial signal.
 - Construction has **no filesystem side effects**.  Call
-  :meth:`SandboxExecutor.prepare_workspace` explicitly to create the workspace.
+  :meth:`SandboxExecutor.prepare_workspace` explicitly to create the
+  workspace.
 
 Environment shaping
 -------------------
-:meth:`SandboxExecutor.build_environment` produces a sanitized environment
-mapping for sandboxed subprocess execution.  It filters an input environment
-through :data:`_SANDBOX_ENV_ALLOWLIST`, preserving only keys that are both
-recognised as safe and necessary for backend subprocess execution.
-
-This is **process-level isolation** — not container-grade security.  The
-workspace cwd and write-boundary enforcement are the primary execution
-boundary; env shaping reduces ambient environment leakage.
+:meth:`SandboxExecutor.build_environment` delegates to the active backend.
+The default backend (:class:`~src.sandbox.backends.local_process.LocalProcessBackend`)
+applies an explicit allowlist filter — **process-level isolation** only, not
+container-grade security.
 """
 
 from __future__ import annotations
 
-import os
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
 from .policy_denial import PolicyDeniedError
+from .sandbox.backends import LocalProcessBackend, SandboxBackend
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from .security_runtime import RuntimeSecurityPolicy
-
-
-# ---------------------------------------------------------------------------
-# Sandbox environment allowlist
-# ---------------------------------------------------------------------------
-
-#: Explicit allowlist of environment variable names preserved by
-#: :meth:`SandboxExecutor.build_environment`.  Matching is case-insensitive
-#: so that Windows uppercase keys and Unix lowercase variants both survive.
-#:
-#: Notably **not** included (stripped from sandboxed subprocess env):
-#:
-#: - ``SSH_AUTH_SOCK``, ``GPG_AGENT_INFO`` — agent sockets
-#: - ``HISTFILE``, ``HISTSIZE``, ``HISTCONTROL`` — shell history
-#: - ``CI``, ``GITHUB_ACTIONS``, ``GITHUB_RUN_ID``, ``GITHUB_WORKFLOW`` — CI markers
-#: - ``XDG_*`` — user config dirs (stripped to reduce config-path leakage)
-#: - Any variable not explicitly listed here
-_SANDBOX_ENV_ALLOWLIST: frozenset[str] = frozenset({
-    # Process execution
-    "PATH",
-    "PATHEXT",           # Windows: executable extensions
-    "COMSPEC",           # Windows: command processor
-    "SHELL",             # Unix: default shell
-
-    # User identity (best-effort; may match host identity in this milestone)
-    "HOME",
-    "USERPROFILE",       # Windows equivalent of HOME
-    "HOMEDRIVE",
-    "HOMEPATH",
-    "USER",
-    "USERNAME",
-    "LOGNAME",
-
-    # Temporary directories (best-effort; not workspace-scoped in this milestone)
-    "TMPDIR",
-    "TMP",
-    "TEMP",
-
-    # Locale / encoding
-    "LANG",
-    "LC_ALL",
-    "LC_CTYPE",
-    "LC_MESSAGES",
-    "TERM",
-
-    # Display / colour
-    "NO_COLOR",
-    "FORCE_COLOR",
-
-    # Network / TLS (required for backend API calls through the subprocess)
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "NO_PROXY",
-    "SSL_CERT_FILE",
-    "REQUESTS_CA_BUNDLE",
-
-    # Backend API credentials (preserved so subprocesses can call their APIs)
-    "ANTHROPIC_API_KEY",
-    "OPENAI_API_KEY",
-    "GEMINI_API_KEY",
-    "GOOGLE_API_KEY",
-    "GOOGLE_APPLICATION_CREDENTIALS",
-    "GITHUB_TOKEN",
-    "GH_TOKEN",
-    "AZURE_OPENAI_API_KEY",
-    "AZURE_OPENAI_ENDPOINT",
-    "COPILOT_TOKEN",
-
-    # Windows system directories and CPU info
-    "SYSTEMROOT",
-    "SYSTEMDRIVE",
-    "WINDIR",
-    "APPDATA",
-    "LOCALAPPDATA",
-    "PROGRAMDATA",
-    "NUMBER_OF_PROCESSORS",
-    "OS",
-    "PROCESSOR_ARCHITECTURE",
-    "PROCESSOR_IDENTIFIER",
-    "PROCESSOR_LEVEL",
-    "PROCESSOR_REVISION",
-})
 
 
 class SandboxExecutor:
     """Policy-bound execution boundary for tool-capable actions.
 
+    :class:`SandboxExecutor` enforces policy rules (write boundaries, network
+    access) and delegates substrate mechanics (workspace creation, environment
+    shaping) to a :class:`~src.sandbox.backends.base.SandboxBackend`.
+
     Parameters
     ----------
     policy:
         The resolved, immutable runtime security policy for this run.
-        Provides all enforcement questions (write roots, network mode, etc.).
     workspace_dir:
-        The run-scoped workspace directory.  Typically
-        ``output_dir / ".workspace"``.  This path is *declared* here but not
-        created until :meth:`prepare_workspace` is called.
+        Declared workspace path.  Used to construct the default
+        :class:`~src.sandbox.backends.local_process.LocalProcessBackend`
+        when no *backend* is provided.  After :meth:`prepare_workspace`
+        is called, :attr:`workspace_dir` reflects the authoritative path
+        returned by the backend.
+    backend:
+        Explicit sandbox backend.  When ``None``, defaults to
+        :class:`~src.sandbox.backends.local_process.LocalProcessBackend`
+        initialized with *workspace_dir*.
     """
 
-    def __init__(self, policy: "RuntimeSecurityPolicy", workspace_dir: Path) -> None:
+    def __init__(
+        self,
+        policy: "RuntimeSecurityPolicy",
+        workspace_dir: Path,
+        *,
+        backend: SandboxBackend | None = None,
+    ) -> None:
         self._policy = policy
         self._workspace_dir = workspace_dir
+        self._backend: SandboxBackend = backend if backend is not None else LocalProcessBackend(workspace_dir)
 
     # ------------------------------------------------------------------
     # Properties
@@ -166,57 +101,49 @@ class SandboxExecutor:
 
     def build_environment(
         self,
-        base_env: Mapping[str, str] | None = None,
+        base_env: "Mapping[str, str] | None" = None,
     ) -> dict[str, str]:
         """Return a sanitized environment dict for sandboxed subprocess execution.
 
-        Filters *base_env* through :data:`_SANDBOX_ENV_ALLOWLIST`, keeping only
-        keys on the explicit allowlist.  Matching is case-insensitive so that
-        Windows uppercase variable names and Unix lowercase variants both survive
-        filtering correctly.
-
-        This is **process-level isolation only** — not container-grade security.
-        The primary execution boundary is the workspace cwd plus write-boundary
-        enforcement.  This method reduces ambient environment leakage without
-        claiming stronger guarantees.
-
-        Notable omissions (stripped):
-        ``SSH_AUTH_SOCK``, ``GPG_AGENT_INFO``, ``HISTFILE``, ``CI``,
-        ``GITHUB_ACTIONS``, ``XDG_*``, and any variable not explicitly
-        on :data:`_SANDBOX_ENV_ALLOWLIST`.
+        Delegates to the active backend's :meth:`~SandboxBackend.build_environment`.
+        The default backend applies an explicit allowlist filter (process-level
+        isolation; not container-grade security).
 
         Parameters
         ----------
         base_env:
-            Source environment to filter.  When ``None``, :data:`os.environ`
-            is used.  The source mapping is **never mutated**.
+            Source environment to filter.  ``None`` → backend default
+            (typically :data:`os.environ`).
 
         Returns
         -------
         dict[str, str]
-            A new dict containing only the allowlisted keys present in
-            *base_env*.
+            A new sanitized dict suitable for passing as ``env`` to subprocesses.
         """
-        source: Mapping[str, str] = base_env if base_env is not None else os.environ
-        allow_upper = {k.upper() for k in _SANDBOX_ENV_ALLOWLIST}
-        return {k: v for k, v in source.items() if k.upper() in allow_upper}
+        return self._backend.build_environment(base_env)
 
     # ------------------------------------------------------------------
     # Workspace setup
     # ------------------------------------------------------------------
 
     def prepare_workspace(self) -> Path:
-        """Create the workspace directory if it does not already exist.
+        """Initialize the execution workspace via the active backend.
 
-        Safe to call multiple times (idempotent).
+        Delegates to :meth:`~SandboxBackend.prepare_workspace` and updates
+        :attr:`workspace_dir` to the authoritative path returned by the backend.
+        This allows container backends to return a different execution path
+        (e.g. a container mount) without changing the executor's external API.
+
+        Idempotent — safe to call multiple times.
 
         Returns
         -------
         Path
-            The workspace directory path.
+            The authoritative execution workspace path.
         """
-        self._workspace_dir.mkdir(parents=True, exist_ok=True)
-        return self._workspace_dir
+        path = self._backend.prepare_workspace()
+        self._workspace_dir = path
+        return path
 
     # ------------------------------------------------------------------
     # Validation
