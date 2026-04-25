@@ -481,11 +481,18 @@ def _read_last_workflow_transition(audit_trail_path: Path) -> dict | None:
     return last
 
 
-def _workflow_state_lines(last_transition: dict | None) -> list[str]:
-    """Return WORKFLOW STATE section lines for *doctor output* output.
+def _workflow_state_lines(
+    last_transition: dict | None,
+) -> tuple[list[str], list[str]]:
+    """Return (section_lines, issues) for the WORKFLOW STATE doctor section.
 
-    Uses workflow contracts and state metadata to annotate the last known
-    phase with recovery semantics and gate status.
+    *issues* is non-empty when the workflow state requires operator attention:
+    - ``paused_for_human`` — pending human gate, run cannot auto-resume
+    - ``interrupted``     — terminal failure; run ended abnormally
+    - non-terminal active phase — workflow history inconsistent with artifact
+      completeness (run looks done but workflow was never closed)
+
+    Both outputs contribute to the overall health/exit-code decision.
     """
     from .workflows.contracts import get_contract
 
@@ -493,26 +500,35 @@ def _workflow_state_lines(last_transition: dict | None) -> list[str]:
     _PAUSE: frozenset[str] = frozenset({"paused_for_human"})
 
     lines: list[str] = ["WORKFLOW STATE"]
+    workflow_issues: list[str] = []
+
     if last_transition is None:
         lines.append("  (no workflow history found in audit trail)")
         lines.append("")
-        return lines
+        return lines, workflow_issues
 
     workflow = last_transition.get("workflow", "unknown")
     to_state = last_transition.get("to_state", "unknown")
     is_terminal = to_state in _TERMINAL
     is_paused = to_state in _PAUSE
+    is_active = not is_terminal and not is_paused
 
     lines.append(f"  workflow:     {workflow}")
     lines.append(f"  last_phase:   {to_state}")
 
-    if is_terminal:
-        lines.append("  terminal:     yes")
+    if to_state == "interrupted":
+        lines.append("  terminal:     yes (interrupted)")
+        lines.append("  pending_gate: no")
+        workflow_issues.append("Workflow terminated with interrupted state — run ended abnormally.")
+    elif to_state == "converged":
+        lines.append("  terminal:     yes (converged)")
         lines.append("  pending_gate: no")
     elif is_paused:
         lines.append("  terminal:     no")
         lines.append("  pending_gate: YES — human review required before resuming")
+        workflow_issues.append("Workflow paused for human review — run cannot auto-resume.")
     else:
+        # Non-terminal active phase
         lines.append("  terminal:     no")
         lines.append("  pending_gate: no")
         contract = get_contract(workflow, to_state)
@@ -520,9 +536,13 @@ def _workflow_state_lines(last_transition: dict | None) -> list[str]:
             lines.append(f"  recovery_mode: {contract.recovery_mode}")
         else:
             lines.append("  recovery_mode: unknown (no contract for this phase)")
+        workflow_issues.append(
+            f"Workflow state '{to_state}' is non-terminal — "
+            "run history may be incomplete or the workflow was interrupted mid-phase."
+        )
 
     lines.append("")
-    return lines
+    return lines, workflow_issues
 
 
 def doctor_output_text(output_dir: Path) -> DoctorReport:
@@ -638,9 +658,22 @@ def doctor_output_text(output_dir: Path) -> DoctorReport:
             parts.append("  [!] effective_config.json missing — config context unavailable.")
     parts.append("")
 
-    # Workflow state (from audit trail)
+    # Workflow state (from audit trail) — may add issues that affect health
     last_transition = _read_last_workflow_transition(paths.audit_trail)
-    parts.extend(_workflow_state_lines(last_transition))
+    workflow_lines, workflow_issues = _workflow_state_lines(last_transition)
+    issues.extend(workflow_issues)
+
+    # Re-derive health after workflow issues are merged
+    health = "OK" if not issues else f"WARNINGS ({len(issues)} issue{'s' if len(issues) != 1 else ''})"
+    exit_code = 0 if not issues else 1
+
+    # Patch the HEALTH line already added to parts
+    for i, line in enumerate(parts):
+        if line.startswith("HEALTH:"):
+            parts[i] = f"HEALTH: {health}"
+            break
+
+    parts.extend(workflow_lines)
 
     # Warnings section
     if issues:

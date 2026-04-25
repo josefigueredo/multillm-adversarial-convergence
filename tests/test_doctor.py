@@ -1067,3 +1067,67 @@ class TestDoctorOutputWorkflowState:
         result = doctor_output_text(tmp_path)
         # hypothesis has outer_loop_continue recovery
         assert "outer_loop_continue" in result.text or "recovery" in result.text.lower()
+
+    def test_paused_for_human_exits_1(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "refine",
+             "from_state": "verifier", "to_state": "paused_for_human"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 1
+
+    def test_interrupted_workflow_exits_1(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "execute", "to_state": "interrupted"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 1
+
+    def test_non_terminal_active_phase_on_complete_run_exits_1(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "idle", "to_state": "execute"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 1
+
+    def test_converged_complete_run_exits_0(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "idle", "to_state": "hypothesis"},
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "hypothesis", "to_state": "converged"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 0
+
+    def test_paused_for_human_health_shows_warnings(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "refine",
+             "from_state": "verifier", "to_state": "paused_for_human"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert "WARN" in result.text or "ERROR" in result.text
+
+    def test_interrupted_health_shows_warnings(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "execute", "to_state": "interrupted"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert "WARN" in result.text or "ERROR" in result.text
+
+    def test_no_workflow_history_does_not_add_issues(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        # no workflow transitions → should not add workflow-related warnings
+        assert "paused" not in result.text.lower()
+        assert "interrupted" not in result.text.lower()
