@@ -17,7 +17,8 @@ class PolicyDeniedError(Exception):
     reason_code:
         Machine-stable token identifying the denial reason.
         Valid values: ``host_bash_disabled``, ``write_outside_allowed_roots``,
-        ``network_access_disallowed``, ``tool_calls_disabled``.
+        ``network_access_disallowed``, ``tool_calls_disabled``,
+        ``tool_unclassified``.
     policy_field:
         The config field that caused the denial (e.g. ``allow_host_bash``).
     requested_action:

@@ -2503,19 +2503,74 @@ class TestAutoResearcherEnforcement:
     # -- capability-based dispatch (M5 Step 3) -----------------------------
 
     def test_unknown_tool_not_blocked_by_bash_policy(self, research_config, fake_backend, tmp_path):
-        """Tools absent from the capability registry do not trigger bash policy enforcement."""
+        """Unclassified tools are NOT denied by bash policy when sandbox is NOT active."""
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_host_bash=False
         )
-        # "UnknownShell" has no capability record → not treated as host-shell → allowed
+        # sandbox_active=False (direct mode) → unclassified check inactive → allowed
         result = researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownShell,Read")
         assert result is not None
 
-    def test_unknown_tool_not_blocked_by_network_policy(self, research_config, fake_backend, tmp_path):
-        """Tools absent from the capability registry do not trigger network policy enforcement."""
-        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
-        # "UnknownNetwork" has no capability record → not treated as networked → allowed
-        result = researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownNetwork,Read")
+    def test_unknown_tool_denied_when_sandbox_active(self, research_config, fake_backend, tmp_path):
+        """Unclassified tools are denied with tool_unclassified when sandbox_active=True."""
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="unrestricted")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownTool,Read")
+        err = exc_info.value
+        assert err.reason_code == "tool_unclassified"
+        assert err.policy_field == "allowed_tools"
+        assert "UnknownTool" in err.requested_action
+
+    def test_unknown_tool_allowed_in_direct_mode(self, research_config, fake_backend, tmp_path):
+        """Unclassified tools pass through in direct mode regardless of other policy settings."""
+        import dataclasses
+        from src.config import SandboxConfig, SecurityConfig
+        # direct mode: sandbox NOT active → unclassified check is off
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                tool_execution_mode="direct",
+                sandbox=SandboxConfig(mode="off", network_access="none"),
+            ),
+        )
+        researcher = AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownTool")
+        assert result is not None
+
+    def test_unclassified_denial_emits_audit_event(self, research_config, fake_backend, tmp_path):
+        """tool_unclassified denial must be recorded in audit_trail.jsonl."""
+        from src.policy_denial import PolicyDeniedError
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="unrestricted")
+        with pytest.raises(PolicyDeniedError):
+            researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownTool")
+        events = self._read_audit_events(researcher)
+        denial_events = [e for e in events if e.get("event") == "policy_denied"]
+        assert len(denial_events) == 1
+        assert denial_events[0]["reason_code"] == "tool_unclassified"
+
+    def test_bash_denial_precedes_unclassified_denial(self, research_config, fake_backend, tmp_path):
+        """When Bash + unknown tool both present, bash denial takes precedence."""
+        from src.policy_denial import PolicyDeniedError
+        import dataclasses
+        from src.config import SandboxConfig, SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                allow_host_bash=False,
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access="unrestricted"),
+            ),
+        )
+        researcher = AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="Bash,UnknownTool")
+        assert exc_info.value.reason_code == "host_bash_disabled"
+
+    def test_known_tool_with_no_capabilities_allowed_in_sandbox(self, research_config, fake_backend, tmp_path):
+        """A classified tool with all capabilities False/None (e.g. Read) is allowed in sandbox mode."""
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="unrestricted")
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="Read,Glob")
         assert result is not None
 
     def test_new_host_shell_tool_blocked_via_capability(self, research_config, fake_backend, tmp_path, monkeypatch):
@@ -2548,17 +2603,16 @@ class TestAutoResearcherEnforcement:
             researcher._call_with(fake_backend, "prompt", allowed_tools="CustomWebTool")
         assert exc_info.value.reason_code == "network_access_disallowed"
 
-    def test_other_destination_type_not_blocked_by_web_only_policy(self, research_config, fake_backend, tmp_path, monkeypatch):
-        """A tool with destination_type='other' is NOT blocked when network_access='web_only'."""
+    def test_other_destination_type_blocked_by_web_only_policy(self, research_config, fake_backend, tmp_path, monkeypatch):
+        """A tool with destination_type='other' is blocked when network_access='web_only'."""
         from src import tool_capabilities as tc
+        from src.policy_denial import PolicyDeniedError
         monkeypatch.setitem(
             tc._TOOL_CAPABILITIES,
             "CustomOtherTool",
             tc.ToolCapabilities(uses_network=True, destination_type="other"),
         )
         researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="web_only")
-        # web_only blocks destination_type="other" → should raise network_access_disallowed
-        from src.policy_denial import PolicyDeniedError
         with pytest.raises(PolicyDeniedError) as exc_info:
             researcher._call_with(fake_backend, "prompt", allowed_tools="CustomOtherTool")
         assert exc_info.value.reason_code == "network_access_disallowed"

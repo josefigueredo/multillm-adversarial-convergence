@@ -1145,15 +1145,18 @@ class AutoResearcher:
 
         Policy enforcement is **capability-based**: each tool in ``allowed_tools`` is
         looked up in the :data:`~src.tool_capabilities._TOOL_CAPABILITIES` registry.
-        Unknown tools (not in the registry) pass through without capability checks.
 
-        Enforces:
-        - ``allow_host_bash``: any tool classified with ``uses_host_shell=True`` is
-          denied when ``allow_host_bash=False``.  Bash denial takes precedence over
-          network denial.
-        - ``sandbox.network_access``: when ``sandbox_active`` is ``True``, any tool
-          classified with ``uses_network=True`` and ``destination_type="web"`` is
-          validated against the network policy via :meth:`guard_network_action`.
+        Enforcement order (first matching check raises):
+
+        1. **Bash** (``allow_host_bash``): any tool classified with ``uses_host_shell=True``
+           is denied when ``allow_host_bash=False``.
+        2. **Network** (``sandbox.network_access``): when ``sandbox_active`` is ``True``,
+           tools with a declared network destination type are validated via
+           :meth:`guard_network_action`.
+        3. **Unclassified** (``allowed_tools``): when ``sandbox_active`` is ``True``,
+           any tool *not in the capability registry* is denied with
+           ``reason_code="tool_unclassified"`` — the conservative-deny contract.
+           In direct mode (``sandbox_active=False``) unclassified tools pass through.
         """
         sandbox = self._sandbox or self._make_transient_sandbox()
         policy = sandbox.policy
@@ -1161,7 +1164,7 @@ class AutoResearcher:
         classified = classify_allowed_tools(tool_names)
 
         # Bash check: any tool with uses_host_shell capability is denied when
-        # allow_host_bash=False. Runs before network check; bash denial takes precedence.
+        # allow_host_bash=False. Runs before network/unclassified checks.
         if not policy.is_host_bash_allowed():
             shell_tools = [name for name, caps in classified if caps and caps.uses_host_shell]
             if shell_tools:
@@ -1173,7 +1176,7 @@ class AutoResearcher:
                 self._audit_trail.emit("policy_denied", **err.audit_payload())
                 raise err
 
-        # Network check: only fires when sandboxing is operationally active.
+        # Network checks: only fire when sandboxing is operationally active.
         if policy.sandbox_active:
             web_tools = sorted(
                 name for name, caps in classified
@@ -1182,15 +1185,26 @@ class AutoResearcher:
             if web_tools:
                 self.guard_network_action(f"tool_dispatch:{web_tools[0]}", "web")
 
-        # Network check for non-web destinations (destination_type="other"): only fires
-        # when sandbox is active. web_only policy blocks "other" destinations.
-        if policy.sandbox_active:
             other_tools = sorted(
                 name for name, caps in classified
                 if caps and caps.uses_network and caps.destination_type == "other"
             )
             if other_tools:
                 self.guard_network_action(f"tool_dispatch:{other_tools[0]}", "other")
+
+        # Unclassified check: when sandbox is active, deny any tool not in the registry.
+        # Conservative-deny contract — unknown tools must be explicitly classified to run
+        # under sandboxing.  Direct mode (sandbox_active=False) is not affected.
+        if policy.sandbox_active:
+            unclassified = sorted(name for name, caps in classified if caps is None)
+            if unclassified:
+                err = PolicyDeniedError(
+                    reason_code="tool_unclassified",
+                    policy_field="allowed_tools",
+                    requested_action=f"tool_dispatch:{unclassified[0]}",
+                )
+                self._audit_trail.emit("policy_denied", **err.audit_payload())
+                raise err
 
     def guard_network_action(self, action: str, destination_type: str) -> None:
         """Raise :exc:`~src.policy_denial.PolicyDeniedError` if a networked action violates policy.
