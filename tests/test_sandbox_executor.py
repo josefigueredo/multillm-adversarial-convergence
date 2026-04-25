@@ -527,3 +527,130 @@ class TestOrchestratorNetworkPolicyIntegration:
         denial_events = [e for e in events if e.get("event") == "policy_denied"]
         assert len(denial_events) == 1
         assert denial_events[0]["reason_code"] == "network_access_disallowed"
+
+
+# ---------------------------------------------------------------------------
+# SandboxExecutor.build_environment — M5 Step 1
+# ---------------------------------------------------------------------------
+
+class TestBuildEnvironment:
+    """Unit tests for SandboxExecutor.build_environment."""
+
+    def test_method_exists_on_executor(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        assert hasattr(executor, "build_environment")
+        assert callable(executor.build_environment)
+
+    # -- allowlisted keys are preserved -----------------------------------
+
+    def test_path_is_preserved(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"PATH": "/usr/bin:/bin"})
+        assert env["PATH"] == "/usr/bin:/bin"
+
+    def test_home_is_preserved(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"HOME": "/home/user", "PATH": "/usr/bin"})
+        assert env["HOME"] == "/home/user"
+
+    def test_lang_is_preserved(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"LANG": "en_US.UTF-8"})
+        assert env["LANG"] == "en_US.UTF-8"
+
+    def test_proxy_vars_are_preserved(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        base = {
+            "HTTP_PROXY": "http://proxy:3128",
+            "HTTPS_PROXY": "http://proxy:3128",
+            "NO_PROXY": "localhost",
+        }
+        env = executor.build_environment(base)
+        assert env["HTTP_PROXY"] == "http://proxy:3128"
+        assert env["HTTPS_PROXY"] == "http://proxy:3128"
+        assert env["NO_PROXY"] == "localhost"
+
+    def test_api_keys_are_preserved(self, tmp_path):
+        """API keys must survive env shaping so backend subprocesses can call their APIs."""
+        executor = _make_executor(tmp_path)
+        base = {
+            "ANTHROPIC_API_KEY": "sk-ant-secret",
+            "OPENAI_API_KEY": "sk-openai-secret",
+        }
+        env = executor.build_environment(base)
+        assert env["ANTHROPIC_API_KEY"] == "sk-ant-secret"
+        assert env["OPENAI_API_KEY"] == "sk-openai-secret"
+
+    # -- non-allowlisted keys are stripped --------------------------------
+
+    def test_ssh_auth_sock_is_stripped(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"SSH_AUTH_SOCK": "/tmp/ssh-agent.sock"})
+        assert "SSH_AUTH_SOCK" not in env
+
+    def test_gpg_agent_info_is_stripped(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"GPG_AGENT_INFO": "/run/user/1000/gnupg"})
+        assert "GPG_AGENT_INFO" not in env
+
+    def test_histfile_is_stripped(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"HISTFILE": "/home/user/.bash_history"})
+        assert "HISTFILE" not in env
+
+    def test_ci_env_var_is_stripped(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"CI": "true", "GITHUB_ACTIONS": "true"})
+        assert "CI" not in env
+        assert "GITHUB_ACTIONS" not in env
+
+    def test_arbitrary_unknown_var_is_stripped(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"MY_CUSTOM_SECRET": "hunter2"})
+        assert "MY_CUSTOM_SECRET" not in env
+
+    # -- edge cases -------------------------------------------------------
+
+    def test_empty_base_env_returns_empty_dict(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        assert executor.build_environment({}) == {}
+
+    def test_returns_new_dict_not_same_object(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        base = {"PATH": "/usr/bin"}
+        result = executor.build_environment(base)
+        assert result is not base
+
+    def test_source_env_is_not_mutated(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        base = {"PATH": "/usr/bin", "SSH_AUTH_SOCK": "/tmp/sock"}
+        original = dict(base)
+        executor.build_environment(base)
+        assert base == original
+
+    def test_none_base_env_uses_os_environ(self, tmp_path, monkeypatch):
+        """When base_env=None, os.environ is the source (not an empty dict)."""
+        monkeypatch.setenv("PATH", "/injected/path")
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment(None)
+        assert env.get("PATH") == "/injected/path"
+
+    # -- case-insensitive matching (Windows compatibility) ----------------
+
+    def test_lowercase_key_in_allowlist_is_still_preserved(self, tmp_path):
+        """Allowlist matching is case-insensitive so Windows vars survive."""
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"path": "/usr/bin"})
+        assert env.get("path") == "/usr/bin"
+
+    def test_mixed_case_key_in_allowlist_is_preserved(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        env = executor.build_environment({"Path": "/usr/bin"})
+        assert env.get("Path") == "/usr/bin"
+
+    # -- deterministic ----------------------------------------------------
+
+    def test_same_input_produces_same_output(self, tmp_path):
+        executor = _make_executor(tmp_path)
+        base = {"PATH": "/usr/bin", "HOME": "/home/user", "SSH_AUTH_SOCK": "/tmp/sock"}
+        assert executor.build_environment(base) == executor.build_environment(base)

@@ -12,10 +12,23 @@ Design contract
 - :class:`~src.policy_denial.PolicyDeniedError` is the only denial signal.
 - Construction has **no filesystem side effects**.  Call
   :meth:`SandboxExecutor.prepare_workspace` explicitly to create the workspace.
+
+Environment shaping
+-------------------
+:meth:`SandboxExecutor.build_environment` produces a sanitized environment
+mapping for sandboxed subprocess execution.  It filters an input environment
+through :data:`_SANDBOX_ENV_ALLOWLIST`, preserving only keys that are both
+recognised as safe and necessary for backend subprocess execution.
+
+This is **process-level isolation** — not container-grade security.  The
+workspace cwd and write-boundary enforcement are the primary execution
+boundary; env shaping reduces ambient environment leakage.
 """
 
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
@@ -23,6 +36,88 @@ from .policy_denial import PolicyDeniedError
 
 if TYPE_CHECKING:
     from .security_runtime import RuntimeSecurityPolicy
+
+
+# ---------------------------------------------------------------------------
+# Sandbox environment allowlist
+# ---------------------------------------------------------------------------
+
+#: Explicit allowlist of environment variable names preserved by
+#: :meth:`SandboxExecutor.build_environment`.  Matching is case-insensitive
+#: so that Windows uppercase keys and Unix lowercase variants both survive.
+#:
+#: Notably **not** included (stripped from sandboxed subprocess env):
+#:
+#: - ``SSH_AUTH_SOCK``, ``GPG_AGENT_INFO`` — agent sockets
+#: - ``HISTFILE``, ``HISTSIZE``, ``HISTCONTROL`` — shell history
+#: - ``CI``, ``GITHUB_ACTIONS``, ``GITHUB_RUN_ID``, ``GITHUB_WORKFLOW`` — CI markers
+#: - ``XDG_*`` — user config dirs (stripped to reduce config-path leakage)
+#: - Any variable not explicitly listed here
+_SANDBOX_ENV_ALLOWLIST: frozenset[str] = frozenset({
+    # Process execution
+    "PATH",
+    "PATHEXT",           # Windows: executable extensions
+    "COMSPEC",           # Windows: command processor
+    "SHELL",             # Unix: default shell
+
+    # User identity (best-effort; may match host identity in this milestone)
+    "HOME",
+    "USERPROFILE",       # Windows equivalent of HOME
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "USER",
+    "USERNAME",
+    "LOGNAME",
+
+    # Temporary directories (best-effort; not workspace-scoped in this milestone)
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+
+    # Locale / encoding
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LC_MESSAGES",
+    "TERM",
+
+    # Display / colour
+    "NO_COLOR",
+    "FORCE_COLOR",
+
+    # Network / TLS (required for backend API calls through the subprocess)
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "SSL_CERT_FILE",
+    "REQUESTS_CA_BUNDLE",
+
+    # Backend API credentials (preserved so subprocesses can call their APIs)
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "GITHUB_TOKEN",
+    "GH_TOKEN",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+    "COPILOT_TOKEN",
+
+    # Windows system directories and CPU info
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+    "NUMBER_OF_PROCESSORS",
+    "OS",
+    "PROCESSOR_ARCHITECTURE",
+    "PROCESSOR_IDENTIFIER",
+    "PROCESSOR_LEVEL",
+    "PROCESSOR_REVISION",
+})
 
 
 class SandboxExecutor:
@@ -64,6 +159,47 @@ class SandboxExecutor:
     def network_mode(self) -> str:
         """Return the resolved network access token (``unrestricted`` / ``web_only`` / ``none``)."""
         return self._policy.network_mode()
+
+    # ------------------------------------------------------------------
+    # Environment shaping
+    # ------------------------------------------------------------------
+
+    def build_environment(
+        self,
+        base_env: Mapping[str, str] | None = None,
+    ) -> dict[str, str]:
+        """Return a sanitized environment dict for sandboxed subprocess execution.
+
+        Filters *base_env* through :data:`_SANDBOX_ENV_ALLOWLIST`, keeping only
+        keys on the explicit allowlist.  Matching is case-insensitive so that
+        Windows uppercase variable names and Unix lowercase variants both survive
+        filtering correctly.
+
+        This is **process-level isolation only** — not container-grade security.
+        The primary execution boundary is the workspace cwd plus write-boundary
+        enforcement.  This method reduces ambient environment leakage without
+        claiming stronger guarantees.
+
+        Notable omissions (stripped):
+        ``SSH_AUTH_SOCK``, ``GPG_AGENT_INFO``, ``HISTFILE``, ``CI``,
+        ``GITHUB_ACTIONS``, ``XDG_*``, and any variable not explicitly
+        on :data:`_SANDBOX_ENV_ALLOWLIST`.
+
+        Parameters
+        ----------
+        base_env:
+            Source environment to filter.  When ``None``, :data:`os.environ`
+            is used.  The source mapping is **never mutated**.
+
+        Returns
+        -------
+        dict[str, str]
+            A new dict containing only the allowlisted keys present in
+            *base_env*.
+        """
+        source: Mapping[str, str] = base_env if base_env is not None else os.environ
+        allow_upper = {k.upper() for k in _SANDBOX_ENV_ALLOWLIST}
+        return {k: v for k, v in source.items() if k.upper() in allow_upper}
 
     # ------------------------------------------------------------------
     # Workspace setup
