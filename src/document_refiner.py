@@ -88,8 +88,11 @@ class DocumentRefiner:
             resume=self._resume,
         )
 
-        # Phase 1 — Convergence
+        # Phases 1–3 and finalization wrapped together so that CONVERGED is
+        # only emitted on true end-to-end completion and INTERRUPTED is emitted
+        # for failures in any phase.
         try:
+            # Phase 1 — Convergence
             while not _should_stop(state, self._config):
                 valid_count, stale_count, deferred_count = run_cycle(
                     state, ctx, strategy, interactive=interactive
@@ -106,6 +109,24 @@ class DocumentRefiner:
                     self._handle_hitl_pause(state)
                     self._audit_trail.emit("run_paused_for_human_input", cycle=state.cycle)
                     return EXIT_HUMAN_REQUIRED
+
+            # Write converged primary artifact
+            self._write_primary_artifact(state.prd)
+            log.info(
+                "[refine] Phase 1 complete — %s converged in %d cycle(s).",
+                self._config.primary_artifact, state.cycle,
+            )
+
+            # Phase 2 — Expansion
+            self._run_phase2(state.prd, strategy, ctx)
+
+            # Phase 3 — Indexing
+            self._run_phase3()
+
+            # Finalize
+            self._write_run_manifest(cycles=state.cycle, total_cost=self._total_cost)
+            self._audit_trail.emit("run_completed", cycles=state.cycle, status="completed")
+            log.info("[refine] Done. Output at: %s", self._output_dir)
         except Exception:
             WorkflowTransitionEmitter(
                 self._audit_trail, "refine", state.current_workflow_state
@@ -115,24 +136,6 @@ class DocumentRefiner:
         WorkflowTransitionEmitter(
             self._audit_trail, "refine", state.current_workflow_state
         ).transition(RefineState.CONVERGED, cycles=state.cycle)
-
-        # Write converged primary artifact
-        self._write_primary_artifact(state.prd)
-        log.info(
-            "[refine] Phase 1 complete — %s converged in %d cycle(s).",
-            self._config.primary_artifact, state.cycle,
-        )
-
-        # Phase 2 — Expansion
-        self._run_phase2(state.prd, strategy, ctx)
-
-        # Phase 3 — Indexing
-        self._run_phase3()
-
-        # Finalize
-        self._write_run_manifest(cycles=state.cycle, total_cost=self._total_cost)
-        self._audit_trail.emit("run_completed", cycles=state.cycle, status="completed")
-        log.info("[refine] Done. Output at: %s", self._output_dir)
         return 0
 
     # ── Phase 2: Expansion ──────────────────────────────────────────────────

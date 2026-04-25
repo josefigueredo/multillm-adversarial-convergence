@@ -466,3 +466,19 @@ class TestWorkflowTerminalTransitions:
             f"Expected 'interrupted' in workflow transitions, got: {[t.get('to_state') for t in transitions]}"
         )
         assert all(t.get("workflow") == "refine" for t in transitions)
+
+    def test_interrupted_emitted_on_later_phase_failure(self, tmp_path):
+        refiner = DocumentRefiner(_make_config(), tmp_path, _make_backends())
+        with (
+            patch("src.document_refiner.ConvergeStrategy"),
+            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.document_refiner._should_stop", side_effect=[False, True]),
+            patch.object(refiner, "_run_phase2", side_effect=RuntimeError("phase2 crash")),
+            pytest.raises(RuntimeError),
+        ):
+            refiner.run(interactive=True)
+
+        transitions = _workflow_transitions(tmp_path)
+        to_states = [t.get("to_state") for t in transitions]
+        assert "interrupted" in to_states, f"Expected 'interrupted', got: {to_states}"
+        assert "converged" not in to_states, f"'converged' must not appear when run crashed: {to_states}"
