@@ -805,3 +805,174 @@ class TestDispatchContractRiskNotes:
         text_lower = result.text.lower()
         assert "host shell is exposed" not in text_lower
         assert "host shell exposed" not in text_lower
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 5 — isolation maturity diagnostics
+# ---------------------------------------------------------------------------
+
+class TestDoctorMM06Diagnostics:
+    """Doctor surfaces MM06 isolation maturity: backend type, env policy, coverage stats."""
+
+    def _sandbox_active_config(self, tools: str = "Read,Grep") -> ResearchConfig:
+        return _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls"),
+            ),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools=tools,
+            ),
+        )
+
+    def _sandbox_declared_not_active_config(self, tools: str = "Read,Grep") -> ResearchConfig:
+        return _make_config(
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="off"),  # declared but not active
+            ),
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools=tools,
+            ),
+        )
+
+    def _direct_config(self, tools: str = "Read,Grep") -> ResearchConfig:
+        return _make_config(
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools=tools,
+            ),
+        )
+
+    # -- sandbox backend type (3 states) -----------------------------------
+
+    def test_sandbox_backend_type_shown_when_sandbox_active(self):
+        """sandbox_active=True → local-process backend type surfaced."""
+        result = doctor_config_text(self._sandbox_active_config())
+        text_lower = result.text.lower()
+        assert "local-process" in text_lower or "localprocessbackend" in text_lower
+
+    def test_sandbox_backend_type_shown_when_declared_not_active(self):
+        """sandboxed declared but not active → local-process still mentioned (as declared)."""
+        result = doctor_config_text(self._sandbox_declared_not_active_config())
+        text_lower = result.text.lower()
+        assert "local-process" in text_lower or "localprocessbackend" in text_lower
+
+    def test_sandbox_backend_type_na_in_direct_mode(self):
+        """direct mode → sandbox backend shown as N/A (no substrate active)."""
+        result = doctor_config_text(self._direct_config())
+        assert "N/A" in result.text
+
+    def test_sandbox_backend_line_not_na_when_sandbox_active(self):
+        """sandbox_active=True → the sandbox backend line must not say N/A."""
+        result = doctor_config_text(self._sandbox_active_config())
+        lines = result.text.splitlines()
+        backend_lines = [l for l in lines if "sandbox backend" in l.lower()]
+        assert backend_lines, "Expected a 'sandbox backend:' line in output"
+        assert "N/A" not in backend_lines[0]
+
+    # -- env policy summary (3 states) ------------------------------------
+
+    def test_env_policy_summary_shown_when_sandbox_active(self):
+        """sandbox_active=True → env policy line with required/denied counts surfaced."""
+        result = doctor_config_text(self._sandbox_active_config())
+        text_lower = result.text.lower()
+        assert "env policy" in text_lower
+
+    def test_env_policy_shows_required_and_denied_counts(self):
+        """sandbox_active=True → required and denied counts visible in env policy line."""
+        result = doctor_config_text(self._sandbox_active_config())
+        text_lower = result.text.lower()
+        assert "required" in text_lower
+        assert "denied" in text_lower
+
+    def test_env_policy_shows_effective_count_when_sandbox_active(self):
+        """sandbox_active=True → effective allowlist size shown."""
+        result = doctor_config_text(self._sandbox_active_config())
+        assert "effective" in result.text.lower()
+
+    def test_env_policy_shown_when_sandbox_declared_not_active(self):
+        """sandbox declared but not active → env policy line shown (as default/inactive)."""
+        result = doctor_config_text(self._sandbox_declared_not_active_config())
+        assert "env policy" in result.text.lower()
+
+    def test_env_policy_not_shown_in_direct_mode(self):
+        """direct mode → env policy line NOT shown (no sandbox substrate)."""
+        result = doctor_config_text(self._direct_config())
+        assert "env policy" not in result.text.lower()
+
+    # -- capability coverage stats ----------------------------------------
+
+    def test_coverage_stats_line_present(self):
+        """A 'tool coverage:' summary line is always shown."""
+        result = doctor_config_text(self._sandbox_active_config())
+        assert "tool coverage" in result.text.lower()
+
+    def test_coverage_stats_shows_fraction_all_classified(self):
+        """All classified tools → coverage fraction shown (e.g. '2/2 classified')."""
+        config = _make_config(
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="Read,Grep",  # both classified
+            ),
+        )
+        result = doctor_config_text(config)
+        assert "2/2" in result.text
+
+    def test_coverage_stats_shows_fraction_with_unclassified(self):
+        """Partially classified tools → fraction reflects actual counts (e.g. '1/2')."""
+        config = _make_config(
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="Read,UnknownTool",  # 1 classified, 1 not
+            ),
+        )
+        result = doctor_config_text(config)
+        assert "1/2" in result.text
+
+    def test_coverage_stats_empty_tools_does_not_crash(self):
+        """Empty allowed_tools → coverage stats render cleanly as 0/0."""
+        config = _make_config(
+            execution=ExecutionConfig(
+                backend="claude-cli",
+                backends=BackendsConfig(primary="claude-cli"),
+                allowed_tools="",
+            ),
+        )
+        result = doctor_config_text(config)
+        assert "tool coverage" in result.text.lower()
+        assert "0/0" in result.text
+
+    # -- write-intent audit -----------------------------------------------
+
+    def test_write_intent_audit_shown_when_sandbox_active(self):
+        """sandbox_active=True → write-intent audit note present in output."""
+        result = doctor_config_text(self._sandbox_active_config(tools="Read,Write"))
+        text_lower = result.text.lower()
+        assert "write-intent" in text_lower or ("write" in text_lower and "audit" in text_lower)
+
+    def test_write_intent_described_as_audit_not_deny(self):
+        """Write-intent audit note must say 'audit' — it is NOT a deny gate."""
+        result = doctor_config_text(self._sandbox_active_config(tools="Read,Write"))
+        lines = result.text.splitlines()
+        write_intent_lines = [l for l in lines if "write-intent" in l.lower()]
+        assert write_intent_lines, "Expected a 'write-intent' line when sandbox_active"
+        for line in write_intent_lines:
+            assert "audit" in line.lower(), "Write-intent line must mention 'audit'"
+
+    def test_write_intent_absent_in_direct_mode(self):
+        """direct mode → no write-intent audit line (dispatch audit events not active)."""
+        result = doctor_config_text(self._direct_config(tools="Read,Write"))
+        lines = result.text.splitlines()
+        write_intent_lines = [l for l in lines if "write-intent" in l.lower()]
+        assert write_intent_lines == [], (
+            "Expected no 'write-intent' line in direct mode, "
+            f"got: {write_intent_lines}"
+        )

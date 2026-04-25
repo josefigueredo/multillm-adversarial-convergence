@@ -106,6 +106,7 @@ Real `run` executions now emit two runtime traces in the output directory:
   - `sandbox_initialized` — workspace path created at setup (`output_dir`, `workspace_dir`)
   - `sandbox_policy_applied` — active runtime policy at setup (`tool_execution_mode`, `sandbox_active`, `filesystem_access`, `network_access`, `allow_host_bash`)
   - `policy_denied` — denial event recorded before exception propagates (`reason_code`, `policy_field`, `requested_action`, and optionally `requested_path`, `allowed_boundary`)
+  - `dispatch_write_intent` — audit event emitted when a tool with `may_write=True` is dispatched while `sandbox_active=True`; **audit-only — not a deny gate**; write-boundary enforcement is still handled by `guard_path_write`
 
 This is especially useful for debugging long iterations, because you can see which step was active before a stall and which artifacts were produced after each step.  Security events make it possible to audit exactly when and why a tool call or write was blocked.
 
@@ -628,11 +629,12 @@ Defaults: `content_trust: strict`, `tool_execution_mode: direct`, `allow_host_ba
 **Declared-only fields** (not yet operationally enforced):
 - `content_trust` — sanitization posture for backend-returned content
 
-**Dispatch-enforced fields** (Milestone 4–5, when `sandbox_active=True`):
+- **Dispatch-enforced fields** (Milestone 4–6, when `sandbox_active=True`):
 - `tool_execution_mode: sandboxed` + `sandbox.mode: tool_calls` — activates the sandbox executor: backend subprocesses run from the workspace cwd, writes go through the executor boundary, and network policy is gate-enforced at dispatch level
 - `sandbox.network_access` — enforced at executor-dispatch level when `sandbox_active=True`: `web_only` restricts networked tool calls (`WebSearch`, `WebFetch`) to web destinations; `none` blocks them entirely. **This is dispatch-level enforcement only — not OS-level firewalling.**
-- **Subprocess environment shaping** (Milestone 5) — when `sandbox_active=True`, `SandboxExecutor.build_environment()` filters the subprocess environment to an explicit allowlist (PATH, HOME, API keys, proxy vars, and a small set of safe runtime vars). Anything not on the allowlist is stripped. **This is process-level isolation — not container-grade security.**
-- **Capability-based tool dispatch** (Milestone 5) — tool execution in sandbox mode uses a `ToolCapabilities` registry to classify each tool before dispatch. Unclassified tools (not in the registry) are denied with `tool_unclassified` before the backend is invoked. In direct mode, unclassified tools pass through without classification checks.
+- **Subprocess environment shaping** (Milestone 5–6) — when `sandbox_active=True`, `SandboxExecutor.build_environment()` delegates to `LocalProcessBackend` which applies an explicit `SandboxEnvPolicy`: three named buckets — `required` (always forwarded), `optional` (forwarded unless suppressed), `denied` (never forwarded, wins over all other categories). Anything outside the effective allowlist is stripped. **This is process-level isolation — not container-grade security.**
+- **Capability-based tool dispatch** (Milestone 5–6) — tool execution in sandbox mode uses a `ToolCapabilities` registry to classify each tool before dispatch. Unclassified tools (not in the registry) are denied with `tool_unclassified` before the backend is invoked. In direct mode, unclassified tools pass through without classification checks. `SHIPPED_TOOLS` is the canonical frozenset of all officially recognised tool names.
+- **Dispatch contract validation** (Milestone 6) — `destination_type` values are validated before network policy is evaluated; invalid values raise `invalid_destination_type` immediately. `may_write` tools emit a `dispatch_write_intent` audit event when `sandbox_active=True` (audit-only — actual write-boundary enforcement remains in `guard_path_write`).
 
 **Runtime-enforced fields** (Milestone 2+):
 - `allow_host_bash: false` — hard-blocks any backend call that includes `Bash` in `allowed_tools`; denial raises `PolicyDeniedError` and is recorded in `audit_trail.jsonl` before the backend is invoked
@@ -662,6 +664,7 @@ Reason codes:
 - `write_outside_allowed_roots` — write target was outside the declared filesystem boundary
 - `network_access_disallowed` — networked tool call blocked by `sandbox.network_access` policy (dispatch-level enforcement)
 - `tool_unclassified` — tool has no registered capability classification; denied in sandbox mode (`sandbox_active=True`) before the backend is invoked; carries `policy_field="allowed_tools"` and `requested_action="tool_dispatch:<name>"`
+- `invalid_destination_type` — tool dispatch declared a `destination_type` value not in `{"web", "other"}`; fails immediately before network policy is evaluated; prevents miscategorisation from silently bypassing enforcement
 
 The full resolved security policy is persisted in `effective_config.json` and surfaced by `explain config`.
 
@@ -739,7 +742,7 @@ Validates a config file and prints a structured diagnostic report covering:
 
 - **Config validity** — whether the YAML parses and passes schema validation
 - **Security enforcement truth table** — which security fields are actively enforced at runtime vs declared-only intent (see [Security enforcement truth table](#security-enforcement-truth-table))
-- **Sandbox tool coverage** (Milestone 5) — per-tool classification table showing each tool in `allowed_tools` as `classified [capabilities]` or `UNCLASSIFIED`; env shaping status (active / inactive / declared-but-not-active); network enforcement scope (dispatch-level; not OS firewall); unclassified tool policy (denied in sandbox, allowed in direct mode)
+- **Sandbox tool coverage** (Milestones 5–6) — sandbox backend type (local-process / N/A), env policy strategy summary (required/optional/denied/effective counts), env shaping status (active / inactive / declared-but-not-active), dispatch-level network enforcement scope, write-intent audit status (audit-only; not a deny gate), unclassified tool policy (denied in sandbox, allowed in direct mode), capability coverage stats (N/N classified fraction), per-tool classification table
 - **Backend validity** — whether declared backends are registered and available
 - **Operator risk notes** — explicit warnings for conditions that affect run safety:
   - Host shell exposed (`allow_host_bash: true` with Bash in `allowed_tools`)

@@ -128,23 +128,45 @@ def _enforcement_table_lines(config: "ResearchConfig") -> list[str]:
 def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
     """Return (lines, issues) for the sandbox tool coverage section.
 
-    Surfaces:
-    - env shaping status (active vs inactive)
+    Surfaces (MM06 isolation maturity):
+    - sandbox backend type (local-process / N/A) — 3-state
+    - env shaping status (active vs inactive) — 3-state
+    - env policy strategy summary (required/optional/denied/effective counts)
     - dispatch-level network enforcement scope
+    - write-intent audit status (audit-only; not a deny gate)
     - unclassified tool policy (deny in sandbox, pass in direct)
+    - capability coverage stats (classified/total fraction)
     - per-tool classification table with capability annotations
 
     Issues are emitted when ``sandbox_active=True`` and unclassified tools
     exist in ``allowed_tools`` — those tools will be denied at runtime.
     """
-    from src.tool_capabilities import classify_tool
+    from src.tool_capabilities import classify_tool, coverage_stats
 
     sec = config.security
     sandbox_active = sec.tool_execution_mode == "sandboxed" and sec.sandbox.mode == "tool_calls"
+    sandbox_declared = sec.tool_execution_mode == "sandboxed"
     tools = sorted(_parse_tools(config.execution.allowed_tools))
 
     lines: list[str] = []
     issues: list[str] = []
+
+    # Sandbox backend type — 3 states
+    if sandbox_active:
+        lines.append(
+            "  sandbox backend:          local-process"
+            "  (LocalProcessBackend — process-level isolation)"
+        )
+    elif sandbox_declared:
+        lines.append(
+            "  sandbox backend:          local-process"
+            "  (LocalProcessBackend — declared, not active;"
+            " set sandbox.mode: tool_calls to enable)"
+        )
+    else:
+        lines.append(
+            "  sandbox backend:          N/A  (direct mode — no sandbox substrate)"
+        )
 
     # Env shaping status — three distinct states
     if sandbox_active:
@@ -163,13 +185,44 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
             " — ambient env inherited; set sandbox.mode: tool_calls to enable)"
         )
 
+    # Env policy summary — only when sandbox substrate is declared
+    if sandbox_declared:
+        from src.sandbox.backends.local_process import SandboxEnvPolicy
+        strat = SandboxEnvPolicy().strategy_summary()
+        opt_label = "active" if strat["optional_active"] else "suppressed"
+        if sandbox_active:
+            lines.append(
+                f"  env policy:               required={strat['required']},"
+                f" optional={strat['optional']} ({opt_label}),"
+                f" denied={strat['denied']} → effective={strat['effective']} vars"
+            )
+        else:
+            lines.append(
+                f"  env policy:               default local-process policy (not active —"
+                f" required={strat['required']},"
+                f" optional={strat['optional']},"
+                f" denied={strat['denied']} → effective={strat['effective']})"
+            )
+
     # Network enforcement scope
     lines.append(
         "  network enforcement:      dispatch-level"
         "  (WebSearch, WebFetch; not OS-level firewall)"
     )
 
-    # Unclassified tool policy — three distinct states mirror env shaping
+    # Write-intent audit — only when sandbox substrate is declared
+    if sandbox_active:
+        lines.append(
+            "  write-intent audit:       enabled"
+            "  (may_write tools emit dispatch_write_intent to audit trail — not a deny gate)"
+        )
+    elif sandbox_declared:
+        lines.append(
+            "  write-intent audit:       inactive  (sandbox not active)"
+        )
+    # direct mode: no write-intent audit line
+
+    # Unclassified tool policy — three distinct states
     if sandbox_active:
         lines.append(
             "  unclassified tool policy: denied (tool_unclassified) when sandbox_active=True"
@@ -183,6 +236,19 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
         lines.append(
             "  unclassified tool policy: allowed (sandbox not active"
             " — would be denied if sandbox enabled)"
+        )
+
+    # Capability coverage stats summary
+    stats = coverage_stats(tools)
+    unclassified_count = stats["unclassified"]
+    if unclassified_count > 0:
+        lines.append(
+            f"  tool coverage:            {stats['classified']}/{stats['total']} classified"
+            f"  ({unclassified_count} unclassified)"
+        )
+    else:
+        lines.append(
+            f"  tool coverage:            {stats['classified']}/{stats['total']} classified"
         )
 
     # Per-tool classification table
