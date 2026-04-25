@@ -94,13 +94,16 @@ TRANSITIONS: dict[RefineState, frozenset[RefineState]] = {
     }),
     RefineState.CHALLENGER: frozenset({
         RefineState.PERSONAS,
+        RefineState.INTERRUPTED,    # unrecoverable failure in challenge step
     }),
     RefineState.PERSONAS: frozenset({
         RefineState.VERIFIER,
+        RefineState.INTERRUPTED,    # unrecoverable failure in persona gathering
     }),
     RefineState.VERIFIER: frozenset({
         RefineState.ARBITRATOR,         # no human input needed
         RefineState.PAUSED_FOR_HUMAN,   # human gate triggered
+        RefineState.INTERRUPTED,        # unrecoverable failure in verification
     }),
     RefineState.PAUSED_FOR_HUMAN: frozenset({
         RefineState.ARBITRATOR,         # resume after human decisions collected
@@ -108,6 +111,7 @@ TRANSITIONS: dict[RefineState, frozenset[RefineState]] = {
     RefineState.ARBITRATOR: frozenset({
         RefineState.BUILDER,    # start next convergence cycle
         RefineState.CONVERGED,  # stopping criterion met
+        RefineState.INTERRUPTED,  # unrecoverable failure in patch generation
     }),
     RefineState.CONVERGED: frozenset(),
     RefineState.INTERRUPTED: frozenset(),

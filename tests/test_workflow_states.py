@@ -127,6 +127,24 @@ class TestResearchTransitions:
         """HYPOTHESIS → CONVERGED when no dimensions remain."""
         assert ResearchState.CONVERGED in R_TRANSITIONS[ResearchState.HYPOTHESIS]
 
+    def test_interrupted_reachable_from_all_active_phases(self):
+        """Every active research phase can transition to INTERRUPTED on failure.
+
+        Active phases are all states that invoke live backend/scoring work —
+        i.e. every non-terminal, non-idle phase.
+        """
+        active_phases = (
+            ResearchState.HYPOTHESIS,
+            ResearchState.EXECUTE,
+            ResearchState.SCORE,
+            ResearchState.DECIDE,
+            ResearchState.MERGE,
+        )
+        for state in active_phases:
+            assert ResearchState.INTERRUPTED in R_TRANSITIONS[state], (
+                f"{state} must be able to transition to INTERRUPTED"
+            )
+
     def test_execute_can_be_interrupted(self):
         assert ResearchState.INTERRUPTED in R_TRANSITIONS[ResearchState.EXECUTE]
 
@@ -255,6 +273,24 @@ class TestRefineTransitions:
         """ARBITRATOR → BUILDER starts a new convergence cycle."""
         assert RefineState.BUILDER in REF_TRANSITIONS[RefineState.ARBITRATOR]
 
+    def test_interrupted_reachable_from_all_active_phases(self):
+        """Every active refine phase can transition to INTERRUPTED on failure.
+
+        Active phases are all non-terminal, non-idle, non-pause states —
+        i.e. every phase that invokes live LLM/backend work.
+        """
+        active_phases = (
+            RefineState.BUILDER,
+            RefineState.CHALLENGER,
+            RefineState.PERSONAS,
+            RefineState.VERIFIER,
+            RefineState.ARBITRATOR,
+        )
+        for state in active_phases:
+            assert RefineState.INTERRUPTED in REF_TRANSITIONS[state], (
+                f"{state} must be able to transition to INTERRUPTED"
+            )
+
     def test_all_states_reachable(self):
         targets = _all_targets(REF_TRANSITIONS)
         for state in RefineState:
@@ -349,6 +385,20 @@ class TestPlanTransitions:
                 continue
             assert state in targets, f"{state} is unreachable"
 
+    def test_interrupted_reachable_from_all_active_phases(self):
+        """Every active plan phase can transition to INTERRUPTED on failure."""
+        active_phases = (
+            PlanState.BUILDER,
+            PlanState.CHALLENGER,
+            PlanState.PERSONAS,
+            PlanState.VERIFIER,
+            PlanState.ARBITRATOR,
+        )
+        for state in active_phases:
+            assert PlanState.INTERRUPTED in PLAN_TRANSITIONS[state], (
+                f"{state} must be able to transition to INTERRUPTED"
+            )
+
 
 # ---------------------------------------------------------------------------
 # Cross-mode structural invariants
@@ -379,3 +429,27 @@ class TestCrossModeInvariants:
 
     def test_research_has_no_pause_states(self):
         assert R_PAUSE == frozenset()
+
+    def test_interrupted_reachable_from_active_phases_in_all_modes(self):
+        """All three workflow models must allow INTERRUPTED from every active phase.
+
+        This guards against reverting the full-failure-surface model.
+        """
+        # research active phases (no pause state; IDLE excluded)
+        research_active = frozenset(ResearchState) - R_TERMINAL - {ResearchState.IDLE}
+        for state in research_active:
+            assert ResearchState.INTERRUPTED in R_TRANSITIONS[state], (
+                f"research:{state} must reach INTERRUPTED"
+            )
+        # refine active phases (exclude PAUSED_FOR_HUMAN — it awaits human input)
+        refine_active = frozenset(RefineState) - REF_TERMINAL - {RefineState.IDLE} - REF_PAUSE
+        for state in refine_active:
+            assert RefineState.INTERRUPTED in REF_TRANSITIONS[state], (
+                f"refine:{state} must reach INTERRUPTED"
+            )
+        # plan active phases (same exclusions)
+        plan_active = frozenset(PlanState) - PLAN_TERMINAL - {PlanState.IDLE} - PLAN_PAUSE
+        for state in plan_active:
+            assert PlanState.INTERRUPTED in PLAN_TRANSITIONS[state], (
+                f"plan:{state} must reach INTERRUPTED"
+            )

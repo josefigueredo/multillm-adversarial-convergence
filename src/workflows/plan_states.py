@@ -90,20 +90,24 @@ TRANSITIONS: dict[PlanState, frozenset[PlanState]] = {
     }),
     PlanState.CHALLENGER: frozenset({
         PlanState.PERSONAS,
+        PlanState.INTERRUPTED,    # unrecoverable failure in challenge step
     }),
     PlanState.PERSONAS: frozenset({
         PlanState.VERIFIER,
+        PlanState.INTERRUPTED,    # unrecoverable failure in persona gathering
     }),
     PlanState.VERIFIER: frozenset({
         PlanState.ARBITRATOR,         # no human input needed
         PlanState.PAUSED_FOR_HUMAN,   # human gate triggered
+        PlanState.INTERRUPTED,        # unrecoverable failure in verification
     }),
     PlanState.PAUSED_FOR_HUMAN: frozenset({
         PlanState.ARBITRATOR,         # resume after human decisions collected
     }),
     PlanState.ARBITRATOR: frozenset({
-        PlanState.BUILDER,    # start next convergence cycle
-        PlanState.CONVERGED,  # stopping criterion met
+        PlanState.BUILDER,      # start next convergence cycle
+        PlanState.CONVERGED,    # stopping criterion met
+        PlanState.INTERRUPTED,  # unrecoverable failure in patch generation
     }),
     PlanState.CONVERGED: frozenset(),
     PlanState.INTERRUPTED: frozenset(),

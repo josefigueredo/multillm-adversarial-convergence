@@ -24,7 +24,11 @@ Lifecycle
     IDLE
      └─→ HYPOTHESIS ──────────────────────────→ CONVERGED
            └─→ EXECUTE → SCORE → DECIDE → MERGE → HYPOTHESIS
-                 └────────────────────────────────→ INTERRUPTED
+                 │         │        │       │
+                 └─────────┴────────┴───────┴──────→ INTERRUPTED
+
+Every active phase (HYPOTHESIS through MERGE) can transition to INTERRUPTED
+on an unrecoverable error.
 """
 
 from __future__ import annotations
@@ -79,14 +83,17 @@ RESUME_STATES: frozenset[ResearchState] = frozenset()
 #: Reading the happy path:
 #:   IDLE → HYPOTHESIS → EXECUTE → SCORE → DECIDE → MERGE → HYPOTHESIS → …
 #:   HYPOTHESIS → CONVERGED  (when no dimensions remain)
-#:   EXECUTE → INTERRUPTED   (on unrecoverable backend failure)
+#:
+#: Every active phase can also transition to INTERRUPTED on an unrecoverable
+#: error (hypothesis generation, backend execution, scoring, deciding, merging).
 TRANSITIONS: dict[ResearchState, frozenset[ResearchState]] = {
     ResearchState.IDLE: frozenset({
         ResearchState.HYPOTHESIS,
     }),
     ResearchState.HYPOTHESIS: frozenset({
         ResearchState.EXECUTE,
-        ResearchState.CONVERGED,   # no dimensions left to explore
+        ResearchState.CONVERGED,    # no dimensions left to explore
+        ResearchState.INTERRUPTED,  # unrecoverable failure in hypothesis step
     }),
     ResearchState.EXECUTE: frozenset({
         ResearchState.SCORE,
@@ -94,14 +101,17 @@ TRANSITIONS: dict[ResearchState, frozenset[ResearchState]] = {
     }),
     ResearchState.SCORE: frozenset({
         ResearchState.DECIDE,
+        ResearchState.INTERRUPTED,  # unrecoverable failure in scoring/judging
     }),
     ResearchState.DECIDE: frozenset({
-        ResearchState.MERGE,       # keep — merge findings
-        ResearchState.HYPOTHESIS,  # discard — try next dimension
+        ResearchState.MERGE,        # keep — merge findings
+        ResearchState.HYPOTHESIS,   # discard — try next dimension
+        ResearchState.INTERRUPTED,  # unrecoverable failure in decision step
     }),
     ResearchState.MERGE: frozenset({
-        ResearchState.HYPOTHESIS,  # continue exploring
-        ResearchState.CONVERGED,   # stopping criterion now met after merge
+        ResearchState.HYPOTHESIS,   # continue exploring
+        ResearchState.CONVERGED,    # stopping criterion now met after merge
+        ResearchState.INTERRUPTED,  # unrecoverable failure in merge/compress
     }),
     ResearchState.CONVERGED: frozenset(),
     ResearchState.INTERRUPTED: frozenset(),
