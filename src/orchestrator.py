@@ -637,15 +637,14 @@ class AutoResearcher:
             self._write_rerun_artifact()
             self._write_run_manifest()
             self._write_effective_config()
-            self.paths.workspace_dir.mkdir(parents=True, exist_ok=True)
+            _policy = resolve_runtime_security_policy(self.config.security, self.paths)
+            self._sandbox = SandboxExecutor(_policy, _policy.workspace_dir)
+            self._sandbox.prepare_workspace()
             self._audit_trail.emit(
                 "sandbox_initialized",
                 output_dir=str(self.paths.output_dir),
                 workspace_dir=str(self.paths.workspace_dir),
             )
-            _policy = resolve_runtime_security_policy(self.config.security, self.paths)
-            self._sandbox = SandboxExecutor(_policy, _policy.workspace_dir)
-            self._sandbox.prepare_workspace()
             self._audit_trail.emit(
                 "sandbox_policy_applied",
                 tool_execution_mode=_policy.tool_execution_mode,
@@ -1152,8 +1151,8 @@ class AutoResearcher:
         Callers should invoke this before any write that originates from an
         agent tool invocation or any untrusted source.
 
-        Delegates to :attr:`_sandbox` when available; falls back to a freshly
-        resolved policy for callers that run before setup (e.g. tests).
+        Delegates to :attr:`_sandbox` when available; constructs a transient
+        executor for callers that run before setup (e.g. tests).
         """
         sandbox = self._sandbox or self._make_transient_sandbox()
         try:
