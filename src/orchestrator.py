@@ -80,15 +80,12 @@ from .tool_runtime import run_function_tool_loop
 from .sandbox_executor import SandboxExecutor
 from .security_runtime import resolve_runtime_security_policy
 from .policy_denial import PolicyDeniedError
+from .tool_capabilities import classify_allowed_tools
 
 log = logging.getLogger("autoresearch")
 
 KB_MAX_WORDS = 4000
 LIGHTWEIGHT_KB_WORDS = 800
-
-# Tool names that declare a "web" network destination (HTTP/HTTPS).
-# Used by _check_execution_policy to enforce sandbox.network_access when sandbox is active.
-_WEB_TOOL_NAMES: frozenset[str] = frozenset({"WebSearch", "WebFetch"})
 
 
 # ---------------------------------------------------------------------------
@@ -1146,33 +1143,54 @@ class AutoResearcher:
         This gate runs after :func:`~src.backend_options.apply_backend_capabilities`
         so that ``allowed_tools`` reflects what the backend would actually use.
 
+        Policy enforcement is **capability-based**: each tool in ``allowed_tools`` is
+        looked up in the :data:`~src.tool_capabilities._TOOL_CAPABILITIES` registry.
+        Unknown tools (not in the registry) pass through without capability checks.
+
         Enforces:
-        - ``allow_host_bash``: denied when ``False`` and ``"Bash"`` appears in tools.
-        - ``sandbox.network_access``: when ``sandbox_active`` is ``True`` and a
-          web-capable tool (``WebSearch``, ``WebFetch``) is requested, the call is
+        - ``allow_host_bash``: any tool classified with ``uses_host_shell=True`` is
+          denied when ``allow_host_bash=False``.  Bash denial takes precedence over
+          network denial.
+        - ``sandbox.network_access``: when ``sandbox_active`` is ``True``, any tool
+          classified with ``uses_network=True`` and ``destination_type="web"`` is
           validated against the network policy via :meth:`guard_network_action`.
-          Bash denial always takes precedence over network denial.
         """
         sandbox = self._sandbox or self._make_transient_sandbox()
         policy = sandbox.policy
-        tools = {t.strip() for t in (opts.allowed_tools or "").split(",") if t.strip()}
+        tool_names = [t.strip() for t in (opts.allowed_tools or "").split(",") if t.strip()]
+        classified = classify_allowed_tools(tool_names)
 
-        # Bash check (runs before network check; bash denial takes precedence).
-        if not policy.is_host_bash_allowed() and "Bash" in tools:
-            err = PolicyDeniedError(
-                reason_code="host_bash_disabled",
-                policy_field="allow_host_bash",
-                requested_action="execute_bash",
-            )
-            self._audit_trail.emit("policy_denied", **err.audit_payload())
-            raise err
+        # Bash check: any tool with uses_host_shell capability is denied when
+        # allow_host_bash=False. Runs before network check; bash denial takes precedence.
+        if not policy.is_host_bash_allowed():
+            shell_tools = [name for name, caps in classified if caps and caps.uses_host_shell]
+            if shell_tools:
+                err = PolicyDeniedError(
+                    reason_code="host_bash_disabled",
+                    policy_field="allow_host_bash",
+                    requested_action="execute_bash",
+                )
+                self._audit_trail.emit("policy_denied", **err.audit_payload())
+                raise err
 
         # Network check: only fires when sandboxing is operationally active.
         if policy.sandbox_active:
-            web_tools_in_use = tools & _WEB_TOOL_NAMES
-            if web_tools_in_use:
-                tool_name = next(iter(sorted(web_tools_in_use)))
-                self.guard_network_action(f"tool_dispatch:{tool_name}", "web")
+            web_tools = sorted(
+                name for name, caps in classified
+                if caps and caps.uses_network and caps.destination_type == "web"
+            )
+            if web_tools:
+                self.guard_network_action(f"tool_dispatch:{web_tools[0]}", "web")
+
+        # Network check for non-web destinations (destination_type="other"): only fires
+        # when sandbox is active. web_only policy blocks "other" destinations.
+        if policy.sandbox_active:
+            other_tools = sorted(
+                name for name, caps in classified
+                if caps and caps.uses_network and caps.destination_type == "other"
+            )
+            if other_tools:
+                self.guard_network_action(f"tool_dispatch:{other_tools[0]}", "other")
 
     def guard_network_action(self, action: str, destination_type: str) -> None:
         """Raise :exc:`~src.policy_denial.PolicyDeniedError` if a networked action violates policy.

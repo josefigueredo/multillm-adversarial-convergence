@@ -2500,6 +2500,69 @@ class TestAutoResearcherEnforcement:
             researcher._call_with(fake_backend, "prompt", allowed_tools="Bash,WebSearch")
         assert exc_info.value.reason_code == "host_bash_disabled"
 
+    # -- capability-based dispatch (M5 Step 3) -----------------------------
+
+    def test_unknown_tool_not_blocked_by_bash_policy(self, research_config, fake_backend, tmp_path):
+        """Tools absent from the capability registry do not trigger bash policy enforcement."""
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_host_bash=False
+        )
+        # "UnknownShell" has no capability record → not treated as host-shell → allowed
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownShell,Read")
+        assert result is not None
+
+    def test_unknown_tool_not_blocked_by_network_policy(self, research_config, fake_backend, tmp_path):
+        """Tools absent from the capability registry do not trigger network policy enforcement."""
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
+        # "UnknownNetwork" has no capability record → not treated as networked → allowed
+        result = researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownNetwork,Read")
+        assert result is not None
+
+    def test_new_host_shell_tool_blocked_via_capability(self, research_config, fake_backend, tmp_path, monkeypatch):
+        """A tool classified with uses_host_shell=True is blocked by bash policy (not by hardcoded name)."""
+        from src import tool_capabilities as tc
+        from src.policy_denial import PolicyDeniedError
+        monkeypatch.setitem(
+            tc._TOOL_CAPABILITIES,
+            "CustomShell",
+            tc.ToolCapabilities(uses_host_shell=True),
+        )
+        researcher = self._make_researcher_with_security(
+            research_config, fake_backend, tmp_path, allow_host_bash=False
+        )
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="CustomShell")
+        assert exc_info.value.reason_code == "host_bash_disabled"
+
+    def test_new_networked_tool_blocked_via_capability(self, research_config, fake_backend, tmp_path, monkeypatch):
+        """A tool classified with uses_network=True/destination_type='web' is blocked by network policy."""
+        from src import tool_capabilities as tc
+        from src.policy_denial import PolicyDeniedError
+        monkeypatch.setitem(
+            tc._TOOL_CAPABILITIES,
+            "CustomWebTool",
+            tc.ToolCapabilities(uses_network=True, destination_type="web"),
+        )
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="CustomWebTool")
+        assert exc_info.value.reason_code == "network_access_disallowed"
+
+    def test_other_destination_type_not_blocked_by_web_only_policy(self, research_config, fake_backend, tmp_path, monkeypatch):
+        """A tool with destination_type='other' is NOT blocked when network_access='web_only'."""
+        from src import tool_capabilities as tc
+        monkeypatch.setitem(
+            tc._TOOL_CAPABILITIES,
+            "CustomOtherTool",
+            tc.ToolCapabilities(uses_network=True, destination_type="other"),
+        )
+        researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="web_only")
+        # web_only blocks destination_type="other" → should raise network_access_disallowed
+        from src.policy_denial import PolicyDeniedError
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            researcher._call_with(fake_backend, "prompt", allowed_tools="CustomOtherTool")
+        assert exc_info.value.reason_code == "network_access_disallowed"
+
 
 # ---------------------------------------------------------------------------
 # Step 4: Sandbox workspace used as working directory for tool-capable calls
