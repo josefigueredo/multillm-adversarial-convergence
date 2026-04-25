@@ -996,3 +996,116 @@ class TestSecurityConfigFromYaml:
         """), encoding="utf-8")
         with pytest.raises(ValueError, match="Invalid security.sandbox.network_access"):
             ResearchConfig.from_yaml(p)
+
+
+# ---------------------------------------------------------------------------
+# HitlConfig — MM08 Step 1
+# ---------------------------------------------------------------------------
+
+
+class TestHitlConfig:
+    def test_default_intervention_mode_is_full_auto(self):
+        from src.config import HitlConfig
+        hc = HitlConfig()
+        assert hc.intervention_mode == "full_auto"
+
+    def test_frozen(self):
+        from src.config import HitlConfig
+        hc = HitlConfig()
+        with pytest.raises(AttributeError):
+            hc.intervention_mode = "co_pilot"
+
+    def test_all_valid_modes_accepted(self):
+        from src.config import HitlConfig, VALID_INTERVENTION_MODES
+        for mode in VALID_INTERVENTION_MODES:
+            hc = HitlConfig(intervention_mode=mode)
+            assert hc.intervention_mode == mode
+
+    def test_valid_modes_are_the_five_expected(self):
+        from src.config import VALID_INTERVENTION_MODES
+        assert set(VALID_INTERVENTION_MODES) == {
+            "full_auto", "checkpoint_only", "decision_only", "co_pilot", "step_review"
+        }
+
+    def test_research_config_has_hitl_field(self, minimal_yaml: Path):
+        from src.config import HitlConfig
+        cfg = ResearchConfig.from_yaml(minimal_yaml)
+        assert hasattr(cfg, "hitl")
+        assert isinstance(cfg.hitl, HitlConfig)
+
+    def test_research_config_hitl_defaults_to_full_auto(self, minimal_yaml: Path):
+        cfg = ResearchConfig.from_yaml(minimal_yaml)
+        assert cfg.hitl.intervention_mode == "full_auto"
+
+
+class TestHitlConfigFromYaml:
+    def test_full_auto_from_yaml(self, tmp_path: Path):
+        from src.config import HitlConfig
+        p = tmp_path / "hitl_full_auto.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "HITL test"
+              hitl:
+                intervention_mode: full_auto
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "full_auto"
+
+    def test_checkpoint_only_from_yaml(self, tmp_path: Path):
+        p = tmp_path / "hitl.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "HITL test"
+              hitl:
+                intervention_mode: checkpoint_only
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "checkpoint_only"
+
+    def test_decision_only_from_yaml(self, tmp_path: Path):
+        p = tmp_path / "hitl.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "HITL test"
+              hitl:
+                intervention_mode: decision_only
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "decision_only"
+
+    def test_co_pilot_from_yaml(self, tmp_path: Path):
+        p = tmp_path / "hitl.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "HITL test"
+              hitl:
+                intervention_mode: co_pilot
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "co_pilot"
+
+    def test_step_review_from_yaml(self, tmp_path: Path):
+        p = tmp_path / "hitl.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "HITL test"
+              hitl:
+                intervention_mode: step_review
+        """), encoding="utf-8")
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "step_review"
+
+    def test_invalid_mode_rejected(self, tmp_path: Path):
+        p = tmp_path / "hitl_bad.yaml"
+        p.write_text(textwrap.dedent("""\
+            research:
+              topic: "HITL test"
+              hitl:
+                intervention_mode: turbo_auto
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="hitl.intervention_mode"):
+            ResearchConfig.from_yaml(p)
+
+    def test_missing_hitl_section_defaults_to_full_auto(self, minimal_yaml: Path):
+        cfg = ResearchConfig.from_yaml(minimal_yaml)
+        assert cfg.hitl.intervention_mode == "full_auto"

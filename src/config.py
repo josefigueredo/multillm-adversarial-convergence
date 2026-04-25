@@ -538,6 +538,51 @@ def _parse_security_config(raw: dict[str, Any]) -> "SecurityConfig":
     )
 
 
+# ---------------------------------------------------------------------------
+# HITL policy configuration (MM08)
+# ---------------------------------------------------------------------------
+
+VALID_INTERVENTION_MODES: tuple[str, ...] = (
+    "full_auto",
+    "checkpoint_only",
+    "decision_only",
+    "co_pilot",
+    "step_review",
+)
+
+
+@dataclass(frozen=True)
+class HitlConfig:
+    """Human-in-the-loop workflow intervention policy.
+
+    Attributes:
+        intervention_mode: Controls when human review gates activate.
+
+            ``full_auto``       — fully automated; no human gates triggered.
+            ``checkpoint_only`` — pause at major workflow checkpoints
+                                  (e.g. end-of-phase, convergence).
+            ``decision_only``   — pause at critical decision points
+                                  (e.g. keep/discard, critique verdict).
+            ``co_pilot``        — pause before each phase execution so a
+                                  human can review context and steer.
+            ``step_review``     — pause after each phase for review before
+                                  the next phase begins.
+    """
+
+    intervention_mode: str = "full_auto"
+
+
+def _parse_hitl_config(raw: dict[str, Any]) -> HitlConfig:
+    """Parse and validate a ``hitl:`` mapping."""
+    mode = raw.get("intervention_mode", "full_auto")
+    if mode not in VALID_INTERVENTION_MODES:
+        raise ValueError(
+            f"Invalid hitl.intervention_mode '{mode}'. "
+            f"Must be one of: {', '.join(VALID_INTERVENTION_MODES)}"
+        )
+    return HitlConfig(intervention_mode=mode)
+
+
 @dataclass(frozen=True)
 class ResearchConfig:
     """Top-level research configuration loaded from a YAML file.
@@ -560,6 +605,7 @@ class ResearchConfig:
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
+    hitl: HitlConfig = field(default_factory=HitlConfig)
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
 
     @classmethod
@@ -822,6 +868,10 @@ class ResearchConfig:
         security_raw: dict[str, Any] = research.get("security", {})
         security = _parse_security_config(security_raw)
 
+        # --- HITL policy ------------------------------------------------------
+        hitl_raw: dict[str, Any] = research.get("hitl", {})
+        hitl = _parse_hitl_config(hitl_raw)
+
         return cls(
             topic=research["topic"],
             goal=research.get("goal", research["topic"]),
@@ -832,6 +882,7 @@ class ResearchConfig:
             scoring=scoring,
             execution=execution,
             security=security,
+            hitl=hitl,
             providers=providers,
         )
 
