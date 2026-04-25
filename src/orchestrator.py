@@ -299,6 +299,12 @@ class AutoResearcher:
 
         Keyword arguments override the defaults from ``self.config.execution``.
         Automatically translates Claude model shortnames for non-Claude backends.
+
+        When the sandbox is active (``tool_execution_mode: sandboxed`` +
+        ``sandbox.mode: tool_calls``), the executor workspace is used as the
+        process working directory and :meth:`SandboxExecutor.prepare_workspace`
+        is called to ensure it exists.  For direct-mode runs the existing
+        ``isolate_backend_context`` path is unchanged.
         """
         provider = getattr(backend, "provider_config", None)
         provider = provider if isinstance(provider, ProviderConfig) else None
@@ -306,10 +312,21 @@ class AutoResearcher:
         config_model = kwargs.pop("model", default_model)
         model = self._resolve_model(backend, config_model)
         isolated = self._should_isolate_backend(backend)
+
+        # Determine working directory — sandbox workspace takes priority.
+        sandbox = self._sandbox or self._make_transient_sandbox()
+        if sandbox.policy.sandbox_active:
+            sandbox.prepare_workspace()
+            working_dir = str(sandbox.workspace_dir)
+        elif isolated and self._backend_runtime_dir():
+            working_dir = str(self._backend_runtime_dir())
+        else:
+            working_dir = ""
+
         opts = build_call_options(
             self.config.execution,
             provider=provider,
-            working_directory=str(self._backend_runtime_dir()) if isolated and self._backend_runtime_dir() else "",
+            working_directory=working_dir,
             sanitize_environment=isolated and self.config.execution.sanitize_backend_env,
         )
         opts = CallOptions(

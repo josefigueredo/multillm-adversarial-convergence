@@ -2499,3 +2499,77 @@ class TestAutoResearcherEnforcement:
         with pytest.raises(PolicyDeniedError) as exc_info:
             researcher._call_with(fake_backend, "prompt", allowed_tools="Bash,WebSearch")
         assert exc_info.value.reason_code == "host_bash_disabled"
+
+
+# ---------------------------------------------------------------------------
+# Step 4: Sandbox workspace used as working directory for tool-capable calls
+# ---------------------------------------------------------------------------
+
+class TestSandboxedExecutionWorkspace:
+    """Prove that _call_with routes sandboxed execution through the executor workspace."""
+
+    def _make_sandboxed(self, research_config, tmp_path, *, network_access="unrestricted"):
+        import dataclasses
+        from src.config import SandboxConfig, SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls", network_access=network_access),
+            ),
+        )
+        backend = CapturingBackend()
+        researcher = AutoResearcher(config=config, backend=backend, output_dir=tmp_path / "output")
+        return researcher, backend
+
+    def test_sandboxed_execution_uses_workspace_as_working_directory(self, research_config, tmp_path):
+        """When sandbox_active=True, opts.working_directory must equal workspace_dir."""
+        researcher, backend = self._make_sandboxed(research_config, tmp_path)
+        researcher._call_with(backend, "prompt")
+        assert backend.last_opts is not None
+        expected = str(researcher.paths.workspace_dir)
+        assert backend.last_opts.working_directory == expected
+
+    def test_sandboxed_call_creates_workspace_dir(self, research_config, tmp_path):
+        """_call_with on a sandboxed researcher must create the workspace directory."""
+        researcher, backend = self._make_sandboxed(research_config, tmp_path)
+        assert not researcher.paths.workspace_dir.exists()
+        researcher._call_with(backend, "prompt")
+        assert researcher.paths.workspace_dir.is_dir()
+
+    def test_workspace_creation_idempotent_across_calls(self, research_config, tmp_path):
+        """Multiple _call_with invocations must not raise even if workspace already exists."""
+        researcher, backend = self._make_sandboxed(research_config, tmp_path)
+        researcher._call_with(backend, "prompt")
+        researcher._call_with(backend, "prompt")  # second call — must not raise
+        assert researcher.paths.workspace_dir.is_dir()
+
+    def test_direct_mode_does_not_use_workspace_as_working_directory(self, research_config, tmp_path):
+        """Direct-mode execution must not override working_directory with workspace_dir."""
+        import dataclasses
+        from src.config import SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(tool_execution_mode="direct"),
+        )
+        backend = CapturingBackend()
+        researcher = AutoResearcher(config=config, backend=backend, output_dir=tmp_path / "output")
+        researcher._call_with(backend, "prompt")
+        assert backend.last_opts is not None
+        workspace = str(researcher.paths.workspace_dir)
+        assert backend.last_opts.working_directory != workspace
+
+    def test_sandboxed_allowed_call_reaches_backend(self, research_config, tmp_path):
+        """Allowed sandboxed execution (no tools, unrestricted network) must invoke the backend."""
+        researcher, backend = self._make_sandboxed(research_config, tmp_path)
+        result = researcher._call_with(backend, "prompt")
+        assert result is not None
+        assert not result.is_error
+
+    def test_sandboxed_network_denied_call_does_not_reach_backend(self, research_config, tmp_path):
+        """Network-denied sandboxed call must not invoke backend.invoke."""
+        from src.policy_denial import PolicyDeniedError
+        researcher, backend = self._make_sandboxed(research_config, tmp_path, network_access="none")
+        with pytest.raises(PolicyDeniedError):
+            researcher._call_with(backend, "prompt", allowed_tools="WebSearch")
+        assert backend.last_opts is None, "backend.invoke must not be called when policy denies"
