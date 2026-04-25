@@ -628,9 +628,11 @@ Defaults: `content_trust: strict`, `tool_execution_mode: direct`, `allow_host_ba
 **Declared-only fields** (not yet operationally enforced):
 - `content_trust` — sanitization posture for backend-returned content
 
-**Dispatch-enforced fields** (Milestone 4, when `sandbox_active=True`):
+**Dispatch-enforced fields** (Milestone 4–5, when `sandbox_active=True`):
 - `tool_execution_mode: sandboxed` + `sandbox.mode: tool_calls` — activates the sandbox executor: backend subprocesses run from the workspace cwd, writes go through the executor boundary, and network policy is gate-enforced at dispatch level
 - `sandbox.network_access` — enforced at executor-dispatch level when `sandbox_active=True`: `web_only` restricts networked tool calls (`WebSearch`, `WebFetch`) to web destinations; `none` blocks them entirely. **This is dispatch-level enforcement only — not OS-level firewalling.**
+- **Subprocess environment shaping** (Milestone 5) — when `sandbox_active=True`, `SandboxExecutor.build_environment()` filters the subprocess environment to an explicit allowlist (PATH, HOME, API keys, proxy vars, and a small set of safe runtime vars). Anything not on the allowlist is stripped. **This is process-level isolation — not container-grade security.**
+- **Capability-based tool dispatch** (Milestone 5) — tool execution in sandbox mode uses a `ToolCapabilities` registry to classify each tool before dispatch. Unclassified tools (not in the registry) are denied with `tool_unclassified` before the backend is invoked. In direct mode, unclassified tools pass through without classification checks.
 
 **Runtime-enforced fields** (Milestone 2+):
 - `allow_host_bash: false` — hard-blocks any backend call that includes `Bash` in `allowed_tools`; denial raises `PolicyDeniedError` and is recorded in `audit_trail.jsonl` before the backend is invoked
@@ -659,6 +661,7 @@ Reason codes:
 - `host_bash_disabled` — `Bash` was in `allowed_tools` but `allow_host_bash: false`
 - `write_outside_allowed_roots` — write target was outside the declared filesystem boundary
 - `network_access_disallowed` — networked tool call blocked by `sandbox.network_access` policy (dispatch-level enforcement)
+- `tool_unclassified` — tool has no registered capability classification; denied in sandbox mode (`sandbox_active=True`) before the backend is invoked; carries `policy_field="allowed_tools"` and `requested_action="tool_dispatch:<name>"`
 
 The full resolved security policy is persisted in `effective_config.json` and surfaced by `explain config`.
 
@@ -673,6 +676,8 @@ The full resolved security policy is persisted in `effective_config.json` and su
 | `allow_filesystem_write_outside_output` | **Enforced** | Relaxes write boundary when `true` |
 | `tool_execution_mode: sandboxed` (sandbox_active=True) | **Dispatch-enforced** | Workspace cwd for backend subprocesses; executor routing for writes and network |
 | `sandbox.network_access` (sandbox_active=True) | **Dispatch-enforced** | `WebSearch`/`WebFetch` gated at executor-dispatch level; `none` blocks them, `web_only` limits to web — **not OS-level firewalling** |
+| Subprocess env shaping (sandbox_active=True) | **Dispatch-enforced** | `build_environment()` filters subprocess env to an explicit allowlist; process-level isolation only |
+| Capability-based dispatch (sandbox_active=True) | **Dispatch-enforced** | All tools checked against `ToolCapabilities` registry; unclassified tools denied (`tool_unclassified`) |
 | `tool_execution_mode: sandboxed` (sandbox_active=False) | **Declared intent** | `sandbox.mode` must be `tool_calls` to activate enforcement |
 | `sandbox.network_access` (sandbox_active=False) | **Declared intent** | No operational effect without `sandbox_active`; set `mode: tool_calls` to activate |
 | `content_trust` | **Declared-only** | Declares content sanitization posture; enforcement deferred |
@@ -734,11 +739,13 @@ Validates a config file and prints a structured diagnostic report covering:
 
 - **Config validity** — whether the YAML parses and passes schema validation
 - **Security enforcement truth table** — which security fields are actively enforced at runtime vs declared-only intent (see [Security enforcement truth table](#security-enforcement-truth-table))
+- **Sandbox tool coverage** (Milestone 5) — per-tool classification table showing each tool in `allowed_tools` as `classified [capabilities]` or `UNCLASSIFIED`; env shaping status (active / inactive / declared-but-not-active); network enforcement scope (dispatch-level; not OS firewall); unclassified tool policy (denied in sandbox, allowed in direct mode)
 - **Backend validity** — whether declared backends are registered and available
 - **Operator risk notes** — explicit warnings for conditions that affect run safety:
   - Host shell exposed (`allow_host_bash: true` with Bash in `allowed_tools`)
   - Sandbox declared but not active (`tool_execution_mode: sandboxed` without `sandbox.mode: tool_calls`)
   - Network policy set but sandbox not active (`sandbox.network_access` has no effect without `sandbox_active`)
+  - Unclassified tools in `allowed_tools` when `sandbox_active=True` (they will be denied at runtime with `tool_unclassified`)
 
 **Health status:**
 
