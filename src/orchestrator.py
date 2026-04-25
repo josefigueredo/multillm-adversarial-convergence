@@ -58,6 +58,8 @@ from .pdf_report import render_simple_pdf
 from .portfolio import build_portfolio, render_portfolio_html
 from .provenance_artifacts import write_provenance_artifacts_bundle
 from .references import build_references_section, inject_references_section
+from .workflows.research_states import ResearchState
+from .workflows.transitions import WorkflowTransitionEmitter
 from .reporting import render_html_report as render_html_report_fn
 from .report_exports import write_reporting_artifacts
 from .reproducibility import write_prompt_snapshot, write_rerun_script
@@ -195,6 +197,7 @@ class AutoResearcher:
         self._run_started_at: str | None = None
         self._run_completed_at: str | None = None
         self._run_status: str = "initialized"
+        self._current_workflow_state: ResearchState = ResearchState.IDLE
         self._claims: list[dict[str, Any]] = []
         self._citations: list[dict[str, Any]] = []
         self._candidate_assessments: list = []
@@ -602,6 +605,16 @@ class AutoResearcher:
         finally:
             if self._run_status == "running":
                 self._run_status = "completed"
+            _terminal = (
+                ResearchState.CONVERGED
+                if self._run_status == "completed"
+                else ResearchState.INTERRUPTED
+            )
+            _emitter = WorkflowTransitionEmitter(
+                self._audit_trail, "research", self._current_workflow_state
+            )
+            _emitter.transition(_terminal, iteration=self.iteration)
+            self._current_workflow_state = _emitter.current_state
             self._generate_synthesis()
             self._generate_baseline()
             self._finalize_run_artifacts()
@@ -748,6 +761,7 @@ class AutoResearcher:
             iterations_dir=self.iterations_dir,
             results_path=self.results_path,
             candidate_assessments=self._candidate_assessments,
+            current_workflow_state=self._current_workflow_state,
         )
 
     def _sync_from_loop_state(self, state: "loop_mod.LoopState") -> None:
@@ -761,6 +775,7 @@ class AutoResearcher:
         self.iteration = state.iteration
         self.results = state.results
         self._candidate_assessments = state.candidate_assessments
+        self._current_workflow_state = state.current_workflow_state
 
     def _run_iteration(self) -> None:
         """Execute one full research iteration via the extracted loop module."""

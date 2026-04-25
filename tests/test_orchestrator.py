@@ -2809,3 +2809,69 @@ class TestDispatchWriteIntentAudit:
         events = self._read_audit_events(researcher)
         write_events = [e for e in events if e.get("event") == "dispatch_write_intent"]
         assert write_events == []
+
+
+# ---------------------------------------------------------------------------
+# Workflow terminal transitions (orchestrator outer driver)
+# ---------------------------------------------------------------------------
+
+class TestResearchWorkflowTerminalTransitions:
+    def _run_with_patches(self, researcher, *, should_stop_side_effect, run_iteration_side_effect=None):
+        """Call researcher.run() with all heavy operations patched out."""
+        run_iter_kwargs = (
+            {"side_effect": run_iteration_side_effect}
+            if run_iteration_side_effect is not None
+            else {}
+        )
+        with (
+            patch("src.orchestrator.git_commit", return_value="abc"),
+            patch("src.orchestrator.cli_version", return_value="1.0"),
+            patch("src.orchestrator.package_version", return_value="0.1.0"),
+            patch.object(researcher, "_run_iteration", **run_iter_kwargs),
+            patch.object(researcher, "_should_stop", side_effect=should_stop_side_effect),
+            patch.object(researcher, "_generate_synthesis"),
+            patch.object(researcher, "_generate_baseline"),
+            patch.object(researcher, "_finalize_run_artifacts"),
+            patch.object(researcher, "_print_summary"),
+        ):
+            researcher.run()
+
+    def _workflow_transitions(self, researcher) -> list[dict]:
+        path = researcher.output_dir / "audit_trail.jsonl"
+        if not path.exists():
+            return []
+        events = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                events.append(json.loads(line))
+        return [e for e in events if e.get("event") == "workflow_transition"]
+
+    def test_converged_emitted_when_loop_stops_normally(self, researcher):
+        self._run_with_patches(researcher, should_stop_side_effect=[False, True])
+
+        transitions = self._workflow_transitions(researcher)
+        assert any(t.get("to_state") == "converged" for t in transitions), (
+            f"Expected 'converged' transition, got: {[t.get('to_state') for t in transitions]}"
+        )
+        assert all(t.get("workflow") == "research" for t in transitions)
+
+    def test_interrupted_emitted_on_keyboard_interrupt(self, researcher):
+        with (
+            patch("src.orchestrator.git_commit", return_value="abc"),
+            patch("src.orchestrator.cli_version", return_value="1.0"),
+            patch("src.orchestrator.package_version", return_value="0.1.0"),
+            patch.object(researcher, "_run_iteration", side_effect=KeyboardInterrupt),
+            patch.object(researcher, "_should_stop", return_value=False),
+            patch.object(researcher, "_generate_synthesis"),
+            patch.object(researcher, "_generate_baseline"),
+            patch.object(researcher, "_finalize_run_artifacts"),
+            patch.object(researcher, "_print_summary"),
+        ):
+            researcher.run()
+
+        transitions = self._workflow_transitions(researcher)
+        assert any(t.get("to_state") == "interrupted" for t in transitions), (
+            f"Expected 'interrupted' transition, got: {[t.get('to_state') for t in transitions]}"
+        )
+        assert all(t.get("workflow") == "research" for t in transitions)

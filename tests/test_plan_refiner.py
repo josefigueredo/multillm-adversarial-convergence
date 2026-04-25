@@ -14,6 +14,26 @@ from src.plan_loop import PlanCycleState
 from src.plan_refiner import EXIT_HUMAN_REQUIRED, PlanRefiner
 
 
+# ---------------------------------------------------------------------------
+# Audit-trail helpers
+# ---------------------------------------------------------------------------
+
+def _read_audit_events(output_dir: Path) -> list[dict]:
+    path = output_dir / "audit_trail.jsonl"
+    if not path.exists():
+        return []
+    events = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line:
+            events.append(json.loads(line))
+    return events
+
+
+def _workflow_transitions(output_dir: Path) -> list[dict]:
+    return [e for e in _read_audit_events(output_dir) if e.get("event") == "workflow_transition"]
+
+
 def _make_config(**kwargs) -> PlanConfig:
     defaults = dict(
         topic="Test Plan",
@@ -226,3 +246,41 @@ class TestBackendInvocation:
 
         opts = backend.invoke.call_args.args[1]
         assert opts.allowed_tools == ""
+
+
+
+# ---------------------------------------------------------------------------
+# Workflow terminal transitions
+# ---------------------------------------------------------------------------
+
+class TestPlanWorkflowTerminalTransitions:
+    def test_converged_emitted_on_successful_run(self, tmp_path):
+        refiner = PlanRefiner(_make_config(), tmp_path, _make_backends())
+        with (
+            patch("src.plan_refiner.PlanStrategy"),
+            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+        ):
+            refiner.run(interactive=True)
+
+        transitions = _workflow_transitions(tmp_path)
+        assert any(t.get("to_state") == "converged" for t in transitions), (
+            f"Expected 'converged' in workflow transitions, got: {[t.get('to_state') for t in transitions]}"
+        )
+        assert all(t.get("workflow") == "plan" for t in transitions)
+
+    def test_interrupted_emitted_on_exception_during_phase1(self, tmp_path):
+        refiner = PlanRefiner(_make_config(), tmp_path, _make_backends())
+        with (
+            patch("src.plan_refiner.PlanStrategy"),
+            patch("src.plan_refiner.run_plan_cycle", side_effect=RuntimeError("backend crash")),
+            patch("src.plan_refiner._plan_should_stop", return_value=False),
+            pytest.raises(RuntimeError),
+        ):
+            refiner.run(interactive=True)
+
+        transitions = _workflow_transitions(tmp_path)
+        assert any(t.get("to_state") == "interrupted" for t in transitions), (
+            f"Expected 'interrupted' in workflow transitions, got: {[t.get('to_state') for t in transitions]}"
+        )
+        assert all(t.get("workflow") == "plan" for t in transitions)

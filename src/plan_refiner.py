@@ -29,6 +29,8 @@ from .plan_loop import (
 )
 from .plan_strategy import PlanStrategy
 from .prompts import render
+from .workflows.plan_states import PlanState
+from .workflows.transitions import WorkflowTransitionEmitter
 
 log = logging.getLogger("autoresearch")
 
@@ -88,26 +90,36 @@ class PlanRefiner:
         )
 
         # Phase 1 — Convergence
-        while not _plan_should_stop(state, self._config):
-            valid_count, stale_count, deferred_count = run_plan_cycle(
-                state, ctx, strategy, interactive=interactive
-            )
-            log.info(
-                "[cycle %d] valid=%d stale=%d deferred=%d clean_streak=%d",
-                state.cycle, valid_count, stale_count, deferred_count,
-                state.consecutive_clean_cycles,
-            )
-            self._write_cycle_snapshot(state)
-            self._write_issue_registry(state)
+        try:
+            while not _plan_should_stop(state, self._config):
+                valid_count, stale_count, deferred_count = run_plan_cycle(
+                    state, ctx, strategy, interactive=interactive
+                )
+                log.info(
+                    "[cycle %d] valid=%d stale=%d deferred=%d clean_streak=%d",
+                    state.cycle, valid_count, stale_count, deferred_count,
+                    state.consecutive_clean_cycles,
+                )
+                self._write_cycle_snapshot(state)
+                self._write_issue_registry(state)
 
-            if state.human_decisions:
-                decisions_path = self._run_dir / "human_decisions.json"
-                append_human_decisions(state.human_decisions, decisions_path)
+                if state.human_decisions:
+                    decisions_path = self._run_dir / "human_decisions.json"
+                    append_human_decisions(state.human_decisions, decisions_path)
 
-            if state.pending_human_inputs and not interactive:
-                self._handle_hitl_pause(state)
-                self._audit_trail.emit("run_paused_for_human_input", cycle=state.cycle)
-                return EXIT_HUMAN_REQUIRED
+                if state.pending_human_inputs and not interactive:
+                    self._handle_hitl_pause(state)
+                    self._audit_trail.emit("run_paused_for_human_input", cycle=state.cycle)
+                    return EXIT_HUMAN_REQUIRED
+        except Exception:
+            WorkflowTransitionEmitter(
+                self._audit_trail, "plan", state.current_workflow_state
+            ).transition(PlanState.INTERRUPTED, cycle=state.cycle)
+            raise
+
+        WorkflowTransitionEmitter(
+            self._audit_trail, "plan", state.current_workflow_state
+        ).transition(PlanState.CONVERGED, cycles=state.cycle)
 
         # Write converged primary artifact
         self._write_primary_artifact(state.plan)

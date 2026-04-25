@@ -26,6 +26,9 @@ from .hitl import (
 )
 from .prompts import render
 
+from .workflows.refine_states import RefineState
+from .workflows.transitions import WorkflowTransitionEmitter
+
 log = logging.getLogger("autoresearch")
 
 EXIT_HUMAN_REQUIRED = 2
@@ -86,22 +89,32 @@ class DocumentRefiner:
         )
 
         # Phase 1 — Convergence
-        while not _should_stop(state, self._config):
-            valid_count, stale_count, deferred_count = run_cycle(
-                state, ctx, strategy, interactive=interactive
-            )
-            log.info(
-                "[cycle %d] valid=%d stale=%d deferred=%d clean_streak=%d",
-                state.cycle, valid_count, stale_count, deferred_count,
-                state.consecutive_clean_cycles,
-            )
-            self._write_cycle_snapshot(state)
-            self._write_issue_registry(state)
+        try:
+            while not _should_stop(state, self._config):
+                valid_count, stale_count, deferred_count = run_cycle(
+                    state, ctx, strategy, interactive=interactive
+                )
+                log.info(
+                    "[cycle %d] valid=%d stale=%d deferred=%d clean_streak=%d",
+                    state.cycle, valid_count, stale_count, deferred_count,
+                    state.consecutive_clean_cycles,
+                )
+                self._write_cycle_snapshot(state)
+                self._write_issue_registry(state)
 
-            if state.pending_human_inputs and not interactive:
-                self._handle_hitl_pause(state)
-                self._audit_trail.emit("run_paused_for_human_input", cycle=state.cycle)
-                return EXIT_HUMAN_REQUIRED
+                if state.pending_human_inputs and not interactive:
+                    self._handle_hitl_pause(state)
+                    self._audit_trail.emit("run_paused_for_human_input", cycle=state.cycle)
+                    return EXIT_HUMAN_REQUIRED
+        except Exception:
+            WorkflowTransitionEmitter(
+                self._audit_trail, "refine", state.current_workflow_state
+            ).transition(RefineState.INTERRUPTED, cycle=state.cycle)
+            raise
+
+        WorkflowTransitionEmitter(
+            self._audit_trail, "refine", state.current_workflow_state
+        ).transition(RefineState.CONVERGED, cycles=state.cycle)
 
         # Write converged primary artifact
         self._write_primary_artifact(state.prd)
