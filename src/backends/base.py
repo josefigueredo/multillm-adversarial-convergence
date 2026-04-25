@@ -150,6 +150,16 @@ class Backend(ABC):
             if key.upper() in keep_upper
         }
 
+    def _resolve_env(self, opts: "CallOptions") -> "dict[str, str] | None":
+        """Return the process environment to use for a subprocess invocation.
+
+        ``opts.process_env`` (executor-built, explicit) always takes precedence.
+        Falls back to :meth:`build_process_env` when ``opts.process_env`` is ``None``.
+        """
+        if opts.process_env is not None:
+            return opts.process_env
+        return self.build_process_env(sanitize=opts.sanitize_environment)
+
     @staticmethod
     def _run_process(
         cmd: list[str],
@@ -219,7 +229,7 @@ class Backend(ABC):
             cmd[0] = exe
 
         stdin_input: str | None = None
-        env = self.build_process_env(sanitize=opts.sanitize_environment)
+        env = self._resolve_env(opts)
         cwd = opts.working_directory or None
 
         if self.prompt_mode() == PromptMode.STDIN:

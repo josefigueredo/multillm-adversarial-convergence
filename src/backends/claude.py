@@ -161,7 +161,7 @@ class ClaudeBackend(Backend):
         exe = self._resolve_executable()
         if exe and cmd and cmd[0] == self.cli_executable():
             cmd[0] = exe
-        env = self.build_process_env(sanitize=opts.sanitize_environment)
+        env = self._resolve_env(opts)
         cwd = opts.working_directory or None
 
         log.debug(

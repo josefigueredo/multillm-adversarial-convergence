@@ -52,4 +52,5 @@ def apply_backend_capabilities(backend: Backend, opts: CallOptions) -> CallOptio
         json_schema=opts.json_schema if backend.capabilities.supports_json_schema else None,
         working_directory=opts.working_directory,
         sanitize_environment=opts.sanitize_environment,
+        process_env=opts.process_env,
     )

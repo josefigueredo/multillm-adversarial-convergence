@@ -2690,3 +2690,62 @@ class TestSandboxedExecutionWorkspace:
         with pytest.raises(PolicyDeniedError):
             researcher._call_with(backend, "prompt", allowed_tools="WebSearch")
         assert backend.last_opts is None, "backend.invoke must not be called when policy denies"
+
+
+# ---------------------------------------------------------------------------
+# M5 Step 1 wiring: sandbox env shaping routed into backend subprocess
+# ---------------------------------------------------------------------------
+
+class TestSandboxedEnvShaping:
+    """Prove that _call_with passes executor-built env to the backend when sandbox is active."""
+
+    def _make_sandboxed(self, research_config, tmp_path):
+        import dataclasses
+        from src.config import SandboxConfig, SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=SandboxConfig(mode="tool_calls"),
+            ),
+        )
+        backend = CapturingBackend()
+        researcher = AutoResearcher(config=config, backend=backend, output_dir=tmp_path / "output")
+        return researcher, backend
+
+    def test_sandboxed_call_sets_process_env_on_opts(self, research_config, tmp_path):
+        """When sandbox_active=True, opts.process_env must be set (not None)."""
+        researcher, backend = self._make_sandboxed(research_config, tmp_path)
+        researcher._call_with(backend, "prompt")
+        assert backend.last_opts is not None
+        assert backend.last_opts.process_env is not None
+
+    def test_sandboxed_process_env_contains_only_allowlisted_keys(self, research_config, tmp_path):
+        """Executor-built env must not contain stripped keys like HISTFILE or SSH_AUTH_SOCK."""
+        import os
+        researcher, backend = self._make_sandboxed(research_config, tmp_path)
+        # Inject a key that should be stripped by the sandbox allowlist
+        test_env = dict(os.environ)
+        test_env["HISTFILE"] = "/tmp/should_be_stripped"
+        test_env["SSH_AUTH_SOCK"] = "/tmp/should_be_stripped"
+        from unittest.mock import patch
+        with patch("os.environ", test_env):
+            researcher._call_with(backend, "prompt")
+        env = backend.last_opts.process_env
+        assert env is not None
+        assert "HISTFILE" not in env
+        assert "SSH_AUTH_SOCK" not in env
+
+    def test_direct_mode_call_leaves_process_env_none(self, research_config, tmp_path):
+        """When sandbox_active=False (direct mode), opts.process_env must be None."""
+        import dataclasses
+        from src.config import SecurityConfig
+        config = dataclasses.replace(
+            research_config,
+            security=SecurityConfig(tool_execution_mode="direct"),
+        )
+        backend = CapturingBackend()
+        researcher = AutoResearcher(config=config, backend=backend, output_dir=tmp_path / "output")
+        researcher._call_with(backend, "prompt")
+        assert backend.last_opts is not None
+        assert backend.last_opts.process_env is None

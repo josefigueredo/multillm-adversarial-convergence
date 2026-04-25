@@ -654,3 +654,51 @@ class TestBuildEnvironment:
         executor = _make_executor(tmp_path)
         base = {"PATH": "/usr/bin", "HOME": "/home/user", "SSH_AUTH_SOCK": "/tmp/sock"}
         assert executor.build_environment(base) == executor.build_environment(base)
+
+
+# ---------------------------------------------------------------------------
+# M5 wiring: _resolve_env prefers process_env over build_process_env
+# ---------------------------------------------------------------------------
+
+class TestResolveEnv:
+    """BaseBackend._resolve_env uses process_env when set, sanitize otherwise."""
+
+    def _make_backend(self):
+        from src.backends import get_backend
+        return get_backend("claude-cli")
+
+    def test_resolve_env_returns_process_env_when_set(self):
+        """If opts.process_env is set, _resolve_env must return it directly."""
+        from src.backends.types import CallOptions
+        backend = self._make_backend()
+        explicit_env = {"PATH": "/usr/bin", "HOME": "/home/user"}
+        opts = CallOptions(process_env=explicit_env)
+        result = backend._resolve_env(opts)
+        assert result is explicit_env
+
+    def test_resolve_env_falls_back_to_sanitize_when_process_env_is_none(self):
+        """If opts.process_env is None and sanitize=True, _resolve_env returns sanitized env."""
+        from src.backends.types import CallOptions
+        from src.backends.base import Backend as BaseBackend
+        backend = self._make_backend()
+        opts = CallOptions(sanitize_environment=True)
+        result = backend._resolve_env(opts)
+        expected = BaseBackend.build_process_env(sanitize=True)
+        assert result == expected
+
+    def test_resolve_env_returns_none_when_both_unset(self):
+        """If opts.process_env is None and sanitize=False, _resolve_env returns None."""
+        from src.backends.types import CallOptions
+        backend = self._make_backend()
+        opts = CallOptions()
+        result = backend._resolve_env(opts)
+        assert result is None
+
+    def test_resolve_env_process_env_wins_over_sanitize(self):
+        """process_env takes precedence even when sanitize_environment=True."""
+        from src.backends.types import CallOptions
+        backend = self._make_backend()
+        explicit_env = {"PATH": "/custom"}
+        opts = CallOptions(process_env=explicit_env, sanitize_environment=True)
+        result = backend._resolve_env(opts)
+        assert result is explicit_env

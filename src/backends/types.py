@@ -33,6 +33,7 @@ class CallOptions:
     json_schema: dict[str, Any] | None = None
     working_directory: str = ""
     sanitize_environment: bool = False
+    process_env: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)

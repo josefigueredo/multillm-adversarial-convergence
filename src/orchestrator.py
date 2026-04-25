@@ -312,9 +312,11 @@ class AutoResearcher:
 
         # Determine working directory — sandbox workspace takes priority.
         sandbox = self._sandbox or self._make_transient_sandbox()
+        process_env: dict[str, str] | None = None
         if sandbox.policy.sandbox_active:
             sandbox.prepare_workspace()
             working_dir = str(sandbox.workspace_dir)
+            process_env = sandbox.build_environment()
         elif isolated and self._backend_runtime_dir():
             working_dir = str(self._backend_runtime_dir())
         else:
@@ -338,6 +340,7 @@ class AutoResearcher:
             json_schema=opts.json_schema,
             working_directory=opts.working_directory,
             sanitize_environment=opts.sanitize_environment,
+            process_env=process_env,
         )
         opts = apply_backend_capabilities(backend, opts)
         self._check_execution_policy(opts)
