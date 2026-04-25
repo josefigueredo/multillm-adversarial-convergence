@@ -181,7 +181,15 @@ class TestValidateToolRequestFilesystem:
         outside = tmp_path / "outside.txt"
         with pytest.raises(PolicyDeniedError) as exc_info:
             executor.validate_tool_request(action="write_file", write_path=outside)
-        assert exc_info.value.allowed_boundary is not None
+        assert exc_info.value.allowed_boundary == "output_only"
+
+    def test_error_carries_workspace_only_boundary_token(self, tmp_path):
+        policy = _make_policy(tmp_path, filesystem_access="workspace_only")
+        executor = SandboxExecutor(policy, policy.workspace_dir)
+        outside = policy.output_dir / "file.txt"  # outside workspace, inside output
+        with pytest.raises(PolicyDeniedError) as exc_info:
+            executor.validate_tool_request(action="write_file", write_path=outside)
+        assert exc_info.value.allowed_boundary == "workspace_only"
 
 
 # ---------------------------------------------------------------------------

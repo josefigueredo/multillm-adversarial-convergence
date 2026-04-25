@@ -125,14 +125,12 @@ class SandboxExecutor:
         """Raise PolicyDeniedError when *path* violates the filesystem boundary."""
         if self._policy.is_write_allowed(path):
             return
-        roots = self._policy.allowed_write_roots()
-        boundary = roots[0].name if roots else "none"
         raise PolicyDeniedError(
             reason_code="write_outside_allowed_roots",
             policy_field="sandbox.filesystem_access",
             requested_action=action,
             requested_path=str(path),
-            allowed_boundary=boundary,
+            allowed_boundary=self._policy.filesystem_access,
         )
 
     def _check_network(self, action: str, destination_type: str) -> None:
