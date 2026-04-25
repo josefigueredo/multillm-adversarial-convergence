@@ -1,4 +1,4 @@
-"""Tests for src.tool_capabilities — M5 Step 2."""
+"""Tests for src.tool_capabilities — M5 Step 2 + MM06 Step 2."""
 
 from __future__ import annotations
 
@@ -8,6 +8,9 @@ from src.tool_capabilities import (
     ToolCapabilities,
     classify_tool,
     classify_allowed_tools,
+    coverage_stats,
+    check_capability_consistency,
+    SHIPPED_TOOLS,
     _TOOL_CAPABILITIES,
 )
 
@@ -248,3 +251,155 @@ class TestToolCapabilitiesRegistry:
             assert isinstance(caps, ToolCapabilities), (
                 f"_TOOL_CAPABILITIES[{name!r}] is not a ToolCapabilities instance"
             )
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 2 — LS classification
+# ---------------------------------------------------------------------------
+
+class TestLSClassification:
+    def test_ls_is_in_registry(self):
+        assert "LS" in _TOOL_CAPABILITIES
+
+    def test_ls_has_no_special_capabilities(self):
+        caps = classify_tool("LS")
+        assert caps is not None
+        assert caps.uses_host_shell is False
+        assert caps.uses_network is False
+        assert caps.destination_type is None
+        assert caps.may_write is False
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 2 — SHIPPED_TOOLS constant
+# ---------------------------------------------------------------------------
+
+class TestShippedTools:
+    _EXPECTED_TOOLS = {
+        # default allowed_tools
+        "Bash", "WebSearch", "WebFetch", "Read", "Glob", "Grep",
+        # filesystem write
+        "Write", "Edit", "MultiEdit",
+        # agent / task helpers
+        "TodoRead", "TodoWrite", "Task",
+        # directory listing
+        "LS",
+    }
+
+    def test_shipped_tools_is_frozenset(self):
+        assert isinstance(SHIPPED_TOOLS, frozenset)
+
+    def test_all_expected_tools_in_shipped_tools(self):
+        for name in self._EXPECTED_TOOLS:
+            assert name in SHIPPED_TOOLS, f"{name!r} missing from SHIPPED_TOOLS"
+
+    def test_all_shipped_tools_are_in_registry(self):
+        for name in SHIPPED_TOOLS:
+            assert name in _TOOL_CAPABILITIES, (
+                f"{name!r} in SHIPPED_TOOLS but not in _TOOL_CAPABILITIES"
+            )
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 2 — coverage_stats
+# ---------------------------------------------------------------------------
+
+class TestCoverageStats:
+    def test_empty_input_returns_zero_stats(self):
+        stats = coverage_stats([])
+        assert stats == {
+            "total": 0,
+            "classified": 0,
+            "unclassified": 0,
+            "unclassified_names": [],
+        }
+
+    def test_all_default_tools_fully_classified(self):
+        default_tools = ["WebSearch", "WebFetch", "Read", "Bash", "Glob", "Grep"]
+        stats = coverage_stats(default_tools)
+        assert stats["total"] == 6
+        assert stats["classified"] == 6
+        assert stats["unclassified"] == 0
+        assert stats["unclassified_names"] == []
+
+    def test_unknown_tool_appears_in_unclassified_names(self):
+        stats = coverage_stats(["UnknownThing"])
+        assert stats["total"] == 1
+        assert stats["classified"] == 0
+        assert stats["unclassified"] == 1
+        assert stats["unclassified_names"] == ["UnknownThing"]
+
+    def test_mixed_known_and_unknown(self):
+        stats = coverage_stats(["Bash", "Ghost", "Read", "Phantom"])
+        assert stats["total"] == 4
+        assert stats["classified"] == 2
+        assert stats["unclassified"] == 2
+        assert set(stats["unclassified_names"]) == {"Ghost", "Phantom"}
+
+    def test_unclassified_names_preserves_input_order(self):
+        tools = ["Alpha", "Bash", "Beta", "Gamma", "Read"]
+        stats = coverage_stats(tools)
+        assert stats["unclassified_names"] == ["Alpha", "Beta", "Gamma"]
+
+    def test_accepts_generator_input(self):
+        gen = (t for t in ["Bash", "MissingTool"])
+        stats = coverage_stats(gen)
+        assert stats["total"] == 2
+        assert stats["classified"] == 1
+        assert stats["unclassified"] == 1
+
+    def test_all_shipped_tools_fully_classified(self):
+        stats = coverage_stats(SHIPPED_TOOLS)
+        assert stats["unclassified"] == 0, (
+            f"Unclassified shipped tools: {stats['unclassified_names']}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 2 — check_capability_consistency
+# ---------------------------------------------------------------------------
+
+class TestCapabilityConsistency:
+    def test_default_caps_are_consistent(self):
+        caps = ToolCapabilities()
+        assert check_capability_consistency(caps) == []
+
+    def test_valid_web_tool_is_consistent(self):
+        caps = ToolCapabilities(uses_network=True, destination_type="web")
+        assert check_capability_consistency(caps) == []
+
+    def test_valid_other_destination_is_consistent(self):
+        caps = ToolCapabilities(uses_network=True, destination_type="other")
+        assert check_capability_consistency(caps) == []
+
+    def test_uses_network_without_destination_type_is_invalid(self):
+        caps = ToolCapabilities(uses_network=True, destination_type=None)
+        errors = check_capability_consistency(caps)
+        assert len(errors) >= 1
+        assert any("destination_type" in e for e in errors)
+
+    def test_destination_type_without_uses_network_is_invalid(self):
+        caps = ToolCapabilities(uses_network=False, destination_type="web")
+        errors = check_capability_consistency(caps)
+        assert len(errors) >= 1
+        assert any("destination_type" in e for e in errors)
+
+    def test_invalid_destination_type_value_is_invalid(self):
+        caps = ToolCapabilities(uses_network=True, destination_type="weeb")
+        errors = check_capability_consistency(caps)
+        assert len(errors) >= 1
+        assert any("destination_type" in e for e in errors)
+
+    def test_another_invalid_destination_type_value(self):
+        caps = ToolCapabilities(uses_network=True, destination_type="http")
+        errors = check_capability_consistency(caps)
+        assert len(errors) >= 1
+
+    def test_all_registry_entries_are_consistent(self):
+        """Every entry in _TOOL_CAPABILITIES must pass consistency validation."""
+        failures: dict[str, list[str]] = {}
+        for name, caps in _TOOL_CAPABILITIES.items():
+            errors = check_capability_consistency(caps)
+            if errors:
+                failures[name] = errors
+        assert failures == {}, f"Registry consistency failures: {failures}"
