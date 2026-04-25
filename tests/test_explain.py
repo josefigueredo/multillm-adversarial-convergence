@@ -205,3 +205,48 @@ class TestExplainResumeText:
         before = set(d.rglob("*"))
         explain_resume_text(d)
         assert set(d.rglob("*")) == before
+
+
+class TestExplainWorkflowContracts:
+    """Step 5: explain config surfaces workflow contracts."""
+
+    def test_contains_workflow_contracts_section(self):
+        result = explain_config_text(_make_config())
+        assert "WORKFLOW CONTRACTS" in result
+
+    def test_shows_research_mode_label(self):
+        result = explain_config_text(_make_config())
+        assert "research" in result.lower()
+
+    def test_shows_hypothesis_phase(self):
+        result = explain_config_text(_make_config())
+        assert "hypothesis" in result
+
+    def test_shows_execute_phase(self):
+        result = explain_config_text(_make_config())
+        assert "execute" in result
+
+    def test_shows_score_phase(self):
+        result = explain_config_text(_make_config())
+        assert "score" in result
+
+    def test_shows_decide_phase(self):
+        result = explain_config_text(_make_config())
+        assert "decide" in result
+
+    def test_shows_merge_phase(self):
+        result = explain_config_text(_make_config())
+        assert "merge" in result
+
+    def test_shows_recovery_mode_for_hypothesis(self):
+        result = explain_config_text(_make_config())
+        # hypothesis uses outer_loop_continue
+        assert "outer_loop_continue" in result
+
+    def test_shows_recovery_mode_none_for_score(self):
+        result = explain_config_text(_make_config())
+        assert "none" in result.lower()
+
+    def test_shows_human_gate_field(self):
+        result = explain_config_text(_make_config())
+        assert "gate" in result.lower() or "human_gate" in result.lower()

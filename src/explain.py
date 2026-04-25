@@ -8,6 +8,28 @@ from typing import Any
 
 from .output_style import build_output_style_presentation, summarize_output_style_overrides
 from .run_paths import RunPaths
+from .workflows.contracts import RESEARCH_CONTRACTS
+
+
+def _workflow_contracts_lines(mode: str = "research") -> list[str]:
+    """Return WORKFLOW CONTRACTS section lines for *explain config* output."""
+    from .workflows.contracts import REFINE_CONTRACTS, PLAN_CONTRACTS
+
+    _contracts_map = {
+        "research": RESEARCH_CONTRACTS,
+        "refine": REFINE_CONTRACTS,
+        "plan": PLAN_CONTRACTS,
+    }
+    contracts = _contracts_map.get(mode, RESEARCH_CONTRACTS)
+
+    lines: list[str] = [f"WORKFLOW CONTRACTS ({mode})"]
+    for phase, contract in contracts.items():
+        gate = "yes" if contract.human_gate else "no"
+        lines.append(
+            f"  {phase:<14} recovery: {contract.recovery_mode:<22}  human_gate: {gate}"
+        )
+    lines.append("")
+    return lines
 
 
 def explain_config_text(config: Any, *, config_path: Path | None = None) -> str:
@@ -113,6 +135,10 @@ def explain_config_text(config: Any, *, config_path: Path | None = None) -> str:
         f"  manifest:         {paths.manifest}",
         f"  report_html:      {paths.report_html}",
     ]
+
+    # --- Workflow contracts ---------------------------------------------------
+    lines.append("")
+    lines.extend(_workflow_contracts_lines("research"))
 
     return "\n".join(lines)
 

@@ -452,6 +452,79 @@ def _classify_run(
     return "complete", warnings
 
 
+def _read_last_workflow_transition(audit_trail_path: Path) -> dict | None:
+    """Return the last ``workflow_transition`` event from *audit_trail_path*.
+
+    Returns ``None`` if the file is absent, unreadable, or has no such events.
+    Pure filesystem read — no side effects.
+    """
+    import json
+
+    if not audit_trail_path.exists():
+        return None
+    try:
+        text = audit_trail_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    last: dict | None = None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict) and event.get("event") == "workflow_transition":
+            last = event
+    return last
+
+
+def _workflow_state_lines(last_transition: dict | None) -> list[str]:
+    """Return WORKFLOW STATE section lines for *doctor output* output.
+
+    Uses workflow contracts and state metadata to annotate the last known
+    phase with recovery semantics and gate status.
+    """
+    from .workflows.contracts import get_contract
+
+    _TERMINAL: frozenset[str] = frozenset({"converged", "interrupted"})
+    _PAUSE: frozenset[str] = frozenset({"paused_for_human"})
+
+    lines: list[str] = ["WORKFLOW STATE"]
+    if last_transition is None:
+        lines.append("  (no workflow history found in audit trail)")
+        lines.append("")
+        return lines
+
+    workflow = last_transition.get("workflow", "unknown")
+    to_state = last_transition.get("to_state", "unknown")
+    is_terminal = to_state in _TERMINAL
+    is_paused = to_state in _PAUSE
+
+    lines.append(f"  workflow:     {workflow}")
+    lines.append(f"  last_phase:   {to_state}")
+
+    if is_terminal:
+        lines.append("  terminal:     yes")
+        lines.append("  pending_gate: no")
+    elif is_paused:
+        lines.append("  terminal:     no")
+        lines.append("  pending_gate: YES — human review required before resuming")
+    else:
+        lines.append("  terminal:     no")
+        lines.append("  pending_gate: no")
+        contract = get_contract(workflow, to_state)
+        if contract is not None:
+            lines.append(f"  recovery_mode: {contract.recovery_mode}")
+        else:
+            lines.append("  recovery_mode: unknown (no contract for this phase)")
+
+    lines.append("")
+    return lines
+
+
 def doctor_output_text(output_dir: Path) -> DoctorReport:
     """Inspect *output_dir* and return a DoctorReport for the run state.
 
@@ -564,6 +637,10 @@ def doctor_output_text(output_dir: Path) -> DoctorReport:
         if not artifact_status.get("effective_config", False):
             parts.append("  [!] effective_config.json missing — config context unavailable.")
     parts.append("")
+
+    # Workflow state (from audit trail)
+    last_transition = _read_last_workflow_transition(paths.audit_trail)
+    parts.extend(_workflow_state_lines(last_transition))
 
     # Warnings section
     if issues:

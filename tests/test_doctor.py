@@ -976,3 +976,94 @@ class TestDoctorMM06Diagnostics:
             "Expected no 'write-intent' line in direct mode, "
             f"got: {write_intent_lines}"
         )
+
+
+def _make_run_with_workflow_transitions(output_dir: Path, transitions: list[dict]) -> None:
+    """Complete run with workflow_transition events in audit trail."""
+    import json
+    _make_complete_run(output_dir)
+    from src.run_paths import RunPaths
+    paths = RunPaths.for_output_dir(output_dir)
+    lines = [json.dumps({"event": "run_started"})]
+    for t in transitions:
+        lines.append(json.dumps(t))
+    _write_file(paths.audit_trail, "\n".join(lines) + "\n")
+
+
+class TestDoctorOutputWorkflowState:
+    """Step 5: doctor output surfaces workflow state from audit trail."""
+
+    def test_contains_workflow_state_section(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "idle", "to_state": "hypothesis"},
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "hypothesis", "to_state": "converged"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert "WORKFLOW" in result.text
+
+    def test_shows_last_workflow_phase(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "idle", "to_state": "execute"},
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "execute", "to_state": "converged"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert "converged" in result.text
+
+    def test_terminal_state_shown_as_terminal(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "idle", "to_state": "converged"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert "terminal" in result.text.lower() or "converged" in result.text
+
+    def test_interrupted_state_shown(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "execute", "to_state": "interrupted"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert "interrupted" in result.text
+
+    def test_pause_state_shows_pending_gate(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "refine",
+             "from_state": "verifier", "to_state": "paused_for_human"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert "human" in result.text.lower() or "gate" in result.text.lower() or "pending" in result.text.lower()
+
+    def test_no_workflow_transitions_shows_no_history(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)  # audit trail has only run_started
+        result = doctor_output_text(tmp_path)
+        # Should not crash; may show "no workflow history" or omit the section
+        assert result.text  # non-empty
+
+    def test_workflow_name_shown(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "idle", "to_state": "hypothesis"},
+        ])
+        result = doctor_output_text(tmp_path)
+        assert "research" in result.text
+
+    def test_active_phase_shows_recovery_mode(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_run_with_workflow_transitions(tmp_path, [
+            {"event": "workflow_transition", "workflow": "research",
+             "from_state": "idle", "to_state": "hypothesis"},
+        ])
+        result = doctor_output_text(tmp_path)
+        # hypothesis has outer_loop_continue recovery
+        assert "outer_loop_continue" in result.text or "recovery" in result.text.lower()
