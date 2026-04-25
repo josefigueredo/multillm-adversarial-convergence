@@ -10,6 +10,7 @@ from src.config import (
     DocumentConfig,
     EvaluationConfig,
     ExecutionConfig,
+    HitlConfig,
     MethodologyConfig,
     OutputStyleOverrides,
     PlanConfig,
@@ -1109,3 +1110,125 @@ class TestHitlConfigFromYaml:
     def test_missing_hitl_section_defaults_to_full_auto(self, minimal_yaml: Path):
         cfg = ResearchConfig.from_yaml(minimal_yaml)
         assert cfg.hitl.intervention_mode == "full_auto"
+
+
+# ---------------------------------------------------------------------------
+# HitlConfig — DocumentConfig integration
+# ---------------------------------------------------------------------------
+
+
+class TestDocumentHitlConfig:
+    """HitlConfig wired into DocumentConfig."""
+
+    def test_default_full_auto(self, tmp_path: Path):
+        p = tmp_path / "doc.yaml"
+        p.write_text(textwrap.dedent("""\
+            document:
+              topic: "Test doc"
+        """), encoding="utf-8")
+        cfg = DocumentConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "full_auto"
+
+    def test_explicit_mode_accepted(self, tmp_path: Path):
+        p = tmp_path / "doc.yaml"
+        p.write_text(textwrap.dedent("""\
+            document:
+              topic: "Test doc"
+              hitl:
+                intervention_mode: co_pilot
+        """), encoding="utf-8")
+        cfg = DocumentConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "co_pilot"
+
+    def test_checkpoint_only_accepted(self, tmp_path: Path):
+        p = tmp_path / "doc.yaml"
+        p.write_text(textwrap.dedent("""\
+            document:
+              topic: "Test doc"
+              hitl:
+                intervention_mode: checkpoint_only
+        """), encoding="utf-8")
+        cfg = DocumentConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "checkpoint_only"
+
+    def test_invalid_mode_rejected(self, tmp_path: Path):
+        p = tmp_path / "doc.yaml"
+        p.write_text(textwrap.dedent("""\
+            document:
+              topic: "Test doc"
+              hitl:
+                intervention_mode: bad_mode
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="hitl.intervention_mode"):
+            DocumentConfig.from_yaml(p)
+
+    def test_hitl_is_frozen(self, tmp_path: Path):
+        p = tmp_path / "doc.yaml"
+        p.write_text(textwrap.dedent("""\
+            document:
+              topic: "Test doc"
+        """), encoding="utf-8")
+        cfg = DocumentConfig.from_yaml(p)
+        with pytest.raises((AttributeError, TypeError)):
+            cfg.hitl.intervention_mode = "step_review"  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# HitlConfig — PlanConfig integration
+# ---------------------------------------------------------------------------
+
+
+class TestPlanHitlConfig:
+    """HitlConfig wired into PlanConfig."""
+
+    def test_default_full_auto(self, tmp_path: Path):
+        p = tmp_path / "plan.yaml"
+        p.write_text(textwrap.dedent("""\
+            plan:
+              topic: "Test plan"
+        """), encoding="utf-8")
+        cfg = PlanConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "full_auto"
+
+    def test_explicit_mode_accepted(self, tmp_path: Path):
+        p = tmp_path / "plan.yaml"
+        p.write_text(textwrap.dedent("""\
+            plan:
+              topic: "Test plan"
+              hitl:
+                intervention_mode: decision_only
+        """), encoding="utf-8")
+        cfg = PlanConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "decision_only"
+
+    def test_step_review_accepted(self, tmp_path: Path):
+        p = tmp_path / "plan.yaml"
+        p.write_text(textwrap.dedent("""\
+            plan:
+              topic: "Test plan"
+              hitl:
+                intervention_mode: step_review
+        """), encoding="utf-8")
+        cfg = PlanConfig.from_yaml(p)
+        assert cfg.hitl.intervention_mode == "step_review"
+
+    def test_invalid_mode_rejected(self, tmp_path: Path):
+        p = tmp_path / "plan.yaml"
+        p.write_text(textwrap.dedent("""\
+            plan:
+              topic: "Test plan"
+              hitl:
+                intervention_mode: turbo_mode
+        """), encoding="utf-8")
+        with pytest.raises(ValueError, match="hitl.intervention_mode"):
+            PlanConfig.from_yaml(p)
+
+    def test_hitl_is_frozen(self, tmp_path: Path):
+        p = tmp_path / "plan.yaml"
+        p.write_text(textwrap.dedent("""\
+            plan:
+              topic: "Test plan"
+        """), encoding="utf-8")
+        cfg = PlanConfig.from_yaml(p)
+        with pytest.raises((AttributeError, TypeError)):
+            cfg.hitl.intervention_mode = "co_pilot"  # type: ignore[misc]

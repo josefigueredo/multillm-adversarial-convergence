@@ -1059,6 +1059,7 @@ class DocumentConfig:
     backends: BackendsConfig = field(default_factory=BackendsConfig)
     strategy_config: StrategyConfig = field(default_factory=StrategyConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    hitl: HitlConfig = field(default_factory=HitlConfig)
 
     @classmethod
     def from_yaml(cls, path: Path) -> "DocumentConfig":
@@ -1176,6 +1177,7 @@ class DocumentConfig:
             critique_depth=strat_raw.get("critique_depth", "standard"),
         )
         execution_cfg = _parse_execution_config(doc.get("execution", {}))
+        hitl_cfg = _parse_hitl_config(doc.get("hitl", {}))
 
         return cls(
             topic=doc["topic"],
@@ -1192,6 +1194,7 @@ class DocumentConfig:
             backends=backends_cfg,
             strategy_config=strategy_cfg,
             execution=execution_cfg,
+            hitl=hitl_cfg,
         )
 
 
@@ -1266,6 +1269,7 @@ class PlanConfig:
     backends: BackendsConfig = field(default_factory=BackendsConfig)
     strategy_config: StrategyConfig = field(default_factory=StrategyConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    hitl: HitlConfig = field(default_factory=HitlConfig)
 
     @classmethod
     def from_yaml(cls, path: Path) -> "PlanConfig":
@@ -1389,6 +1393,7 @@ class PlanConfig:
         )
 
         execution_cfg = _parse_execution_config(plan_raw.get("execution", {}))
+        hitl_cfg = _parse_hitl_config(plan_raw.get("hitl", {}))
 
         return cls(
             topic=plan_raw["topic"],
@@ -1405,4 +1410,5 @@ class PlanConfig:
             backends=backends_cfg,
             strategy_config=strategy_cfg,
             execution=execution_cfg,
+            hitl=hitl_cfg,
         )
