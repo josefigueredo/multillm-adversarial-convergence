@@ -77,6 +77,7 @@ from .semantic_eval import (
 )
 from .strategy import ResearchCandidate, Strategy, get_strategy
 from .tool_runtime import run_function_tool_loop
+from .sandbox_executor import SandboxExecutor
 from .security_runtime import resolve_runtime_security_policy
 from .policy_denial import PolicyDeniedError
 
@@ -198,6 +199,7 @@ class AutoResearcher:
         self._candidate_assessments: list = []
         self._usage = UsageTotals()
         self._backend_workdir: Path | None = None
+        self._sandbox: SandboxExecutor | None = None
         self._tool_loop_summary: dict[str, Any] = {
             "runs": 0,
             "tool_calls": 0,
@@ -642,6 +644,8 @@ class AutoResearcher:
                 workspace_dir=str(self.paths.workspace_dir),
             )
             _policy = resolve_runtime_security_policy(self.config.security, self.paths)
+            self._sandbox = SandboxExecutor(_policy, _policy.workspace_dir)
+            self._sandbox.prepare_workspace()
             self._audit_trail.emit(
                 "sandbox_policy_applied",
                 tool_execution_mode=_policy.tool_execution_mode,
@@ -1147,18 +1151,21 @@ class AutoResearcher:
 
         Callers should invoke this before any write that originates from an
         agent tool invocation or any untrusted source.
+
+        Delegates to :attr:`_sandbox` when available; falls back to a freshly
+        resolved policy for callers that run before setup (e.g. tests).
         """
-        policy = resolve_runtime_security_policy(self.config.security, self.paths)
-        if not policy.is_write_allowed(path):
-            err = PolicyDeniedError(
-                reason_code="write_outside_allowed_roots",
-                policy_field="sandbox.filesystem_access",
-                requested_action="write",
-                requested_path=str(path),
-                allowed_boundary=policy.filesystem_access,
-            )
+        sandbox = self._sandbox or self._make_transient_sandbox()
+        try:
+            sandbox.validate_tool_request(action="write", write_path=path)
+        except PolicyDeniedError as err:
             self._audit_trail.emit("policy_denied", **err.audit_payload())
-            raise err
+            raise
+
+    def _make_transient_sandbox(self) -> SandboxExecutor:
+        """Return a one-off executor for callers that run before ``_setup_run``."""
+        policy = resolve_runtime_security_policy(self.config.security, self.paths)
+        return SandboxExecutor(policy, policy.workspace_dir)
 
     def _write_metrics(self) -> None:
         """Write machine-readable run metrics."""
