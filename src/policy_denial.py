@@ -16,9 +16,21 @@ class PolicyDeniedError(Exception):
     ----------
     reason_code:
         Machine-stable token identifying the denial reason.
-        Valid values: ``host_bash_disabled``, ``write_outside_allowed_roots``,
-        ``network_access_disallowed``, ``tool_calls_disabled``,
-        ``tool_unclassified``.
+        Valid values:
+
+        - ``host_bash_disabled`` — tool with ``uses_host_shell=True`` blocked by
+          ``allow_host_bash=False``.
+        - ``write_outside_allowed_roots`` — write path outside permitted filesystem
+          boundary (``sandbox.filesystem_access``).
+        - ``network_access_disallowed`` — outbound network request blocked by
+          ``sandbox.network_access`` policy.
+        - ``tool_calls_disabled`` — tool dispatch blocked because tool calls are
+          globally disabled.
+        - ``tool_unclassified`` — unknown tool denied conservatively when
+          ``sandbox_active=True`` (not in capability registry).
+        - ``invalid_destination_type`` — ``destination_type`` passed to the network
+          dispatch check is not a recognised value (``"web"`` or ``"other"``);
+          indicates a caller-side coding error rather than a policy decision.
     policy_field:
         The config field that caused the denial (e.g. ``allow_host_bash``).
     requested_action:

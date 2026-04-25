@@ -236,3 +236,36 @@ class TestExceptionContract:
             requested_action="execute_bash",
         )
         assert isinstance(str(err), str)
+
+
+# ---------------------------------------------------------------------------
+# MM06 Step 4 refinement — denial contract completeness
+# ---------------------------------------------------------------------------
+
+class TestReasonCodeDocumentation:
+    """All reason codes used at runtime must be present in the PolicyDeniedError docstring."""
+
+    _KNOWN_REASON_CODES = {
+        "host_bash_disabled",
+        "write_outside_allowed_roots",
+        "network_access_disallowed",
+        "tool_calls_disabled",
+        "tool_unclassified",
+        "invalid_destination_type",
+    }
+
+    def test_all_reason_codes_in_docstring(self):
+        """Every known reason code must appear in the PolicyDeniedError docstring."""
+        doc = PolicyDeniedError.__doc__ or ""
+        missing = [rc for rc in self._KNOWN_REASON_CODES if rc not in doc]
+        assert missing == [], f"Reason code(s) missing from PolicyDeniedError docstring: {missing}"
+
+    def test_invalid_destination_type_constructable(self):
+        """invalid_destination_type must be a valid reason code at construction time."""
+        err = PolicyDeniedError(
+            reason_code="invalid_destination_type",
+            policy_field="sandbox.network_access",
+            requested_action="tool_dispatch:BrokenTool",
+        )
+        assert err.reason_code == "invalid_destination_type"
+        assert err.policy_field == "sandbox.network_access"
