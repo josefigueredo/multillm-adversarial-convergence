@@ -27,11 +27,14 @@ _TRACKING_PARAMS: frozenset[str] = frozenset(
     }
 )
 
-# Heading patterns that mark an existing references/bibliography block
-_REFS_HEADING_RE = re.compile(
+# Heading patterns that mark an existing references/bibliography block.
+# Exported as ``REFS_HEADING_RE`` so other modules (e.g. citation_verification)
+# can share the same compiled pattern without duplicating the rule.
+REFS_HEADING_RE = re.compile(
     r"^#{1,6}\s+(References|Bibliography)\s*$",
     re.MULTILINE | re.IGNORECASE,
 )
+_REFS_HEADING_RE = REFS_HEADING_RE  # internal alias preserved for backward compat
 
 
 # ---------------------------------------------------------------------------
