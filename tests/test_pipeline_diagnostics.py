@@ -184,6 +184,38 @@ class TestDoctorPipelineHealthy:
         )
         assert doctor_pipeline(p).exit_code == 0
 
+    def test_revision_adding_citations_makes_paper_healthy(self):
+        """Synthesis has no refs but revision adds them → doctor should be healthy."""
+        from src.doctor import doctor_pipeline
+        synthesis_body = "## Abstract\nOriginal content, no references."
+        revised_body = (
+            "## Abstract\nRevised content.\n\n"
+            "## References\n\n"
+            "1. [Added Paper](https://example.com)\n"
+        )
+        p = (
+            DeliverablePipeline(topic="T", deliverable_class="paper")
+            .with_synthesis(_synthesis(body=synthesis_body))
+            .with_revision(RevisionArtifact(revised_body=revised_body, revision_notes=("added refs",)))
+        )
+        assert doctor_pipeline(p).exit_code == 0
+
+    def test_revision_removing_citations_makes_paper_unhealthy(self):
+        """Synthesis has refs but revision removes them → doctor should warn."""
+        from src.doctor import doctor_pipeline
+        synthesis_body = (
+            "## Abstract\nContent.\n\n"
+            "## References\n\n"
+            "1. [Original Ref](https://example.com)\n"
+        )
+        revised_body = "## Abstract\nRevised content with references removed."
+        p = (
+            DeliverablePipeline(topic="T", deliverable_class="paper")
+            .with_synthesis(_synthesis(body=synthesis_body))
+            .with_revision(RevisionArtifact(revised_body=revised_body, revision_notes=("removed refs",)))
+        )
+        assert doctor_pipeline(p).exit_code == 1
+
 
 # ---------------------------------------------------------------------------
 # doctor_pipeline — warning states

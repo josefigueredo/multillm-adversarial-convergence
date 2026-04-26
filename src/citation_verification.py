@@ -73,11 +73,51 @@ def _extract_section_body(markdown: str, heading_match: re.Match) -> str:  # typ
 # ---------------------------------------------------------------------------
 
 
+def verify_body_citations(
+    body: str,
+    config: DeliverableClassConfig,
+) -> list[VerificationViolation]:
+    """Return violations for *body* based on citation requirements in *config*.
+
+    This is the text-level implementation used by both
+    :func:`verify_synthesis_citations` and :func:`~src.doctor.doctor_pipeline`
+    so diagnostics can check whichever stage's text is most authoritative.
+
+    When ``config.requires_citations`` is ``False``, always returns ``[]``.
+    """
+    if not config.requires_citations:
+        return []
+
+    match = REFS_HEADING_RE.search(body)
+    if not match:
+        return [
+            VerificationViolation(
+                code="missing_references_section",
+                message="body is missing a References or Bibliography heading",
+            )
+        ]
+
+    section = _extract_section_body(body, match)
+    if not _CITATION_ENTRY_RE.search(section):
+        return [
+            VerificationViolation(
+                code="empty_references_section",
+                message="References section exists but contains no numbered citation entries",
+            )
+        ]
+
+    return []
+
+
 def verify_synthesis_citations(
     synthesis: SynthesisArtifact,
     config: DeliverableClassConfig,
 ) -> list[VerificationViolation]:
     """Return violations for *synthesis* based on citation requirements in *config*.
+
+    Delegates to :func:`verify_body_citations` using the synthesis body.
+    Use :func:`verify_body_citations` directly when you need to check a
+    revised body or any other plain text.
 
     When ``config.requires_citations`` is ``False``, the check is a no-op and
     always returns an empty list.
@@ -90,28 +130,7 @@ def verify_synthesis_citations(
        of the form ``N. <non-whitespace>``.  Numbered entries in sections that
        follow the References heading (e.g. an Appendix) are not counted.
     """
-    if not config.requires_citations:
-        return []
-
-    match = REFS_HEADING_RE.search(synthesis.body)
-    if not match:
-        return [
-            VerificationViolation(
-                code="missing_references_section",
-                message="synthesis body is missing a References or Bibliography heading",
-            )
-        ]
-
-    section = _extract_section_body(synthesis.body, match)
-    if not _CITATION_ENTRY_RE.search(section):
-        return [
-            VerificationViolation(
-                code="empty_references_section",
-                message="References section exists but contains no numbered citation entries",
-            )
-        ]
-
-    return []
+    return verify_body_citations(synthesis.body, config)
 
 
 # ---------------------------------------------------------------------------

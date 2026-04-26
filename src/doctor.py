@@ -965,7 +965,7 @@ def doctor_pipeline(pipeline: "Any") -> DoctorReport:  # DeliverablePipeline
     Returns:
         DoctorReport with exit_code=0 if healthy, exit_code=1 if issues found.
     """
-    from .citation_verification import verify_export_artifact, verify_synthesis_citations
+    from .citation_verification import verify_body_citations, verify_export_artifact
     from .deliverable_classes import get_config_for_pipeline
     from .deliverable_pipeline import PipelineStage
 
@@ -981,12 +981,17 @@ def doctor_pipeline(pipeline: "Any") -> DoctorReport:  # DeliverablePipeline
         f"completed stage:   {completed}",
     ]
 
-    # ── Citation check (when synthesis is present and class requires citations) ──
+    # ── Citation check — use most authoritative stage text available ──────────
+    # Revision is authoritative over synthesis because it reflects the final
+    # edited content (same principle as build_export_bundle using revised_body).
     if pipeline.synthesis is not None:
         config = get_config_for_pipeline(pipeline)
         if config is not None:
-            violations = verify_synthesis_citations(pipeline.synthesis, config)
-            for v in violations:
+            if pipeline.revision is not None:
+                authoritative_body = pipeline.revision.revised_body
+            else:
+                authoritative_body = pipeline.synthesis.body
+            for v in verify_body_citations(authoritative_body, config):
                 issues.append(f"citation: {v.message}")
 
     # ── Export artifact check ──────────────────────────────────────────────────
