@@ -31,6 +31,8 @@ from .plan_strategy import PlanStrategy
 from .prompts import render
 from .workflows.plan_states import PlanState
 from .workflows.transitions import WorkflowTransitionEmitter
+from .workflows.guidance import GUIDANCE_FILENAME, GuidanceStore, format_guidance_block
+from .workflows.gates import GateTrigger
 
 log = logging.getLogger("autoresearch")
 
@@ -71,6 +73,12 @@ class PlanRefiner:
         strategy = PlanStrategy(self._config, self._backends)
         state = self._init_state()
 
+        guidance_context = ""
+        if self._resume:
+            store = GuidanceStore(self._output_dir)
+            records = store.load_for_target("plan", "verifier", GateTrigger.AFTER)
+            guidance_context = format_guidance_block(records)
+
         ctx = PlanCycleContext(
             call_with=self._invoke,
             invoke_for_strategy=self._invoke,
@@ -81,6 +89,7 @@ class PlanRefiner:
             update_issue_registry=lambda issues: None,
             audit_trail=self._audit_trail,
             artifact_root=self._output_dir,
+            guidance_context=guidance_context,
         )
 
         self._audit_trail.emit(
@@ -321,10 +330,13 @@ class PlanRefiner:
 
     def _handle_hitl_pause(self, state: PlanCycleState) -> None:
         pending_path = self._run_dir / "pending_questions.json"
+        guidance_path = self._output_dir / GUIDANCE_FILENAME
         write_pending_questions(state.pending_human_inputs, pending_path)
         print(
             f"\n[plan] {len(state.pending_human_inputs)} question(s) require human input.\n"
             f"Fill in answers in: {pending_path}\n"
+            f"Optional: add steering guidance in: {guidance_path}\n"
+            f"  (workflow=plan, target=verifier, gate_trigger=after)\n"
             f"Then re-run with --resume to continue.\n"
         )
 

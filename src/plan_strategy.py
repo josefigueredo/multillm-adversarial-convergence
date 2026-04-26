@@ -106,6 +106,7 @@ class PlanStrategy:
         invoke: InvokeFn,
         *,
         human_decisions: list[HumanDecision],
+        guidance_context: str = "",
     ) -> str:
         """Generate the initial plan (cycle 1) or apply validated patches (cycle N+)."""
         human_block = _format_human_decisions(human_decisions)
@@ -120,6 +121,8 @@ class PlanStrategy:
             patches=patches_block,
             human_decisions=human_block,
         )
+        if guidance_context:
+            prompt = guidance_context + "\n\n---\n\n" + prompt
         resp = invoke(prompt, self._builder, self._builder_name)
         return resp.text
 

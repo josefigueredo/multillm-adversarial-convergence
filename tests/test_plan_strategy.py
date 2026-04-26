@@ -119,6 +119,40 @@ def test_run_builder_calls_invoke_once():
     assert backend.run.call_count == 1
 
 
+def test_run_builder_prepends_guidance_context():
+    backend = _make_backend("# Plan")
+    s = _make_strategy({"claude-cli": backend})
+    captured: list[str] = []
+
+    def capturing_call(prompt, b, name):
+        captured.append(prompt)
+        return b.run(prompt, None)
+
+    guidance = "## Human Guidance\n### Steer (verifier, after)\nPrioritise test coverage."
+    s.run_builder("", [], capturing_call, human_decisions=[], guidance_context=guidance)
+    assert captured[0].startswith(guidance)
+    assert "Prioritise test coverage." in captured[0]
+
+
+def test_run_builder_empty_guidance_context_unchanged():
+    backend = _make_backend("# Plan")
+    s = _make_strategy({"claude-cli": backend})
+    baseline: list[str] = []
+    with_empty: list[str] = []
+
+    def cap_baseline(prompt, b, name):
+        baseline.append(prompt)
+        return b.run(prompt, None)
+
+    def cap_empty(prompt, b, name):
+        with_empty.append(prompt)
+        return b.run(prompt, None)
+
+    s.run_builder("", [], cap_baseline, human_decisions=[])
+    s.run_builder("", [], cap_empty, human_decisions=[], guidance_context="")
+    assert baseline[0] == with_empty[0]
+
+
 # ── run_challenger ───────────────────────────────────────────────────────────
 
 def test_run_challenger_parses_json():

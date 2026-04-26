@@ -54,6 +54,7 @@ class PlanCycleContext(BaseContext):
     update_issue_registry: Callable[[list[Any]], None]
     audit_trail: Any
     artifact_root: Path
+    guidance_context: str = ""
 
 
 def _plan_should_stop(state: PlanCycleState, config: PlanConfig) -> bool:
@@ -116,6 +117,7 @@ def run_plan_cycle(
             state.pending_patches,
             ctx.call_with,
             human_decisions=ctx.human_decisions,
+            guidance_context=ctx.guidance_context,
         )
     state.plan = plan
     state.plan_versions.append(plan)

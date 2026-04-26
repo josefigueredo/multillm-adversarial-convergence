@@ -71,6 +71,7 @@ class CycleContext(BaseContext):
     update_issue_registry: Callable[[list[Any]], None]
     audit_trail: Any
     artifact_root: Path
+    guidance_context: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +142,7 @@ def run_cycle(
             state.pending_patches,
             ctx.call_with,
             human_decisions=ctx.human_decisions,
+            guidance_context=ctx.guidance_context,
         )
     state.prd = prd
     state.prd_versions.append(prd)
