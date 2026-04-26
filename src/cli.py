@@ -161,6 +161,35 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Validate config, backend wiring, and planned outputs without running plan refinement.",
     )
 
+    # ── implement subcommand ─────────────────────────────────────────────────
+    implement_p = subparsers.add_parser(
+        "implement",
+        help="Run an adversarial code-task implementation loop against a target repo.",
+    )
+    implement_p.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to an implement config YAML.",
+    )
+    implement_p.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output directory for patches and artifacts. Defaults to output/<config-stem>/.",
+    )
+    implement_p.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from a previous paused implement run.",
+    )
+    implement_p.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help="Validate config and target contract without running the implement loop.",
+    )
+
     # ── explain subcommand ───────────────────────────────────────────────────
     explain_p = subparsers.add_parser(
         "explain",
@@ -221,6 +250,42 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
+    from pathlib import Path as _Path
+
+    from .implement_loop import ImplementTarget
+    from .implement_runner import ImplementRunner
+
+    config_path: _Path = args.config
+    if not config_path.exists():
+        log.error("Implement config file not found: %s", config_path)
+        return 1
+
+    output_dir: _Path = args.output or (_Path("output") / config_path.stem)
+
+    # Default target: patch_only against current directory (operator must
+    # override via config for a real target repo — Step 2 concern).
+    target = ImplementTarget(
+        path=_Path("."),
+        execution_level="patch_only",
+    )
+
+    if args.dry_run:
+        print(f"implement dry-run: config={config_path}, output={output_dir}")
+        print(f"  target.path:            {target.path}")
+        print(f"  target.execution_level: {target.execution_level}")
+        return 0
+
+    runner = ImplementRunner(
+        config=None,        # full ImplementConfig parsing is a Step-2 concern
+        backends={},
+        target=target,
+        output_dir=output_dir,
+        resume=args.resume,
+    )
+    return runner.run()
 
 
 def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
@@ -503,6 +568,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_refine(args, log)
     if args.subcommand == "plan":
         return _run_plan(args, log)
+    if args.subcommand == "implement":
+        return _run_implement(args, log)
     if args.subcommand == "explain":
         if args.explain_subcommand == "config":
             return _run_explain_config(args, log)
