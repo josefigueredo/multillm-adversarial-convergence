@@ -14,6 +14,7 @@ Covers:
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -291,10 +292,19 @@ class TestCliImplementSubcommand:
         args = parser.parse_args(["implement", "--config", "foo.yaml", "--resume"])
         assert args.resume is True
 
-    def test_non_dry_run_with_valid_config_proceeds(self, tmp_path, capsys):
-        """Non-dry-run implement with a valid config but no backends returns 1 (fail-fast)."""
+    @patch("src.cli.get_backends")
+    @patch("src.implement_runner.ImplementRunner.run")
+    def test_non_dry_run_with_valid_config_proceeds(
+        self, mock_run, mock_get_backends, tmp_path, capsys
+    ):
+        """Non-dry-run implement with a valid config and an available backend runs the loop."""
         from src.cli import _run_implement
         import argparse, logging
+
+        mock_backend = MagicMock()
+        mock_backend.check_available.return_value = True
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+        mock_run.return_value = 0
 
         config_file = tmp_path / "impl.yaml"
         config_file.write_text(f"target:\n  path: {tmp_path}\n")
@@ -306,7 +316,8 @@ class TestCliImplementSubcommand:
             dry_run=False,
         )
         rc = _run_implement(args, logging.getLogger("test"))
-        assert rc == 1  # no backends configured → fail-fast
+        assert rc == 0  # runner ran successfully
+        mock_run.assert_called_once()
 
     def test_non_dry_run_with_missing_target_path_returns_1(self, tmp_path, capsys):
         """Non-dry-run with a config that omits target.path must fail with rc == 1."""
@@ -941,3 +952,142 @@ class TestImplementStrategySignatures:
         import inspect
         sig = inspect.signature(ImplementStrategy.run_arbitrator)
         assert "invoke" in sig.parameters
+
+
+# ---------------------------------------------------------------------------
+# Step 3 refinement — ImplementConfig backends / providers contract
+# ---------------------------------------------------------------------------
+
+class TestImplementConfigBackendsContract:
+    """ImplementConfig must parse and expose a backends/providers section."""
+
+    def _make_config_file(self, tmp_path, extra_yaml: str = "") -> object:
+        target = tmp_path / "repo"
+        target.mkdir()
+        cfg_file = tmp_path / "impl.yaml"
+        cfg_file.write_text(f"target:\n  path: {target}\n{extra_yaml}")
+        return cfg_file
+
+    def test_default_backends_is_BackendsConfig(self, tmp_path):
+        from src.implement_loop import ImplementConfig, ImplementTarget
+        from src.config import BackendsConfig
+        cfg = ImplementConfig(target=ImplementTarget(path=tmp_path))
+        assert isinstance(cfg.backends, BackendsConfig)
+
+    def test_default_providers_is_empty_dict(self, tmp_path):
+        from src.implement_loop import ImplementConfig, ImplementTarget
+        cfg = ImplementConfig(target=ImplementTarget(path=tmp_path))
+        assert cfg.providers == {}
+
+    def test_from_yaml_default_backends_primary_is_claude_cli(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._make_config_file(tmp_path))
+        assert cfg.backends.primary == "claude-cli"
+
+    def test_from_yaml_parses_backends_primary(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._make_config_file(
+            tmp_path,
+            "backends:\n  primary: claude-cli\n",
+        ))
+        assert cfg.backends.primary == "claude-cli"
+
+    def test_from_yaml_parses_multiple_backend_names(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._make_config_file(
+            tmp_path,
+            "backends:\n  primary: claude-cli\n  judge: gemini-cli\n",
+        ))
+        assert cfg.backends.primary == "claude-cli"
+        assert cfg.backends.judge == "gemini-cli"
+
+    def test_all_backend_names_returns_set(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._make_config_file(tmp_path))
+        names = cfg.backends.all_backend_names()
+        assert isinstance(names, (set, frozenset))
+        assert "claude-cli" in names
+
+
+# ---------------------------------------------------------------------------
+# Step 3 refinement — CLI backend wiring for implement
+# ---------------------------------------------------------------------------
+
+class TestCliImplementBackendWiring:
+    """_run_implement() must load and pass real backends, not always {}."""
+
+    def _make_args(self, config_file, dry_run=False, output=None, resume=False):
+        import argparse
+        return argparse.Namespace(
+            config=config_file,
+            output=output,
+            resume=resume,
+            dry_run=dry_run,
+        )
+
+    def _make_config_file(self, tmp_path, extra_yaml: str = "") -> object:
+        target = tmp_path / "repo"
+        target.mkdir()
+        cfg_file = tmp_path / "impl.yaml"
+        cfg_file.write_text(f"target:\n  path: {target}\n{extra_yaml}")
+        return cfg_file
+
+    @patch("src.cli.get_backends")
+    @patch("src.implement_runner.ImplementRunner.run")
+    def test_valid_config_with_available_backend_reaches_runner(
+        self, mock_run, mock_get_backends, tmp_path
+    ):
+        """With a working backend the runner is called and its exit code returned."""
+        import logging
+        from src.cli import _run_implement
+
+        mock_backend = MagicMock()
+        mock_backend.check_available.return_value = True
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+        mock_run.return_value = 0
+
+        cfg_file = self._make_config_file(tmp_path)
+        rc = _run_implement(self._make_args(cfg_file), logging.getLogger("test"))
+
+        assert rc == 0
+        mock_run.assert_called_once()
+
+    @patch("src.cli.get_backends")
+    def test_unavailable_backend_returns_1(self, mock_get_backends, tmp_path):
+        """Unavailable backend must return rc=1 before reaching the runner."""
+        import logging
+        from src.cli import _run_implement
+
+        mock_backend = MagicMock()
+        mock_backend.check_available.return_value = False
+        mock_backend.cli_executable.return_value = "claude"
+        mock_backend.name = "claude-cli"
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+
+        cfg_file = self._make_config_file(tmp_path)
+        rc = _run_implement(self._make_args(cfg_file), logging.getLogger("test"))
+
+        assert rc == 1
+
+    @patch("src.cli.get_backends")
+    @patch("src.implement_runner.ImplementRunner.run")
+    def test_runner_receives_non_empty_backends(
+        self, mock_run, mock_get_backends, tmp_path
+    ):
+        """ImplementRunner must be constructed with the resolved backends dict."""
+        import logging
+        from src.cli import _run_implement
+
+        mock_backend = MagicMock()
+        mock_backend.check_available.return_value = True
+        mock_get_backends.return_value = {"claude-cli": mock_backend}
+        mock_run.return_value = 0
+
+        cfg_file = self._make_config_file(tmp_path)
+
+        with patch("src.implement_runner.ImplementRunner.__init__", return_value=None) as mock_init:
+            _run_implement(self._make_args(cfg_file), logging.getLogger("test"))
+
+        call_kwargs = mock_init.call_args.kwargs
+        assert call_kwargs["backends"] != {}
+        assert "claude-cli" in call_kwargs["backends"]

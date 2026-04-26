@@ -257,6 +257,7 @@ def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
 
     from .implement_loop import ImplementConfig
     from .implement_runner import ImplementRunner
+    from .provider_instances import instantiate_provider_backends
 
     config_path: _Path = args.config
     if not config_path.exists():
@@ -284,9 +285,24 @@ def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
         print(f"  target.allowed_roots:   {roots_display}")
         return 0
 
+    if impl_config.providers:
+        backends = instantiate_provider_backends(impl_config.providers, impl_config.backends)
+    else:
+        all_names = impl_config.backends.all_backend_names()
+        backends = get_backends(all_names)
+
+    for name, be in backends.items():
+        if not be.check_available():
+            log.error(
+                "%s CLI not found or not responding. "
+                "Ensure '%s --version' works from the terminal.",
+                name, be.cli_executable(),
+            )
+            return 1
+
     runner = ImplementRunner(
         config=impl_config,
-        backends={},
+        backends=backends,
         output_dir=output_dir,
         resume=args.resume,
     )

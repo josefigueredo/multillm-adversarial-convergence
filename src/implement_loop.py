@@ -26,6 +26,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from .config import (
+    BackendsConfig,
+    ProviderConfig,
+    _parse_backends_config,
+    _parse_providers_config,
+    _validate_provider_references,
+)
 from .run_state import BaseContext
 from .workflows.implement_states import ImplementState
 from .workflows.transitions import WorkflowTransitionEmitter
@@ -115,6 +122,8 @@ class ImplementConfig:
     task_description: str = ""
     max_cycles: int = 5
     convergence_cycles: int = 1
+    backends: BackendsConfig = field(default_factory=BackendsConfig)
+    providers: dict[str, ProviderConfig] = field(default_factory=dict)
 
     @classmethod
     def from_yaml(cls, path: Path) -> "ImplementConfig":
@@ -199,6 +208,11 @@ class ImplementConfig:
         max_cycles = int(raw.get("max_cycles", 5))
         task_description = str(raw.get("task_description", "") or "")
 
+        # Backend / provider config (mirrors DocumentConfig / PlanConfig pattern)
+        providers = _parse_providers_config(raw.get("providers", {}))
+        backends_config = _parse_backends_config(raw.get("backends", {}))
+        _validate_provider_references(backends_config, providers)
+
         return cls(
             target=ImplementTarget(
                 path=target_path,
@@ -208,6 +222,8 @@ class ImplementConfig:
             task_description=task_description,
             max_cycles=max_cycles,
             convergence_cycles=convergence_cycles,
+            backends=backends_config,
+            providers=providers,
         )
 
 
