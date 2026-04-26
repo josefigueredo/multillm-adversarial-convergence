@@ -372,7 +372,7 @@ class TestDeliverablePipeline:
     def test_to_dict_has_expected_keys(self):
         p = self._pipeline()
         d = p.to_dict()
-        assert {"topic", "synthesis", "revision", "package", "export"} <= d.keys()
+        assert {"topic", "synthesis", "revision", "package", "export", "deliverable_class"} <= d.keys()
 
     def test_to_dict_from_dict_round_trip_empty(self):
         from src.deliverable_pipeline import DeliverablePipeline

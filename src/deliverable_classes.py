@@ -212,8 +212,21 @@ def validate_synthesis_for_class(
 def create_pipeline(topic: str, deliverable_class: DeliverableClass) -> DeliverablePipeline:
     """Return a fresh :class:`~src.deliverable_pipeline.DeliverablePipeline` for *topic*.
 
-    The returned pipeline starts at ``PipelineStage.PENDING``.  Retrieve
-    the class-specific config via :data:`CLASS_CONFIGS` to apply validation
-    and defaults as the pipeline advances.
+    The returned pipeline starts at ``PipelineStage.PENDING`` and carries
+    the deliverable class identity in
+    :attr:`~src.deliverable_pipeline.DeliverablePipeline.deliverable_class`
+    so later stages can retrieve the governing config without re-supplying
+    the class externally.
     """
-    return DeliverablePipeline(topic=topic)
+    return DeliverablePipeline(topic=topic, deliverable_class=deliverable_class.value)
+
+
+def get_config_for_pipeline(pipeline: DeliverablePipeline) -> DeliverableClassConfig | None:
+    """Return the :class:`DeliverableClassConfig` associated with *pipeline*.
+
+    Returns ``None`` if the pipeline was not created with a deliverable class
+    (e.g., constructed directly with ``DeliverablePipeline(topic=...)``).
+    """
+    if pipeline.deliverable_class is None:
+        return None
+    return CLASS_CONFIGS[DeliverableClass(pipeline.deliverable_class)]

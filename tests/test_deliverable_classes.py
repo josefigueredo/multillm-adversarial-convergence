@@ -270,3 +270,34 @@ class TestCreatePipeline:
         for cls in DeliverableClass:
             p = create_pipeline("topic", cls)
             assert p.topic == "topic"
+
+    def test_paper_pipeline_remembers_it_is_paper(self):
+        from src.deliverable_classes import DeliverableClass, create_pipeline
+        p = create_pipeline("LLM Safety", DeliverableClass.PAPER)
+        assert p.deliverable_class == DeliverableClass.PAPER.value
+
+    def test_executive_brief_pipeline_remembers_class(self):
+        from src.deliverable_classes import DeliverableClass, create_pipeline
+        p = create_pipeline("AI Ethics", DeliverableClass.EXECUTIVE_BRIEF)
+        assert p.deliverable_class == DeliverableClass.EXECUTIVE_BRIEF.value
+
+    def test_config_retrievable_from_pipeline_without_resupplying_class(self):
+        from src.deliverable_classes import (
+            DeliverableClass, create_pipeline, get_config_for_pipeline, PAPER_CONFIG,
+        )
+        p = create_pipeline("T", DeliverableClass.PAPER)
+        config = get_config_for_pipeline(p)
+        assert config == PAPER_CONFIG
+
+    def test_all_classes_config_retrievable(self):
+        from src.deliverable_classes import DeliverableClass, create_pipeline, get_config_for_pipeline, CLASS_CONFIGS
+        for cls in DeliverableClass:
+            p = create_pipeline("topic", cls)
+            config = get_config_for_pipeline(p)
+            assert config == CLASS_CONFIGS[cls]
+
+    def test_pipeline_without_class_returns_none_config(self):
+        from src.deliverable_classes import get_config_for_pipeline
+        from src.deliverable_pipeline import DeliverablePipeline
+        p = DeliverablePipeline(topic="bare pipeline")
+        assert get_config_for_pipeline(p) is None

@@ -223,6 +223,7 @@ class DeliverablePipeline:
     revision: RevisionArtifact | None = None
     package: PackageArtifact | None = None
     export: ExportArtifact | None = None
+    deliverable_class: str | None = None  # DeliverableClass.value when set via create_pipeline()
 
     def __post_init__(self) -> None:
         if not self.topic:
@@ -303,6 +304,7 @@ class DeliverablePipeline:
     def to_dict(self) -> dict[str, Any]:
         return {
             "topic": self.topic,
+            "deliverable_class": self.deliverable_class,
             "synthesis": self.synthesis.to_dict() if self.synthesis else None,
             "revision": self.revision.to_dict() if self.revision else None,
             "package": self.package.to_dict() if self.package else None,
@@ -313,6 +315,7 @@ class DeliverablePipeline:
     def from_dict(cls, d: dict[str, Any]) -> "DeliverablePipeline":
         return cls(
             topic=d["topic"],
+            deliverable_class=d.get("deliverable_class"),
             synthesis=SynthesisArtifact.from_dict(d["synthesis"]) if d.get("synthesis") else None,
             revision=RevisionArtifact.from_dict(d["revision"]) if d.get("revision") else None,
             package=PackageArtifact.from_dict(d["package"]) if d.get("package") else None,
