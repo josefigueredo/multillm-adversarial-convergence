@@ -206,3 +206,48 @@ class TestExecutionPlan:
                 steps=(ExecutionStep(command="x"),),
                 target=TargetContext(working_dir=phantom),
             )
+
+
+# ---------------------------------------------------------------------------
+# MM10 Step 1 refinement — TargetContext deep immutability
+# ---------------------------------------------------------------------------
+
+class TestTargetContextImmutability:
+    def test_env_vars_cannot_be_mutated_after_construction(self, tmp_path):
+        from src.execution_plan import TargetContext
+        ctx = TargetContext(working_dir=tmp_path, env_vars={"A": "1"})
+        with pytest.raises((TypeError, AttributeError)):
+            ctx.env_vars["B"] = "2"  # type: ignore[index]
+
+    def test_env_vars_readable_as_mapping(self, tmp_path):
+        from src.execution_plan import TargetContext
+        ctx = TargetContext(working_dir=tmp_path, env_vars={"X": "hello"})
+        assert ctx.env_vars["X"] == "hello"
+
+    def test_env_vars_keys_iterable(self, tmp_path):
+        from src.execution_plan import TargetContext
+        ctx = TargetContext(working_dir=tmp_path, env_vars={"A": "1", "B": "2"})
+        assert set(ctx.env_vars.keys()) == {"A", "B"}
+
+    def test_source_dict_mutation_does_not_affect_context(self, tmp_path):
+        from src.execution_plan import TargetContext
+        original = {"X": "before"}
+        ctx = TargetContext(working_dir=tmp_path, env_vars=original)
+        original["X"] = "after"
+        assert ctx.env_vars["X"] == "before"
+
+    def test_round_trip_preserves_env_vars(self, tmp_path):
+        from src.execution_plan import TargetContext
+        ctx = TargetContext(working_dir=tmp_path, env_vars={"CI": "true", "PORT": "8080"})
+        restored = TargetContext.from_dict(ctx.to_dict())
+        assert restored.env_vars["CI"] == "true"
+        assert restored.env_vars["PORT"] == "8080"
+
+    def test_execution_plan_target_env_vars_immutable(self, tmp_path):
+        from src.execution_plan import ExecutionPlan, ExecutionStep, TargetContext
+        plan = ExecutionPlan(
+            steps=(ExecutionStep(command="pytest"),),
+            target=TargetContext(working_dir=tmp_path, env_vars={"K": "v"}),
+        )
+        with pytest.raises((TypeError, AttributeError)):
+            plan.target.env_vars["EXTRA"] = "injected"  # type: ignore[index]

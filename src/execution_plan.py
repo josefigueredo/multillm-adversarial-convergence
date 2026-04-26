@@ -6,14 +6,16 @@ Defines the explicit contract for a single execution attempt:
 - :class:`ExecutionPlan` — ordered sequence of steps + target context
 
 All objects are frozen dataclasses so callers cannot widen the contract
-after construction.  All support ``to_dict()`` / ``from_dict()`` for
-artifact persistence.
+after construction.  ``TargetContext.env_vars`` is stored as a
+:class:`types.MappingProxyType` so the nested mapping is also immutable.
+All types support ``to_dict()`` / ``from_dict()`` for artifact persistence.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 
@@ -81,14 +83,29 @@ class TargetContext:
     working_dir:
         Filesystem directory in which steps execute.
     env_vars:
-        Extra environment variables to inject.  Keys and values are strings.
+        Extra environment variables to inject.  Returned as an immutable
+        :class:`~types.MappingProxyType` so the env contract cannot be
+        widened after construction.
     description:
         Human-readable label for the environment.
     """
 
     working_dir: Path
-    env_vars: dict[str, str] = field(default_factory=dict)
+    # Stored as MappingProxyType so the nested mapping is genuinely immutable.
+    env_vars: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
     description: str = ""
+
+    def __init__(
+        self,
+        working_dir: Path,
+        env_vars: dict[str, str] | MappingProxyType | None = None,
+        description: str = "",
+    ) -> None:
+        object.__setattr__(self, "working_dir", working_dir)
+        raw = env_vars if env_vars is not None else {}
+        proxy = MappingProxyType(dict(raw))  # copy + freeze
+        object.__setattr__(self, "env_vars", proxy)
+        object.__setattr__(self, "description", description)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a JSON-compatible dict."""
@@ -157,3 +174,4 @@ class ExecutionPlan:
             target=TargetContext.from_dict(data["target"]),
             description=data.get("description", ""),
         )
+
