@@ -441,6 +441,20 @@ class TestImplementConfig:
         with pytest.raises(OSError):
             ImplementConfig.from_yaml(tmp_path / "nonexistent.yaml")
 
+    def test_nonexistent_target_path_raises_value_error(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg_file = self._yaml(tmp_path, "target:\n  path: /this/does/not/exist/ever\n")
+        with pytest.raises(ValueError, match="not exist"):
+            ImplementConfig.from_yaml(cfg_file)
+
+    def test_file_path_as_target_raises_value_error(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        a_file = tmp_path / "somefile.txt"
+        a_file.write_text("hello")
+        cfg_file = self._yaml(tmp_path, f"target:\n  path: {a_file}\n")
+        with pytest.raises(ValueError, match="directory"):
+            ImplementConfig.from_yaml(cfg_file)
+
 
 # ---------------------------------------------------------------------------
 # ImplementTarget — allowed_roots contract

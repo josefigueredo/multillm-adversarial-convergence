@@ -147,6 +147,15 @@ class ImplementConfig:
         if not target_path.is_absolute():
             target_path = (path.parent / target_path).resolve()
 
+        if not target_path.exists():
+            raise ValueError(
+                f"Implement target path does not exist: {target_path}"
+            )
+        if not target_path.is_dir():
+            raise ValueError(
+                f"Implement target path must be a directory, not a file: {target_path}"
+            )
+
         execution_level = target_data.get("execution_level", "patch_only")
         if not isinstance(execution_level, str):
             raise ValueError(
