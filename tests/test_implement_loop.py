@@ -295,3 +295,42 @@ class TestCliImplementSubcommand:
         parser = _build_parser()
         args = parser.parse_args(["implement", "--config", "foo.yaml", "--resume"])
         assert args.resume is True
+
+    def test_non_dry_run_cannot_proceed_without_target_contract(self, tmp_path, capsys):
+        """Non-dry-run implement must fail before fabricating a target path."""
+        from src.cli import _run_implement
+        import argparse, logging
+
+        config_file = tmp_path / "impl.yaml"
+        config_file.write_text("# stub\n")
+
+        args = argparse.Namespace(
+            config=config_file,
+            output=None,
+            resume=False,
+            dry_run=False,
+        )
+        rc = _run_implement(args, logging.getLogger("test"))
+        assert rc == 1
+
+    def test_dry_run_does_not_claim_current_repo_as_target(self, tmp_path, capsys):
+        """dry-run output must not print path='.' or pretend a real target exists."""
+        from src.cli import _run_implement
+        import argparse, logging
+
+        config_file = tmp_path / "impl.yaml"
+        config_file.write_text("# stub\n")
+
+        args = argparse.Namespace(
+            config=config_file,
+            output=None,
+            resume=False,
+            dry_run=True,
+        )
+        rc = _run_implement(args, logging.getLogger("test"))
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "." not in out.split("target contract:")[-1].split("\n")[0], (
+            "dry-run must not expose a fabricated target path"
+        )
+        assert "deferred" in out or "Step 2" in out

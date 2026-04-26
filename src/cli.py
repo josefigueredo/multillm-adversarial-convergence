@@ -255,9 +255,6 @@ def _build_parser() -> argparse.ArgumentParser:
 def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
     from pathlib import Path as _Path
 
-    from .implement_loop import ImplementTarget
-    from .implement_runner import ImplementRunner
-
     config_path: _Path = args.config
     if not config_path.exists():
         log.error("Implement config file not found: %s", config_path)
@@ -265,27 +262,21 @@ def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
 
     output_dir: _Path = args.output or (_Path("output") / config_path.stem)
 
-    # Default target: patch_only against current directory (operator must
-    # override via config for a real target repo — Step 2 concern).
-    target = ImplementTarget(
-        path=_Path("."),
-        execution_level="patch_only",
-    )
-
     if args.dry_run:
+        # Target resolution requires an explicit contract (Step 2).
+        # Do not fabricate a default target path.
         print(f"implement dry-run: config={config_path}, output={output_dir}")
-        print(f"  target.path:            {target.path}")
-        print(f"  target.execution_level: {target.execution_level}")
+        print("  target contract: deferred — explicit target-repo path required (Step 2)")
+        print("  execution level: patch_only (conceptual default)")
         return 0
 
-    runner = ImplementRunner(
-        config=None,        # full ImplementConfig parsing is a Step-2 concern
-        backends={},
-        target=target,
-        output_dir=output_dir,
-        resume=args.resume,
+    # Real execution cannot proceed without an explicit target-repo contract.
+    # Step 2 will add ImplementConfig parsing that supplies the target path.
+    log.error(
+        "implement execution requires an explicit target-repo contract "
+        "(not available until Step 2 — use --dry-run for scaffold verification)"
     )
-    return runner.run()
+    return 1
 
 
 def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
