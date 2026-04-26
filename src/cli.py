@@ -255,28 +255,43 @@ def _build_parser() -> argparse.ArgumentParser:
 def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
     from pathlib import Path as _Path
 
+    from .implement_loop import ImplementConfig
+    from .implement_runner import ImplementRunner
+
     config_path: _Path = args.config
     if not config_path.exists():
         log.error("Implement config file not found: %s", config_path)
         return 1
 
+    try:
+        impl_config = ImplementConfig.from_yaml(config_path)
+    except (ValueError, OSError) as exc:
+        log.error("Invalid implement config: %s", exc)
+        return 1
+
     output_dir: _Path = args.output or (_Path("output") / config_path.stem)
+    target = impl_config.target
 
     if args.dry_run:
-        # Target resolution requires an explicit contract (Step 2).
-        # Do not fabricate a default target path.
+        roots_display = (
+            ", ".join(str(r) for r in target.allowed_roots)
+            if target.allowed_roots
+            else "(all — no roots restricted)"
+        )
         print(f"implement dry-run: config={config_path}, output={output_dir}")
-        print("  target contract: deferred — explicit target-repo path required (Step 2)")
-        print("  execution level: patch_only (conceptual default)")
+        print(f"  target.path:            {target.path}")
+        print(f"  target.execution_level: {target.execution_level}")
+        print(f"  target.allowed_roots:   {roots_display}")
         return 0
 
-    # Real execution cannot proceed without an explicit target-repo contract.
-    # Step 2 will add ImplementConfig parsing that supplies the target path.
-    log.error(
-        "implement execution requires an explicit target-repo contract "
-        "(not available until Step 2 — use --dry-run for scaffold verification)"
+    runner = ImplementRunner(
+        config=impl_config,
+        backends={},
+        target=target,
+        output_dir=output_dir,
+        resume=args.resume,
     )
-    return 1
+    return runner.run()
 
 
 def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:

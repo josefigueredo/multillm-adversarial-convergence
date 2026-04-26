@@ -71,6 +71,107 @@ class ImplementTarget:
                 f"Invalid execution_level '{self.execution_level}'. "
                 f"Must be one of: {', '.join(VALID_EXECUTION_LEVELS)}"
             )
+        for root in self.allowed_roots:
+            root_path = root if isinstance(root, Path) else Path(root)
+            if root_path.is_absolute():
+                raise ValueError(
+                    f"allowed_roots must be relative paths (not absolute): {root}"
+                )
+            if ".." in root_path.parts:
+                raise ValueError(
+                    f"allowed_roots must not contain parent traversal: {root}"
+                )
+
+
+
+# ---------------------------------------------------------------------------
+# Implement config (loaded from YAML)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ImplementConfig:
+    """Top-level configuration for an implement run.
+
+    Attributes
+    ----------
+    target:
+        Explicit target-repo contract: path, execution level, allowed roots.
+    """
+
+    target: ImplementTarget
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> "ImplementConfig":
+        """Load and validate an implement config from a YAML file.
+
+        Parameters
+        ----------
+        path:
+            Path to the config YAML file.
+
+        Raises
+        ------
+        OSError
+            If the file cannot be read.
+        ValueError
+            If the YAML is malformed or the config contract is not satisfied.
+        """
+        import yaml  # lazy import — matches project convention
+
+        try:
+            raw = yaml.safe_load(path.read_text())
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Invalid YAML in implement config: {exc}") from exc
+
+        if not isinstance(raw, dict):
+            raise ValueError(
+                "Implement config must be a YAML mapping at the top level"
+            )
+
+        target_data = raw.get("target")
+        if not isinstance(target_data, dict):
+            raise ValueError(
+                "Implement config must have a 'target' mapping "
+                "(e.g.  target:\\n  path: /path/to/repo)"
+            )
+
+        target_path_str = target_data.get("path")
+        if not target_path_str or not isinstance(target_path_str, str):
+            raise ValueError(
+                "Implement config must specify target.path as a non-empty string"
+            )
+
+        # Resolve relative paths against the config file's own directory so
+        # behaviour is not CWD-dependent.
+        target_path = Path(target_path_str)
+        if not target_path.is_absolute():
+            target_path = (path.parent / target_path).resolve()
+
+        execution_level = target_data.get("execution_level", "patch_only")
+        if not isinstance(execution_level, str):
+            raise ValueError(
+                f"target.execution_level must be a string, got "
+                f"{type(execution_level).__name__!r}"
+            )
+
+        allowed_roots_raw = target_data.get("allowed_roots", [])
+        if not isinstance(allowed_roots_raw, (list, tuple)):
+            raise ValueError(
+                "target.allowed_roots must be a list of relative path strings"
+            )
+        if not all(isinstance(r, str) for r in allowed_roots_raw):
+            raise ValueError(
+                "target.allowed_roots entries must all be strings"
+            )
+        allowed_roots = tuple(Path(r) for r in allowed_roots_raw)
+
+        return cls(
+            target=ImplementTarget(
+                path=target_path,
+                execution_level=execution_level,
+                allowed_roots=allowed_roots,
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
