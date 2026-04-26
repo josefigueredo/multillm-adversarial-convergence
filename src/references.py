@@ -178,6 +178,33 @@ def inject_references_section(markdown: str, references_block: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# References section extraction
+# ---------------------------------------------------------------------------
+
+
+def extract_references_section(markdown: str) -> str:
+    """Return the References/Bibliography section including its heading, or ``''``.
+
+    Extracts from the matched heading to the next heading of the same or
+    higher level, using the same boundary rule as :func:`inject_references_section`.
+    Returns an empty string when no ``References`` or ``Bibliography`` heading
+    is found.
+    """
+    match = REFS_HEADING_RE.search(markdown)
+    if not match:
+        return ""
+    heading_level = len(match.group(0).split()[0])  # count '#' chars
+    after = markdown[match.end():]
+    next_heading_re = re.compile(
+        r"^#{1," + str(heading_level) + r"}\s+\S",
+        re.MULTILINE,
+    )
+    next_match = next_heading_re.search(after)
+    section_body = after[: next_match.start()] if next_match else after
+    return match.group(0) + section_body
+
+
+# ---------------------------------------------------------------------------
 # Filesystem integration
 # ---------------------------------------------------------------------------
 
