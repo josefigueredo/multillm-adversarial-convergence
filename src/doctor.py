@@ -284,6 +284,116 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
     return lines, issues
 
 
+def _hitl_policy_lines(config: "ResearchConfig") -> list[str]:
+    """Return the HITL POLICY section lines for doctor config output."""
+    from src.workflows.gates import GATES_BY_MODE
+
+    mode = config.hitl.intervention_mode
+    gates = GATES_BY_MODE.get(mode, frozenset())
+    lines: list[str] = []
+
+    if not gates:
+        lines.append(
+            f"  intervention_mode: {mode}"
+            "  (fully automated — no human gates active)"
+        )
+        return lines
+
+    lines.append(f"  intervention_mode: {mode}  ({len(gates)} gate(s) active)")
+    lines.append("")
+
+    # Group by workflow order, then sort gates by trigger/target within each
+    for wf in ("research", "refine", "plan", "all"):
+        wf_gates = sorted(
+            [g for g in gates if g.workflow == wf],
+            key=lambda g: (g.trigger.value, g.target),
+        )
+        if not wf_gates:
+            continue
+        lines.append(f"  Gates ({wf}):")
+        for gate in wf_gates:
+            lines.append(
+                f"    {gate.trigger.value:<6} {gate.target:<14} {gate.description}"
+            )
+    return lines
+
+
+def _hitl_artifacts_lines(output_dir: Path) -> tuple[list[str], list[str]]:
+    """Return (section_lines, issues) for HITL run artifacts in doctor output.
+
+    Surfaces:
+    - last_pause.json (gate metadata when a HITL pause is pending)
+    - hitl_guidance.jsonl (guidance provided by operator)
+    - hitl_review_packet.json (structured review packet emitted at pause)
+
+    Issues are emitted when last_pause.json is present — the run cannot
+    auto-resume until the operator provides guidance.
+
+    Pure filesystem read — no side effects.
+    """
+    import json
+
+    from src.workflows.guidance import GUIDANCE_FILENAME
+    from src.workflows.review_packet import REVIEW_PACKET_FILENAME
+
+    last_pause_path = output_dir / ".run" / "last_pause.json"
+    guidance_path = output_dir / GUIDANCE_FILENAME
+    review_packet_path = output_dir / REVIEW_PACKET_FILENAME
+
+    lines: list[str] = ["HITL ARTIFACTS"]
+    issues: list[str] = []
+
+    # --- last_pause.json -------------------------------------------------------
+    if last_pause_path.exists():
+        try:
+            meta = json.loads(last_pause_path.read_text(encoding="utf-8"))
+            workflow = meta.get("workflow", "?")
+            target = meta.get("target", "?")
+            trigger = meta.get("gate_trigger", "?")
+            cycle = meta.get("cycle", "?")
+            lines.append(
+                f"  last_pause.json:         present"
+                f"  (workflow={workflow}, target={target},"
+                f" trigger={trigger}, cycle={cycle})"
+            )
+            lines.append(
+                f"  guidance expectations:   add to {GUIDANCE_FILENAME} with"
+                f" workflow={workflow}, target={target},"
+                f" gate_trigger={trigger}, sequence={cycle}"
+            )
+        except (json.JSONDecodeError, OSError):
+            lines.append("  last_pause.json:         present  (unreadable)")
+        issues.append(
+            "HITL pause pending — run cannot auto-resume without human guidance."
+        )
+    else:
+        lines.append("  last_pause.json:         absent")
+
+    # --- hitl_guidance.jsonl ---------------------------------------------------
+    if guidance_path.exists():
+        count = 0
+        try:
+            for raw_line in guidance_path.read_text(encoding="utf-8").splitlines():
+                if raw_line.strip():
+                    count += 1
+        except OSError:
+            count = -1
+        label = f"{count} record(s)" if count >= 0 else "unreadable"
+        lines.append(f"  hitl_guidance.jsonl:     present  ({label})")
+    else:
+        lines.append("  hitl_guidance.jsonl:     absent")
+
+    # --- hitl_review_packet.json -----------------------------------------------
+    if review_packet_path.exists():
+        lines.append("  hitl_review_packet.json: present")
+    else:
+        lines.append("  hitl_review_packet.json: absent")
+
+    lines.append("")
+    return lines, issues
+
+
+
 def _risk_note_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
     """Return (note_lines, issues) for operator warnings.
 
@@ -354,6 +464,7 @@ def doctor_config_text(config: "ResearchConfig") -> DoctorReport:
     issues.extend(backend_warns)
 
     enforcement_lines = _enforcement_table_lines(config)
+    hitl_lines = _hitl_policy_lines(config)
     coverage_lines, coverage_issues = _tool_coverage_lines(config)
     issues.extend(coverage_issues)
     risk_lines, risk_warns = _risk_note_lines(config)
@@ -369,6 +480,11 @@ def doctor_config_text(config: "ResearchConfig") -> DoctorReport:
     # Security enforcement truth table (first-class section)
     parts.append("SECURITY ENFORCEMENT STATUS")
     parts.extend(enforcement_lines)
+    parts.append("")
+
+    # HITL policy (MM08)
+    parts.append("HITL POLICY")
+    parts.extend(hitl_lines)
     parts.append("")
 
     # Sandbox tool coverage (M5: env shaping, classification, dispatch scope)
@@ -663,6 +779,10 @@ def doctor_output_text(output_dir: Path) -> DoctorReport:
     workflow_lines, workflow_issues = _workflow_state_lines(last_transition)
     issues.extend(workflow_issues)
 
+    # HITL artifacts (MM08) — may add issues for pending pause
+    hitl_artifact_lines, hitl_artifact_issues = _hitl_artifacts_lines(output_dir)
+    issues.extend(hitl_artifact_issues)
+
     # Re-derive health after workflow issues are merged
     health = "OK" if not issues else f"WARNINGS ({len(issues)} issue{'s' if len(issues) != 1 else ''})"
     exit_code = 0 if not issues else 1
@@ -674,6 +794,7 @@ def doctor_output_text(output_dir: Path) -> DoctorReport:
             break
 
     parts.extend(workflow_lines)
+    parts.extend(hitl_artifact_lines)
 
     # Warnings section
     if issues:

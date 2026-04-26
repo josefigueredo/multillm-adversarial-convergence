@@ -123,7 +123,21 @@ def explain_config_text(config: Any, *, config_path: Path | None = None) -> str:
         f"  sandbox.network:     {sb.network_access}",
     ]
 
-    # --- Artifact paths (dry-run preview) --------------------------------------
+    # --- HITL policy (MM08) ---------------------------------------------------
+    from src.workflows.gates import GATES_BY_MODE
+
+    hitl_mode = config.hitl.intervention_mode
+    gate_count = len(GATES_BY_MODE.get(hitl_mode, frozenset()))
+    lines += ["", "HITL POLICY", f"  intervention_mode: {hitl_mode}"]
+    if gate_count == 0:
+        lines.append("  active_gates:      none  (fully automated — no human gates)")
+    else:
+        lines.append(
+            f"  active_gates:      {gate_count} gate(s) active"
+            "  (run doctor config for gate details)"
+        )
+
+    # --- Artifact paths (dry-run preview) -------------------------------------
     stem = config_path.stem if config_path is not None else "run"
     output_dir = Path("output") / stem
     paths = RunPaths.for_output_dir(output_dir)

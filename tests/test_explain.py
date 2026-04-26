@@ -250,3 +250,35 @@ class TestExplainWorkflowContracts:
     def test_shows_human_gate_field(self):
         result = explain_config_text(_make_config())
         assert "gate" in result.lower() or "human_gate" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# HITL policy — explain config
+# ---------------------------------------------------------------------------
+
+class TestExplainHitlPolicy:
+    def test_hitl_policy_section_present(self):
+        result = explain_config_text(_make_config())
+        assert "HITL" in result
+
+    def test_shows_intervention_mode(self):
+        result = explain_config_text(_make_config())
+        # default is full_auto
+        assert "full_auto" in result
+
+    def test_full_auto_shows_no_gates_note(self):
+        result = explain_config_text(_make_config())
+        assert "no human gates" in result or "fully automated" in result or "none" in result.lower()
+
+    def test_non_full_auto_shows_gate_summary(self):
+        from src.config import HitlConfig
+        config = _make_config(hitl=HitlConfig(intervention_mode="co_pilot"))
+        result = explain_config_text(config)
+        assert "co_pilot" in result
+        assert "gate" in result.lower()
+
+    def test_decision_only_shows_in_explain(self):
+        from src.config import HitlConfig
+        config = _make_config(hitl=HitlConfig(intervention_mode="decision_only"))
+        result = explain_config_text(config)
+        assert "decision_only" in result

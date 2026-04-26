@@ -1131,3 +1131,163 @@ class TestDoctorOutputWorkflowState:
         # no workflow transitions → should not add workflow-related warnings
         assert "paused" not in result.text.lower()
         assert "interrupted" not in result.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# HITL policy — doctor config
+# ---------------------------------------------------------------------------
+
+class TestDoctorConfigHitlPolicy:
+    def test_hitl_policy_section_present(self):
+        result = doctor_config_text(_make_config())
+        assert "HITL POLICY" in result.text
+
+    def test_full_auto_shows_intervention_mode(self):
+        result = doctor_config_text(_make_config())
+        assert "full_auto" in result.text
+
+    def test_full_auto_shows_no_active_gates(self):
+        result = doctor_config_text(_make_config())
+        # full_auto → no gates; text should say so
+        assert "no human gates" in result.text or "fully automated" in result.text
+
+    def test_co_pilot_shows_intervention_mode(self):
+        from src.config import HitlConfig
+        config = _make_config(hitl=HitlConfig(intervention_mode="co_pilot"))
+        result = doctor_config_text(config)
+        assert "co_pilot" in result.text
+
+    def test_co_pilot_shows_research_phase_gates(self):
+        from src.config import HitlConfig
+        config = _make_config(hitl=HitlConfig(intervention_mode="co_pilot"))
+        result = doctor_config_text(config)
+        # co_pilot gates research phases before execution
+        assert "hypothesis" in result.text or "execute" in result.text
+
+    def test_step_review_shows_after_trigger(self):
+        from src.config import HitlConfig
+        config = _make_config(hitl=HitlConfig(intervention_mode="step_review"))
+        result = doctor_config_text(config)
+        assert "step_review" in result.text
+        assert "after" in result.text
+
+    def test_decision_only_shows_verifier_or_decide_gate(self):
+        from src.config import HitlConfig
+        config = _make_config(hitl=HitlConfig(intervention_mode="decision_only"))
+        result = doctor_config_text(config)
+        assert "verifier" in result.text or "decide" in result.text
+
+    def test_checkpoint_only_shows_convergence_gate(self):
+        from src.config import HitlConfig
+        config = _make_config(hitl=HitlConfig(intervention_mode="checkpoint_only"))
+        result = doctor_config_text(config)
+        assert "convergence" in result.text or "run_complete" in result.text
+
+    def test_non_full_auto_shows_gate_count(self):
+        from src.config import HitlConfig
+        config = _make_config(hitl=HitlConfig(intervention_mode="co_pilot"))
+        result = doctor_config_text(config)
+        # should mention gate count
+        assert "gate" in result.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# HITL artifacts — doctor output
+# ---------------------------------------------------------------------------
+
+class TestDoctorOutputHitlArtifacts:
+    def test_hitl_artifacts_section_present(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        assert "HITL" in result.text
+
+    def test_no_hitl_artifacts_shows_absent(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        # no HITL files → absent shown for each artifact
+        assert "absent" in result.text.lower() or "none" in result.text.lower()
+
+    def test_last_pause_present_surfaces_gate_metadata(self, tmp_path):
+        import json
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        run_dir = tmp_path / ".run"
+        run_dir.mkdir(exist_ok=True)
+        (run_dir / "last_pause.json").write_text(
+            json.dumps({
+                "cycle": 3, "workflow": "refine",
+                "target": "verifier", "gate_trigger": "after",
+            }),
+            encoding="utf-8",
+        )
+        result = doctor_output_text(tmp_path)
+        assert "verifier" in result.text
+        assert "3" in result.text   # cycle number
+
+    def test_last_pause_adds_issue_and_exit_1(self, tmp_path):
+        import json
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        run_dir = tmp_path / ".run"
+        run_dir.mkdir(exist_ok=True)
+        (run_dir / "last_pause.json").write_text(
+            json.dumps({
+                "cycle": 1, "workflow": "refine",
+                "target": "verifier", "gate_trigger": "after",
+            }),
+            encoding="utf-8",
+        )
+        result = doctor_output_text(tmp_path)
+        assert result.exit_code == 1
+
+    def test_last_pause_shows_guidance_expectations(self, tmp_path):
+        import json
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        run_dir = tmp_path / ".run"
+        run_dir.mkdir(exist_ok=True)
+        (run_dir / "last_pause.json").write_text(
+            json.dumps({
+                "cycle": 2, "workflow": "refine",
+                "target": "verifier", "gate_trigger": "after",
+            }),
+            encoding="utf-8",
+        )
+        result = doctor_output_text(tmp_path)
+        # Should tell operator what fields to fill in guidance file
+        assert "hitl_guidance" in result.text or "guidance" in result.text.lower()
+        assert "sequence" in result.text or "cycle" in result.text.lower()
+
+    def test_guidance_file_present_shows_record_count(self, tmp_path):
+        import json
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        lines = [
+            json.dumps({"workflow": "refine", "target": "verifier",
+                        "gate_trigger": "after", "sequence": 1, "content": "Focus on X"}),
+            json.dumps({"workflow": "refine", "target": "verifier",
+                        "gate_trigger": "after", "sequence": 2, "content": "Also Y"}),
+        ]
+        (tmp_path / "hitl_guidance.jsonl").write_text("\n".join(lines), encoding="utf-8")
+        result = doctor_output_text(tmp_path)
+        assert "hitl_guidance" in result.text or "guidance" in result.text.lower()
+        assert "2" in result.text
+
+    def test_review_packet_present_noted(self, tmp_path):
+        import json
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        (tmp_path / "hitl_review_packet.json").write_text(
+            json.dumps({"workflow": "refine", "cycle": 1}), encoding="utf-8"
+        )
+        result = doctor_output_text(tmp_path)
+        assert "review_packet" in result.text or "hitl_review" in result.text.lower()
+
+    def test_no_last_pause_no_hitl_issue(self, tmp_path):
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        result = doctor_output_text(tmp_path)
+        # With no last_pause.json, no HITL-specific issue should appear
+        assert "HITL pause pending" not in result.text

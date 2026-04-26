@@ -303,17 +303,69 @@ Each run writes to `output/<config-name>/` (or `--output <dir>`):
 | `.run/cycles/cycle_NNN.md` | Per-cycle snapshot (valid issues, clean streak, PRD excerpt) |
 | `.run/PRD_vN.md` | Full PRD snapshot after each cycle |
 | `.run/pending_questions.json` | Deferred human-input questions (when HITL is triggered) |
+| `hitl_guidance.jsonl` | Operator steering guidance added before resuming a paused run |
+| `hitl_review_packet.json` | Structured review packet emitted at every HITL pause point |
+| `.run/last_pause.json` | Gate metadata for the most recent HITL pause (workflow, target, trigger, cycle) |
 
 ## Human-in-the-Loop (HITL)
 
-When a persona raises a question requiring human judgement (scope decisions, external constraints, strategic trade-offs), the cycle pauses and writes the pending questions to `.run/pending_questions.json`.
+### Policy-driven gate model (MM08)
 
-In interactive mode (the default), the CLI prompts you inline. In non-interactive mode (`--no-interactive`), the run exits with code `2`. Fill in your answers, then resume:
+HITL behaviour is controlled by `hitl.intervention_mode` in the config:
+
+| Mode | Description |
+|------|-------------|
+| `full_auto` | Fully automated — no human gates triggered (default) |
+| `checkpoint_only` | Gate at major milestones: Phase-1 convergence and run completion |
+| `decision_only` | Gate after key decisions: research keep/discard (`decide`) and critique verdict (`verifier`) |
+| `co_pilot` | Gate *before* every active phase so a human can steer before each step executes |
+| `step_review` | Gate *after* every active phase so a human can review output before the next phase begins |
+
+Example config:
+
+```yaml
+hitl:
+  intervention_mode: decision_only  # pause after verifier and decide phases
+```
+
+Use `autoresearch doctor config --config <path>` to see all active gates for the configured mode.
+
+### Pause and resume flow
+
+When a gate fires, the run exits with code `2` and emits three artifacts:
+
+- **`hitl_review_packet.json`** — structured summary of the gate that fired, open issues, and candidate decisions for the operator to review
+- **`.run/last_pause.json`** — gate metadata: `workflow`, `target`, `gate_trigger`, `cycle`
+- **`hitl_guidance.jsonl`** — append your steering guidance here before resuming (see below)
+
+The operator can also find deferred persona questions in **`.run/pending_questions.json`** and fill in answers there.
+
+### Providing guidance
+
+Add one or more JSON lines to `hitl_guidance.jsonl` matching the pause gate:
+
+```json
+{"workflow": "refine", "target": "verifier", "gate_trigger": "after", "sequence": 3, "content": "Focus the verifier on consistency issues in section 2."}
+```
+
+Fields:
+- `workflow` — matches the paused workflow (`refine` or `plan`)
+- `target` — phase name from `.run/last_pause.json`
+- `gate_trigger` — `"after"` or `"before"` from `.run/last_pause.json`
+- `sequence` — cycle number from `.run/last_pause.json`
+- `content` — free-form operator steering text
+
+The `sequence` field ensures guidance is injected into the correct resumed step and consumed once — it will not re-appear in later cycles.
+
+### Resume
 
 ```bash
-# After filling in .run/pending_questions.json
+# After filling in hitl_guidance.jsonl and/or .run/pending_questions.json
 uv run python -m src.cli refine --config configs/my_prd.yaml --resume
 ```
+
+Use `autoresearch doctor output --output <dir>` to inspect HITL artifact status and see pending-gate warnings before resuming.
+
 
 ## Project Structure
 
