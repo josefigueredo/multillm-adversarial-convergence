@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 
 from .deliverable_classes import DeliverableClassConfig
 from .deliverable_pipeline import ExportArtifact, SynthesisArtifact
@@ -27,9 +28,6 @@ from .references import REFS_HEADING_RE
 
 # Matches a numbered citation entry: "1. ..." (with optional leading whitespace)
 _CITATION_ENTRY_RE = re.compile(r"^\s*\d+\.\s+\S", re.MULTILINE)
-
-# Minimum ISO 8601 shape: YYYY-MM-DD (optionally followed by time/zone info)
-_ISO8601_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 
 # ---------------------------------------------------------------------------
@@ -159,15 +157,22 @@ def verify_export_artifact(export: ExportArtifact) -> list[VerificationViolation
                 message="ExportArtifact.exported_at is empty or whitespace",
             )
         )
-    elif not _ISO8601_RE.match(exported_at):
-        violations.append(
-            VerificationViolation(
-                code="invalid_exported_at",
-                message=(
-                    f"ExportArtifact.exported_at does not look like an ISO 8601 "
-                    f"timestamp: {export.exported_at!r}"
-                ),
+    else:
+        # Normalise trailing Z (Python < 3.11 fromisoformat doesn't accept it)
+        normalised = exported_at
+        if normalised.endswith("Z"):
+            normalised = normalised[:-1] + "+00:00"
+        try:
+            datetime.fromisoformat(normalised)
+        except ValueError:
+            violations.append(
+                VerificationViolation(
+                    code="invalid_exported_at",
+                    message=(
+                        f"ExportArtifact.exported_at is not a valid ISO 8601 "
+                        f"timestamp: {export.exported_at!r}"
+                    ),
+                )
             )
-        )
 
     return violations

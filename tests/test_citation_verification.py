@@ -169,6 +169,16 @@ class TestVerifyExportArtifactPassing:
         e = _export(exported_at="2024-06-15T12:00:00+03:00")
         assert verify_export_artifact(e) == []
 
+    def test_iso8601_timestamp_without_timezone_accepted(self):
+        from src.citation_verification import verify_export_artifact
+        e = _export(exported_at="2024-06-01T12:00:00")
+        assert verify_export_artifact(e) == []
+
+    def test_iso8601_with_trailing_z_accepted(self):
+        from src.citation_verification import verify_export_artifact
+        e = _export(exported_at="2024-06-01T12:00:00Z")
+        assert verify_export_artifact(e) == []
+
 
 # ---------------------------------------------------------------------------
 # verify_export_artifact — failing cases
@@ -208,6 +218,26 @@ class TestVerifyExportArtifactFailures:
     def test_random_string_exported_at_returns_violation(self):
         from src.citation_verification import verify_export_artifact
         violations = verify_export_artifact(_export(exported_at="not-a-date"))
+        assert any(v.code == "invalid_exported_at" for v in violations)
+
+    def test_invalid_month_returns_violation(self):
+        from src.citation_verification import verify_export_artifact
+        violations = verify_export_artifact(_export(exported_at="2024-13-01"))
+        assert any(v.code == "invalid_exported_at" for v in violations)
+
+    def test_invalid_day_returns_violation(self):
+        from src.citation_verification import verify_export_artifact
+        violations = verify_export_artifact(_export(exported_at="2024-06-40"))
+        assert any(v.code == "invalid_exported_at" for v in violations)
+
+    def test_impossible_calendar_date_returns_violation(self):
+        from src.citation_verification import verify_export_artifact
+        violations = verify_export_artifact(_export(exported_at="2024-99-99"))
+        assert any(v.code == "invalid_exported_at" for v in violations)
+
+    def test_trailing_garbage_after_valid_prefix_returns_violation(self):
+        from src.citation_verification import verify_export_artifact
+        violations = verify_export_artifact(_export(exported_at="2024-12-01 definitely-not-a-timestamp"))
         assert any(v.code == "invalid_exported_at" for v in violations)
 
     def test_both_missing_paths_and_exported_at_returns_two_violations(self):
