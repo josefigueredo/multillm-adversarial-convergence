@@ -204,7 +204,24 @@ def diagnose_plan(
     -------
     list[DiagnosisArtifact]
         Empty list when all steps passed.
+
+    Raises
+    ------
+    ValueError
+        If the number of *results* or *validation_results* does not match
+        the number of steps in *plan*.
     """
+    n = len(plan.steps)
+    if len(results) != n:
+        raise ValueError(
+            f"diagnose_plan: number of results ({len(results)}) does not match "
+            f"number of plan steps ({n})"
+        )
+    if len(validation_results) != n:
+        raise ValueError(
+            f"diagnose_plan: number of validation results ({len(validation_results)}) "
+            f"does not match number of plan steps ({n})"
+        )
     artifacts: list[DiagnosisArtifact] = []
     for step, result, vr in zip(plan.steps, results, validation_results):
         artifact = diagnose_step(step, result, vr)

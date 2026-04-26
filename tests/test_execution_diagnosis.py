@@ -262,3 +262,63 @@ class TestPersistDiagnosis:
         from src.execution_diagnosis import persist_diagnosis
         path = persist_diagnosis([self._artifact()], tmp_path)
         assert path == tmp_path / "diagnosis.json"
+
+
+# ---------------------------------------------------------------------------
+# MM10 Step 3 refinement — diagnose_plan length contract
+# ---------------------------------------------------------------------------
+
+class TestDiagnosePlanLengthContract:
+    def _plan(self, tmp_path, n=2):
+        steps = tuple(ExecutionStep(command=f"step{i}") for i in range(n))
+        return ExecutionPlan(steps=steps, target=_ctx(tmp_path))
+
+    def _vrs(self, n=2):
+        from src.execution_validator import validate_plan
+        # We don't have a real plan for vrs — build them directly.
+        results = [_passing_result() for _ in range(n)]
+        vrs = [validate_step(ExecutionStep(command=f"step{i}"), r) for i, r in enumerate(results)]
+        return results, vrs
+
+    def test_too_few_results_raises(self, tmp_path):
+        from src.execution_diagnosis import diagnose_plan
+        from src.execution_validator import validate_plan
+        plan = self._plan(tmp_path, n=2)
+        results = [_passing_result()]          # only 1 for 2 steps
+        vrs = [validate_step(plan.steps[0], results[0])]
+        with pytest.raises(ValueError, match="results"):
+            diagnose_plan(plan, results, vrs)
+
+    def test_too_many_results_raises(self, tmp_path):
+        from src.execution_diagnosis import diagnose_plan
+        plan = self._plan(tmp_path, n=1)
+        results = [_passing_result(), _passing_result()]  # 2 for 1 step
+        vrs = [validate_step(plan.steps[0], results[0]), validate_step(plan.steps[0], results[1])]
+        with pytest.raises(ValueError, match="results"):
+            diagnose_plan(plan, results, vrs)
+
+    def test_too_few_validation_results_raises(self, tmp_path):
+        from src.execution_diagnosis import diagnose_plan
+        plan = self._plan(tmp_path, n=2)
+        results = [_passing_result(), _passing_result()]
+        vrs = [validate_step(plan.steps[0], results[0])]  # only 1 vr for 2 steps
+        with pytest.raises(ValueError, match="validation"):
+            diagnose_plan(plan, results, vrs)
+
+    def test_too_many_validation_results_raises(self, tmp_path):
+        from src.execution_diagnosis import diagnose_plan
+        plan = self._plan(tmp_path, n=1)
+        results = [_passing_result()]
+        vrs = [validate_step(plan.steps[0], results[0]),
+               validate_step(plan.steps[0], results[0])]  # 2 vrs for 1 step
+        with pytest.raises(ValueError, match="validation"):
+            diagnose_plan(plan, results, vrs)
+
+    def test_matching_lengths_behave_unchanged(self, tmp_path):
+        from src.execution_diagnosis import diagnose_plan
+        plan = self._plan(tmp_path, n=2)
+        results = [_passing_result(), _failing_result(exit_code=1)]
+        vrs = [validate_step(plan.steps[0], results[0]),
+               validate_step(plan.steps[1], results[1])]
+        artifacts = diagnose_plan(plan, results, vrs)
+        assert len(artifacts) == 1
