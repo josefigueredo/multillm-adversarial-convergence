@@ -1351,3 +1351,101 @@ class TestBoundaryEnforcementInRunner:
         assert not _should_stop_implement(state, cfg)
         state.boundary_violations.append("file outside allowed_roots: tests/x.py")
         assert _should_stop_implement(state, cfg)
+
+
+# ---------------------------------------------------------------------------
+# Step 4 refinement — arbitrator patch boundary enforcement
+# ---------------------------------------------------------------------------
+
+class TestArbitratorBoundaryEnforcement:
+    """validate_patch_boundaries must also run on the arbitrator's revised patch."""
+
+    def _make_config(self, tmp_path, allowed_roots=(Path("src"),)):
+        from src.implement_loop import ImplementConfig, ImplementTarget
+        return ImplementConfig(
+            target=ImplementTarget(path=tmp_path, allowed_roots=allowed_roots),
+            task_description="test",
+            max_cycles=5,
+            convergence_cycles=1,
+        )
+
+    def _strategy_builder_ok_arbitrator_bad(self, bad_files):
+        """Builder patch is within bounds; arbitrator returns out-of-bounds patch."""
+        from src.implement_loop import (
+            CandidatePatch, ImplementCritique, VerifiedImplementCritique,
+        )
+        strategy = MagicMock()
+        # Builder: touches a file inside allowed_roots
+        strategy.run_builder.return_value = CandidatePatch(
+            content="good", touched_files=("src/main.py",)
+        )
+        # Challenger: raises a critique
+        strategy.run_challenger.return_value = [
+            ImplementCritique(description="issue", file_ref="src/main.py", raised_by="challenger")
+        ]
+        # Verifier: marks critique as valid
+        strategy.run_verifier.return_value = [
+            VerifiedImplementCritique(
+                description="issue", file_ref="src/main.py", raised_by="challenger", status="valid"
+            )
+        ]
+        # Arbitrator: returns a patch touching files outside allowed_roots
+        strategy.run_arbitrator.return_value = CandidatePatch(
+            content="revised", touched_files=tuple(bad_files)
+        )
+        return strategy
+
+    def test_arbitrator_out_of_bounds_patch_makes_runner_return_1(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        rc = runner.run(_strategy=self._strategy_builder_ok_arbitrator_bad(["docs/outside.md"]))
+        assert rc == 1
+
+    def test_arbitrator_boundary_violation_recorded_in_state(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._strategy_builder_ok_arbitrator_bad(["../README.md"]))
+        assert len(runner.state.boundary_violations) >= 1
+
+    def test_out_of_bounds_arbitrator_patch_not_in_state_patches(self, tmp_path):
+        """The revised patch must not be appended to state.patches on violation."""
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._strategy_builder_ok_arbitrator_bad(["/etc/passwd"]))
+        # Only the builder patch should be in history (the bad revised is rejected)
+        assert all(
+            "/etc/passwd" not in f
+            for p in runner.state.patches
+            for f in p.touched_files
+        )
+
+    def test_in_bounds_arbitrator_patch_accepted_normally(self, tmp_path):
+        """Arbitrator patch within allowed_roots must still be accepted."""
+        from src.implement_loop import (
+            CandidatePatch, ImplementCritique, VerifiedImplementCritique,
+        )
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        strategy = MagicMock()
+        strategy.run_builder.return_value = CandidatePatch(
+            content="v1", touched_files=("src/a.py",)
+        )
+        strategy.run_challenger.return_value = [
+            ImplementCritique(description="fix x", file_ref="src/a.py", raised_by="challenger")
+        ]
+        strategy.run_verifier.return_value = [
+            VerifiedImplementCritique(
+                description="fix x", file_ref="src/a.py", raised_by="challenger", status="valid"
+            )
+        ]
+        # Arbitrator returns a patch within allowed_roots
+        strategy.run_arbitrator.return_value = CandidatePatch(
+            content="v2", touched_files=("src/a.py",)
+        )
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        rc = runner.run(_strategy=strategy)
+        assert rc == 0
+        assert runner.state.boundary_violations == []

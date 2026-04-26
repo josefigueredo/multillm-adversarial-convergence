@@ -499,6 +499,18 @@ def run_implement_cycle(
         revised = strategy.run_arbitrator(
             patch, valid, state.task, ctx.target, invoke=ctx.call_with
         )
+        # 5b. Boundary check on the revised patch — the arbitrator is a
+        #     patch-producing phase and must satisfy the same boundary contract.
+        arb_violations = validate_patch_boundaries(revised, ctx.target)
+        if arb_violations:
+            state.boundary_violations.extend(arb_violations)
+            log.error(
+                "[implement][cycle %03d] BOUNDARY VIOLATION in arbitrator patch — stopping loop: %s",
+                state.cycle, "; ".join(arb_violations),
+            )
+            # Do NOT carry the out-of-bounds revised patch forward.
+            state.current_workflow_state = emitter.current_state
+            return 0, 0, 0
         state.patches.append(revised)
         state.pending_critiques = list(valid)  # carry forward for next builder
     else:
