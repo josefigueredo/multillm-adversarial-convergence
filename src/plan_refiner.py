@@ -33,6 +33,11 @@ from .workflows.plan_states import PlanState
 from .workflows.transitions import WorkflowTransitionEmitter
 from .workflows.guidance import GUIDANCE_FILENAME, GuidanceStore, format_guidance_block
 from .workflows.gates import GateTrigger
+from .workflows.review_packet import (
+    REVIEW_PACKET_FILENAME,
+    build_review_packet,
+    write_review_packet,
+)
 
 log = logging.getLogger("autoresearch")
 
@@ -348,8 +353,17 @@ class PlanRefiner:
             }),
             encoding="utf-8",
         )
+        packet = build_review_packet(
+            workflow="plan",
+            cycle=state.cycle,
+            consecutive_clean_cycles=state.consecutive_clean_cycles,
+            open_issues=state.issue_registry,
+            pending_requests=state.pending_human_inputs,
+        )
+        write_review_packet(packet, self._output_dir / REVIEW_PACKET_FILENAME)
         print(
             f"\n[plan] {len(state.pending_human_inputs)} question(s) require human input.\n"
+            f"Review packet:  {self._output_dir / REVIEW_PACKET_FILENAME}\n"
             f"Fill in answers in: {pending_path}\n"
             f"Optional: add steering guidance in: {guidance_path}\n"
             f"  (workflow=plan, target=verifier, gate_trigger=after, sequence={state.cycle})\n"
