@@ -118,6 +118,7 @@ class ImplementRunner:
                 len(state.boundary_violations), "; ".join(state.boundary_violations),
             )
             self._persist_artifacts(state)
+            self._persist_diagnosis(state)
             return 1
 
         state.converged = (
@@ -181,3 +182,16 @@ class ImplementRunner:
         (self._output_dir / "rollback_notes.json").write_text(
             json.dumps(rollback_data, indent=2), encoding="utf-8"
         )
+
+    def _persist_diagnosis(self, state: TaskState) -> None:
+        """Write ``diagnosis.json`` when a boundary violation stops the run.
+
+        Uses the execution integration adapter to produce a
+        :class:`~src.execution_diagnosis.DiagnosisArtifact` and persists it
+        via :func:`~src.execution_diagnosis.persist_diagnosis`.
+        """
+        from .execution_diagnosis import persist_diagnosis
+        from .execution_integration import diagnose_implement_failure
+
+        artifacts = diagnose_implement_failure(state, self._config)
+        persist_diagnosis(artifacts, self._output_dir)

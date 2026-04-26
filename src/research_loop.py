@@ -310,6 +310,7 @@ def _execute_research(
 
     if not findings:
         log.error("Research call failed.")
+        _emit_research_failure_diagnosis(ctx, dimension)
         return ""
 
     with ctx.audit_trail.step(
@@ -330,6 +331,23 @@ def _execute_research(
         )
 
     return findings
+
+
+def _emit_research_failure_diagnosis(ctx: LoopContext, dimension: str) -> None:
+    """Emit a diagnosis artifact when a research call returns no findings.
+
+    Uses the execution integration adapter so the failure is captured in the
+    same structured way as implement-mode boundary violations.
+    """
+    try:
+        from .execution_integration import diagnose_research_failure
+        artifact = diagnose_research_failure(dimension, ctx.artifact_root)
+        log.warning(
+            "[research][diagnosis] dimension=%r type=%s — %s",
+            dimension, artifact.diagnosis_type, artifact.summary,
+        )
+    except Exception:
+        log.debug("[research][diagnosis] could not emit diagnosis artifact", exc_info=True)
 
 
 def _select_candidate_findings(
