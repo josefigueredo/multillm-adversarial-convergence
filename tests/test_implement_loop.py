@@ -1449,3 +1449,195 @@ class TestArbitratorBoundaryEnforcement:
         rc = runner.run(_strategy=strategy)
         assert rc == 0
         assert runner.state.boundary_violations == []
+
+
+# ---------------------------------------------------------------------------
+# MM09 Step 5 refinement — artifact persistence
+# ---------------------------------------------------------------------------
+
+class TestImplementArtifactPersistence:
+    """ImplementRunner.run() must write structured artifacts to output_dir."""
+
+    def _make_config(self, tmp_path, allowed_roots=(Path("src"),)):
+        from src.implement_loop import ImplementConfig, ImplementTarget
+        return ImplementConfig(
+            target=ImplementTarget(path=tmp_path, allowed_roots=allowed_roots),
+            task_description="Add retry logic",
+            max_cycles=2,
+            convergence_cycles=1,
+        )
+
+    def _converging_strategy(self):
+        """Strategy that converges immediately (no valid critiques)."""
+        from src.implement_loop import CandidatePatch, VerifiedImplementCritique
+        strategy = MagicMock()
+        strategy.run_builder.return_value = CandidatePatch(
+            content="diff ...", touched_files=("src/main.py",)
+        )
+        strategy.run_challenger.return_value = []
+        strategy.run_verifier.return_value = []
+        return strategy
+
+    def _one_critique_strategy(self):
+        """Builder → one valid critique → arbitrator revises → second cycle clean."""
+        from src.implement_loop import (
+            CandidatePatch, ImplementCritique, VerifiedImplementCritique,
+        )
+        strategy = MagicMock()
+        call_count = {"n": 0}
+
+        def builder_side_effect(*a, **kw):
+            call_count["n"] += 1
+            return CandidatePatch(content=f"patch-{call_count['n']}", touched_files=("src/x.py",))
+
+        strategy.run_builder.side_effect = builder_side_effect
+        # Challenger/verifier only active on first call
+        challenger_calls = {"n": 0}
+
+        def challenger_side_effect(*a, **kw):
+            challenger_calls["n"] += 1
+            if challenger_calls["n"] == 1:
+                return [ImplementCritique(description="fix null check", file_ref="src/x.py", raised_by="challenger")]
+            return []
+
+        verifier_calls = {"n": 0}
+
+        def verifier_side_effect(*a, **kw):
+            verifier_calls["n"] += 1
+            if verifier_calls["n"] == 1:
+                return [VerifiedImplementCritique(
+                    description="fix null check", file_ref="src/x.py",
+                    raised_by="challenger", status="valid"
+                )]
+            return []
+
+        strategy.run_challenger.side_effect = challenger_side_effect
+        strategy.run_verifier.side_effect = verifier_side_effect
+        strategy.run_arbitrator.return_value = CandidatePatch(
+            content="revised-patch", touched_files=("src/x.py",)
+        )
+        return strategy
+
+    # ── patches.json ────────────────────────────────────────────────────────
+
+    def test_successful_run_writes_patches_json(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._converging_strategy())
+        assert (tmp_path / "patches.json").exists()
+
+    def test_patches_json_is_valid_json(self, tmp_path):
+        import json
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._converging_strategy())
+        data = json.loads((tmp_path / "patches.json").read_text())
+        assert isinstance(data, list)
+
+    def test_patches_json_records_content_and_files(self, tmp_path):
+        import json
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._converging_strategy())
+        data = json.loads((tmp_path / "patches.json").read_text())
+        assert len(data) >= 1
+        assert "content" in data[0]
+        assert "touched_files" in data[0]
+
+    # ── critiques.json ───────────────────────────────────────────────────────
+
+    def test_successful_run_writes_critiques_json(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._converging_strategy())
+        assert (tmp_path / "critiques.json").exists()
+
+    def test_critiques_json_is_valid_json_list(self, tmp_path):
+        import json
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._converging_strategy())
+        data = json.loads((tmp_path / "critiques.json").read_text())
+        assert isinstance(data, list)
+
+    def test_critiques_json_records_critique_fields(self, tmp_path):
+        import json
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._one_critique_strategy())
+        data = json.loads((tmp_path / "critiques.json").read_text())
+        assert len(data) >= 1
+        assert "description" in data[0]
+        assert "status" in data[0]
+
+    # ── accepted_changes.json ────────────────────────────────────────────────
+
+    def test_successful_run_writes_accepted_changes_json(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._converging_strategy())
+        assert (tmp_path / "accepted_changes.json").exists()
+
+    def test_accepted_changes_only_has_valid_critiques(self, tmp_path):
+        import json
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._one_critique_strategy())
+        data = json.loads((tmp_path / "accepted_changes.json").read_text())
+        assert all(c["status"] == "valid" for c in data)
+
+    # ── rollback_notes.json — safety stop ───────────────────────────────────
+
+    def test_boundary_violation_writes_rollback_notes(self, tmp_path):
+        from src.implement_loop import CandidatePatch
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, allowed_roots=(Path("src"),))
+        strategy = MagicMock()
+        strategy.run_builder.return_value = CandidatePatch(
+            content="bad", touched_files=("docs/outside.md",)
+        )
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=strategy)
+        assert (tmp_path / "rollback_notes.json").exists()
+
+    def test_rollback_notes_records_violations(self, tmp_path):
+        import json
+        from src.implement_loop import CandidatePatch
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, allowed_roots=(Path("src"),))
+        strategy = MagicMock()
+        strategy.run_builder.return_value = CandidatePatch(
+            content="bad", touched_files=("../README.md",)
+        )
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=strategy)
+        data = json.loads((tmp_path / "rollback_notes.json").read_text())
+        assert "boundary_violations" in data
+        assert len(data["boundary_violations"]) >= 1
+
+    def test_clean_run_writes_empty_rollback_notes(self, tmp_path):
+        import json
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._converging_strategy())
+        data = json.loads((tmp_path / "rollback_notes.json").read_text())
+        assert data["boundary_violations"] == []
+
+    # ── output_dir is actually used ──────────────────────────────────────────
+
+    def test_output_dir_is_created_if_missing(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        new_dir = tmp_path / "nested" / "output"
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=new_dir)
+        runner.run(_strategy=self._converging_strategy())
+        assert new_dir.exists()

@@ -12,7 +12,9 @@ implement``.  It mirrors the shape of DocumentRefiner and PlanRefiner:
 
 from __future__ import annotations
 
+import json
 import logging
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -115,6 +117,7 @@ class ImplementRunner:
                 "[implement] stopped due to %d boundary violation(s): %s",
                 len(state.boundary_violations), "; ".join(state.boundary_violations),
             )
+            self._persist_artifacts(state)
             return 1
 
         state.converged = (
@@ -124,4 +127,57 @@ class ImplementRunner:
             "[implement] done — cycles=%d converged=%s patches=%d critiques=%d",
             state.cycle, state.converged, len(state.patches), len(state.critiques),
         )
+        self._persist_artifacts(state)
         return 0
+
+    # ── Artifact persistence ─────────────────────────────────────────────────
+
+    def _persist_artifacts(self, state: TaskState) -> None:
+        """Write structured implement-run artifacts to the output directory.
+
+        Written files:
+        - ``patches.json``         — all candidate patches produced (builder + arbitrator)
+        - ``critiques.json``       — all verified critiques across all cycles
+        - ``accepted_changes.json``— subset of critiques with status ``"valid"``
+        - ``rollback_notes.json``  — boundary violations and safety-stop summary
+        """
+        self._output_dir.mkdir(parents=True, exist_ok=True)
+
+        patches_data = [
+            {
+                "content": p.content,
+                "rationale": p.rationale,
+                "touched_files": list(p.touched_files),
+            }
+            for p in state.patches
+        ]
+        (self._output_dir / "patches.json").write_text(
+            json.dumps(patches_data, indent=2), encoding="utf-8"
+        )
+
+        critiques_data = [
+            {
+                "description": c.description,
+                "file_ref": c.file_ref,
+                "raised_by": c.raised_by,
+                "status": c.status,
+            }
+            for c in state.critiques
+        ]
+        (self._output_dir / "critiques.json").write_text(
+            json.dumps(critiques_data, indent=2), encoding="utf-8"
+        )
+
+        accepted_data = [c for c in critiques_data if c["status"] == "valid"]
+        (self._output_dir / "accepted_changes.json").write_text(
+            json.dumps(accepted_data, indent=2), encoding="utf-8"
+        )
+
+        rollback_data = {
+            "boundary_violations": list(state.boundary_violations),
+            "converged": state.converged,
+            "cycles_run": state.cycle,
+        }
+        (self._output_dir / "rollback_notes.json").write_text(
+            json.dumps(rollback_data, indent=2), encoding="utf-8"
+        )
