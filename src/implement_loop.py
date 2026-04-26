@@ -116,6 +116,10 @@ class ImplementConfig:
         Maximum adversarial cycles.  ``0`` means unlimited.
     convergence_cycles:
         Consecutive clean cycles required to declare convergence.
+    allow_same_repo:
+        When ``True``, allows the target path to be the same repository as
+        this planner/orchestrator.  Defaults to ``False`` (safe) — same-repo
+        self-hosting is a high-risk operation and requires explicit opt-in.
     """
 
     target: ImplementTarget
@@ -124,6 +128,7 @@ class ImplementConfig:
     convergence_cycles: int = 1
     backends: BackendsConfig = field(default_factory=BackendsConfig)
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
+    allow_same_repo: bool = False
 
     @classmethod
     def from_yaml(cls, path: Path) -> "ImplementConfig":
@@ -199,6 +204,25 @@ class ImplementConfig:
             )
         allowed_roots = tuple(Path(r) for r in allowed_roots_raw)
 
+        # Self-hosting safety gate — detect if target_path contains this very repo.
+        # If the orchestrator source file is reachable relative to target_path, then
+        # target_path is an ancestor (or equal to) the planner repo root, which is
+        # self-hosting.  This is disabled by default; opt-in via allow_same_repo: true.
+        allow_same_repo = bool(raw.get("allow_same_repo", False))
+        _orchestrator_file = Path(__file__).resolve()
+        try:
+            _orchestrator_file.relative_to(target_path.resolve())
+            _is_same_repo = True
+        except ValueError:
+            _is_same_repo = False
+
+        if _is_same_repo and not allow_same_repo:
+            raise ValueError(
+                f"Implement target '{target_path}' contains this planner repository. "
+                "Self-hosting is a high-risk operation and is disabled by default. "
+                "Set 'allow_same_repo: true' in your implement config to explicitly opt in."
+            )
+
         # Top-level cycle configuration
         convergence_cycles = int(raw.get("convergence_cycles", 1))
         if convergence_cycles < 1:
@@ -243,6 +267,7 @@ class ImplementConfig:
             convergence_cycles=convergence_cycles,
             backends=backends_config,
             providers=providers,
+            allow_same_repo=allow_same_repo,
         )
 
 
@@ -374,6 +399,7 @@ class TaskState:
     pending_critiques: list[VerifiedImplementCritique] = field(default_factory=list)
     consecutive_clean_cycles: int = 0
     current_workflow_state: ImplementState = ImplementState.IDLE
+    boundary_violations: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -434,6 +460,19 @@ def run_implement_cycle(
     state.patches.append(patch)
     state.pending_critiques = []  # consumed
 
+    # 1b. Boundary safety check — before any further phases, verify the patch
+    #     does not touch files outside allowed_roots.  If violated, record and
+    #     abort the cycle immediately (challenger/verifier/arbitrator skipped).
+    violations = validate_patch_boundaries(patch, ctx.target)
+    if violations:
+        state.boundary_violations.extend(violations)
+        log.error(
+            "[implement][cycle %03d] BOUNDARY VIOLATION — stopping loop: %s",
+            state.cycle, "; ".join(violations),
+        )
+        state.current_workflow_state = emitter.current_state
+        return 0, 0, 0
+
     # 2. Challenger
     emitter.transition(ImplementState.CHALLENGER, cycle=state.cycle)
     log.info("[implement][cycle %03d] challenger starting", state.cycle)
@@ -489,7 +528,60 @@ def run_implement_cycle(
 
 def _should_stop_implement(state: TaskState, config: ImplementConfig) -> bool:
     """Return ``True`` when the implement loop should terminate."""
+    if state.boundary_violations:
+        return True
     if config.max_cycles > 0 and state.cycle >= config.max_cycles:
         return True
     return state.consecutive_clean_cycles >= config.convergence_cycles
 
+
+# ---------------------------------------------------------------------------
+# Patch boundary validation
+# ---------------------------------------------------------------------------
+
+def validate_patch_boundaries(
+    patch: "CandidatePatch", target: "ImplementTarget"
+) -> list[str]:
+    """Return boundary violation descriptions for files outside *allowed_roots*.
+
+    Parameters
+    ----------
+    patch:
+        The patch produced by the builder or arbitrator.
+    target:
+        The implement target contract providing ``allowed_roots``.
+
+    Returns
+    -------
+    list[str]
+        Empty list when the patch is within bounds.  Each entry describes one
+        violation (file path + reason).  A non-empty list means the patch
+        must NOT proceed to apply.
+
+    Notes
+    -----
+    When ``target.allowed_roots`` is empty, no boundaries are declared and all
+    files are considered in-scope (permissive default for configs that omit
+    ``allowed_roots``).  Absolute paths in ``touched_files`` are always
+    violations when ``allowed_roots`` is non-empty, because they cannot be
+    safely compared with relative root constraints.
+    """
+    if not target.allowed_roots:
+        return []
+
+    violations: list[str] = []
+    for file_str in patch.touched_files:
+        p = Path(file_str)
+        if p.is_absolute():
+            violations.append(f"absolute path not permitted in touched_files: {file_str}")
+            continue
+        in_allowed = any(
+            p == root or p.parts[: len(root.parts)] == root.parts
+            for root in target.allowed_roots
+        )
+        if not in_allowed:
+            roots_display = ", ".join(str(r) for r in target.allowed_roots)
+            violations.append(
+                f"file outside allowed_roots [{roots_display}]: {file_str}"
+            )
+    return violations

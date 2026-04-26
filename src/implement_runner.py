@@ -109,7 +109,14 @@ class ImplementRunner:
                 state.consecutive_clean_cycles,
             )
 
-        # Distinguish true convergence from max-cycles stop
+        # Distinguish true convergence from max-cycles stop or boundary violation
+        if state.boundary_violations:
+            log.error(
+                "[implement] stopped due to %d boundary violation(s): %s",
+                len(state.boundary_violations), "; ".join(state.boundary_violations),
+            )
+            return 1
+
         state.converged = (
             state.consecutive_clean_cycles >= self._config.convergence_cycles
         )

@@ -1165,3 +1165,189 @@ class TestImplementConfigProviderBranch:
         yaml_extra = "backends:\n  primary: not-a-real-adapter\n"
         with pytest.raises(ValueError):
             ImplementConfig.from_yaml(self._write_config(tmp_path, yaml_extra))
+
+
+# ===========================================================================
+# MM09 Step 4 — Safety guardrails
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Self-hosting safety gate
+# ---------------------------------------------------------------------------
+
+class TestSelfHostingGuard:
+    """from_yaml() must reject same-repo targets unless allow_same_repo: true."""
+
+    def _repo_root(self):
+        import src.implement_loop as m
+        return Path(m.__file__).parent.parent
+
+    def test_same_repo_target_raises_without_flag(self, tmp_path):
+        cfg_file = tmp_path / "impl.yaml"
+        cfg_file.write_text(f"target:\n  path: {self._repo_root()}\n")
+        with pytest.raises(ValueError, match="[Ss]elf.hosting|[Ss]ame.repo|[Pp]lanner"):
+            from src.implement_loop import ImplementConfig
+            ImplementConfig.from_yaml(cfg_file)
+
+    def test_same_repo_target_accepted_with_allow_flag(self, tmp_path):
+        cfg_file = tmp_path / "impl.yaml"
+        cfg_file.write_text(
+            f"target:\n  path: {self._repo_root()}\nallow_same_repo: true\n"
+        )
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(cfg_file)
+        assert cfg.allow_same_repo is True
+
+    def test_different_repo_always_accepted(self, tmp_path):
+        other = tmp_path / "other_repo"
+        other.mkdir()
+        cfg_file = tmp_path / "impl.yaml"
+        cfg_file.write_text(f"target:\n  path: {other}\n")
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(cfg_file)
+        assert cfg.allow_same_repo is False
+
+    def test_allow_same_repo_defaults_to_false(self, tmp_path):
+        other = tmp_path / "repo"
+        other.mkdir()
+        cfg_file = tmp_path / "impl.yaml"
+        cfg_file.write_text(f"target:\n  path: {other}\n")
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(cfg_file)
+        assert cfg.allow_same_repo is False
+
+
+# ---------------------------------------------------------------------------
+# Patch boundary validation
+# ---------------------------------------------------------------------------
+
+class TestValidatePatchBoundaries:
+    """validate_patch_boundaries(patch, target) -> list[str]."""
+
+    def test_no_allowed_roots_never_violates(self, tmp_path):
+        from src.implement_loop import ImplementTarget, CandidatePatch, validate_patch_boundaries
+        target = ImplementTarget(path=tmp_path)
+        patch = CandidatePatch(content="x", touched_files=("src/main.py", "tests/foo.py"))
+        assert validate_patch_boundaries(patch, target) == []
+
+    def test_file_within_allowed_root_no_violation(self, tmp_path):
+        from src.implement_loop import ImplementTarget, CandidatePatch, validate_patch_boundaries
+        target = ImplementTarget(path=tmp_path, allowed_roots=(Path("src"),))
+        patch = CandidatePatch(content="x", touched_files=("src/main.py",))
+        assert validate_patch_boundaries(patch, target) == []
+
+    def test_file_outside_allowed_root_is_violation(self, tmp_path):
+        from src.implement_loop import ImplementTarget, CandidatePatch, validate_patch_boundaries
+        target = ImplementTarget(path=tmp_path, allowed_roots=(Path("src"),))
+        patch = CandidatePatch(content="x", touched_files=("tests/foo.py",))
+        violations = validate_patch_boundaries(patch, target)
+        assert len(violations) == 1
+        assert "tests/foo.py" in violations[0]
+
+    def test_absolute_path_in_touched_files_is_violation(self, tmp_path):
+        from src.implement_loop import ImplementTarget, CandidatePatch, validate_patch_boundaries
+        target = ImplementTarget(path=tmp_path, allowed_roots=(Path("src"),))
+        patch = CandidatePatch(content="x", touched_files=("/etc/passwd",))
+        violations = validate_patch_boundaries(patch, target)
+        assert len(violations) == 1
+
+    def test_empty_touched_files_no_violation(self, tmp_path):
+        from src.implement_loop import ImplementTarget, CandidatePatch, validate_patch_boundaries
+        target = ImplementTarget(path=tmp_path, allowed_roots=(Path("src"),))
+        patch = CandidatePatch(content="x")
+        assert validate_patch_boundaries(patch, target) == []
+
+    def test_multiple_files_multiple_violations(self, tmp_path):
+        from src.implement_loop import ImplementTarget, CandidatePatch, validate_patch_boundaries
+        target = ImplementTarget(path=tmp_path, allowed_roots=(Path("src"),))
+        patch = CandidatePatch(content="x", touched_files=("tests/a.py", "docs/b.md"))
+        violations = validate_patch_boundaries(patch, target)
+        assert len(violations) == 2
+
+    def test_nested_file_within_root_no_violation(self, tmp_path):
+        from src.implement_loop import ImplementTarget, CandidatePatch, validate_patch_boundaries
+        target = ImplementTarget(path=tmp_path, allowed_roots=(Path("src"),))
+        patch = CandidatePatch(content="x", touched_files=("src/utils/helpers.py",))
+        assert validate_patch_boundaries(patch, target) == []
+
+
+# ---------------------------------------------------------------------------
+# TaskState boundary_violations field
+# ---------------------------------------------------------------------------
+
+class TestTaskStateBoundaryViolations:
+    def test_boundary_violations_defaults_empty(self, tmp_path):
+        from src.implement_loop import TaskState, ImplementTask
+        state = TaskState(task=ImplementTask(description="t"))
+        assert state.boundary_violations == []
+
+
+# ---------------------------------------------------------------------------
+# Boundary enforcement in cycle and runner
+# ---------------------------------------------------------------------------
+
+class TestBoundaryEnforcementInRunner:
+    """Runner must exit 1 and stop when a patch violates allowed_roots."""
+
+    def _make_config(self, tmp_path, allowed_roots=()):
+        from src.implement_loop import ImplementConfig, ImplementTarget
+        target = ImplementTarget(path=tmp_path, allowed_roots=allowed_roots)
+        return ImplementConfig(
+            target=target,
+            task_description="test",
+            max_cycles=5,
+            convergence_cycles=1,
+        )
+
+    def _strategy_touching(self, files):
+        """Mock strategy whose builder returns a patch touching specific files."""
+        from src.implement_loop import CandidatePatch, VerifiedImplementCritique
+        strategy = MagicMock()
+        strategy.run_builder.return_value = CandidatePatch(
+            content="diff", touched_files=tuple(files)
+        )
+        strategy.run_challenger.return_value = []
+        strategy.run_verifier.return_value = []
+        strategy.run_arbitrator.return_value = CandidatePatch(content="diff")
+        return strategy
+
+    def test_boundary_violation_makes_runner_return_1(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, allowed_roots=(Path("src"),))
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        # Patch touches a file outside allowed_roots
+        rc = runner.run(_strategy=self._strategy_touching(["tests/outside.py"]))
+        assert rc == 1
+
+    def test_clean_patch_runner_returns_0(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, allowed_roots=(Path("src"),))
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        rc = runner.run(_strategy=self._strategy_touching(["src/main.py"]))
+        assert rc == 0
+
+    def test_boundary_violation_stops_before_challenger(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, allowed_roots=(Path("src"),))
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        strat = self._strategy_touching(["tests/outside.py"])
+        runner.run(_strategy=strat)
+        strat.run_challenger.assert_not_called()
+
+    def test_boundary_violations_stored_in_state(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, allowed_roots=(Path("src"),))
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._strategy_touching(["tests/outside.py"]))
+        assert len(runner.state.boundary_violations) >= 1
+
+    def test_should_stop_on_boundary_violation(self, tmp_path):
+        from src.implement_loop import _should_stop_implement, TaskState, ImplementTask, ImplementConfig, ImplementTarget
+        cfg = ImplementConfig(
+            target=ImplementTarget(path=tmp_path),
+            max_cycles=10, convergence_cycles=3,
+        )
+        state = TaskState(task=ImplementTask(description="t"))
+        assert not _should_stop_implement(state, cfg)
+        state.boundary_violations.append("file outside allowed_roots: tests/x.py")
+        assert _should_stop_implement(state, cfg)
