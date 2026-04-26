@@ -184,6 +184,17 @@ class RepairLoop:
         RepairOutcome
             Full history of repair attempts and the final state.
         """
+        # Entry-contract: lengths must match plan.steps before anything runs.
+        n = len(plan.steps)
+        if len(initial_results) != n:
+            raise ValueError(
+                f"initial_results length {len(initial_results)} != plan steps {n}"
+            )
+        if len(initial_validations) != n:
+            raise ValueError(
+                f"initial_validations length {len(initial_validations)} != plan steps {n}"
+            )
+
         # Fast path — already passing.
         if all(v.passed for v in initial_validations):
             return RepairOutcome(
