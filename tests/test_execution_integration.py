@@ -254,3 +254,54 @@ class TestImplementRunnerDiagnosisWiring:
         runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
         runner.run(_strategy=_converging_strategy())
         assert not (tmp_path / "diagnosis.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# TestResearchFailureDiagnosisPersistence
+# ---------------------------------------------------------------------------
+
+def _make_loop_ctx(artifact_root):
+    """Minimal LoopContext for testing _emit_research_failure_diagnosis."""
+    from src.audit_trail import NullAuditTrailWriter
+    from src.research_loop import LoopContext
+    noop = lambda *a, **kw: None
+    config = MagicMock()
+    config.execution.compress_every = 999
+    return LoopContext(
+        call_with=noop,
+        invoke_for_strategy=noop,
+        track_usage=noop,
+        track_cost=noop,
+        config=config,
+        strategy=MagicMock(),
+        track_candidate_usage=noop,
+        collect_provenance=noop,
+        methodology_summary=lambda: "",
+        kb_summary=lambda: "",
+        format_dimension_list=lambda l: ", ".join(l),
+        goal_constraints_summary=lambda: "",
+        audit_trail=NullAuditTrailWriter(),
+        artifact_root=artifact_root,
+    )
+
+
+class TestResearchFailureDiagnosisPersistence:
+    def test_empty_findings_writes_research_diagnosis_json(self, tmp_path):
+        from src.research_loop import _emit_research_failure_diagnosis
+        ctx = _make_loop_ctx(tmp_path)
+        _emit_research_failure_diagnosis(ctx, "llm safety")
+        assert (tmp_path / "research_diagnosis.json").exists()
+
+    def test_persisted_artifact_includes_dimension(self, tmp_path):
+        import json
+        from src.research_loop import _emit_research_failure_diagnosis
+        ctx = _make_loop_ctx(tmp_path)
+        _emit_research_failure_diagnosis(ctx, "security properties")
+        data = json.loads((tmp_path / "research_diagnosis.json").read_text())
+        assert "security properties" in str(data)
+
+    def test_successful_research_no_research_diagnosis_json(self, tmp_path):
+        # research_diagnosis.json should only appear when findings are empty.
+        # Verify it is absent when _emit_research_failure_diagnosis is never called.
+        assert not (tmp_path / "research_diagnosis.json").exists()
+

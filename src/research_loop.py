@@ -337,14 +337,22 @@ def _emit_research_failure_diagnosis(ctx: LoopContext, dimension: str) -> None:
     """Emit a diagnosis artifact when a research call returns no findings.
 
     Uses the execution integration adapter so the failure is captured in the
-    same structured way as implement-mode boundary violations.
+    same structured way as implement-mode boundary violations.  The artifact
+    is persisted to ``research_diagnosis.json`` under the run artifact root
+    so operators can inspect it after the run.
     """
     try:
+        import json as _json
         from .execution_integration import diagnose_research_failure
         artifact = diagnose_research_failure(dimension, ctx.artifact_root)
         log.warning(
             "[research][diagnosis] dimension=%r type=%s — %s",
             dimension, artifact.diagnosis_type, artifact.summary,
+        )
+        diag_path = ctx.artifact_root / "research_diagnosis.json"
+        diag_path.parent.mkdir(parents=True, exist_ok=True)
+        diag_path.write_text(
+            _json.dumps(artifact.to_dict(), indent=2), encoding="utf-8"
         )
     except Exception:
         log.debug("[research][diagnosis] could not emit diagnosis artifact", exc_info=True)
