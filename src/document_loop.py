@@ -147,6 +147,7 @@ def run_cycle(
     state.prd = prd
     state.prd_versions.append(prd)
     state.pending_patches = []
+    ctx.guidance_context = ""  # one-shot: inject only into the first builder after resume
     log.info("[refine][cycle %03d] builder completed", state.cycle)
 
     # 2. Challenger

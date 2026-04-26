@@ -122,6 +122,7 @@ def run_plan_cycle(
     state.plan = plan
     state.plan_versions.append(plan)
     state.pending_patches = []
+    ctx.guidance_context = ""  # one-shot: inject only into the first builder after resume
     log.info("[plan][cycle %03d] builder completed", state.cycle)
 
     # 2. Challenger

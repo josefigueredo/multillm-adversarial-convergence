@@ -34,6 +34,7 @@ from .workflows.gates import GateTrigger
 log = logging.getLogger("autoresearch")
 
 EXIT_HUMAN_REQUIRED = 2
+_LAST_PAUSE_FILE = "last_pause.json"
 
 
 class DocumentRefiner:
@@ -73,9 +74,15 @@ class DocumentRefiner:
 
         guidance_context = ""
         if self._resume:
-            store = GuidanceStore(self._output_dir)
-            records = store.load_for_target("refine", "verifier", GateTrigger.AFTER)
-            guidance_context = format_guidance_block(records)
+            pause_file = self._run_dir / _LAST_PAUSE_FILE
+            if pause_file.exists():
+                meta = json.loads(pause_file.read_text(encoding="utf-8"))
+                sequence = meta.get("cycle")
+                store = GuidanceStore(self._output_dir)
+                records = store.load_for_target(
+                    "refine", "verifier", GateTrigger.AFTER, sequence=sequence
+                )
+                guidance_context = format_guidance_block(records)
 
         ctx = CycleContext(
             call_with=self._invoke,
@@ -329,11 +336,20 @@ class DocumentRefiner:
         pending_path = self._run_dir / "pending_questions.json"
         guidance_path = self._output_dir / GUIDANCE_FILENAME
         write_pending_questions(state.pending_human_inputs, pending_path)
+        (self._run_dir / _LAST_PAUSE_FILE).write_text(
+            json.dumps({
+                "cycle": state.cycle,
+                "workflow": "refine",
+                "target": "verifier",
+                "gate_trigger": "after",
+            }),
+            encoding="utf-8",
+        )
         print(
             f"\n[refine] {len(state.pending_human_inputs)} question(s) require human input.\n"
             f"Fill in answers in: {pending_path}\n"
             f"Optional: add steering guidance in: {guidance_path}\n"
-            f"  (workflow=refine, target=verifier, gate_trigger=after)\n"
+            f"  (workflow=refine, target=verifier, gate_trigger=after, sequence={state.cycle})\n"
             f"Then re-run with --resume to continue.\n"
         )
 

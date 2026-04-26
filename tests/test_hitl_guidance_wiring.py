@@ -183,3 +183,108 @@ def test_empty_store_produces_no_guidance_in_prompt(tmp_path):
 
     strategy.run_builder("", [], capture, human_decisions=[], guidance_context=guidance_context)
     assert "## Human Guidance" not in captured[0]
+
+
+# ---------------------------------------------------------------------------
+# 4. Sequence isolation: resume loads only the exact pause sequence
+# ---------------------------------------------------------------------------
+
+def test_sequence_2_resume_excludes_sequence_1_guidance(tmp_path):
+    store = GuidanceStore(tmp_path)
+    store.save(_make_guidance(text="Old guidance from cycle 1.", sequence=1))
+    store.save(_make_guidance(text="New guidance from cycle 2.", sequence=2))
+
+    records_seq2 = store.load_for_target("refine", "verifier", GateTrigger.AFTER, sequence=2)
+    assert len(records_seq2) == 1
+    assert records_seq2[0].guidance_text == "New guidance from cycle 2."
+
+    records_seq1 = store.load_for_target("refine", "verifier", GateTrigger.AFTER, sequence=1)
+    assert len(records_seq1) == 1
+    assert records_seq1[0].guidance_text == "Old guidance from cycle 1."
+
+
+def test_resume_with_no_matching_sequence_gives_empty(tmp_path):
+    store = GuidanceStore(tmp_path)
+    store.save(_make_guidance(text="Guidance for cycle 1.", sequence=1))
+
+    records = store.load_for_target("refine", "verifier", GateTrigger.AFTER, sequence=3)
+    assert records == []
+    assert format_guidance_block(records) == ""
+
+
+# ---------------------------------------------------------------------------
+# 5. One-shot consumption: guidance cleared after first builder call
+# ---------------------------------------------------------------------------
+
+def test_guidance_cleared_after_first_run_cycle():
+    from unittest.mock import MagicMock
+    from src.document_loop import CycleContext, CycleState, run_cycle
+    from src.audit_trail import NullAuditTrailWriter
+    from pathlib import Path
+
+    guidance = "## Human Guidance\n### Steer (verifier, after)\nFocus on clarity."
+    ctx = CycleContext(
+        call_with=lambda *a, **kw: None,
+        invoke_for_strategy=lambda *a, **kw: None,
+        track_usage=lambda *a, **kw: None,
+        track_cost=lambda *a, **kw: None,
+        config=DocumentConfig(topic="T", goal="G"),
+        human_decisions=[],
+        read_prd_section=lambda s: "",
+        update_issue_registry=lambda issues: None,
+        audit_trail=NullAuditTrailWriter(),
+        artifact_root=Path("."),
+        guidance_context=guidance,
+    )
+    state = CycleState()
+    strategy = MagicMock()
+    strategy.run_builder.return_value = "PRD"
+    strategy.run_challenger.return_value = []
+    strategy.run_personas.return_value = []
+    strategy.run_verifier.return_value = []
+    strategy.run_arbitrator.return_value = []
+
+    run_cycle(state, ctx, strategy, interactive=False)
+
+    assert ctx.guidance_context == ""
+    first_kwargs = strategy.run_builder.call_args_list[0][1]
+    assert first_kwargs["guidance_context"] == guidance
+
+
+def test_guidance_not_replayed_in_second_cycle():
+    from unittest.mock import MagicMock
+    from src.document_loop import CycleContext, CycleState, run_cycle
+    from src.audit_trail import NullAuditTrailWriter
+    from pathlib import Path
+
+    guidance = "## Human Guidance\n### Steer\nExpand section 2."
+    ctx = CycleContext(
+        call_with=lambda *a, **kw: None,
+        invoke_for_strategy=lambda *a, **kw: None,
+        track_usage=lambda *a, **kw: None,
+        track_cost=lambda *a, **kw: None,
+        config=DocumentConfig(topic="T", goal="G"),
+        human_decisions=[],
+        read_prd_section=lambda s: "",
+        update_issue_registry=lambda issues: None,
+        audit_trail=NullAuditTrailWriter(),
+        artifact_root=Path("."),
+        guidance_context=guidance,
+    )
+    state = CycleState()
+    strategy = MagicMock()
+    strategy.run_builder.return_value = "PRD"
+    strategy.run_challenger.return_value = []
+    strategy.run_personas.return_value = []
+    strategy.run_verifier.return_value = []
+    strategy.run_arbitrator.return_value = []
+
+    run_cycle(state, ctx, strategy, interactive=False)  # first cycle: uses guidance
+    run_cycle(state, ctx, strategy, interactive=False)  # second cycle: should be empty
+
+    assert strategy.run_builder.call_count == 2
+    first_kwargs = strategy.run_builder.call_args_list[0][1]
+    second_kwargs = strategy.run_builder.call_args_list[1][1]
+    assert first_kwargs["guidance_context"] == guidance
+    assert second_kwargs["guidance_context"] == ""
+
