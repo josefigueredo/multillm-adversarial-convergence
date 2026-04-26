@@ -48,15 +48,22 @@ def _make_request(issue_id="I-01", question="Q?", suggested_answer="A", context=
 # ---------------------------------------------------------------------------
 
 def test_gate_summary_fields():
-    gate = GateSummary(workflow="refine", target="verifier", gate_trigger="after", sequence=3)
+    gate = GateSummary(
+        workflow="refine", target="verifier", gate_trigger="after",
+        target_type="phase", sequence=3,
+    )
     assert gate.workflow == "refine"
     assert gate.target == "verifier"
     assert gate.gate_trigger == "after"
+    assert gate.target_type == "phase"
     assert gate.sequence == 3
 
 
 def test_gate_summary_is_frozen():
-    gate = GateSummary(workflow="refine", target="verifier", gate_trigger="after", sequence=1)
+    gate = GateSummary(
+        workflow="refine", target="verifier", gate_trigger="after",
+        target_type="phase", sequence=1,
+    )
     with pytest.raises((AttributeError, TypeError)):
         gate.workflow = "plan"  # type: ignore[misc]
 
@@ -124,11 +131,58 @@ def test_build_review_packet_gate_fields():
         consecutive_clean_cycles=1,
         open_issues=[],
         pending_requests=[],
+        target="verifier",
+        gate_trigger="after",
+        target_type="phase",
     )
     assert packet.gate.workflow == "plan"
     assert packet.gate.target == "verifier"
     assert packet.gate.gate_trigger == "after"
+    assert packet.gate.target_type == "phase"
     assert packet.gate.sequence == 5
+
+
+def test_build_review_packet_non_verifier_target():
+    packet = build_review_packet(
+        workflow="refine",
+        cycle=2,
+        consecutive_clean_cycles=0,
+        open_issues=[],
+        pending_requests=[],
+        target="builder",
+        gate_trigger="before",
+        target_type="phase",
+    )
+    assert packet.gate.target == "builder"
+    assert packet.gate.gate_trigger == "before"
+
+
+def test_build_review_packet_checkpoint_target():
+    packet = build_review_packet(
+        workflow="refine",
+        cycle=3,
+        consecutive_clean_cycles=2,
+        open_issues=[],
+        pending_requests=[],
+        target="convergence",
+        gate_trigger="after",
+        target_type="checkpoint",
+    )
+    assert packet.gate.target == "convergence"
+    assert packet.gate.target_type == "checkpoint"
+
+
+def test_build_review_packet_default_gate_is_verifier_after_phase():
+    packet = build_review_packet(
+        workflow="refine",
+        cycle=1,
+        consecutive_clean_cycles=0,
+        open_issues=[],
+        pending_requests=[],
+    )
+    assert packet.gate.target == "verifier"
+    assert packet.gate.gate_trigger == "after"
+    assert packet.gate.target_type == "phase"
 
 
 def test_build_review_packet_filters_stale_issues():
@@ -220,6 +274,7 @@ def test_review_packet_to_dict_structure():
         workflow="refine", cycle=2, consecutive_clean_cycles=0,
         open_issues=[_make_issue("I-01", status="valid")],
         pending_requests=[_make_request("I-01", "Q?", "A", "ctx")],
+        target="verifier", gate_trigger="after", target_type="phase",
     )
     d = packet.to_dict()
     assert d["workflow"] == "refine"
@@ -227,6 +282,8 @@ def test_review_packet_to_dict_structure():
     assert d["workflow_state"] == "paused_for_human"
     assert "gate" in d
     assert d["gate"]["target"] == "verifier"
+    assert d["gate"]["gate_trigger"] == "after"
+    assert d["gate"]["target_type"] == "phase"
     assert len(d["open_issues"]) == 1
     assert len(d["candidate_decisions"]) == 1
 

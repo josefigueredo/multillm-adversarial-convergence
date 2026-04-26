@@ -33,6 +33,7 @@ class GateSummary:
     workflow: str
     target: str
     gate_trigger: str
+    target_type: str
     sequence: int
 
 
@@ -115,6 +116,10 @@ def build_review_packet(
     consecutive_clean_cycles: int,
     open_issues: list[Any],
     pending_requests: list[Any],
+    *,
+    target: str = "verifier",
+    gate_trigger: str = "after",
+    target_type: str = "phase",
 ) -> ReviewPacket:
     """Build a :class:`ReviewPacket` from current loop state.
 
@@ -133,11 +138,18 @@ def build_review_packet(
     pending_requests:
         Pending :class:`~src.hitl.HumanInputRequest` objects (``issue_id``,
         ``question``, ``suggested_answer``, ``context``).
+    target:
+        The workflow phase or checkpoint at which the gate fired.
+    gate_trigger:
+        Whether the gate fired ``"before"`` or ``"after"`` the target.
+    target_type:
+        Whether *target* is a ``"phase"`` or ``"checkpoint"``.
     """
     gate = GateSummary(
         workflow=workflow,
-        target="verifier",
-        gate_trigger="after",
+        target=target,
+        gate_trigger=gate_trigger,
+        target_type=target_type,
         sequence=cycle,
     )
     filtered_issues = [

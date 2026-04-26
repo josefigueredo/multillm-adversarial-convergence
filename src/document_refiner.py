@@ -356,6 +356,9 @@ class DocumentRefiner:
             consecutive_clean_cycles=state.consecutive_clean_cycles,
             open_issues=state.issue_registry,
             pending_requests=state.pending_human_inputs,
+            target="verifier",
+            gate_trigger="after",
+            target_type="phase",
         )
         write_review_packet(packet, self._output_dir / REVIEW_PACKET_FILENAME)
         print(
