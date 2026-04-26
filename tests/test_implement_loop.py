@@ -216,13 +216,14 @@ class TestImplementStrategy:
         s = self._make_strategy()
         assert callable(getattr(s, "run_arbitrator", None))
 
-    def test_run_builder_raises_not_implemented(self):
-        from src.implement_loop import ImplementTask, ImplementTarget, CandidatePatch
+    def test_run_builder_raises_runtime_error_when_backends_empty(self):
+        from src.implement_loop import ImplementTask, ImplementTarget
         s = self._make_strategy()
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(RuntimeError, match="backend"):
             s.run_builder(
                 task=ImplementTask(description="t"),
                 target=ImplementTarget(path=Path(".")),
+                invoke=lambda *a, **kw: None,
             )
 
 
@@ -233,33 +234,27 @@ class TestImplementStrategy:
 class TestImplementRunner:
     def test_instantiates(self, tmp_path):
         from src.implement_runner import ImplementRunner
-        from src.implement_loop import ImplementTarget
         runner = ImplementRunner(
             config=None,
             backends={},
-            target=ImplementTarget(path=tmp_path),
             output_dir=tmp_path,
         )
         assert runner is not None
 
     def test_has_run_method(self, tmp_path):
         from src.implement_runner import ImplementRunner
-        from src.implement_loop import ImplementTarget
         runner = ImplementRunner(
             config=None,
             backends={},
-            target=ImplementTarget(path=tmp_path),
             output_dir=tmp_path,
         )
         assert callable(runner.run)
 
     def test_run_returns_int(self, tmp_path):
         from src.implement_runner import ImplementRunner
-        from src.implement_loop import ImplementTarget
         runner = ImplementRunner(
             config=None,
             backends={},
-            target=ImplementTarget(path=tmp_path),
             output_dir=tmp_path,
         )
         result = runner.run()
@@ -297,7 +292,7 @@ class TestCliImplementSubcommand:
         assert args.resume is True
 
     def test_non_dry_run_with_valid_config_proceeds(self, tmp_path, capsys):
-        """Non-dry-run implement with a valid config passes through to the runner (stub returns 0)."""
+        """Non-dry-run implement with a valid config but no backends returns 1 (fail-fast)."""
         from src.cli import _run_implement
         import argparse, logging
 
@@ -311,7 +306,7 @@ class TestCliImplementSubcommand:
             dry_run=False,
         )
         rc = _run_implement(args, logging.getLogger("test"))
-        assert rc == 0
+        assert rc == 1  # no backends configured → fail-fast
 
     def test_non_dry_run_with_missing_target_path_returns_1(self, tmp_path, capsys):
         """Non-dry-run with a config that omits target.path must fail with rc == 1."""
@@ -483,3 +478,466 @@ class TestImplementTargetAllowedRoots:
         from pathlib import Path
         with pytest.raises(ValueError, match="traversal"):
             ImplementTarget(path=tmp_path, allowed_roots=(Path("../outside"),))
+
+
+# ---------------------------------------------------------------------------
+# Step 3 — Adversarial workflow data types
+# ---------------------------------------------------------------------------
+
+class TestImplementCritique:
+    def test_has_description(self):
+        from src.implement_loop import ImplementCritique
+        c = ImplementCritique(description="Missing null check", file_ref="src/foo.py", raised_by="challenger")
+        assert c.description == "Missing null check"
+
+    def test_has_file_ref(self):
+        from src.implement_loop import ImplementCritique
+        c = ImplementCritique(description="d", file_ref="src/foo.py", raised_by="challenger")
+        assert c.file_ref == "src/foo.py"
+
+    def test_has_raised_by(self):
+        from src.implement_loop import ImplementCritique
+        c = ImplementCritique(description="d", file_ref="f", raised_by="challenger")
+        assert c.raised_by == "challenger"
+
+
+class TestVerifiedImplementCritique:
+    def test_has_status_field(self):
+        from src.implement_loop import VerifiedImplementCritique
+        v = VerifiedImplementCritique(
+            description="Missing check", file_ref="src/a.py",
+            raised_by="challenger", status="valid",
+        )
+        assert v.status == "valid"
+
+    def test_stale_status_accepted(self):
+        from src.implement_loop import VerifiedImplementCritique
+        v = VerifiedImplementCritique(description="d", file_ref="f", raised_by="r", status="stale")
+        assert v.status == "stale"
+
+    def test_all_fields_present(self):
+        from src.implement_loop import VerifiedImplementCritique
+        v = VerifiedImplementCritique(
+            description="d", file_ref="f", raised_by="r", status="valid"
+        )
+        assert v.description == "d"
+        assert v.file_ref == "f"
+        assert v.raised_by == "r"
+
+
+class TestTaskStateNewFields:
+    def _make_state(self):
+        from src.implement_loop import TaskState, ImplementTask
+        return TaskState(task=ImplementTask(description="task"))
+
+    def test_consecutive_clean_cycles_defaults_zero(self):
+        state = self._make_state()
+        assert state.consecutive_clean_cycles == 0
+
+    def test_pending_critiques_defaults_empty(self):
+        state = self._make_state()
+        assert state.pending_critiques == []
+
+    def test_critiques_is_list(self):
+        state = self._make_state()
+        assert isinstance(state.critiques, list)
+
+
+# ---------------------------------------------------------------------------
+# Step 3 — ImplementConfig new fields
+# ---------------------------------------------------------------------------
+
+class TestImplementConfigCycleFields:
+    def _yaml(self, tmp_path, content):
+        f = tmp_path / "impl.yaml"
+        f.write_text(content)
+        return f
+
+    def test_defaults_max_cycles_to_5(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._yaml(tmp_path, f"target:\n  path: {tmp_path}\n"))
+        assert cfg.max_cycles == 5
+
+    def test_defaults_convergence_cycles_to_1(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._yaml(tmp_path, f"target:\n  path: {tmp_path}\n"))
+        assert cfg.convergence_cycles == 1
+
+    def test_defaults_task_description_to_empty(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._yaml(tmp_path, f"target:\n  path: {tmp_path}\n"))
+        assert cfg.task_description == ""
+
+    def test_parses_max_cycles(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._yaml(tmp_path, f"max_cycles: 3\ntarget:\n  path: {tmp_path}\n"))
+        assert cfg.max_cycles == 3
+
+    def test_parses_convergence_cycles(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._yaml(tmp_path, f"convergence_cycles: 2\ntarget:\n  path: {tmp_path}\n"))
+        assert cfg.convergence_cycles == 2
+
+    def test_parses_task_description(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        cfg = ImplementConfig.from_yaml(self._yaml(
+            tmp_path, f"task_description: 'Add type hints'\ntarget:\n  path: {tmp_path}\n"
+        ))
+        assert cfg.task_description == "Add type hints"
+
+    def test_convergence_cycles_zero_raises(self, tmp_path):
+        from src.implement_loop import ImplementConfig
+        with pytest.raises(ValueError, match="convergence_cycles"):
+            ImplementConfig.from_yaml(self._yaml(
+                tmp_path, f"convergence_cycles: 0\ntarget:\n  path: {tmp_path}\n"
+            ))
+
+
+# ---------------------------------------------------------------------------
+# Step 3 — Convergence helpers
+# ---------------------------------------------------------------------------
+
+class TestShouldStopImplement:
+    def _make_config(self, tmp_path, max_cycles=5, convergence_cycles=1):
+        from src.implement_loop import ImplementConfig
+        f = tmp_path / "i.yaml"
+        f.write_text(
+            f"max_cycles: {max_cycles}\nconvergence_cycles: {convergence_cycles}\n"
+            f"target:\n  path: {tmp_path}\n"
+        )
+        return ImplementConfig.from_yaml(f)
+
+    def _make_state(self):
+        from src.implement_loop import TaskState, ImplementTask
+        return TaskState(task=ImplementTask(description="t"))
+
+    def test_stops_when_clean_cycles_reached(self, tmp_path):
+        from src.implement_loop import _should_stop_implement
+        cfg = self._make_config(tmp_path, convergence_cycles=1)
+        state = self._make_state()
+        state.consecutive_clean_cycles = 1
+        assert _should_stop_implement(state, cfg) is True
+
+    def test_continues_when_no_clean_cycles(self, tmp_path):
+        from src.implement_loop import _should_stop_implement
+        cfg = self._make_config(tmp_path, convergence_cycles=1)
+        state = self._make_state()
+        state.consecutive_clean_cycles = 0
+        assert _should_stop_implement(state, cfg) is False
+
+    def test_stops_when_max_cycles_reached(self, tmp_path):
+        from src.implement_loop import _should_stop_implement
+        cfg = self._make_config(tmp_path, max_cycles=3, convergence_cycles=99)
+        state = self._make_state()
+        state.cycle = 3
+        assert _should_stop_implement(state, cfg) is True
+
+    def test_continues_when_below_max_cycles(self, tmp_path):
+        from src.implement_loop import _should_stop_implement
+        cfg = self._make_config(tmp_path, max_cycles=5, convergence_cycles=99)
+        state = self._make_state()
+        state.cycle = 2
+        assert _should_stop_implement(state, cfg) is False
+
+    def test_max_cycles_zero_never_stops_on_cycles(self, tmp_path):
+        from src.implement_loop import _should_stop_implement
+        cfg = self._make_config(tmp_path, max_cycles=0, convergence_cycles=1)
+        state = self._make_state()
+        state.cycle = 100  # does not trigger max_cycles check
+        state.consecutive_clean_cycles = 0
+        assert _should_stop_implement(state, cfg) is False
+
+
+# ---------------------------------------------------------------------------
+# Step 3 — run_implement_cycle
+# ---------------------------------------------------------------------------
+
+class TestRunImplementCycle:
+    """Tests for run_implement_cycle() control flow using mock strategy."""
+
+    def _make_ctx(self, tmp_path):
+        from src.implement_loop import ImplementCycleContext, ImplementTarget
+        from src.audit_trail import NullAuditTrailWriter
+        target = ImplementTarget(path=tmp_path)
+        noop = lambda *a, **kw: None
+        return ImplementCycleContext(
+            call_with=noop,
+            invoke_for_strategy=noop,
+            track_usage=noop,
+            track_cost=noop,
+            target=target,
+            audit_trail=NullAuditTrailWriter(),
+        )
+
+    def _make_state(self, task_description="implement feature X"):
+        from src.implement_loop import TaskState, ImplementTask
+        return TaskState(task=ImplementTask(description=task_description))
+
+    def _clean_strategy(self, tmp_path):
+        """Strategy that returns a patch and zero valid critiques (converges)."""
+        from unittest.mock import MagicMock
+        from src.implement_loop import CandidatePatch, VerifiedImplementCritique
+        strategy = MagicMock()
+        strategy.run_builder.return_value = CandidatePatch(content="diff --git ...")
+        strategy.run_challenger.return_value = []
+        strategy.run_verifier.return_value = []
+        return strategy
+
+    def _dirty_strategy(self, tmp_path):
+        """Strategy with one valid critique — arbitrator returns revised patch."""
+        from unittest.mock import MagicMock
+        from src.implement_loop import CandidatePatch, ImplementCritique, VerifiedImplementCritique
+        strategy = MagicMock()
+        strategy.run_builder.return_value = CandidatePatch(content="initial patch")
+        strategy.run_challenger.return_value = [
+            ImplementCritique(description="Missing null check", file_ref="src/a.py", raised_by="challenger")
+        ]
+        strategy.run_verifier.return_value = [
+            VerifiedImplementCritique(description="Missing null check", file_ref="src/a.py", raised_by="challenger", status="valid")
+        ]
+        strategy.run_arbitrator.return_value = CandidatePatch(content="revised patch")
+        return strategy
+
+    def test_cycle_increments(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._clean_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        assert state.cycle == 1
+
+    def test_builder_called_with_task_and_target(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._clean_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        strategy.run_builder.assert_called_once()
+        call_kwargs = strategy.run_builder.call_args
+        assert call_kwargs is not None
+
+    def test_builder_patch_added_to_history(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._clean_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        assert len(state.patches) >= 1
+
+    def test_challenger_called_with_patch(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._clean_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        strategy.run_challenger.assert_called_once()
+
+    def test_verifier_called(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._clean_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        strategy.run_verifier.assert_called_once()
+
+    def test_arbitrator_not_called_when_no_valid_critiques(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._clean_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        strategy.run_arbitrator.assert_not_called()
+
+    def test_clean_cycle_increments_consecutive_clean(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._clean_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        assert state.consecutive_clean_cycles == 1
+
+    def test_dirty_cycle_resets_consecutive_clean(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        state.consecutive_clean_cycles = 2  # simulated prior clean run
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._dirty_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        assert state.consecutive_clean_cycles == 0
+
+    def test_dirty_cycle_calls_arbitrator(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._dirty_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        strategy.run_arbitrator.assert_called_once()
+
+    def test_dirty_cycle_appends_revised_patch(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._dirty_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        # builder patch + arbitrator revised patch
+        assert len(state.patches) == 2
+        assert state.patches[-1].content == "revised patch"
+
+    def test_valid_critiques_stored_in_pending_for_next_cycle(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._dirty_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        assert len(state.pending_critiques) == 1
+        assert state.pending_critiques[0].status == "valid"
+
+    def test_critiques_accumulated_in_history(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._dirty_strategy(tmp_path)
+        run_implement_cycle(state, ctx, strategy)
+        assert len(state.critiques) == 1
+
+    def test_returns_valid_stale_deferred_counts(self, tmp_path):
+        from src.implement_loop import run_implement_cycle
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._dirty_strategy(tmp_path)
+        valid, stale, deferred = run_implement_cycle(state, ctx, strategy)
+        assert valid == 1
+        assert stale == 0
+        assert deferred == 0
+
+    def test_builder_receives_previous_patch_on_second_cycle(self, tmp_path):
+        from src.implement_loop import run_implement_cycle, CandidatePatch
+        state = self._make_state()
+        ctx = self._make_ctx(tmp_path)
+        strategy = self._dirty_strategy(tmp_path)
+        # First cycle produces a revised patch and pending critiques
+        run_implement_cycle(state, ctx, strategy)
+        # Second cycle: configure strategy to return clean result
+        strategy.run_verifier.return_value = []
+        strategy.run_challenger.return_value = []
+        run_implement_cycle(state, ctx, strategy)
+        # Builder should have been called twice
+        assert strategy.run_builder.call_count == 2
+        # Second call's last_patch kwarg should be the revised patch from cycle 1
+        _, kwargs2 = strategy.run_builder.call_args_list[1]
+        assert kwargs2.get("last_patch") is not None
+
+
+# ---------------------------------------------------------------------------
+# Step 3 — ImplementRunner loop
+# ---------------------------------------------------------------------------
+
+class TestImplementRunnerLoop:
+    def _make_config(self, tmp_path, max_cycles=3, convergence_cycles=1, task_description="implement X"):
+        from src.implement_loop import ImplementConfig
+        f = tmp_path / "impl.yaml"
+        f.write_text(
+            f"task_description: '{task_description}'\n"
+            f"max_cycles: {max_cycles}\n"
+            f"convergence_cycles: {convergence_cycles}\n"
+            f"target:\n  path: {tmp_path}\n"
+        )
+        return ImplementConfig.from_yaml(f)
+
+    def _clean_strategy(self):
+        from unittest.mock import MagicMock
+        from src.implement_loop import CandidatePatch
+        s = MagicMock()
+        s.run_builder.return_value = CandidatePatch(content="patch")
+        s.run_challenger.return_value = []
+        s.run_verifier.return_value = []
+        return s
+
+    def _always_dirty_strategy(self):
+        from unittest.mock import MagicMock
+        from src.implement_loop import CandidatePatch, ImplementCritique, VerifiedImplementCritique
+        s = MagicMock()
+        s.run_builder.return_value = CandidatePatch(content="patch")
+        s.run_challenger.return_value = [
+            ImplementCritique(description="issue", file_ref="f", raised_by="challenger")
+        ]
+        s.run_verifier.return_value = [
+            VerifiedImplementCritique(description="issue", file_ref="f", raised_by="challenger", status="valid")
+        ]
+        s.run_arbitrator.return_value = CandidatePatch(content="revised")
+        return s
+
+    def test_no_backends_returns_1(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        rc = runner.run()
+        assert rc == 1
+
+    def test_converges_in_one_clean_cycle(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, convergence_cycles=1)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        rc = runner.run(_strategy=self._clean_strategy())
+        assert rc == 0
+
+    def test_converged_flag_set_on_true_convergence(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, convergence_cycles=1)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._clean_strategy())
+        assert runner.state.converged is True
+
+    def test_stops_at_max_cycles(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, max_cycles=2, convergence_cycles=99)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        rc = runner.run(_strategy=self._always_dirty_strategy())
+        assert rc == 0
+        assert runner.state.cycle == 2
+
+    def test_converged_false_on_max_cycles_stop(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, max_cycles=2, convergence_cycles=99)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._always_dirty_strategy())
+        assert runner.state.converged is False
+
+    def test_patches_produced(self, tmp_path):
+        from src.implement_runner import ImplementRunner
+        cfg = self._make_config(tmp_path, convergence_cycles=1)
+        runner = ImplementRunner(config=cfg, backends={}, output_dir=tmp_path)
+        runner.run(_strategy=self._clean_strategy())
+        assert len(runner.state.patches) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Step 3 — ImplementStrategy method signatures
+# ---------------------------------------------------------------------------
+
+class TestImplementStrategySignatures:
+    def test_run_builder_accepts_invoke_kwarg(self, tmp_path):
+        from src.implement_strategy import ImplementStrategy
+        from src.implement_loop import ImplementTask, ImplementTarget
+        import inspect
+        sig = inspect.signature(ImplementStrategy.run_builder)
+        assert "invoke" in sig.parameters
+
+    def test_run_challenger_accepts_invoke_kwarg(self):
+        from src.implement_strategy import ImplementStrategy
+        import inspect
+        sig = inspect.signature(ImplementStrategy.run_challenger)
+        assert "invoke" in sig.parameters
+
+    def test_run_verifier_accepts_task_and_target(self):
+        from src.implement_strategy import ImplementStrategy
+        import inspect
+        sig = inspect.signature(ImplementStrategy.run_verifier)
+        assert "task" in sig.parameters
+        assert "target" in sig.parameters
+
+    def test_run_arbitrator_accepts_invoke_kwarg(self):
+        from src.implement_strategy import ImplementStrategy
+        import inspect
+        sig = inspect.signature(ImplementStrategy.run_arbitrator)
+        assert "invoke" in sig.parameters

@@ -14,15 +14,23 @@ Key design decisions
 - :class:`TaskState` tracks mutable loop state; ``current_workflow_state`` uses
   :class:`~src.workflows.implement_states.ImplementState` for audit-trail
   compatibility.
+- HITL/deferred semantics are out of scope for Step 3; they are addressed in a
+  future step.  The convergence criterion is: no valid critiques in the current
+  cycle (``status == "valid"``).
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
+from .run_state import BaseContext
 from .workflows.implement_states import ImplementState
+from .workflows.transitions import WorkflowTransitionEmitter
+
+log = logging.getLogger("autoresearch")
 
 
 #: Execution levels available for implement mode.
@@ -56,7 +64,7 @@ class ImplementTarget:
         One of :data:`VALID_EXECUTION_LEVELS`.  Defaults to ``"patch_only"``
         (safe default — no direct mutation).
     allowed_roots:
-        Tuple of paths (relative to *path*) where writes are permitted.
+        Tuple of relative paths (relative to *path*) where writes are permitted.
         Empty tuple means "no paths explicitly allowed" — enforcement is a
         Step-4 concern.
     """
@@ -83,7 +91,6 @@ class ImplementTarget:
                 )
 
 
-
 # ---------------------------------------------------------------------------
 # Implement config (loaded from YAML)
 # ---------------------------------------------------------------------------
@@ -96,9 +103,18 @@ class ImplementConfig:
     ----------
     target:
         Explicit target-repo contract: path, execution level, allowed roots.
+    task_description:
+        Natural-language description of what to implement.
+    max_cycles:
+        Maximum adversarial cycles.  ``0`` means unlimited.
+    convergence_cycles:
+        Consecutive clean cycles required to declare convergence.
     """
 
     target: ImplementTarget
+    task_description: str = ""
+    max_cycles: int = 5
+    convergence_cycles: int = 1
 
     @classmethod
     def from_yaml(cls, path: Path) -> "ImplementConfig":
@@ -174,12 +190,24 @@ class ImplementConfig:
             )
         allowed_roots = tuple(Path(r) for r in allowed_roots_raw)
 
+        # Top-level cycle configuration
+        convergence_cycles = int(raw.get("convergence_cycles", 1))
+        if convergence_cycles < 1:
+            raise ValueError(
+                f"convergence_cycles must be >= 1, got {convergence_cycles}"
+            )
+        max_cycles = int(raw.get("max_cycles", 5))
+        task_description = str(raw.get("task_description", "") or "")
+
         return cls(
             target=ImplementTarget(
                 path=target_path,
                 execution_level=execution_level,
                 allowed_roots=allowed_roots,
-            )
+            ),
+            task_description=task_description,
+            max_cycles=max_cycles,
+            convergence_cycles=convergence_cycles,
         )
 
 
@@ -227,6 +255,49 @@ class CandidatePatch:
     touched_files: tuple[str, ...] = ()
 
 
+@dataclass
+class ImplementCritique:
+    """Raw critique from the Challenger about a candidate patch.
+
+    Attributes
+    ----------
+    description:
+        Natural-language description of the problem.
+    file_ref:
+        File or area of the patch being critiqued.
+    raised_by:
+        Role that raised this critique (e.g. ``"challenger"``).
+    """
+
+    description: str
+    file_ref: str
+    raised_by: str
+
+
+@dataclass
+class VerifiedImplementCritique:
+    """A critique classified by the Verifier.
+
+    Attributes
+    ----------
+    description:
+        Original critique description.
+    file_ref:
+        File or area being critiqued.
+    raised_by:
+        Role that raised this critique.
+    status:
+        ``"valid"`` — must be addressed in the revised patch.
+        ``"stale"`` — no longer applicable to the current patch.
+        Note: ``"deferred"``/HITL semantics are out of scope for Step 3.
+    """
+
+    description: str
+    file_ref: str
+    raised_by: str
+    status: str  # "valid" | "stale"
+
+
 # ---------------------------------------------------------------------------
 # Loop state
 # ---------------------------------------------------------------------------
@@ -240,13 +311,22 @@ class TaskState:
     task:
         The implementation task being worked on.
     cycle:
-        Current loop cycle number (0-indexed).
+        Current loop cycle number (0-indexed; incremented at start of each cycle).
     converged:
-        True once the stopping criterion is met.
+        ``True`` only when the stopping criterion was clean-cycle convergence,
+        not when the loop stopped due to ``max_cycles``.
     patches:
-        History of :class:`CandidatePatch` objects produced so far.
+        Full history of :class:`CandidatePatch` objects produced (builder +
+        arbitrator outputs).
     critiques:
-        Critiques accumulated in the current cycle (cleared each cycle).
+        Full history of :class:`VerifiedImplementCritique` across all cycles
+        (the "critique bundle" artifact).
+    pending_critiques:
+        Valid critiques from the *most recent* cycle, passed to the builder
+        on the next cycle so it can incorporate accepted feedback.  Cleared
+        after each builder invocation.
+    consecutive_clean_cycles:
+        Number of consecutive cycles with zero valid critiques.
     current_workflow_state:
         Current :class:`~src.workflows.implement_states.ImplementState`.
     """
@@ -255,5 +335,126 @@ class TaskState:
     cycle: int = 0
     converged: bool = False
     patches: list[CandidatePatch] = field(default_factory=list)
-    critiques: list[Any] = field(default_factory=list)
+    critiques: list[VerifiedImplementCritique] = field(default_factory=list)
+    pending_critiques: list[VerifiedImplementCritique] = field(default_factory=list)
+    consecutive_clean_cycles: int = 0
     current_workflow_state: ImplementState = ImplementState.IDLE
+
+
+# ---------------------------------------------------------------------------
+# Cycle context
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ImplementCycleContext(BaseContext):
+    """Callback bundle for the implement loop.
+
+    Extends :class:`~src.run_state.BaseContext` (call_with,
+    invoke_for_strategy, track_usage, track_cost) with implement-specific
+    fields.
+    """
+
+    target: ImplementTarget
+    audit_trail: Any
+
+
+# ---------------------------------------------------------------------------
+# Cycle execution
+# ---------------------------------------------------------------------------
+
+def run_implement_cycle(
+    state: TaskState,
+    ctx: ImplementCycleContext,
+    strategy: Any,
+) -> tuple[int, int, int]:
+    """Execute one adversarial implement cycle.
+
+    Phases: Builder → Challenger → Verifier → (Arbitrator if valid critiques).
+
+    Returns
+    -------
+    tuple[int, int, int]
+        ``(valid_count, stale_count, deferred_count)``.
+    """
+    state.cycle += 1
+    log.info("[implement][cycle %03d] starting", state.cycle)
+
+    emitter = WorkflowTransitionEmitter(
+        ctx.audit_trail, "implement", state.current_workflow_state
+    )
+
+    # 1. Builder — generate patch (cycle 1) or improve from previous patch +
+    #    accepted critiques (cycle N+1).
+    last_patch = state.patches[-1] if state.patches else None
+    accepted = list(state.pending_critiques)
+    emitter.transition(ImplementState.BUILDER, cycle=state.cycle)
+    log.info("[implement][cycle %03d] builder starting", state.cycle)
+    patch = strategy.run_builder(
+        state.task,
+        ctx.target,
+        last_patch=last_patch,
+        accepted_critiques=accepted,
+        invoke=ctx.call_with,
+    )
+    state.patches.append(patch)
+    state.pending_critiques = []  # consumed
+
+    # 2. Challenger
+    emitter.transition(ImplementState.CHALLENGER, cycle=state.cycle)
+    log.info("[implement][cycle %03d] challenger starting", state.cycle)
+    raw_critiques = strategy.run_challenger(
+        patch, state.task, ctx.target, invoke=ctx.call_with
+    )
+
+    # 3. Verifier
+    emitter.transition(ImplementState.VERIFIER, cycle=state.cycle)
+    log.info("[implement][cycle %03d] verifier starting (%d critique(s))", state.cycle, len(raw_critiques))
+    verified = strategy.run_verifier(
+        patch, raw_critiques, state.task, ctx.target, invoke=ctx.call_with
+    )
+
+    # 4. Classify
+    valid = [v for v in verified if v.status == "valid"]
+    stale = [v for v in verified if v.status == "stale"]
+    deferred = [v for v in verified if v.status not in ("valid", "stale")]
+
+    # 5. Arbitrator — only when there are valid critiques to address
+    emitter.transition(ImplementState.ARBITRATOR, cycle=state.cycle)
+    if valid:
+        log.info("[implement][cycle %03d] arbitrator starting (%d valid critique(s))", state.cycle, len(valid))
+        revised = strategy.run_arbitrator(
+            patch, valid, state.task, ctx.target, invoke=ctx.call_with
+        )
+        state.patches.append(revised)
+        state.pending_critiques = list(valid)  # carry forward for next builder
+    else:
+        log.info("[implement][cycle %03d] arbitrator skipped (no valid critiques)", state.cycle)
+
+    # 6. Accumulate full critique history
+    state.critiques.extend(verified)
+
+    # 7. Update convergence counter
+    if not valid:
+        state.consecutive_clean_cycles += 1
+    else:
+        state.consecutive_clean_cycles = 0
+
+    state.current_workflow_state = emitter.current_state
+    log.info(
+        "[implement][cycle %03d] done (valid=%d stale=%d deferred=%d clean_streak=%d)",
+        state.cycle, len(valid), len(stale), len(deferred),
+        state.consecutive_clean_cycles,
+    )
+    return len(valid), len(stale), len(deferred)
+
+
+# ---------------------------------------------------------------------------
+# Convergence helpers
+# ---------------------------------------------------------------------------
+
+def _should_stop_implement(state: TaskState, config: ImplementConfig) -> bool:
+    """Return ``True`` when the implement loop should terminate."""
+    if config.max_cycles > 0 and state.cycle >= config.max_cycles:
+        return True
+    return state.consecutive_clean_cycles >= config.convergence_cycles
+

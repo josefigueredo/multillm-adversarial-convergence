@@ -287,7 +287,6 @@ def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
     runner = ImplementRunner(
         config=impl_config,
         backends={},
-        target=target,
         output_dir=output_dir,
         resume=args.resume,
     )
