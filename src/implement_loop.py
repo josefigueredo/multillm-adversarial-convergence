@@ -208,10 +208,29 @@ class ImplementConfig:
         max_cycles = int(raw.get("max_cycles", 5))
         task_description = str(raw.get("task_description", "") or "")
 
-        # Backend / provider config (mirrors DocumentConfig / PlanConfig pattern)
+        # Backend / provider config — mirrors DocumentConfig / PlanConfig exactly:
+        # when providers are declared, build BackendsConfig from provider instance
+        # names directly (never route through _parse_backends_config which validates
+        # against VALID_BACKENDS adapter names, not instance names).
         providers = _parse_providers_config(raw.get("providers", {}))
-        backends_config = _parse_backends_config(raw.get("backends", {}))
-        _validate_provider_references(backends_config, providers)
+        if providers:
+            backends_raw = raw.get("backends", {})
+            if backends_raw:
+                research_val = backends_raw.get("research", [backends_raw.get("primary", next(iter(providers)))])
+                if isinstance(research_val, str):
+                    research_val = [research_val]
+                backends_config = BackendsConfig(
+                    primary=backends_raw.get("primary", next(iter(providers))),
+                    research=tuple(research_val),
+                    judge=backends_raw.get("judge", ""),
+                    utility=backends_raw.get("utility", ""),
+                )
+            else:
+                first_provider = next(iter(providers))
+                backends_config = BackendsConfig(primary=first_provider, research=(first_provider,))
+            _validate_provider_references(backends_config, providers)
+        else:
+            backends_config = _parse_backends_config(raw.get("backends", {}))
 
         return cls(
             target=ImplementTarget(

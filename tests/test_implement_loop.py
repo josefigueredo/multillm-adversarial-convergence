@@ -1091,3 +1091,77 @@ class TestCliImplementBackendWiring:
         call_kwargs = mock_init.call_args.kwargs
         assert call_kwargs["backends"] != {}
         assert "claude-cli" in call_kwargs["backends"]
+
+
+# ---------------------------------------------------------------------------
+# Step 3 refinement — provider-instance backend contract
+# ---------------------------------------------------------------------------
+
+class TestImplementConfigProviderBranch:
+    """ImplementConfig.from_yaml() must handle provider-instance names correctly.
+
+    When providers are declared, backends section uses instance names
+    (e.g. 'primary_reasoner'), NOT adapter names (e.g. 'claude-cli').
+    These must not be routed through _parse_backends_config which validates
+    against VALID_BACKENDS.
+    """
+
+    def _write_config(self, tmp_path, yaml_content: str):
+        target = tmp_path / "repo"
+        target.mkdir(exist_ok=True)
+        cfg = tmp_path / "impl.yaml"
+        cfg.write_text(f"target:\n  path: {target}\n" + yaml_content)
+        return cfg
+
+    def test_provider_backed_config_loads_successfully(self, tmp_path):
+        """Provider instance names must not be rejected as invalid backend adapters."""
+        from src.implement_loop import ImplementConfig
+        yaml_extra = (
+            "providers:\n"
+            "  primary_reasoner:\n"
+            "    adapter: claude-cli\n"
+            "backends:\n"
+            "  primary: primary_reasoner\n"
+        )
+        cfg = ImplementConfig.from_yaml(self._write_config(tmp_path, yaml_extra))
+        assert cfg.backends.primary == "primary_reasoner"
+        assert cfg.providers["primary_reasoner"].adapter == "claude-cli"
+
+    def test_provider_backed_config_no_explicit_backends_uses_first_provider(self, tmp_path):
+        """When providers declared but no backends section, first provider becomes primary."""
+        from src.implement_loop import ImplementConfig
+        yaml_extra = (
+            "providers:\n"
+            "  fast_model:\n"
+            "    adapter: claude-cli\n"
+        )
+        cfg = ImplementConfig.from_yaml(self._write_config(tmp_path, yaml_extra))
+        assert cfg.backends.primary == "fast_model"
+
+    def test_unknown_provider_reference_fails(self, tmp_path):
+        """Backends referencing an undeclared provider instance must raise ValueError."""
+        from src.implement_loop import ImplementConfig
+        yaml_extra = (
+            "providers:\n"
+            "  known_instance:\n"
+            "    adapter: claude-cli\n"
+            "backends:\n"
+            "  primary: unknown_instance\n"
+        )
+        with pytest.raises(ValueError):
+            ImplementConfig.from_yaml(self._write_config(tmp_path, yaml_extra))
+
+    def test_direct_backend_name_without_providers_still_works(self, tmp_path):
+        """Without providers, adapter names like claude-cli must still be accepted."""
+        from src.implement_loop import ImplementConfig
+        yaml_extra = "backends:\n  primary: claude-cli\n"
+        cfg = ImplementConfig.from_yaml(self._write_config(tmp_path, yaml_extra))
+        assert cfg.backends.primary == "claude-cli"
+        assert cfg.providers == {}
+
+    def test_invalid_adapter_name_without_providers_fails(self, tmp_path):
+        """Without providers, invalid adapter names must still be rejected."""
+        from src.implement_loop import ImplementConfig
+        yaml_extra = "backends:\n  primary: not-a-real-adapter\n"
+        with pytest.raises(ValueError):
+            ImplementConfig.from_yaml(self._write_config(tmp_path, yaml_extra))
