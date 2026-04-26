@@ -88,6 +88,7 @@ class DocumentRefiner:
                     "refine", "verifier", GateTrigger.AFTER, sequence=sequence
                 )
                 guidance_context = format_guidance_block(records)
+                pause_file.unlink()  # consumed — clear so doctor output does not report stale pending pause
 
         ctx = CycleContext(
             call_with=self._invoke,

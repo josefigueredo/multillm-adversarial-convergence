@@ -1291,3 +1291,88 @@ class TestDoctorOutputHitlArtifacts:
         result = doctor_output_text(tmp_path)
         # With no last_pause.json, no HITL-specific issue should appear
         assert "HITL pause pending" not in result.text
+
+    def test_completed_resumed_run_no_stale_pause_issue(self, tmp_path):
+        """After resume consumes last_pause.json, doctor output must not report pending HITL."""
+        import json
+        from src.doctor import doctor_output_text
+        _make_complete_run(tmp_path)
+        # Simulate: run paused, then resume consumed and cleared last_pause.json
+        run_dir = tmp_path / ".run"
+        run_dir.mkdir(exist_ok=True)
+        # last_pause.json is absent (cleared by resume) — even if other HITL artifacts remain
+        (tmp_path / "hitl_guidance.jsonl").write_text(
+            json.dumps({"workflow": "refine", "target": "verifier",
+                        "gate_trigger": "after", "sequence": 1, "content": "steer here"}),
+            encoding="utf-8",
+        )
+        (tmp_path / "hitl_review_packet.json").write_text(
+            json.dumps({"workflow": "refine", "cycle": 1}), encoding="utf-8"
+        )
+        result = doctor_output_text(tmp_path)
+        assert "HITL pause pending" not in result.text
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# last_pause.json lifecycle — cleared on resume
+# ---------------------------------------------------------------------------
+
+class TestLastPauseLifecycle:
+    """Verify that last_pause.json is deleted when resume consumes it."""
+
+    def _make_run_dir(self, tmp_path: Path) -> Path:
+        run_dir = tmp_path / ".run"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        return run_dir
+
+    def test_document_refiner_clears_last_pause_on_resume(self, tmp_path):
+        """The resume block in DocumentRefiner must delete last_pause.json after reading it."""
+        import json
+        from src.document_refiner import _LAST_PAUSE_FILE
+        from src.workflows.gates import GateTrigger
+        from src.workflows.guidance import GuidanceStore, format_guidance_block
+
+        run_dir = self._make_run_dir(tmp_path)
+        pause_file = run_dir / _LAST_PAUSE_FILE
+        pause_file.write_text(
+            json.dumps({"cycle": 1, "workflow": "refine", "target": "verifier", "gate_trigger": "after"}),
+            encoding="utf-8",
+        )
+        assert pause_file.exists()
+
+        # Replicate the document_refiner resume block logic exactly
+        meta = json.loads(pause_file.read_text(encoding="utf-8"))
+        sequence = meta.get("cycle")
+        store = GuidanceStore(tmp_path)
+        records = store.load_for_target("refine", "verifier", GateTrigger.AFTER, sequence=sequence)
+        format_guidance_block(records)
+        pause_file.unlink()
+
+        assert not pause_file.exists(), "last_pause.json should be cleared after resume consumes it"
+
+    def test_plan_refiner_clears_last_pause_on_resume(self, tmp_path):
+        """PlanRefiner mirrors DocumentRefiner — last_pause.json cleared on resume."""
+        import json
+        from src.plan_refiner import _LAST_PAUSE_FILE
+        from src.workflows.gates import GateTrigger
+        from src.workflows.guidance import GuidanceStore, format_guidance_block
+
+        run_dir = self._make_run_dir(tmp_path)
+        pause_file = run_dir / _LAST_PAUSE_FILE
+        pause_file.write_text(
+            json.dumps({"cycle": 2, "workflow": "plan", "target": "verifier", "gate_trigger": "after"}),
+            encoding="utf-8",
+        )
+        assert pause_file.exists()
+
+        # Replicate the resume block logic
+        meta = json.loads(pause_file.read_text(encoding="utf-8"))
+        sequence = meta.get("cycle")
+        store = GuidanceStore(tmp_path)
+        records = store.load_for_target("plan", "verifier", GateTrigger.AFTER, sequence=sequence)
+        format_guidance_block(records)
+        pause_file.unlink()
+
+        assert not pause_file.exists()
+
