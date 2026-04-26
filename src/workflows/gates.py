@@ -218,6 +218,16 @@ GATES_BY_MODE: dict[str, frozenset[HitlGate]] = {
 # Public helpers
 # ---------------------------------------------------------------------------
 
+VALID_WORKFLOWS: tuple[str, ...] = ("research", "refine", "plan")
+
+
+def _validate_workflow(workflow: str) -> None:
+    if workflow not in VALID_WORKFLOWS:
+        raise ValueError(
+            f"Unknown workflow: {workflow!r}. "
+            f"Must be one of: {', '.join(VALID_WORKFLOWS)}"
+        )
+
 
 def get_gates_for_mode(intervention_mode: str) -> frozenset[HitlGate]:
     """Return all :class:`HitlGate` instances active for *intervention_mode*.
@@ -244,8 +254,10 @@ def get_gates(intervention_mode: str, workflow: str) -> frozenset[HitlGate]:
     Raises
     ------
     ValueError
-        If *intervention_mode* is not a known mode.
+        If *intervention_mode* is not a known mode or *workflow* is not a
+        recognised workflow name.
     """
+    _validate_workflow(workflow)
     all_gates = get_gates_for_mode(intervention_mode)
     return frozenset(g for g in all_gates if g.workflow in (workflow, "all"))
 
@@ -272,9 +284,9 @@ def should_pause(
     Raises
     ------
     ValueError
-        If *intervention_mode* is unknown or *trigger* is not a valid
-        :class:`GateTrigger` value.
+        If *intervention_mode* is unknown, *workflow* is not a recognised
+        workflow name, or *trigger* is not a valid :class:`GateTrigger` value.
     """
     trigger = GateTrigger(trigger)  # validates the trigger value
-    relevant = get_gates(intervention_mode, workflow)
+    relevant = get_gates(intervention_mode, workflow)  # validates workflow
     return any(g.target == target and g.trigger == trigger for g in relevant)

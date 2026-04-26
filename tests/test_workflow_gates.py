@@ -13,6 +13,7 @@ import pytest
 
 from src.workflows.gates import (
     GATES_BY_MODE,
+    VALID_WORKFLOWS,
     GateTarget,
     GateTrigger,
     HitlGate,
@@ -255,6 +256,18 @@ class TestGetGates:
         with pytest.raises(ValueError, match="intervention mode"):
             get_gates("bad_mode", "research")
 
+    def test_raises_on_unknown_workflow(self):
+        with pytest.raises(ValueError, match="workflow"):
+            get_gates("co_pilot", "doc")
+
+    def test_raises_on_typo_workflow(self):
+        with pytest.raises(ValueError, match="workflow"):
+            get_gates("co_pilot", "reseach")
+
+    def test_valid_workflows_accepted(self):
+        for wf in VALID_WORKFLOWS:
+            get_gates("full_auto", wf)  # should not raise
+
 
 # ===========================================================================
 # should_pause()
@@ -333,3 +346,11 @@ class TestShouldPause:
     def test_unknown_mode_raises(self):
         with pytest.raises(ValueError, match="intervention mode"):
             should_pause("invalid_mode", "research", "hypothesis", GateTrigger.BEFORE)
+
+    def test_unknown_workflow_raises(self):
+        with pytest.raises(ValueError, match="workflow"):
+            should_pause("co_pilot", "plans", "builder", GateTrigger.BEFORE)
+
+    def test_workflow_typo_raises(self):
+        with pytest.raises(ValueError, match="workflow"):
+            should_pause("co_pilot", "reseach", "hypothesis", GateTrigger.BEFORE)
