@@ -301,3 +301,79 @@ def explain_implement_config_text(config: Any, *, config_path: Path | None = Non
     lines.append("  violation outcome:    loop stops immediately, runner returns 1")
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Publication pipeline explainer (MM11 Step 5)
+# ---------------------------------------------------------------------------
+
+_STAGE_ORDER = ("pending", "synthesize", "revise", "package", "export")
+
+_NEXT_STAGE: dict[str, str] = {
+    "pending": "synthesize",
+    "synthesize": "revise",
+    "revise": "package",
+    "package": "export",
+    "export": "complete",
+}
+
+
+def explain_pipeline_text(pipeline: "Any") -> str:  # DeliverablePipeline
+    """Return a human-readable explanation of *pipeline*'s current publication state.
+
+    Describes:
+    - Topic and deliverable class identity
+    - Completed stage and what comes next
+    - Per-stage artifact summaries for completed stages
+
+    Pure inspection — no side effects.
+    """
+    from .deliverable_pipeline import PipelineStage
+
+    lines: list[str] = []
+
+    class_label = pipeline.deliverable_class if pipeline.deliverable_class else "unclassed"
+    lines += [
+        f"topic:             {pipeline.topic}",
+        f"deliverable_class: {class_label}",
+    ]
+
+    completed = pipeline.completed_stage.value
+    next_stage = _NEXT_STAGE.get(completed, "complete")
+
+    lines += [
+        "",
+        "PUBLICATION PIPELINE",
+        f"  completed stage: {completed}",
+        f"  next stage:      {next_stage}",
+    ]
+
+    lines.append("")
+    lines.append("STAGES")
+
+    stage_reached = _STAGE_ORDER.index(completed)
+
+    for i, stage in enumerate(_STAGE_ORDER[1:], start=1):  # skip "pending"
+        done = i <= stage_reached
+        mark = "✓" if done else "✗"
+        detail = ""
+
+        if done:
+            if stage == "synthesize" and pipeline.synthesis is not None:
+                s = pipeline.synthesis
+                wc = len(s.body.split())
+                detail = f"{wc} words, {s.source_count} source(s), {len(s.key_findings)} finding(s)"
+            elif stage == "revise" and pipeline.revision is not None:
+                n = len(pipeline.revision.revision_notes)
+                detail = f"{n} revision note(s)"
+            elif stage == "package" and pipeline.package is not None:
+                detail = f"format: {pipeline.package.format}"
+            elif stage == "export" and pipeline.export is not None:
+                exp = pipeline.export
+                paths_str = ", ".join(exp.output_paths) if exp.output_paths else "(none)"
+                detail = f"{len(exp.output_paths)} file(s): {paths_str} — exported_at: {exp.exported_at}"
+
+        suffix = f" — {detail}" if detail else ""
+        lines.append(f"  {mark} {stage}{suffix}")
+
+    return "\n".join(lines)

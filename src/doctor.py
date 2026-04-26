@@ -940,3 +940,84 @@ def doctor_config_from_path(config_path: Path) -> DoctorReport:
         return DoctorReport(text=text, exit_code=1)
 
     return doctor_config_text(config)
+
+
+# ---------------------------------------------------------------------------
+# Publication pipeline diagnostics (MM11 Step 5)
+# ---------------------------------------------------------------------------
+
+
+def doctor_pipeline(pipeline: "Any") -> DoctorReport:  # DeliverablePipeline
+    """Inspect *pipeline* and return a :class:`DoctorReport`.
+
+    Checks:
+    - Stage completeness and artifact presence
+    - Citation coverage when the deliverable class requires citations
+      (uses :func:`~src.citation_verification.verify_synthesis_citations`)
+    - Export artifact integrity at the EXPORT stage
+      (uses :func:`~src.citation_verification.verify_export_artifact`)
+
+    Pure inspection — no side effects.
+
+    Args:
+        pipeline: A :class:`~src.deliverable_pipeline.DeliverablePipeline` to inspect.
+
+    Returns:
+        DoctorReport with exit_code=0 if healthy, exit_code=1 if issues found.
+    """
+    from .citation_verification import verify_export_artifact, verify_synthesis_citations
+    from .deliverable_classes import get_config_for_pipeline
+    from .deliverable_pipeline import PipelineStage
+
+    issues: list[str] = []
+    parts: list[str] = []
+
+    class_label = pipeline.deliverable_class if pipeline.deliverable_class else "unclassed"
+    completed = pipeline.completed_stage.value
+
+    parts += [
+        f"topic:             {pipeline.topic}",
+        f"deliverable_class: {class_label}",
+        f"completed stage:   {completed}",
+    ]
+
+    # ── Citation check (when synthesis is present and class requires citations) ──
+    if pipeline.synthesis is not None:
+        config = get_config_for_pipeline(pipeline)
+        if config is not None:
+            violations = verify_synthesis_citations(pipeline.synthesis, config)
+            for v in violations:
+                issues.append(f"citation: {v.message}")
+
+    # ── Export artifact check ──────────────────────────────────────────────────
+    if pipeline.export is not None:
+        for v in verify_export_artifact(pipeline.export):
+            issues.append(f"export: {v.message}")
+
+    # ── Health line ────────────────────────────────────────────────────────────
+    health = "OK" if not issues else f"WARNINGS ({len(issues)} issue{'s' if len(issues) != 1 else ''})"
+    exit_code = 0 if not issues else 1
+
+    header = [
+        "",
+        f"HEALTH: {health}",
+        "",
+        "PUBLICATION PIPELINE",
+    ]
+
+    _stage_order = ("pending", "synthesize", "revise", "package", "export")
+    stage_reached = _stage_order.index(completed)
+    for i, stage in enumerate(_stage_order[1:], start=1):
+        done = i <= stage_reached
+        mark = "✓" if done else "✗"
+        header.append(f"  {mark} {stage}")
+
+    parts = parts[:3] + header + parts[3:]
+
+    if issues:
+        parts.append("")
+        parts.append("WARNINGS")
+        for issue in issues:
+            parts.append(f"  [!] {issue}")
+
+    return DoctorReport(text="\n".join(parts), exit_code=exit_code)
