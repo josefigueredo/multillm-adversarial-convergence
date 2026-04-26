@@ -246,3 +246,58 @@ def explain_resume_text(output_dir: Path) -> str:
     ]
 
     return "\n".join(lines)
+
+
+def explain_implement_config_text(config: Any, *, config_path: Path | None = None) -> str:
+    """Render a human-readable explanation of an implement config.
+
+    Does NOT create output directories, run backends, or instantiate any
+    execution machinery.  Pure inspection of the resolved ImplementConfig object.
+    """
+    lines: list[str] = []
+
+    if config_path is not None:
+        lines.append(f"config: {config_path.resolve()}")
+
+    target = config.target
+
+    # ── Target repo contract ──────────────────────────────────────────────────
+    lines += [
+        "",
+        "TARGET",
+        f"  path:            {target.path.resolve()}",
+        f"  execution_level: {target.execution_level}",
+    ]
+    if target.allowed_roots:
+        lines.append(f"  allowed_roots:   {', '.join(str(r) for r in target.allowed_roots)}")
+    else:
+        lines.append("  allowed_roots:   (none — all target files reachable)")
+
+    # ── Task / cycle config ───────────────────────────────────────────────────
+    lines += [
+        "",
+        "TASK",
+        f"  description:       {config.task_description or '(none)'}",
+        f"  max_cycles:        {config.max_cycles}",
+        f"  convergence_cycles:{config.convergence_cycles}",
+    ]
+
+    # ── Safety boundaries ─────────────────────────────────────────────────────
+    lines += [
+        "",
+        "SAFETY BOUNDARIES",
+        f"  allow_same_repo: {config.allow_same_repo}",
+    ]
+    if config.allow_same_repo:
+        lines.append("  [!] self-hosting opt-in is active — target may be this planner repo")
+
+    if target.allowed_roots:
+        lines.append(
+            f"  boundary enforcement: RESTRICTED to {', '.join(str(r) for r in target.allowed_roots)}"
+        )
+    else:
+        lines.append("  boundary enforcement: PERMISSIVE (no allowed_roots declared)")
+
+    lines.append("  violation outcome:    loop stops immediately, runner returns 1")
+
+    return "\n".join(lines)

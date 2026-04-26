@@ -282,3 +282,151 @@ class TestExplainHitlPolicy:
         config = _make_config(hitl=HitlConfig(intervention_mode="decision_only"))
         result = explain_config_text(config)
         assert "decision_only" in result
+
+
+# ---------------------------------------------------------------------------
+# MM09 Step 5 — explain_implement_config_text
+# ---------------------------------------------------------------------------
+
+from pathlib import Path as _Path
+
+from src.implement_loop import ImplementConfig, ImplementTarget
+
+
+def _make_impl_config(tmp_path: _Path, **kwargs) -> ImplementConfig:
+    target = ImplementTarget(path=tmp_path, execution_level="patch_only", allowed_roots=(_Path("src"),))
+    defaults = dict(target=target, task_description="Add retry logic", max_cycles=3, convergence_cycles=1)
+    defaults.update(kwargs)
+    return ImplementConfig(**defaults)
+
+
+class TestExplainImplementConfigText:
+    def test_returns_string(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert isinstance(explain_implement_config_text(cfg), str)
+
+    def test_shows_target_path(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert str(tmp_path) in explain_implement_config_text(cfg)
+
+    def test_shows_execution_level(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert "patch_only" in explain_implement_config_text(cfg)
+
+    def test_shows_task_description(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert "Add retry logic" in explain_implement_config_text(cfg)
+
+    def test_shows_max_cycles(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert "3" in explain_implement_config_text(cfg)
+
+    def test_shows_allowed_roots(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert "src" in explain_implement_config_text(cfg)
+
+    def test_shows_implement_target_section(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert "TARGET" in explain_implement_config_text(cfg)
+
+    def test_shows_safety_boundaries_section(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert "SAFETY" in explain_implement_config_text(cfg)
+
+    def test_shows_allow_same_repo_false(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path, allow_same_repo=False)
+        assert "allow_same_repo" in explain_implement_config_text(cfg)
+
+    def test_shows_allow_same_repo_true(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path, allow_same_repo=True)
+        text = explain_implement_config_text(cfg)
+        assert "allow_same_repo" in text
+        assert "true" in text.lower() or "True" in text
+
+    def test_shows_no_roots_when_empty(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        target = ImplementTarget(path=tmp_path, allowed_roots=())
+        cfg = ImplementConfig(target=target, task_description="t")
+        text = explain_implement_config_text(cfg)
+        assert "none" in text.lower() or "unrestricted" in text.lower() or "no roots" in text.lower()
+
+    def test_config_path_shown_when_provided(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        fake_path = tmp_path / "my_config.yaml"
+        text = explain_implement_config_text(cfg, config_path=fake_path)
+        assert "my_config.yaml" in text
+
+    def test_shows_convergence_cycles(self, tmp_path):
+        from src.explain import explain_implement_config_text
+        cfg = _make_impl_config(tmp_path)
+        assert "1" in explain_implement_config_text(cfg)
+
+
+class TestCliExplainImplement:
+    """CLI wiring: explain implement --config."""
+
+    def test_explain_implement_returns_0_for_valid_config(self, tmp_path):
+        from src.cli import main
+
+        config_yaml = tmp_path / "impl.yaml"
+        target_dir = tmp_path / "target"
+        target_dir.mkdir()
+        config_yaml.write_text(
+            f"target:\n  path: {target_dir}\n  execution_level: patch_only\n  allowed_roots:\n    - src\n"
+            "task_description: Do something\nmax_cycles: 2\n"
+        )
+        rc = main(["explain", "implement", "--config", str(config_yaml)])
+        assert rc == 0
+
+    def test_explain_implement_returns_1_for_missing_config(self, tmp_path):
+        from src.cli import main
+
+        rc = main(["explain", "implement", "--config", str(tmp_path / "no.yaml")])
+        assert rc == 1
+
+
+class TestCliDoctorImplement:
+    """CLI wiring: doctor implement --config."""
+
+    def test_doctor_implement_returns_0_for_healthy_config(self, tmp_path):
+        from src.cli import main
+
+        config_yaml = tmp_path / "impl.yaml"
+        target_dir = tmp_path / "target"
+        target_dir.mkdir()
+        config_yaml.write_text(
+            f"target:\n  path: {target_dir}\n  execution_level: patch_only\n  allowed_roots:\n    - src\n"
+            "task_description: Do something\nmax_cycles: 2\n"
+        )
+        rc = main(["doctor", "implement", "--config", str(config_yaml)])
+        assert rc == 0
+
+    def test_doctor_implement_returns_1_for_missing_config(self, tmp_path):
+        from src.cli import main
+
+        rc = main(["doctor", "implement", "--config", str(tmp_path / "no.yaml")])
+        assert rc == 1
+
+    def test_doctor_implement_returns_1_for_no_allowed_roots(self, tmp_path):
+        from src.cli import main
+
+        config_yaml = tmp_path / "impl.yaml"
+        target_dir = tmp_path / "target"
+        target_dir.mkdir()
+        config_yaml.write_text(
+            f"target:\n  path: {target_dir}\n  execution_level: patch_only\n"
+            "task_description: Do something\nmax_cycles: 2\n"
+        )
+        rc = main(["doctor", "implement", "--config", str(config_yaml)])
+        assert rc == 1

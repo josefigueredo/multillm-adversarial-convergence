@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.config import ResearchConfig
+    from src.implement_loop import ImplementConfig
 
 
 # ---------------------------------------------------------------------------
@@ -804,6 +805,116 @@ def doctor_output_text(output_dir: Path) -> DoctorReport:
         parts.append("")
 
     return DoctorReport(text="\n".join(parts), exit_code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# Implement-mode diagnostics (MM09 Step 5)
+# ---------------------------------------------------------------------------
+
+#: Safety notes per execution_level — surfaced verbatim in the report.
+_EXECUTION_LEVEL_NOTES: dict[str, str] = {
+    "analyze_only": "read-only — no writes; safest level",
+    "patch_only":   "safe default — generates a diff/patch; no direct repo mutation",
+    "isolated_apply": "medium risk — applies patch in a temporary worktree/clone; never the live repo",
+}
+
+
+def doctor_implement_config_text(config: "ImplementConfig") -> DoctorReport:
+    """Inspect an :class:`~src.implement_loop.ImplementConfig` and return a DoctorReport.
+
+    Surfaces implement-mode safety boundaries, target contract validity,
+    self-hosting opt-in status, and boundary-violation outcomes.
+
+    This is pure inspection — no I/O, no backends, no directories created.
+
+    Args:
+        config: A fully-loaded ImplementConfig.
+
+    Returns:
+        DoctorReport — exit_code=0 if healthy, exit_code=1 if there are warnings.
+    """
+    issues: list[str] = []
+    parts: list[str] = []
+
+    target = config.target
+
+    # ── TARGET CONTRACT section ──────────────────────────────────────────────
+    parts.append("TARGET CONTRACT")
+    parts.append(f"  path:            {target.path.resolve()}")
+    execution_level = target.execution_level
+    level_note = _EXECUTION_LEVEL_NOTES.get(execution_level, "")
+    parts.append(f"  execution_level: {execution_level}  ({level_note})")
+
+    if target.allowed_roots:
+        roots_str = ", ".join(str(r) for r in target.allowed_roots)
+        parts.append(f"  allowed_roots:   {roots_str}")
+    else:
+        parts.append("  allowed_roots:   (none — boundary enforcement is permissive)")
+        issues.append(
+            "No allowed_roots declared — any file in the target repo may be patched. "
+            "Declare target.allowed_roots to restrict write scope."
+        )
+
+    parts.append("")
+
+    # ── BOUNDARY ENFORCEMENT section ─────────────────────────────────────────
+    parts.append("BOUNDARY ENFORCEMENT")
+    if target.allowed_roots:
+        parts.append("  Status:   RESTRICTED  (validate_patch_boundaries enforced on builder + arbitrator)")
+        parts.append(f"  Roots:    {', '.join(str(r) for r in target.allowed_roots)}")
+    else:
+        parts.append("  Status:   PERMISSIVE  (no allowed_roots — all target files reachable)")
+
+    parts.append("  Outcome:  boundary violation → loop stops, runner returns 1, violation recorded in state")
+    parts.append("  Phases:   builder patch and arbitrator revised patch are both validated")
+    parts.append("")
+
+    # ── SELF-HOSTING section ─────────────────────────────────────────────────
+    parts.append("SELF-HOSTING SAFETY")
+    if config.allow_same_repo:
+        parts.append("  allow_same_repo: true  [!] explicit opt-in — target may be this planner repo")
+        issues.append(
+            "allow_same_repo: true — self-hosting is enabled. "
+            "Ensure you intend to run the implement loop against this planner repository."
+        )
+    else:
+        parts.append("  allow_same_repo: false  (safe default — same-repo targeting is blocked)")
+    parts.append("")
+
+    # ── HEALTH summary ───────────────────────────────────────────────────────
+    exit_code = 0 if not issues else 1
+    health = "OK" if not issues else f"WARNINGS ({len(issues)} issue{'s' if len(issues) != 1 else ''})"
+    header = f"HEALTH: {health}\n"
+
+    if issues:
+        parts.append("WARNINGS")
+        for issue in issues:
+            parts.append(f"  [!] {issue}")
+        parts.append("")
+
+    return DoctorReport(text=header + "\n" + "\n".join(parts), exit_code=exit_code)
+
+
+def doctor_implement_config_from_path(config_path: Path) -> DoctorReport:
+    """Load an implement config from *config_path* and run doctor_implement_config_text.
+
+    Handles parse failures gracefully (exit_code=1, error text).
+
+    Args:
+        config_path: Path to the implement config YAML.
+
+    Returns:
+        DoctorReport — exit_code=1 if the file cannot be parsed.
+    """
+    from src.implement_loop import ImplementConfig
+
+    try:
+        config = ImplementConfig.from_yaml(config_path)
+    except (ValueError, OSError) as exc:
+        text = f"HEALTH: ERROR\n\n  [ERROR] Failed to load implement config: {exc}\n"
+        return DoctorReport(text=text, exit_code=1)
+
+    return doctor_implement_config_text(config)
 
 
 def doctor_config_from_path(config_path: Path) -> DoctorReport:

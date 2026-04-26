@@ -15,8 +15,8 @@ from .backends import VALID_BACKENDS, get_backend, get_backends
 from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
 from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
 from .document_refiner import DocumentRefiner
-from .doctor import doctor_config_from_path, doctor_output_text
-from .explain import explain_config_text, explain_resume_text
+from .doctor import doctor_config_from_path, doctor_implement_config_from_path, doctor_output_text
+from .explain import explain_config_text, explain_implement_config_text, explain_resume_text
 from .orchestrator import AutoResearcher
 from .plan_refiner import PlanRefiner
 from .provider_instances import instantiate_provider_backends
@@ -220,6 +220,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output directory of a previous run.",
     )
 
+    explain_implement_p = explain_sub.add_parser(
+        "implement",
+        help="Print a human-readable explanation of an implement config YAML.",
+    )
+    explain_implement_p.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to an implement config YAML.",
+    )
+
     # ── doctor subcommand ────────────────────────────────────────────────────
     doctor_p = subparsers.add_parser(
         "doctor",
@@ -247,6 +258,17 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="Output directory of a previous run.",
+    )
+
+    doctor_implement_p = doctor_sub.add_parser(
+        "implement",
+        help="Diagnose an implement config YAML and report safety boundary status.",
+    )
+    doctor_implement_p.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to an implement config YAML.",
     )
 
     return parser
@@ -577,6 +599,35 @@ def _run_doctor_output(args: argparse.Namespace, log: logging.Logger) -> int:
     return report.exit_code
 
 
+def _run_explain_implement(args: argparse.Namespace, log: logging.Logger) -> int:
+    config_path: Path = args.config
+    if not config_path.exists():
+        log.error("Config file not found: %s", config_path)
+        return 1
+
+    from .implement_loop import ImplementConfig
+
+    try:
+        config = ImplementConfig.from_yaml(config_path)
+    except (ValueError, OSError) as exc:
+        log.error("Failed to load implement config: %s", exc)
+        return 1
+
+    print(explain_implement_config_text(config, config_path=config_path))
+    return 0
+
+
+def _run_doctor_implement(args: argparse.Namespace, log: logging.Logger) -> int:
+    config_path: Path = args.config
+    if not config_path.exists():
+        log.error("Config file not found: %s", config_path)
+        return 1
+
+    report = doctor_implement_config_from_path(config_path)
+    print(report.text)
+    return report.exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -596,6 +647,8 @@ def main(argv: list[str] | None = None) -> int:
             return _run_explain_config(args, log)
         if args.explain_subcommand == "resume":
             return _run_explain_resume(args, log)
+        if args.explain_subcommand == "implement":
+            return _run_explain_implement(args, log)
         log.error("explain subcommand %r is not yet implemented.", args.explain_subcommand)
         return 1
 
@@ -604,6 +657,8 @@ def main(argv: list[str] | None = None) -> int:
             return _run_doctor_config(args, log)
         if args.doctor_subcommand == "output":
             return _run_doctor_output(args, log)
+        if args.doctor_subcommand == "implement":
+            return _run_doctor_implement(args, log)
         log.error("doctor subcommand %r is not yet implemented.", args.doctor_subcommand)
         return 1
 

@@ -1376,3 +1376,113 @@ class TestLastPauseLifecycle:
 
         assert not pause_file.exists()
 
+
+
+# ---------------------------------------------------------------------------
+# MM09 Step 5 — doctor_implement_config_text
+# ---------------------------------------------------------------------------
+
+from src.implement_loop import ImplementConfig, ImplementTarget
+
+
+def _make_implement_config(tmp_path: Path, **kwargs) -> ImplementConfig:
+    target = ImplementTarget(path=tmp_path, execution_level="patch_only", allowed_roots=(Path("src"),))
+    defaults = dict(target=target, task_description="Add retry logic", max_cycles=3, convergence_cycles=1)
+    defaults.update(kwargs)
+    return ImplementConfig(**defaults)
+
+
+class TestDoctorImplementConfigText:
+    def test_returns_doctor_report(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        result = doctor_implement_config_text(cfg)
+        assert isinstance(result, DoctorReport)
+
+    def test_healthy_config_exit_code_0(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        assert doctor_implement_config_text(cfg).exit_code == 0
+
+    def test_contains_target_contract_section(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        assert "TARGET CONTRACT" in doctor_implement_config_text(cfg).text
+
+    def test_shows_target_path(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        assert str(tmp_path) in doctor_implement_config_text(cfg).text
+
+    def test_shows_execution_level(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        assert "patch_only" in doctor_implement_config_text(cfg).text
+
+    def test_shows_allowed_roots_when_set(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        assert "src" in doctor_implement_config_text(cfg).text
+
+    def test_shows_permissive_note_when_no_allowed_roots(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        target = ImplementTarget(path=tmp_path, allowed_roots=())
+        cfg = ImplementConfig(target=target, task_description="t")
+        text = doctor_implement_config_text(cfg).text
+        assert "permissive" in text.lower() or "no roots" in text.lower()
+
+    def test_empty_allowed_roots_produces_warning(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        target = ImplementTarget(path=tmp_path, allowed_roots=())
+        cfg = ImplementConfig(target=target, task_description="t")
+        report = doctor_implement_config_text(cfg)
+        assert report.exit_code == 1
+
+    def test_contains_boundary_enforcement_section(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        assert "BOUNDARY" in doctor_implement_config_text(cfg).text
+
+    def test_allow_same_repo_false_shows_safe(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path, allow_same_repo=False)
+        text = doctor_implement_config_text(cfg).text
+        assert "allow_same_repo" in text
+
+    def test_allow_same_repo_true_shows_warning(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path, allow_same_repo=True)
+        report = doctor_implement_config_text(cfg)
+        assert report.exit_code == 1
+        assert "allow_same_repo" in report.text
+
+    def test_patch_only_has_safe_label(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        text = doctor_implement_config_text(cfg).text
+        assert "safe" in text.lower() or "patch_only" in text
+
+    def test_analyze_only_shows_read_only_note(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        target = ImplementTarget(path=tmp_path, execution_level="analyze_only", allowed_roots=(Path("src"),))
+        cfg = ImplementConfig(target=target, task_description="t")
+        text = doctor_implement_config_text(cfg).text
+        assert "analyze_only" in text
+
+    def test_isolated_apply_shows_medium_risk_note(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        target = ImplementTarget(path=tmp_path, execution_level="isolated_apply", allowed_roots=(Path("src"),))
+        cfg = ImplementConfig(target=target, task_description="t")
+        text = doctor_implement_config_text(cfg).text
+        assert "isolated_apply" in text
+
+    def test_boundary_violation_outcome_documented(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        text = doctor_implement_config_text(cfg).text
+        assert "violation" in text.lower()
+
+    def test_shows_health_line(self, tmp_path):
+        from src.doctor import doctor_implement_config_text
+        cfg = _make_implement_config(tmp_path)
+        assert "HEALTH" in doctor_implement_config_text(cfg).text
