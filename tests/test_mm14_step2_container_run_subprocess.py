@@ -208,6 +208,43 @@ class TestContainerBackendRunSubprocessKwargs:
 
 
 # ---------------------------------------------------------------------------
+# Working directory (--workdir) semantics
+# ---------------------------------------------------------------------------
+
+class TestContainerBackendRunSubprocessWorkdir:
+    def test_explicit_cwd_becomes_workdir(self, tmp_path):
+        """When cwd is given, docker argv includes --workdir <cwd>."""
+        backend = _make_backend(tmp_path)
+        custom_cwd = Path("/sandbox/workspace/subdir")
+        with patch("subprocess.run", return_value=_mock_run()) as mock_run:
+            backend.run_subprocess(["ls"], cwd=custom_cwd)
+            argv = mock_run.call_args[0][0]
+            assert "--workdir" in argv
+            wdir_idx = argv.index("--workdir")
+            assert argv[wdir_idx + 1] == str(custom_cwd)
+
+    def test_none_cwd_defaults_to_container_workspace(self, tmp_path):
+        """When cwd=None, --workdir defaults to the container workspace path."""
+        backend = _make_backend(tmp_path)
+        with patch("subprocess.run", return_value=_mock_run()) as mock_run:
+            backend.run_subprocess(["ls"], cwd=None)
+            argv = mock_run.call_args[0][0]
+            assert "--workdir" in argv
+            wdir_idx = argv.index("--workdir")
+            assert argv[wdir_idx + 1] == backend.container_workspace
+
+    def test_workdir_before_image(self, tmp_path):
+        """--workdir flag appears before the image name in docker argv."""
+        backend = _make_backend(tmp_path)
+        with patch("subprocess.run", return_value=_mock_run()) as mock_run:
+            backend.run_subprocess(["ls"], cwd=Path("/sandbox/workspace"))
+            argv = mock_run.call_args[0][0]
+            wdir_idx = argv.index("--workdir")
+            img_idx = argv.index(backend.image)
+            assert wdir_idx < img_idx
+
+
+# ---------------------------------------------------------------------------
 # Return value passthrough
 # ---------------------------------------------------------------------------
 

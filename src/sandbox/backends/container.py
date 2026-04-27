@@ -224,6 +224,7 @@ class ContainerBackend(SandboxBackend):
                 f",target={self._container_workspace}"
                 f",readonly=false"
             ),
+            "--workdir", str(cwd) if cwd is not None else self._container_workspace,
         ]
         for key, value in (env or {}).items():
             docker_argv += ["--env", f"{key}={value}"]
