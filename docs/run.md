@@ -653,6 +653,48 @@ output/<run>/.workspace/
 
 This directory is the write root when `sandbox.filesystem_access: workspace_only`.  When `sandbox_active=True` (i.e. `tool_execution_mode: sandboxed` + `sandbox.mode: tool_calls`), it also becomes the working directory for all backend subprocesses — the sandbox executor calls `prepare_workspace()` before each invocation.  The workspace path is recorded in `audit_trail.jsonl` (`sandbox_initialized` event).  Inspect-only commands (`explain config`, `explain resume`) never create it.
 
+#### Container Sandbox Backend
+
+By default the sandbox uses a **local-process backend** — subprocess isolation via workspace cwd and env allowlist with no container runtime required.  To upgrade to a **container backend** (stronger substrate, actual process boundary), configure:
+
+```yaml
+research:
+  security:
+    tool_execution_mode: sandboxed
+    sandbox:
+      mode: tool_calls
+      backend: container          # local_process | container
+      container:
+        image: python:3.11-slim   # any OCI image reference
+        container_workspace: /sandbox/workspace  # absolute path inside the container
+```
+
+**Prerequisite:** Docker CLI must be on `$PATH`.  Run `docker --version` to verify.  If Docker is absent when `backend: container` is active, the run fails at startup with a clear `RuntimeError`.  Use `autoresearch doctor config` to check readiness before running.
+
+**What `run_subprocess` does:**  Every sandboxed tool subprocess call is translated into:
+
+```
+docker run --rm \
+  --mount type=bind,source=<host_workspace>,target=<container_workspace>,readonly=false \
+  --workdir <cwd_inside_container> \
+  [--env KEY=VALUE ...] \
+  <image> \
+  <argv...>
+```
+
+No shell interpretation — `argv` is passed directly.  Each key in the filtered environment becomes a `--env KEY=VALUE` pair; only variables in the strict container allowlist are forwarded (secrets, CI markers, and agent sockets are always stripped).
+
+**Isolation boundary:**  The container process is isolated from the host by the Docker runtime.  The workspace directory is bind-mounted read-write at `container_workspace`.  **Network access is still dispatch-level only** (not OS-level firewalling) — `sandbox.network_access` gates `WebSearch`/`WebFetch` calls before they reach a subprocess, but does not set up Docker network policies.
+
+**Fallback:** To revert to the local-process backend without removing other sandbox settings:
+
+```yaml
+sandbox:
+  backend: local_process
+```
+
+Use `autoresearch explain config --config <path>` to confirm which backend and image are active for a given config.
+
 #### Denial behavior
 
 When a policy check fails, the platform:

@@ -785,6 +785,32 @@ class TestExplainConfigSubcommand:
         main(["explain", "config", "--config", str(config_file)])
         mock_researcher_cls.assert_not_called()
 
+    def test_explain_config_container_backend_shows_sandbox_backend_and_image(
+        self, tmp_path: Path, capsys
+    ):
+        """explain config with container backend shows sandbox.backend and image name."""
+        container_config = tmp_path / "container_research.yaml"
+        container_config.write_text(textwrap.dedent("""\
+            research:
+              topic: "Test topic"
+              goal: "Test goal"
+              dimensions:
+                - "Dimension A"
+              execution:
+                backend: claude-cli
+              security:
+                tool_execution_mode: sandboxed
+                sandbox:
+                  mode: tool_calls
+                  backend: container
+                  container:
+                    image: python:3.11-slim
+        """), encoding="utf-8")
+        main(["explain", "config", "--config", str(container_config)])
+        out = capsys.readouterr().out
+        assert "sandbox.backend" in out
+        assert "python:3.11-slim" in out
+
 
 # ---------------------------------------------------------------------------
 # explain resume subcommand
