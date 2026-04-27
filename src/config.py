@@ -419,11 +419,19 @@ class ContainerBackendConfig:
     Attributes:
         image: OCI image reference to use for the container.
         container_workspace: Absolute path inside the container where the
-            host workspace directory will be bind-mounted.
+            host workspace directory will be bind-mounted.  Must start with
+            ``/``; relative paths are rejected at construction time.
     """
 
     image: str = "python:3.11-slim"
     container_workspace: str = "/sandbox/workspace"
+
+    def __post_init__(self) -> None:
+        if not self.container_workspace.startswith("/"):
+            raise ValueError(
+                f"container_workspace must be an absolute path; "
+                f"got {self.container_workspace!r}"
+            )
 
 
 @dataclass(frozen=True)

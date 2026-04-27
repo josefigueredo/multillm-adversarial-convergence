@@ -121,6 +121,28 @@ class TestSandboxBackendYAMLParsing:
                 {"sandbox": {"mode": "off", "backend": "docker_swarm"}}
             )
 
+    def test_relative_container_workspace_rejected_at_parse_time(self):
+        from src.config import _parse_security_config
+        with pytest.raises(ValueError, match="absolute"):
+            _parse_security_config({
+                "sandbox": {
+                    "mode": "tool_calls",
+                    "backend": "container",
+                    "container": {"container_workspace": "relative/path"},
+                }
+            })
+
+    def test_absolute_container_workspace_accepted_at_parse_time(self):
+        cfg = _parse_yaml_security(
+            "security:\n"
+            "  sandbox:\n"
+            "    mode: tool_calls\n"
+            "    backend: container\n"
+            "    container:\n"
+            "      container_workspace: /abs/path\n"
+        )
+        assert cfg.sandbox.container.container_workspace == "/abs/path"
+
     def test_container_sub_config_defaults_when_omitted(self):
         cfg = _parse_yaml_security(
             "security:\n  sandbox:\n    mode: tool_calls\n    backend: container\n"
