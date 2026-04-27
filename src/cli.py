@@ -16,7 +16,7 @@ from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig
 from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
 from .document_refiner import DocumentRefiner
 from .doctor import doctor_config_from_path, doctor_implement_config_from_path, doctor_output_text
-from .explain import explain_config_text, explain_implement_config_text, explain_resume_text
+from .explain import explain_config_text, explain_domain_packages, explain_implement_config_text, explain_resume_text
 from .orchestrator import AutoResearcher
 from .plan_refiner import PlanRefiner
 from .provider_instances import instantiate_provider_backends
@@ -229,6 +229,11 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="Path to an implement config YAML.",
+    )
+
+    explain_sub.add_parser(
+        "domain-packages",
+        help="Print the Research OS bounded-context package map.",
     )
 
     # ── doctor subcommand ────────────────────────────────────────────────────
@@ -649,6 +654,9 @@ def main(argv: list[str] | None = None) -> int:
             return _run_explain_resume(args, log)
         if args.explain_subcommand == "implement":
             return _run_explain_implement(args, log)
+        if args.explain_subcommand == "domain-packages":
+            print(explain_domain_packages())
+            return 0
         log.error("explain subcommand %r is not yet implemented.", args.explain_subcommand)
         return 1
 

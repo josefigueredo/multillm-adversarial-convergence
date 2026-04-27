@@ -119,3 +119,24 @@ class TestExplainDomainPackagesResponsibilities:
         lower = result.lower()
         after = lower.split("policy", 1)[-1][:200]
         assert any(kw in after for kw in ("hitl", "trust", "sandbox", "security", "tool"))
+
+
+class TestExplainDomainPackagesCLI:
+    """Verify the CLI subcommand is wired and works."""
+
+    def test_cli_returns_zero(self, capsys):
+        from src.cli import main
+        rc = main(["explain", "domain-packages"])
+        assert rc == 0
+
+    def test_cli_output_mentions_evidence(self, capsys):
+        from src.cli import main
+        main(["explain", "domain-packages"])
+        captured = capsys.readouterr()
+        assert "evidence" in captured.out
+
+    def test_cli_output_mentions_policy(self, capsys):
+        from src.cli import main
+        main(["explain", "domain-packages"])
+        captured = capsys.readouterr()
+        assert "policy" in captured.out

@@ -216,7 +216,7 @@ cross-cutting runtime utilities.
 | Step 2 | Introduce `src/deliverables/` and `src/evidence/` package seams | `refactor: introduce domain package seams` | ✅ done (`194b95f`) |
 | Step 3 | Carve out `src/execution/` and `src/implement/` | `refactor: separate execution and implement bounded contexts` | ✅ done (`53d78aa`) |
 | Step 4 | Isolate HITL/policy into `src/policy/` | `refactor: isolate hitl policy boundaries` | ✅ done (`6691c3a`) |
-| Step 5 | Update docs and diagnostics to reflect domain architecture | `docs: align research os bounded contexts` | ⏳ in progress |
+| Step 5 | Update docs and diagnostics to reflect domain architecture | `docs: align research os bounded contexts` | ✅ done (`fbaf8c0`) |
 
 ---
 
