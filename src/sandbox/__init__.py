@@ -42,6 +42,12 @@ def select_sandbox_backend(config: "SandboxConfig", output_dir: Path) -> Sandbox
         return LocalProcessBackend(workspace_dir=host_workspace)
 
     if config.backend == "container":
+        if not ContainerBackend.is_available():
+            raise RuntimeError(
+                "sandbox.backend is set to 'container' but no Docker-compatible CLI was found "
+                "on $PATH.  Either install Docker (https://docs.docker.com/get-docker/) or "
+                "set sandbox.backend: local_process in your config to use process-level sandboxing."
+            )
         return ContainerBackend(
             image=config.container.image,
             host_workspace=host_workspace,
