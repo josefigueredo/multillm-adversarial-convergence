@@ -285,6 +285,8 @@ class LocalProcessBackend(SandboxBackend):
         Path
             The workspace directory path (base or iteration-scoped).
         """
+        if iteration is not None and iteration < 1:
+            raise ValueError(f"iteration must be >= 1; got {iteration!r}")
         self._workspace_dir.mkdir(parents=True, exist_ok=True)
         if iteration is None:
             return self._workspace_dir

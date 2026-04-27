@@ -102,6 +102,18 @@ class TestLocalProcessBackendIterationWorkspace:
         assert p1.is_dir()
         assert p2.is_dir()
 
+    def test_iteration_zero_raises(self, tmp_path):
+        """iteration=0 is rejected (must be >= 1)."""
+        backend = LocalProcessBackend(tmp_path / "ws")
+        with pytest.raises(ValueError, match="iteration must be >= 1"):
+            backend.prepare_workspace(iteration=0)
+
+    def test_iteration_negative_raises(self, tmp_path):
+        """iteration=-1 is rejected (must be >= 1)."""
+        backend = LocalProcessBackend(tmp_path / "ws")
+        with pytest.raises(ValueError, match="iteration must be >= 1"):
+            backend.prepare_workspace(iteration=-1)
+
 
 # ---------------------------------------------------------------------------
 # ContainerBackend: prepare_workspace with iteration
@@ -144,3 +156,15 @@ class TestContainerBackendIterationWorkspace:
         backend = self._make_backend(tmp_path)
         path = backend.prepare_workspace(iteration=7)
         assert "iter_0007" in str(path)
+
+    def test_iteration_zero_raises(self, tmp_path):
+        """iteration=0 is rejected (must be >= 1)."""
+        backend = self._make_backend(tmp_path)
+        with pytest.raises(ValueError, match="iteration must be >= 1"):
+            backend.prepare_workspace(iteration=0)
+
+    def test_iteration_negative_raises(self, tmp_path):
+        """iteration=-1 is rejected (must be >= 1)."""
+        backend = self._make_backend(tmp_path)
+        with pytest.raises(ValueError, match="iteration must be >= 1"):
+            backend.prepare_workspace(iteration=-1)

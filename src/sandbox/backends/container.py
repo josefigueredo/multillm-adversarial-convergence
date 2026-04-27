@@ -148,6 +148,8 @@ class ContainerBackend(SandboxBackend):
         Path
             The authoritative execution workspace path inside the container.
         """
+        if iteration is not None and iteration < 1:
+            raise ValueError(f"iteration must be >= 1; got {iteration!r}")
         self._host_workspace.mkdir(parents=True, exist_ok=True)
         if iteration is None:
             return Path(self._container_workspace)
