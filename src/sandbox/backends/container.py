@@ -23,6 +23,7 @@ Design contract
 from __future__ import annotations
 
 import os
+import subprocess
 import shutil
 from collections.abc import Mapping
 from pathlib import Path
@@ -186,11 +187,52 @@ class ContainerBackend(SandboxBackend):
         self,
         argv: list[str],
         *,
-        cwd: "Path | None" = None,
-        env: "dict[str, str] | None" = None,
-        timeout: "float | None" = None,
-    ) -> "tuple[int, str, str]":
-        """Run *argv* inside a Docker container (implemented in MM14 Step 2)."""
-        raise NotImplementedError(  # pragma: no cover — replaced in Step 2
-            "ContainerBackend.run_subprocess is implemented in MM14 Step 2"
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> tuple[int, str, str]:
+        """Run *argv* inside a Docker container.
+
+        Builds a ``docker run`` invocation (no shell, no string interpolation)
+        that bind-mounts the host workspace at the container workspace path,
+        forwards the supplied environment variables, and executes *argv* inside
+        the specified image.
+
+        Parameters
+        ----------
+        argv:
+            Command and arguments to run inside the container.
+        cwd:
+            Unused for the container path (the container cwd is the mounted
+            workspace); accepted for interface parity with other backends.
+        env:
+            Environment variables to inject.  Each key becomes a
+            ``--env KEY=VALUE`` flag.  ``None`` → no extra env flags.
+        timeout:
+            Seconds before the subprocess is killed.  ``None`` → no timeout.
+
+        Returns
+        -------
+        tuple[int, str, str]
+            ``(returncode, stdout, stderr)`` from the docker run invocation.
+        """
+        docker_argv: list[str] = [
+            "docker", "run", "--rm",
+            "--mount", (
+                f"type=bind"
+                f",source={self._host_workspace}"
+                f",target={self._container_workspace}"
+                f",readonly=false"
+            ),
+        ]
+        for key, value in (env or {}).items():
+            docker_argv += ["--env", f"{key}={value}"]
+        docker_argv += [self._image, *argv]
+
+        result = subprocess.run(
+            docker_argv,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
+        return (result.returncode, result.stdout, result.stderr)
