@@ -182,3 +182,135 @@ class TestTransientSandboxIterationSupport:
             action="write",
             write_path=executor.workspace_dir / "artifact.txt",
         )
+
+
+# ---------------------------------------------------------------------------
+# _make_transient_sandbox() is side-effect free
+# Iteration-aware prepare_workspace() must be called by _call_with(), not
+# inside the factory.
+# ---------------------------------------------------------------------------
+
+class TestTransientSandboxSideEffectFree:
+    """Verify that _make_transient_sandbox() does NOT call prepare_workspace()."""
+
+    def _make_researcher(self, tmp_path: Path, scope: str = "run"):
+        """Build a minimal AutoResearcher with an in-memory FakeBackend."""
+        from tests.test_orchestrator import FakeBackend
+        from src.orchestrator import AutoResearcher
+        from src.config import (
+            ContainerBackendConfig, ExecutionConfig, ResearchConfig,
+            SandboxConfig, ScoringConfig, SecurityConfig,
+        )
+        sandbox = SandboxConfig(scope=scope)
+        config = ResearchConfig(
+            topic="T",
+            goal="G",
+            dimensions=("A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(max_iterations=1, backend="claude-cli", timeout_seconds=5),
+            security=SecurityConfig(sandbox=sandbox),
+        )
+        return AutoResearcher(config=config, backend=FakeBackend(), output_dir=tmp_path / "out")
+
+    def test_transient_sandbox_has_unprepared_workspace(self, tmp_path):
+        """_make_transient_sandbox() returns executor; workspace dir NOT yet on disk."""
+        researcher = self._make_researcher(tmp_path, scope="run")
+        executor = researcher._make_transient_sandbox()
+        # The factory must NOT have created the workspace dir as a side effect.
+        assert not executor.workspace_dir.exists()
+
+    def test_transient_sandbox_scope_iteration_workspace_not_created(self, tmp_path):
+        """With scope=iteration, _make_transient_sandbox() still creates nothing on disk."""
+        researcher = self._make_researcher(tmp_path, scope="iteration")
+        researcher.iteration = 3  # simulate being mid-run
+        executor = researcher._make_transient_sandbox()
+        assert not executor.workspace_dir.exists()
+        # No iter_0003 dir either
+        iter_dir = executor.workspace_dir.parent / "iter_0003"
+        assert not iter_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# _call_with() iteration-aware prepare_workspace invocation
+# ---------------------------------------------------------------------------
+
+class TestCallWithIterationScoping:
+    """Verify _call_with() passes the right iteration to prepare_workspace."""
+
+    def _make_researcher(self, tmp_path: Path, scope: str = "run"):
+        from tests.test_orchestrator import FakeBackend
+        from src.orchestrator import AutoResearcher
+        from src.config import (
+            ContainerBackendConfig, ExecutionConfig, ResearchConfig,
+            SandboxConfig, ScoringConfig, SecurityConfig,
+        )
+        sandbox = SandboxConfig(
+            scope=scope,
+            mode="tool_calls",
+        )
+        config = ResearchConfig(
+            topic="T",
+            goal="G",
+            dimensions=("A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(max_iterations=1, backend="claude-cli", timeout_seconds=5),
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=sandbox,
+            ),
+        )
+        return AutoResearcher(config=config, backend=FakeBackend(), output_dir=tmp_path / "out")
+
+    def test_scope_run_calls_prepare_with_none(self, tmp_path):
+        """scope=run → _call_with passes iteration=None to prepare_workspace."""
+        from unittest.mock import patch
+        from src.backends import AgentResponse
+        researcher = self._make_researcher(tmp_path, scope="run")
+        mock_executor = MagicMock()
+        mock_executor.policy.sandbox_active = True
+        mock_executor.workspace_dir = tmp_path / "ws"
+        mock_executor.build_environment.return_value = {}
+        researcher._sandbox = mock_executor
+        researcher.iteration = 0
+        with patch.object(
+            researcher.backend, "invoke",
+            return_value=AgentResponse(text="ok", cost_usd=0.0, is_error=False),
+        ):
+            researcher._call_with(researcher.backend, "prompt")
+        mock_executor.prepare_workspace.assert_called_once_with(iteration=None)
+
+    def test_scope_iteration_with_active_iter_calls_prepare_with_iter(self, tmp_path):
+        """scope=iteration + iteration=3 → _call_with passes iteration=3 to prepare_workspace."""
+        researcher = self._make_researcher(tmp_path, scope="iteration")
+        mock_executor = MagicMock()
+        mock_executor.policy.sandbox_active = True
+        mock_executor.workspace_dir = tmp_path / "ws"
+        mock_executor.build_environment.return_value = {}
+        researcher._sandbox = mock_executor
+        researcher.iteration = 3
+        from unittest.mock import patch
+        from src.backends import AgentResponse
+        with patch.object(
+            researcher.backend, "invoke",
+            return_value=AgentResponse(text="ok", cost_usd=0.0, is_error=False),
+        ):
+            researcher._call_with(researcher.backend, "prompt")
+        mock_executor.prepare_workspace.assert_called_once_with(iteration=3)
+
+    def test_scope_iteration_with_zero_iter_calls_prepare_with_none(self, tmp_path):
+        """scope=iteration but iteration=0 (pre-run) → _call_with passes iteration=None."""
+        researcher = self._make_researcher(tmp_path, scope="iteration")
+        mock_executor = MagicMock()
+        mock_executor.policy.sandbox_active = True
+        mock_executor.workspace_dir = tmp_path / "ws"
+        mock_executor.build_environment.return_value = {}
+        researcher._sandbox = mock_executor
+        researcher.iteration = 0
+        from unittest.mock import patch
+        from src.backends import AgentResponse
+        with patch.object(
+            researcher.backend, "invoke",
+            return_value=AgentResponse(text="ok", cost_usd=0.0, is_error=False),
+        ):
+            researcher._call_with(researcher.backend, "prompt")
+        mock_executor.prepare_workspace.assert_called_once_with(iteration=None)

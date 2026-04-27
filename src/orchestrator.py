@@ -318,7 +318,9 @@ class AutoResearcher:
         sandbox = self._sandbox or self._make_transient_sandbox()
         process_env: dict[str, str] | None = None
         if sandbox.policy.sandbox_active:
-            sandbox.prepare_workspace()
+            scope = self.config.security.sandbox.scope
+            _iter = self.iteration if scope == "iteration" and self.iteration >= 1 else None
+            sandbox.prepare_workspace(iteration=_iter)
             working_dir = str(sandbox.workspace_dir)
             process_env = sandbox.build_environment()
         elif isolated and self._backend_runtime_dir():
@@ -1285,17 +1287,13 @@ class AutoResearcher:
     def _make_transient_sandbox(self) -> SandboxExecutor:
         """Return a one-off executor for callers that run before ``_setup_run``.
 
-        When ``sandbox.scope`` is ``"iteration"`` and an active iteration
-        exists (``self.iteration >= 1``), the executor's workspace is prepared
-        for the current iteration.  Otherwise the run-scoped workspace is used.
+        Side-effect free: no workspace is prepared here.  The caller is
+        responsible for calling :meth:`~SandboxExecutor.prepare_workspace`
+        with the appropriate iteration argument.
         """
         policy = resolve_runtime_security_policy(self.config.security, self.paths)
         backend = select_sandbox_backend(self.config.security.sandbox, self.output_dir)
-        executor = SandboxExecutor(policy, policy.workspace_dir, backend=backend)
-        scope = self.config.security.sandbox.scope
-        _iter = self.iteration if scope == "iteration" and self.iteration >= 1 else None
-        executor.prepare_workspace(iteration=_iter)
-        return executor
+        return SandboxExecutor(policy, policy.workspace_dir, backend=backend)
 
     def _write_metrics(self) -> None:
         """Write machine-readable run metrics."""
