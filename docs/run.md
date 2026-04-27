@@ -830,3 +830,25 @@ configs/
 prompts/                    Prompt templates (research phases)
 benchmarks/                 Reusable benchmark definitions
 ```
+
+---
+
+## Domain Package Architecture (Research OS)
+
+The source tree is organised into bounded-context packages introduced by MM12.
+Each package re-exports a coherent public API; flat-module imports remain
+backward-compatible during migration.
+
+| Package | Responsibility |
+|---|---|
+| `src.evidence` | Citations, provenance tracking, references, reproducibility |
+| `src.deliverables` | Publication pipeline, class configs, citation/export verification, export bundles |
+| `src.execution` | Execution plans, validation, diagnosis artifacts, repair loops |
+| `src.implement` | Implement / plan / document loops, strategies, and HITL refiners |
+| `src.policy` | HITL pause/resume, trust classification, policy denial, security runtime, tool capabilities, sandbox executor |
+| `src.workflows` | Workflow state machine — states, transitions, gates, review packets *(pre-existing)* |
+| `src.backends` | LLM backend adapters *(pre-existing)* |
+| `src.sandbox` | Sandbox execution backends *(pre-existing)* |
+
+Run `autoresearch explain domain-packages` (or call `src.explain.explain_domain_packages()`)
+to inspect the active package seams at runtime.

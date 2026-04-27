@@ -318,6 +318,40 @@ _NEXT_STAGE: dict[str, str] = {
 }
 
 
+def explain_domain_packages() -> str:
+    """Return a human-readable summary of the Research OS bounded-context packages.
+
+    Reports which domain package seams are active (introduced by MM12) and which
+    were already packaged before MM12.  Flat-module imports remain backward-
+    compatible throughout the migration; this function documents the canonical
+    package boundaries operators and contributors should prefer going forward.
+
+    Pure inspection — no side effects.
+    """
+    lines: list[str] = [
+        "RESEARCH OS — DOMAIN PACKAGES",
+        "═" * 40,
+        "",
+        "Package seams introduced by MM12:",
+        "",
+        "  src.evidence       Citations, provenance, references, reproducibility",
+        "  src.deliverables   Publication pipeline, class configs, citation/export verification",
+        "  src.execution      Execution plans, validation, diagnosis, repair loops",
+        "  src.implement      Implement / plan / document loops, strategies, refiners",
+        "  src.policy         HITL, trust, policy denial, security runtime, tool capabilities, sandbox",
+        "",
+        "Pre-existing package seams (unchanged by MM12):",
+        "",
+        "  src.workflows      Workflow state machine — states, transitions, gates, review packets",
+        "  src.backends       LLM backend adapters",
+        "  src.sandbox        Sandbox execution backends",
+        "",
+        "Backward compat: flat-module imports (e.g. from src.hitl import …) remain",
+        "valid during migration.  New code should prefer the domain package paths.",
+    ]
+    return "\n".join(lines)
+
+
 def explain_pipeline_text(pipeline: "Any") -> str:  # DeliverablePipeline
     """Return a human-readable explanation of *pipeline*'s current publication state.
 
