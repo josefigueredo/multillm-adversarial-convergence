@@ -41,8 +41,14 @@ def _make_config(
         goal="G",
         dimensions=("A",),
         scoring=ScoringConfig(),
-        execution=ExecutionConfig(max_iterations=1, backend="claude-cli"),
-        security=SecurityConfig(tool_execution_mode="sandboxed", sandbox=sandbox),
+        # Use no allowed_tools and allow_host_bash=False so the config is
+        # otherwise clean; any exit_code=1 must come from our Docker check.
+        execution=ExecutionConfig(max_iterations=1, backend="claude-cli", allowed_tools=""),
+        security=SecurityConfig(
+            tool_execution_mode="sandboxed",
+            sandbox=sandbox,
+            allow_host_bash=False,
+        ),
     )
 
 
@@ -81,7 +87,7 @@ class TestDoctorContainerBackendReady:
 
 
 # ---------------------------------------------------------------------------
-# container backend + Docker unavailable
+# container backend + Docker unavailable — exit_code must be 1
 # ---------------------------------------------------------------------------
 
 class TestDoctorContainerBackendNotFound:
@@ -90,7 +96,6 @@ class TestDoctorContainerBackendNotFound:
         config = _make_config(backend="container")
         with patch("src.sandbox.backends.container.ContainerBackend.is_available", return_value=False):
             report = doctor_config_text(config)
-        # Must say either "not found on $PATH" or "RuntimeError"
         text = report.text
         assert ("not found on $PATH" in text) or ("RuntimeError" in text)
 
@@ -100,6 +105,35 @@ class TestDoctorContainerBackendNotFound:
         with patch("src.sandbox.backends.container.ContainerBackend.is_available", return_value=False):
             report = doctor_config_text(config)
         assert "container backend" in report.text
+
+    def test_docker_missing_exits_with_code_1(self, tmp_path):
+        """Active container backend with Docker absent must return exit_code=1."""
+        config = _make_config(backend="container", sandbox_mode="tool_calls")
+        with patch("src.sandbox.backends.container.ContainerBackend.is_available", return_value=False):
+            report = doctor_config_text(config)
+        assert report.exit_code == 1
+
+    def test_docker_missing_emits_health_warning(self, tmp_path):
+        """HEALTH: WARNINGS appears when Docker is missing for an active container backend."""
+        config = _make_config(backend="container", sandbox_mode="tool_calls")
+        with patch("src.sandbox.backends.container.ContainerBackend.is_available", return_value=False):
+            report = doctor_config_text(config)
+        assert "WARNINGS" in report.text
+
+
+# ---------------------------------------------------------------------------
+# container backend + Docker available — healthy
+# ---------------------------------------------------------------------------
+
+class TestDoctorContainerBackendAvailableHealthy:
+    def test_docker_available_no_backend_availability_issue(self, tmp_path):
+        """When Docker is present, no backend-availability issue is added."""
+        config = _make_config(backend="container", sandbox_mode="tool_calls")
+        with patch("src.sandbox.backends.container.ContainerBackend.is_available", return_value=True):
+            report = doctor_config_text(config)
+        # Should not contain the unavailability warning text
+        assert "not found on $PATH" not in report.text
+        assert "RuntimeError at runtime" not in report.text
 
 
 # ---------------------------------------------------------------------------

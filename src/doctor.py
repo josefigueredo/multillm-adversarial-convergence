@@ -171,6 +171,10 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
                     "  container backend configured but Docker not found on $PATH"
                     " — will raise RuntimeError at runtime)"
                 )
+                issues.append(
+                    "container backend is active but Docker not found on $PATH"
+                    " — run will raise RuntimeError; install Docker or set sandbox.backend: local_process"
+                )
         else:
             lines.append(
                 "  sandbox backend:          local_process"
