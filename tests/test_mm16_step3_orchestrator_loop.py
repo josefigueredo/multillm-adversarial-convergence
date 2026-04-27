@@ -72,15 +72,21 @@ def _apply_setup_patches():
     )
 
 
-def _make_config(scope: str = "run") -> ResearchConfig:
-    sandbox = SandboxConfig(scope=scope)
+def _make_config(scope: str = "run", *, sandboxed: bool = False) -> ResearchConfig:
+    sandbox = SandboxConfig(
+        scope=scope,
+        mode="tool_calls" if sandboxed else "off",
+    )
     return ResearchConfig(
         topic="T",
         goal="G",
         dimensions=("A",),
         scoring=ScoringConfig(),
         execution=ExecutionConfig(max_iterations=2, backend="claude-cli", timeout_seconds=5),
-        security=SecurityConfig(sandbox=sandbox),
+        security=SecurityConfig(
+            tool_execution_mode="sandboxed" if sandboxed else "direct",
+            sandbox=sandbox,
+        ),
     )
 
 
@@ -143,8 +149,8 @@ class TestScopeRunSetupBehavior:
 
 class TestScopeIterationSetupBehavior:
     def test_iteration_scope_skips_workspace_in_setup(self, tmp_path):
-        """scope=iteration → _setup() does NOT create the workspace dir."""
-        researcher = _make_researcher(_make_config(scope="iteration"), tmp_path)
+        """scope=iteration (active sandbox) → _setup() does NOT create the workspace dir."""
+        researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
         assert researcher._sandbox is not None
         # Base workspace dir should NOT exist yet (no prepare_workspace called)
@@ -152,7 +158,7 @@ class TestScopeIterationSetupBehavior:
 
     def test_iteration_scope_workspace_prepared_before_iter1(self, tmp_path):
         """scope=iteration → prepare_workspace(iteration=1) called before iteration 1."""
-        researcher = _make_researcher(_make_config(scope="iteration"), tmp_path)
+        researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
 
         with patch.object(researcher._sandbox, "prepare_workspace") as mock_prep, \
@@ -164,7 +170,7 @@ class TestScopeIterationSetupBehavior:
 
     def test_iteration_scope_workspace_prepared_before_iter2(self, tmp_path):
         """scope=iteration → prepare_workspace(iteration=2) called before iteration 2."""
-        researcher = _make_researcher(_make_config(scope="iteration"), tmp_path)
+        researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
 
         with patch.object(researcher._sandbox, "prepare_workspace") as mock_prep, \
@@ -179,7 +185,7 @@ class TestScopeIterationSetupBehavior:
 
     def test_iteration_scope_workspace_dir_changes_between_iterations(self, tmp_path):
         """scope=iteration → workspace_dir updates to iter_0001, iter_0002 path."""
-        researcher = _make_researcher(_make_config(scope="iteration"), tmp_path)
+        researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
 
         with patch("src.research_loop.run_iteration") as mock_iter:
@@ -195,7 +201,7 @@ class TestScopeIterationSetupBehavior:
 
     def test_iteration_scope_iter_dirs_created_on_disk(self, tmp_path):
         """scope=iteration → iter_0001/ and iter_0002/ dirs exist after two iterations."""
-        researcher = _make_researcher(_make_config(scope="iteration"), tmp_path)
+        researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
 
         with patch("src.research_loop.run_iteration") as mock_iter:
@@ -214,7 +220,7 @@ class TestScopeIterationSetupBehavior:
 
 class TestSandboxWorkspacePreparedAuditEvent:
     def _make_researcher_with_capturing_trail(self, tmp_path: Path, scope: str = "iteration"):
-        researcher = _make_researcher(_make_config(scope=scope), tmp_path)
+        researcher = _make_researcher(_make_config(scope=scope, sandboxed=(scope == "iteration")), tmp_path)
         _run_setup(researcher)  # runs first, _sync_paths() inside recreates _audit_trail
         trail = CapturingAuditTrail()
         researcher._audit_trail = trail  # inject AFTER setup so _sync_paths can't overwrite
@@ -279,3 +285,95 @@ class TestSandboxWorkspacePreparedAuditEvent:
 
         events = trail.events_named("sandbox_workspace_prepared")
         assert len(events) == 0
+
+
+# ---------------------------------------------------------------------------
+# Direct-mode with scope=iteration: no workspace creation, no audit events
+# ---------------------------------------------------------------------------
+
+class TestDirectModeWithIterationScope:
+    """When sandbox is not active, scope=iteration must not trigger workspace or events."""
+
+    def _make_direct_config(self) -> ResearchConfig:
+        """Config with scope=iteration but tool_execution_mode=direct (sandbox inactive)."""
+        sandbox = SandboxConfig(scope="iteration")  # scope set, but mode is direct
+        return ResearchConfig(
+            topic="T",
+            goal="G",
+            dimensions=("A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(max_iterations=2, backend="claude-cli", timeout_seconds=5),
+            security=SecurityConfig(
+                tool_execution_mode="direct",   # sandbox NOT active
+                sandbox=sandbox,
+            ),
+        )
+
+    def test_direct_mode_no_iteration_workspace_created(self, tmp_path):
+        """scope=iteration + direct mode → no iter_* dirs created during _run_iteration."""
+        from tests.test_orchestrator import FakeBackend
+        from src.orchestrator import AutoResearcher
+        researcher = AutoResearcher(
+            config=self._make_direct_config(),
+            backend=FakeBackend(),
+            output_dir=tmp_path / "output",
+        )
+        _run_setup(researcher)
+
+        with patch("src.research_loop.run_iteration") as mock_iter:
+            mock_iter.side_effect = lambda ctx, state: setattr(state, "iteration", state.iteration + 1)
+            researcher._run_iteration()
+            researcher._run_iteration()
+
+        base_ws = tmp_path / "output" / ".workspace"
+        assert not (base_ws / "iter_0001").exists()
+        assert not (base_ws / "iter_0002").exists()
+
+    def test_direct_mode_no_sandbox_workspace_prepared_event(self, tmp_path):
+        """scope=iteration + direct mode → no sandbox_workspace_prepared audit events."""
+        from tests.test_orchestrator import FakeBackend
+        from src.orchestrator import AutoResearcher
+        researcher = AutoResearcher(
+            config=self._make_direct_config(),
+            backend=FakeBackend(),
+            output_dir=tmp_path / "output",
+        )
+        _run_setup(researcher)
+        trail = CapturingAuditTrail()
+        researcher._audit_trail = trail  # inject after setup
+
+        with patch("src.research_loop.run_iteration") as mock_iter:
+            mock_iter.side_effect = lambda ctx, state: setattr(state, "iteration", state.iteration + 1)
+            researcher._run_iteration()
+            researcher._run_iteration()
+
+        assert len(trail.events_named("sandbox_workspace_prepared")) == 0
+
+    def test_active_sandbox_iteration_scope_still_prepares(self, tmp_path):
+        """Active sandbox + scope=iteration still creates iteration workspaces (regression guard)."""
+        from tests.test_orchestrator import FakeBackend
+        from src.orchestrator import AutoResearcher
+        from src.config import SandboxConfig, SecurityConfig
+        sandbox = SandboxConfig(scope="iteration", mode="tool_calls")
+        config = ResearchConfig(
+            topic="T",
+            goal="G",
+            dimensions=("A",),
+            scoring=ScoringConfig(),
+            execution=ExecutionConfig(max_iterations=2, backend="claude-cli", timeout_seconds=5),
+            security=SecurityConfig(
+                tool_execution_mode="sandboxed",
+                sandbox=sandbox,
+            ),
+        )
+        researcher = AutoResearcher(config=config, backend=FakeBackend(), output_dir=tmp_path / "output")
+        _run_setup(researcher)
+
+        with patch("src.research_loop.run_iteration") as mock_iter:
+            mock_iter.side_effect = lambda ctx, state: setattr(state, "iteration", state.iteration + 1)
+            researcher._run_iteration()
+            researcher._run_iteration()
+
+        base_ws = tmp_path / "output" / ".workspace"
+        assert (base_ws / "iter_0001").is_dir()
+        assert (base_ws / "iter_0002").is_dir()

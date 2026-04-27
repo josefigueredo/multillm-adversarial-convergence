@@ -789,6 +789,7 @@ class AutoResearcher:
         state = self._build_loop_state()
         if (
             self._sandbox is not None
+            and self._sandbox.policy.sandbox_active
             and self.config.security.sandbox.scope == "iteration"
         ):
             next_iter = self.iteration + 1
