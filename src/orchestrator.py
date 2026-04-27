@@ -80,6 +80,7 @@ from .semantic_eval import (
 from .strategy import ResearchCandidate, Strategy, get_strategy
 from .tool_runtime import run_function_tool_loop
 from .sandbox_executor import SandboxExecutor
+from .sandbox import select_sandbox_backend
 from .security_runtime import resolve_runtime_security_policy
 from .policy_denial import PolicyDeniedError
 from .tool_capabilities import classify_allowed_tools
@@ -672,12 +673,13 @@ class AutoResearcher:
             self._write_run_manifest()
             self._write_effective_config()
             _policy = resolve_runtime_security_policy(self.config.security, self.paths)
-            self._sandbox = SandboxExecutor(_policy, _policy.workspace_dir)
+            _backend = select_sandbox_backend(self.config.security.sandbox, self.output_dir)
+            self._sandbox = SandboxExecutor(_policy, _policy.workspace_dir, backend=_backend)
             self._sandbox.prepare_workspace()
             self._audit_trail.emit(
                 "sandbox_initialized",
                 output_dir=str(self.paths.output_dir),
-                workspace_dir=str(self.paths.workspace_dir),
+                workspace_dir=str(self._sandbox.workspace_dir),
             )
             self._audit_trail.emit(
                 "sandbox_policy_applied",
@@ -1283,7 +1285,8 @@ class AutoResearcher:
     def _make_transient_sandbox(self) -> SandboxExecutor:
         """Return a one-off executor for callers that run before ``_setup_run``."""
         policy = resolve_runtime_security_policy(self.config.security, self.paths)
-        return SandboxExecutor(policy, policy.workspace_dir)
+        backend = select_sandbox_backend(self.config.security.sandbox, self.output_dir)
+        return SandboxExecutor(policy, policy.workspace_dir, backend=backend)
 
     def _write_metrics(self) -> None:
         """Write machine-readable run metrics."""
