@@ -653,6 +653,44 @@ output/<run>/.workspace/
 
 This directory is the write root when `sandbox.filesystem_access: workspace_only`.  When `sandbox_active=True` (i.e. `tool_execution_mode: sandboxed` + `sandbox.mode: tool_calls`), it also becomes the working directory for all backend subprocesses — the sandbox executor calls `prepare_workspace()` before each invocation.  The workspace path is recorded in `audit_trail.jsonl` (`sandbox_initialized` event).  Inspect-only commands (`explain config`, `explain resume`) never create it.
 
+#### Per-iteration workspace isolation
+
+By default (`sandbox.scope: run`) a single workspace directory is shared across all iterations.
+To give each iteration its own isolated subdirectory, set `sandbox.scope: iteration`:
+
+```yaml
+research:
+  security:
+    tool_execution_mode: sandboxed
+    sandbox:
+      mode: tool_calls
+      scope: iteration   # run (default) | iteration
+```
+
+**Workspace layout:**
+
+| `sandbox.scope` | Layout | Notes |
+|---|---|---|
+| `run` (default) | `<output>/.workspace/` | Single shared dir for all iterations |
+| `iteration` | `<output>/.workspace/iter_0001/`, `iter_0002/`, … | Fresh subdir per iteration; old dirs persist |
+
+When `scope: iteration` is active the sandbox executor creates the subdirectory for the next
+iteration *before* each research loop step.  An `sandbox_workspace_prepared` audit event is
+emitted for each prepared iteration directory.  Previous iteration directories are **never
+deleted** — they persist as audit and debug artifacts.
+
+**Trade-offs:**
+
+- `scope: run` — lower filesystem overhead; suitable when iterations are independent and
+  artifact bleed between iterations is acceptable.
+- `scope: iteration` — prevents tools from reading files written in earlier iterations;
+  recommended for adversarial runs where cross-iteration contamination could skew results.
+
+> **Note:** `scope: iteration` only has a runtime effect when the sandbox is active
+> (`tool_execution_mode: sandboxed` + `sandbox.mode: tool_calls`).  In direct mode, the
+> `scope` setting is recorded in the config but no isolation directories are created.
+> Use `autoresearch doctor config` to verify the effective isolation model before running.
+
 #### Container Sandbox Backend
 
 By default the sandbox uses a **local-process backend** — subprocess isolation via workspace cwd and env allowlist with no container runtime required.  To upgrade to a **container backend** (stronger substrate, actual process boundary), configure:
