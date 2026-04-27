@@ -99,12 +99,50 @@ class TestContainerBackendPrepareWorkspace:
         backend.prepare_workspace()  # second call must not raise
         assert ws.exists()
 
-    def test_returns_host_workspace_path(self, tmp_path: Path):
+    def test_returns_container_workspace_path(self, tmp_path: Path):
+        """Returned path is the authoritative container-side execution path."""
         from src.sandbox.backends.container import ContainerBackend
         ws = tmp_path / "workspace"
         backend = ContainerBackend(image="python:3.11-slim", host_workspace=ws)
         result = backend.prepare_workspace()
-        assert result == ws
+        assert result == Path(backend.container_workspace)
+
+    def test_returns_default_container_workspace(self, tmp_path: Path):
+        from src.sandbox.backends.container import ContainerBackend
+        ws = tmp_path / "workspace"
+        backend = ContainerBackend(image="python:3.11-slim", host_workspace=ws)
+        result = backend.prepare_workspace()
+        assert result == Path("/sandbox/workspace")
+
+    def test_custom_container_workspace_is_returned(self, tmp_path: Path):
+        from src.sandbox.backends.container import ContainerBackend
+        ws = tmp_path / "workspace"
+        backend = ContainerBackend(
+            image="python:3.11-slim",
+            host_workspace=ws,
+            container_workspace="/custom/exec",
+        )
+        result = backend.prepare_workspace()
+        assert result == Path("/custom/exec")
+
+    def test_host_dir_created_even_with_custom_container_path(self, tmp_path: Path):
+        from src.sandbox.backends.container import ContainerBackend
+        ws = tmp_path / "workspace"
+        backend = ContainerBackend(
+            image="python:3.11-slim",
+            host_workspace=ws,
+            container_workspace="/custom/exec",
+        )
+        backend.prepare_workspace()
+        assert ws.exists()
+
+    def test_returned_path_is_not_host_path(self, tmp_path: Path):
+        """Container backend must NOT return the host-side path."""
+        from src.sandbox.backends.container import ContainerBackend
+        ws = tmp_path / "workspace"
+        backend = ContainerBackend(image="python:3.11-slim", host_workspace=ws)
+        result = backend.prepare_workspace()
+        assert result != ws
 
 
 class TestContainerBackendBuildEnvironment:
@@ -172,6 +210,36 @@ class TestContainerBackendAvailability:
             from src.sandbox.backends.container import ContainerBackend  # noqa: F401
 
 
+class TestContainerBackendValidation:
+    def test_relative_container_workspace_raises(self, tmp_path: Path):
+        from src.sandbox.backends.container import ContainerBackend
+        with pytest.raises(ValueError, match="absolute"):
+            ContainerBackend(
+                image="python:3.11-slim",
+                host_workspace=tmp_path,
+                container_workspace="relative/path",
+            )
+
+    def test_no_leading_slash_raises(self, tmp_path: Path):
+        from src.sandbox.backends.container import ContainerBackend
+        with pytest.raises(ValueError):
+            ContainerBackend(
+                image="python:3.11-slim",
+                host_workspace=tmp_path,
+                container_workspace="sandbox/work",
+            )
+
+    def test_absolute_path_accepted(self, tmp_path: Path):
+        from src.sandbox.backends.container import ContainerBackend
+        # Must not raise
+        backend = ContainerBackend(
+            image="python:3.11-slim",
+            host_workspace=tmp_path,
+            container_workspace="/valid/abs/path",
+        )
+        assert backend.container_workspace == "/valid/abs/path"
+
+
 class TestContainerBackendSandboxPackageExport:
     def test_sandbox_init_exposes_container_backend(self):
         from src.sandbox import ContainerBackend
@@ -180,3 +248,7 @@ class TestContainerBackendSandboxPackageExport:
     def test_sandbox_init_still_exposes_local_process(self):
         from src.sandbox import LocalProcessBackend
         assert LocalProcessBackend is not None
+
+    def test_backends_package_exposes_container_backend(self):
+        from src.sandbox.backends import ContainerBackend
+        assert ContainerBackend is not None

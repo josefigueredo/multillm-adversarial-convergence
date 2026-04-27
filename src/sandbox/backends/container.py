@@ -91,13 +91,18 @@ class ContainerBackend(SandboxBackend):
         host_workspace: Path,
         container_workspace: str | None = None,
     ) -> None:
-        self._image = image
-        self._host_workspace = host_workspace
-        self._container_workspace = (
+        _cw = (
             container_workspace
             if container_workspace is not None
             else self._DEFAULT_CONTAINER_WORKSPACE
         )
+        if not _cw.startswith("/"):
+            raise ValueError(
+                f"container_workspace must be an absolute path; got {_cw!r}"
+            )
+        self._image = image
+        self._host_workspace = host_workspace
+        self._container_workspace = _cw
 
     # ── Properties ────────────────────────────────────────────────────────────
 
@@ -119,18 +124,23 @@ class ContainerBackend(SandboxBackend):
     # ── SandboxBackend interface ──────────────────────────────────────────────
 
     def prepare_workspace(self) -> Path:
-        """Create the host workspace directory and return its path.
+        """Create the host workspace directory and return the authoritative container execution path.
+
+        The host directory is provisioned so it can be bind-mounted into the
+        container.  The *returned path* is the container-side mount point — the
+        path callers should use as the cwd for subprocess execution inside the
+        container.
 
         Idempotent — safe to call multiple times.
 
         Returns
         -------
         Path
-            The host-side workspace directory (to be bind-mounted into the
-            container at :attr:`container_workspace`).
+            The authoritative execution workspace path inside the container
+            (i.e. ``Path(self.container_workspace)``), not the host-side path.
         """
         self._host_workspace.mkdir(parents=True, exist_ok=True)
-        return self._host_workspace
+        return Path(self._container_workspace)
 
     def build_environment(
         self,
