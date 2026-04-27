@@ -29,6 +29,7 @@ VALID_SANDBOX_MODES = ("off", "tool_calls")
 VALID_SANDBOX_SCOPES = ("run",)
 VALID_SANDBOX_FILESYSTEM_ACCESS = ("output_only", "workspace_only")
 VALID_SANDBOX_NETWORK_ACCESS = ("unrestricted", "web_only", "none")
+VALID_SANDBOX_BACKENDS = ("local_process", "container")
 
 
 def _validate_backend_name(name: str, role: str) -> None:
@@ -412,6 +413,20 @@ class ExecutionConfig:
 
 
 @dataclass(frozen=True)
+class ContainerBackendConfig:
+    """Container-specific configuration for the sandbox backend (MM13).
+
+    Attributes:
+        image: OCI image reference to use for the container.
+        container_workspace: Absolute path inside the container where the
+            host workspace directory will be bind-mounted.
+    """
+
+    image: str = "python:3.11-slim"
+    container_workspace: str = "/sandbox/workspace"
+
+
+@dataclass(frozen=True)
 class SandboxConfig:
     """Sandbox isolation settings (policy declaration; enforcement is a later milestone).
 
@@ -435,6 +450,8 @@ class SandboxConfig:
     scope: str = "run"
     filesystem_access: str = "output_only"
     network_access: str = "unrestricted"
+    backend: str = "local_process"
+    container: ContainerBackendConfig = field(default_factory=ContainerBackendConfig)
 
 
 @dataclass(frozen=True)
@@ -522,6 +539,21 @@ def _parse_security_config(raw: dict[str, Any]) -> "SecurityConfig":
             f"Must be one of: {', '.join(VALID_SANDBOX_NETWORK_ACCESS)}"
         )
 
+    sandbox_backend = str(sandbox_raw.get("backend", "local_process"))
+    if sandbox_backend not in VALID_SANDBOX_BACKENDS:
+        raise ValueError(
+            f"Invalid security.sandbox.backend '{sandbox_backend}'. "
+            f"Must be one of: {', '.join(VALID_SANDBOX_BACKENDS)}"
+        )
+
+    container_raw: dict[str, Any] = sandbox_raw.get("container", {})
+    container_cfg = ContainerBackendConfig(
+        image=str(container_raw.get("image", "python:3.11-slim")),
+        container_workspace=str(
+            container_raw.get("container_workspace", "/sandbox/workspace")
+        ),
+    )
+
     return SecurityConfig(
         content_trust=content_trust,
         tool_execution_mode=tool_execution_mode,
@@ -534,6 +566,8 @@ def _parse_security_config(raw: dict[str, Any]) -> "SecurityConfig":
             scope=sandbox_scope,
             filesystem_access=filesystem_access,
             network_access=network_access,
+            backend=sandbox_backend,
+            container=container_cfg,
         ),
     )
 
