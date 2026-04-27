@@ -189,8 +189,20 @@ class SandboxExecutor:
     # ------------------------------------------------------------------
 
     def _check_write(self, action: str, path: Path) -> None:
-        """Raise PolicyDeniedError when *path* violates the filesystem boundary."""
+        """Raise PolicyDeniedError when *path* violates the filesystem boundary.
+
+        Checks the runtime policy first.  For container backends the executor's
+        ``workspace_dir`` is updated to the container-side path by
+        :meth:`prepare_workspace`; that path may differ from the policy's
+        host-side workspace, so we also accept writes within the executor's
+        own authoritative workspace path.
+        """
         if self._policy.is_write_allowed(path):
+            return
+        # Also accept writes within the executor's own workspace_dir.
+        # This handles container backends where _workspace_dir is a container-
+        # side path that the host-scoped policy does not know about.
+        if self._is_within_executor_workspace(path):
             return
         raise PolicyDeniedError(
             reason_code="write_outside_allowed_roots",
@@ -199,6 +211,14 @@ class SandboxExecutor:
             requested_path=str(path),
             allowed_boundary=self._policy.filesystem_access,
         )
+
+    def _is_within_executor_workspace(self, path: Path) -> bool:
+        """Return True when *path* falls within the executor's workspace_dir."""
+        try:
+            path.resolve().relative_to(self._workspace_dir.resolve())
+            return True
+        except ValueError:
+            return False
 
     def _check_network(self, action: str, destination_type: str) -> None:
         """Raise PolicyDeniedError when *destination_type* violates network policy.
