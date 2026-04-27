@@ -1283,10 +1283,19 @@ class AutoResearcher:
             raise
 
     def _make_transient_sandbox(self) -> SandboxExecutor:
-        """Return a one-off executor for callers that run before ``_setup_run``."""
+        """Return a one-off executor for callers that run before ``_setup_run``.
+
+        When ``sandbox.scope`` is ``"iteration"`` and an active iteration
+        exists (``self.iteration >= 1``), the executor's workspace is prepared
+        for the current iteration.  Otherwise the run-scoped workspace is used.
+        """
         policy = resolve_runtime_security_policy(self.config.security, self.paths)
         backend = select_sandbox_backend(self.config.security.sandbox, self.output_dir)
-        return SandboxExecutor(policy, policy.workspace_dir, backend=backend)
+        executor = SandboxExecutor(policy, policy.workspace_dir, backend=backend)
+        scope = self.config.security.sandbox.scope
+        _iter = self.iteration if scope == "iteration" and self.iteration >= 1 else None
+        executor.prepare_workspace(iteration=_iter)
+        return executor
 
     def _write_metrics(self) -> None:
         """Write machine-readable run metrics."""

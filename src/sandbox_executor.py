@@ -130,7 +130,7 @@ class SandboxExecutor:
     # Workspace setup
     # ------------------------------------------------------------------
 
-    def prepare_workspace(self) -> Path:
+    def prepare_workspace(self, *, iteration: int | None = None) -> Path:
         """Initialize the execution workspace via the active backend.
 
         Delegates to :meth:`~SandboxBackend.prepare_workspace` and updates
@@ -138,14 +138,23 @@ class SandboxExecutor:
         This allows container backends to return a different execution path
         (e.g. a container mount) without changing the executor's external API.
 
+        When *iteration* is provided, the backend creates a per-iteration
+        subdirectory and :attr:`workspace_dir` is updated to that path.
+
         Idempotent — safe to call multiple times.
+
+        Parameters
+        ----------
+        iteration:
+            Iteration number.  ``None`` → existing run-scoped behavior.
+            Positive int → create and activate ``iter_<NNNN>/`` subdir.
 
         Returns
         -------
         Path
             The authoritative execution workspace path.
         """
-        path = self._backend.prepare_workspace()
+        path = self._backend.prepare_workspace(iteration=iteration)
         self._workspace_dir = path
         return path
 
