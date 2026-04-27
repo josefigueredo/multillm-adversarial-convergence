@@ -121,7 +121,13 @@ def explain_config_text(config: Any, *, config_path: Path | None = None) -> str:
         f"  sandbox.scope:       {sb.scope}",
         f"  sandbox.filesystem:  {sb.filesystem_access}",
         f"  sandbox.network:     {sb.network_access}",
+        f"  sandbox.backend:     {sb.backend}",
     ]
+    if sb.backend == "container":
+        lines += [
+            f"  sandbox.container.image:     {sb.container.image}",
+            f"  sandbox.container.workspace: {sb.container.container_workspace}",
+        ]
 
     # --- HITL policy (MM08) ---------------------------------------------------
     from src.workflows.gates import GATES_BY_MODE

@@ -152,18 +152,34 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
     lines: list[str] = []
     issues: list[str] = []
 
-    # Sandbox backend type — 3 states
+    # Sandbox backend type — reflects the configured backend substrate
+    configured_backend = sec.sandbox.backend  # "local_process" | "container"
     if sandbox_active:
-        lines.append(
-            "  sandbox backend:          local-process"
-            "  (LocalProcessBackend — process-level isolation)"
-        )
+        if configured_backend == "container":
+            _img = sec.sandbox.container.image
+            _cws = sec.sandbox.container.container_workspace
+            lines.append(
+                f"  sandbox backend:          container  ({_img} → {_cws};"
+                "  container-grade isolation)"
+            )
+        else:
+            lines.append(
+                "  sandbox backend:          local_process"
+                "  (LocalProcessBackend — process-level isolation)"
+            )
     elif sandbox_declared:
-        lines.append(
-            "  sandbox backend:          local-process"
-            "  (LocalProcessBackend — declared, not active;"
-            " set sandbox.mode: tool_calls to enable)"
-        )
+        if configured_backend == "container":
+            _img = sec.sandbox.container.image
+            lines.append(
+                f"  sandbox backend:          container  ({_img};"
+                "  declared, not active; set sandbox.mode: tool_calls to enable)"
+            )
+        else:
+            lines.append(
+                "  sandbox backend:          local_process"
+                "  (LocalProcessBackend — declared, not active;"
+                " set sandbox.mode: tool_calls to enable)"
+            )
     else:
         lines.append(
             "  sandbox backend:          N/A  (direct mode — no sandbox substrate)"
@@ -171,10 +187,16 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
 
     # Env shaping status — three distinct states
     if sandbox_active:
-        lines.append(
-            "  env shaping:              ACTIVE"
-            "  (build_environment filters to allowlist; process-level, not container-grade)"
-        )
+        if configured_backend == "container":
+            lines.append(
+                "  env shaping:              ACTIVE"
+                "  (build_environment filters to allowlist; container-grade env isolation)"
+            )
+        else:
+            lines.append(
+                "  env shaping:              ACTIVE"
+                "  (build_environment filters to allowlist; process-level, not container-grade)"
+            )
     elif sec.tool_execution_mode == "direct":
         lines.append(
             "  env shaping:              inactive  (direct mode — ambient env inherited)"
