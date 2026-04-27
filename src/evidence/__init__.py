@@ -1,9 +1,9 @@
-"""Evidence domain package — MM12 Step 2.
+"""Evidence domain package — MM12 Step 2 / MM15 Step 1.
 
 Re-exports the public API for research evidence — deterministic references,
 provenance tracking, and claim/citation extraction — under a single package
 boundary.  Existing flat-module imports (``from src.references import …``)
-remain valid.
+remain valid via compatibility shims.
 
 Contexts exposed:
 - References: heading regex, deduplication, building, injection, extraction
@@ -13,7 +13,7 @@ Contexts exposed:
 from __future__ import annotations
 
 # ── References ────────────────────────────────────────────────────────────────
-from ..references import (
+from .references import (
     REFS_HEADING_RE,
     build_references_section,
     dedupe_citations,
@@ -24,7 +24,7 @@ from ..references import (
 )
 
 # ── Provenance ────────────────────────────────────────────────────────────────
-from ..provenance import (
+from .provenance import (
     build_source_file_provenance,
     detect_claim_conflicts,
     extract_citations,
@@ -34,7 +34,7 @@ from ..provenance import (
     score_research_rubric,
     summarize_evidence_quality,
 )
-from ..provenance_artifacts import write_provenance_artifacts_bundle
+from .provenance_artifacts import write_provenance_artifacts_bundle
 
 __all__ = [
     # references
