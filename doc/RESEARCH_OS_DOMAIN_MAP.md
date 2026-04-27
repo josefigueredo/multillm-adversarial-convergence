@@ -24,7 +24,6 @@ iteration, scoring, convergence, and run lifecycle management.
 | File | Role |
 |---|---|
 | `src/research_loop.py` | Top-level loop driver |
-| `src/auto_researcher.py` | LLM orchestrator, tool dispatch |
 | `src/config.py` | Research config model and validation |
 | `src/strategy.py` | Execution strategy selection |
 | `src/orchestrator.py` | Multi-run / portfolio orchestration |
@@ -61,6 +60,9 @@ artefacts.
 | `src/certainty.py` | Certainty / confidence tracking |
 | `src/comparison.py` | Source comparison utilities |
 | `src/constraints.py` | Research constraint models |
+| `src/provenance.py` | Provenance tracking |
+| `src/provenance_artifacts.py` | Provenance artifact models |
+| `src/provenance_pipeline.py` | Provenance pipeline |
 
 **Target package seam:** `src/evidence/`
 
@@ -78,6 +80,8 @@ citation verification into publication-grade deliverables.
 | `src/citation_verification.py` | Citation/export verification (MM11 Step 3) |
 | `src/export_bundle.py` | Export bundle assembly (MM11 Step 4) |
 | `src/pdf_report.py` | PDF report generation |
+| `src/reporting.py` | Report generation orchestration |
+| `src/report_exports.py` | Report export helpers |
 | `src/output_style.py` | Output style config and presentation |
 
 **Target package seam:** `src/deliverables/`
@@ -182,6 +186,7 @@ cross-cutting runtime utilities.
 | `src/backends/` | LLM backend adapters (already a package) |
 | `src/templates/` | Prompt/report templates (already a package) |
 | `src/backend_options.py` | Backend option helpers |
+| `src/provider_instances.py` | Provider instance construction |
 | `src/prompts.py` | Prompt construction utilities |
 | `src/portfolio.py` | Portfolio / multi-topic run helpers |
 
