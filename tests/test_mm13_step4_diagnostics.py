@@ -109,15 +109,21 @@ class TestDoctorConfigSandboxBackend:
         assert "ubuntu:22.04" in report.text
 
     def test_container_isolation_language_differs_from_local(self):
-        """Container backend should claim container-grade isolation, not process-level."""
+        """Container backend must not claim process-level; must be honest about guarantees."""
         from src.doctor import doctor_config_text
         local_report = doctor_config_text(_make_config("local_process", sandbox_mode="tool_calls"))
         container_report = doctor_config_text(_make_config("container", sandbox_mode="tool_calls"))
-        # local_process should say process-level
+        # local_process says process-level
         assert "process-level" in local_report.text
-        # container should NOT say local-process in the isolation line
-        # (it may say container-grade or similar)
-        assert "container" in container_report.text
+        # container mentions configured (not container-grade as a hard claim)
+        assert "container backend configured" in container_report.text
+        # container does not claim process-level isolation
+        sandbox_lines = [
+            l for l in container_report.text.splitlines()
+            if "sandbox backend" in l.lower()
+        ]
+        for line in sandbox_lines:
+            assert "process-level" not in line
 
     def test_doctor_sandbox_backend_section_not_always_local(self):
         """Verifies we no longer hard-code 'local-process' for all backends."""

@@ -160,7 +160,7 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
             _cws = sec.sandbox.container.container_workspace
             lines.append(
                 f"  sandbox backend:          container  ({_img} → {_cws};"
-                "  container-grade isolation)"
+                "  container backend configured; actual runtime guarantees depend on availability)"
             )
         else:
             lines.append(
@@ -190,7 +190,8 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
         if configured_backend == "container":
             lines.append(
                 "  env shaping:              ACTIVE"
-                "  (build_environment filters to allowlist; container-grade env isolation)"
+                "  (strict allowlist; stronger than local_process;"
+                "  actual runtime guarantees depend on backend availability)"
             )
         else:
             lines.append(
