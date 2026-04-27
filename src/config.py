@@ -26,7 +26,7 @@ VALID_STRATEGIES = ("single", "ensemble", "adversarial", "parallel", "serial", "
 VALID_CONTENT_TRUST = ("strict", "permissive")
 VALID_TOOL_EXECUTION_MODES = ("direct", "sandboxed")
 VALID_SANDBOX_MODES = ("off", "tool_calls")
-VALID_SANDBOX_SCOPES = ("run",)
+VALID_SANDBOX_SCOPES = ("run", "iteration")
 VALID_SANDBOX_FILESYSTEM_ACCESS = ("output_only", "workspace_only")
 VALID_SANDBOX_NETWORK_ACCESS = ("unrestricted", "web_only", "none")
 VALID_SANDBOX_BACKENDS = ("local_process", "container")
@@ -460,6 +460,13 @@ class SandboxConfig:
     network_access: str = "unrestricted"
     backend: str = "local_process"
     container: ContainerBackendConfig = field(default_factory=ContainerBackendConfig)
+
+    def __post_init__(self) -> None:
+        if self.scope not in VALID_SANDBOX_SCOPES:
+            raise ValueError(
+                f"Invalid sandbox.scope {self.scope!r}. "
+                f"Must be one of: {', '.join(VALID_SANDBOX_SCOPES)}"
+            )
 
 
 @dataclass(frozen=True)

@@ -40,14 +40,24 @@ class SandboxBackend(ABC):
     """
 
     @abstractmethod
-    def prepare_workspace(self) -> Path:
+    def prepare_workspace(self, *, iteration: int | None = None) -> Path:
         """Initialize the execution workspace and return its authoritative path.
 
         For a local-process backend this is a simple ``mkdir``.  For a
         container backend it might start a container and return a mount path
         that differs from the host path.
 
+        When *iteration* is given, the workspace for that specific iteration
+        number is provisioned and returned instead of the shared run workspace.
+        Path format: ``<workspace>/iter_<NNNN>/``  (zero-padded to 4 digits).
+
         Must be idempotent — safe to call multiple times.
+
+        Parameters
+        ----------
+        iteration:
+            Iteration number for per-iteration workspace isolation.
+            ``None`` → shared run-scoped workspace (existing behavior).
 
         Returns
         -------

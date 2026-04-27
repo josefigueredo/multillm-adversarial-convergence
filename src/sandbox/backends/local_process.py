@@ -263,20 +263,34 @@ class LocalProcessBackend(SandboxBackend):
         """The active environment shaping policy."""
         return self._policy
 
-    def prepare_workspace(self) -> Path:
+    def prepare_workspace(self, *, iteration: int | None = None) -> Path:
         """Create the workspace directory and return its path.
+
+        When *iteration* is provided, a per-iteration subdirectory
+        ``iter_<NNNN>/`` is created inside the base workspace and returned.
+        The base workspace is always created first.
 
         Idempotent — safe to call multiple times even if the directory
         already exists.
 
+        Parameters
+        ----------
+        iteration:
+            Iteration number.  ``None`` → return the base workspace (existing
+            behavior).  Positive int → create and return
+            ``<workspace>/iter_<N:04d>/``.
+
         Returns
         -------
         Path
-            The workspace directory path (same as the path provided at
-            construction).
+            The workspace directory path (base or iteration-scoped).
         """
         self._workspace_dir.mkdir(parents=True, exist_ok=True)
-        return self._workspace_dir
+        if iteration is None:
+            return self._workspace_dir
+        iter_dir = self._workspace_dir / f"iter_{iteration:04d}"
+        iter_dir.mkdir(parents=True, exist_ok=True)
+        return iter_dir
 
     def build_environment(
         self,

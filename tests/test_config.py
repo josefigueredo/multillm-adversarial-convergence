@@ -935,15 +935,15 @@ class TestSecurityConfigFromYaml:
         with pytest.raises(ValueError, match="Invalid security.sandbox.scope"):
             ResearchConfig.from_yaml(p)
 
-    def test_sandbox_scope_iteration_rejected(self, tmp_path: Path):
-        """'iteration'/'call' scopes are premature — only 'run' is valid in M1."""
-        p = tmp_path / "bad_sandbox_iter.yaml"
+    def test_sandbox_scope_call_rejected(self, tmp_path: Path):
+        """'call' scope is not valid — only 'run' and 'iteration' are valid."""
+        p = tmp_path / "bad_sandbox_call.yaml"
         p.write_text(textwrap.dedent("""\
             research:
               topic: "Test"
               security:
                 sandbox:
-                  scope: iteration
+                  scope: call
         """), encoding="utf-8")
         with pytest.raises(ValueError, match="Invalid security.sandbox.scope"):
             ResearchConfig.from_yaml(p)

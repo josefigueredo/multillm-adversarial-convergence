@@ -124,24 +124,36 @@ class ContainerBackend(SandboxBackend):
 
     # ── SandboxBackend interface ──────────────────────────────────────────────
 
-    def prepare_workspace(self) -> Path:
+    def prepare_workspace(self, *, iteration: int | None = None) -> Path:
         """Create the host workspace directory and return the authoritative container execution path.
 
         The host directory is provisioned so it can be bind-mounted into the
-        container.  The *returned path* is the container-side mount point — the
-        path callers should use as the cwd for subprocess execution inside the
-        container.
+        container.  The *returned path* is the container-side mount point.
+
+        When *iteration* is provided, a per-iteration subdirectory
+        ``iter_<NNNN>/`` is created on the host and the corresponding
+        container-side path is returned.
 
         Idempotent — safe to call multiple times.
+
+        Parameters
+        ----------
+        iteration:
+            Iteration number.  ``None`` → return the root container workspace
+            (existing behavior).  Positive int → create host subdir and return
+            ``Path(container_workspace) / "iter_<N:04d>"``.
 
         Returns
         -------
         Path
-            The authoritative execution workspace path inside the container
-            (i.e. ``Path(self.container_workspace)``), not the host-side path.
+            The authoritative execution workspace path inside the container.
         """
         self._host_workspace.mkdir(parents=True, exist_ok=True)
-        return Path(self._container_workspace)
+        if iteration is None:
+            return Path(self._container_workspace)
+        iter_name = f"iter_{iteration:04d}"
+        (self._host_workspace / iter_name).mkdir(parents=True, exist_ok=True)
+        return Path(self._container_workspace) / iter_name
 
     def build_environment(
         self,
