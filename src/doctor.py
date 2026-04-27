@@ -123,6 +123,19 @@ def _enforcement_table_lines(config: "ResearchConfig") -> list[str]:
         lines.append(f"  {net_label:<39} declared intent  (no effect without sandbox_active)")
 
     lines.append(f"  {'content_trust':<39} declared-only  (not yet runtime-evaluated)")
+
+    # sandbox.scope — workspace isolation model
+    if sb.scope == "iteration":
+        lines.append(
+            f"  {'sandbox.scope: iteration':<39}"
+            " workspace isolation: per-iteration (<output>/.workspace/iter_NNNN/)"
+        )
+    else:
+        lines.append(
+            f"  {'sandbox.scope: run':<39}"
+            " workspace isolation: per-run (<output>/.workspace/ — shared across iterations)"
+        )
+
     return lines
 
 
