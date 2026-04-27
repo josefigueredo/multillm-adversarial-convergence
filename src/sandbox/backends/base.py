@@ -25,6 +25,7 @@ substrate mechanics here.
 
 from __future__ import annotations
 
+import subprocess
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from pathlib import Path
@@ -74,4 +75,35 @@ class SandboxBackend(ABC):
         -------
         dict[str, str]
             A new dict suitable for passing as ``env`` to subprocess calls.
+        """
+
+    @abstractmethod
+    def run_subprocess(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> tuple[int, str, str]:
+        """Run *argv* in the sandbox substrate.
+
+        Parameters
+        ----------
+        argv:
+            Command and arguments as a list of strings.  Never a shell string.
+        cwd:
+            Working directory for the subprocess.  ``None`` → backend default.
+        env:
+            Explicit environment dict.  ``None`` → backend default (typically
+            the result of :meth:`build_environment`).
+        timeout:
+            Seconds before the subprocess is killed.  ``None`` → no timeout.
+
+        Returns
+        -------
+        tuple[int, str, str]
+            ``(returncode, stdout, stderr)`` — both stdout and stderr are
+            captured as strings.  This normalized shape is identical across
+            all backend implementations.
         """

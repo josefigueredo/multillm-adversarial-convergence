@@ -22,6 +22,7 @@ resources outside the workspace.
 from __future__ import annotations
 
 import os
+import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -300,3 +301,39 @@ class LocalProcessBackend(SandboxBackend):
         source: Mapping[str, str] = base_env if base_env is not None else os.environ
         allow_upper = {k.upper() for k in self._policy.effective_allowlist()}
         return {k: v for k, v in source.items() if k.upper() in allow_upper}
+
+    def run_subprocess(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> tuple[int, str, str]:
+        """Run *argv* as a local subprocess.
+
+        Parameters
+        ----------
+        argv:
+            Command and arguments.  Never passed through a shell.
+        cwd:
+            Working directory.  ``None`` → inherit from caller.
+        env:
+            Explicit environment dict.  ``None`` → inherit from caller.
+        timeout:
+            Seconds before the subprocess is killed.  ``None`` → no timeout.
+
+        Returns
+        -------
+        tuple[int, str, str]
+            ``(returncode, stdout, stderr)``.
+        """
+        result = subprocess.run(
+            argv,
+            cwd=cwd,
+            env=env,
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+        )
+        return (result.returncode, result.stdout, result.stderr)

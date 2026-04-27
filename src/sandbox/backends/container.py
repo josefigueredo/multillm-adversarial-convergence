@@ -179,3 +179,18 @@ class ContainerBackend(SandboxBackend):
         Safe to call without Docker installed.
         """
         return shutil.which("docker") is not None
+
+    # ── SandboxBackend: run_subprocess ────────────────────────────────────────
+
+    def run_subprocess(
+        self,
+        argv: list[str],
+        *,
+        cwd: "Path | None" = None,
+        env: "dict[str, str] | None" = None,
+        timeout: "float | None" = None,
+    ) -> "tuple[int, str, str]":
+        """Run *argv* inside a Docker container (implemented in MM14 Step 2)."""
+        raise NotImplementedError(  # pragma: no cover — replaced in Step 2
+            "ContainerBackend.run_subprocess is implemented in MM14 Step 2"
+        )
