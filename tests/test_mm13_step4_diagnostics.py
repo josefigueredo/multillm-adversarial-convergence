@@ -115,8 +115,8 @@ class TestDoctorConfigSandboxBackend:
         container_report = doctor_config_text(_make_config("container", sandbox_mode="tool_calls"))
         # local_process says process-level
         assert "process-level" in local_report.text
-        # container mentions configured (not container-grade as a hard claim)
-        assert "container backend configured" in container_report.text
+        # container mentions "container backend" in some form (ready, configured, or not found)
+        assert "container backend" in container_report.text
         # container does not claim process-level isolation
         sandbox_lines = [
             l for l in container_report.text.splitlines()

@@ -156,12 +156,21 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
     configured_backend = sec.sandbox.backend  # "local_process" | "container"
     if sandbox_active:
         if configured_backend == "container":
+            from src.sandbox.backends.container import ContainerBackend as _CB
+            _docker_ready = _CB.is_available()
             _img = sec.sandbox.container.image
             _cws = sec.sandbox.container.container_workspace
-            lines.append(
-                f"  sandbox backend:          container  ({_img} → {_cws};"
-                "  container backend configured; actual runtime guarantees depend on availability)"
-            )
+            if _docker_ready:
+                lines.append(
+                    f"  sandbox backend:          container  ({_img} → {_cws};"
+                    "  container backend ready; run_subprocess invokes docker run)"
+                )
+            else:
+                lines.append(
+                    f"  sandbox backend:          container  ({_img} → {_cws};"
+                    "  container backend configured but Docker not found on $PATH"
+                    " — will raise RuntimeError at runtime)"
+                )
         else:
             lines.append(
                 "  sandbox backend:          local_process"
@@ -188,11 +197,18 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
     # Env shaping status — three distinct states
     if sandbox_active:
         if configured_backend == "container":
-            lines.append(
-                "  env shaping:              ACTIVE"
-                "  (strict allowlist; stronger than local_process;"
-                "  actual runtime guarantees depend on backend availability)"
-            )
+            from src.sandbox.backends.container import ContainerBackend as _CB2
+            if _CB2.is_available():
+                lines.append(
+                    "  env shaping:              ACTIVE"
+                    "  (strict allowlist; container backend ready)"
+                )
+            else:
+                lines.append(
+                    "  env shaping:              ACTIVE"
+                    "  (strict allowlist; stronger than local_process;"
+                    "  actual runtime guarantees depend on backend availability)"
+                )
         else:
             lines.append(
                 "  env shaping:              ACTIVE"
