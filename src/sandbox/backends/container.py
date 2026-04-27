@@ -203,8 +203,8 @@ class ContainerBackend(SandboxBackend):
         argv:
             Command and arguments to run inside the container.
         cwd:
-            Unused for the container path (the container cwd is the mounted
-            workspace); accepted for interface parity with other backends.
+            Working directory inside the container, passed as Docker
+            ``--workdir``.  ``None`` → defaults to :attr:`container_workspace`.
         env:
             Environment variables to inject.  Each key becomes a
             ``--env KEY=VALUE`` flag.  ``None`` → no extra env flags.

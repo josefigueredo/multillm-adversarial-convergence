@@ -150,6 +150,43 @@ class SandboxExecutor:
         return path
 
     # ------------------------------------------------------------------
+    # Subprocess execution
+    # ------------------------------------------------------------------
+
+    def run_subprocess(
+        self,
+        argv: list[str],
+        *,
+        timeout: float | None = None,
+    ) -> tuple[int, str, str]:
+        """Run *argv* inside the active sandbox substrate.
+
+        Builds the execution environment via the backend's
+        :meth:`~SandboxBackend.build_environment`, then delegates to
+        :meth:`~SandboxBackend.run_subprocess` with the executor's authoritative
+        workspace as the working directory.
+
+        Parameters
+        ----------
+        argv:
+            Command and arguments.  Never passed through a shell.
+        timeout:
+            Seconds before the subprocess is killed.  ``None`` → no timeout.
+
+        Returns
+        -------
+        tuple[int, str, str]
+            ``(returncode, stdout, stderr)`` from the backend.
+        """
+        env = self._backend.build_environment()
+        return self._backend.run_subprocess(
+            argv,
+            cwd=self._workspace_dir,
+            env=env,
+            timeout=timeout,
+        )
+
+    # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
 
