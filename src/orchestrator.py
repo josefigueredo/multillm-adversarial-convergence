@@ -677,7 +677,9 @@ class AutoResearcher:
             _policy = resolve_runtime_security_policy(self.config.security, self.paths)
             _backend = select_sandbox_backend(self.config.security.sandbox, self.output_dir)
             self._sandbox = SandboxExecutor(_policy, _policy.workspace_dir, backend=_backend)
-            self._sandbox.prepare_workspace()
+            _scope = self.config.security.sandbox.scope
+            if _scope != "iteration":
+                self._sandbox.prepare_workspace()
             self._audit_trail.emit(
                 "sandbox_initialized",
                 output_dir=str(self.paths.output_dir),
@@ -785,6 +787,18 @@ class AutoResearcher:
         """Execute one full research iteration via the extracted loop module."""
         ctx = self._build_loop_context()
         state = self._build_loop_state()
+        if (
+            self._sandbox is not None
+            and self.config.security.sandbox.scope == "iteration"
+        ):
+            next_iter = self.iteration + 1
+            self._sandbox.prepare_workspace(iteration=next_iter)
+            self._audit_trail.emit(
+                "sandbox_workspace_prepared",
+                iteration=next_iter,
+                workspace_dir=str(self._sandbox.workspace_dir),
+                scope="iteration",
+            )
         loop_mod.run_iteration(ctx, state)
         self._sync_from_loop_state(state)
 
