@@ -47,7 +47,7 @@ from .citation_verification import (
 )
 
 # ── Export bundle assembly ────────────────────────────────────────────────────
-from src.export_bundle import (
+from .export_bundle import (
     BundleManifest,
     BundleProvenance,
     ExportBundle,

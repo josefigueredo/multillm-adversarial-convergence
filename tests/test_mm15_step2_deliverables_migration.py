@@ -52,6 +52,18 @@ class TestDeliverablesCanonicalPaths:
         from src.deliverables.report_exports import write_reporting_artifacts
         assert callable(write_reporting_artifacts)
 
+    def test_export_bundle_module_importable_at_canonical_path(self):
+        from src.deliverables import export_bundle  # noqa: F401
+        assert export_bundle is not None
+
+    def test_build_export_bundle_from_canonical_export_bundle(self):
+        from src.deliverables.export_bundle import build_export_bundle
+        assert callable(build_export_bundle)
+
+    def test_export_bundle_class_from_canonical_export_bundle(self):
+        from src.deliverables.export_bundle import ExportBundle
+        assert ExportBundle is not None
+
 
 # ---------------------------------------------------------------------------
 # Old flat-path imports must still work via compatibility shims
@@ -77,6 +89,10 @@ class TestDeliverablesShimBackwardCompat:
     def test_write_reporting_artifacts_from_src_report_exports(self):
         from src.report_exports import write_reporting_artifacts
         assert callable(write_reporting_artifacts)
+
+    def test_build_export_bundle_still_importable_from_src_export_bundle(self):
+        from src.export_bundle import build_export_bundle
+        assert callable(build_export_bundle)
 
 
 # ---------------------------------------------------------------------------
