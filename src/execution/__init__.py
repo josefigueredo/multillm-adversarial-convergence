@@ -1,8 +1,9 @@
-"""Execution domain package — MM12 Step 3.
+"""Execution domain package — MM12 Step 3 / MM15 Step 3.
 
 Re-exports the MM10 execution subsystem API under a single package boundary:
 execution plans, validation, diagnosis, integration adapters, and repair loops.
-Existing flat-module imports (``from src.execution_plan import …``) remain valid.
+Existing flat-module imports (``from src.execution_plan import …``) remain valid
+via compatibility shims.
 
 Contexts exposed:
 - Execution plans: step/context/plan models
@@ -15,10 +16,10 @@ Contexts exposed:
 from __future__ import annotations
 
 # ── Execution plan ─────────────────────────────────────────────────────────────
-from ..execution_plan import ExecutionPlan, ExecutionStep, TargetContext
+from .plan import ExecutionPlan, ExecutionStep, TargetContext
 
 # ── Validation ────────────────────────────────────────────────────────────────
-from ..execution_validator import (
+from .validator import (
     ExecutionResult,
     ValidationResult,
     validate_plan,
@@ -26,7 +27,7 @@ from ..execution_validator import (
 )
 
 # ── Diagnosis ─────────────────────────────────────────────────────────────────
-from ..execution_diagnosis import (
+from .diagnosis import (
     DiagnosisArtifact,
     diagnose_plan,
     diagnose_step,
@@ -34,7 +35,7 @@ from ..execution_diagnosis import (
 )
 
 # ── Integration adapters ──────────────────────────────────────────────────────
-from ..execution_integration import (
+from .integration import (
     build_implement_execution_plan,
     build_research_execution_plan,
     diagnose_implement_failure,
@@ -44,7 +45,7 @@ from ..execution_integration import (
 )
 
 # ── Repair loop ───────────────────────────────────────────────────────────────
-from ..repair_loop import RepairAttempt, RepairLoop, RepairOutcome
+from .repair_loop import RepairAttempt, RepairLoop, RepairOutcome
 
 __all__ = [
     # execution plan
