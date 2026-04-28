@@ -1,0 +1,197 @@
+"""Citation and export verification — MM11 Step 3.
+
+Provides structured coverage checks over:
+
+- **Citation presence** — when a deliverable class requires citations,
+  the synthesis body must contain a proper Markdown ``References`` or
+  ``Bibliography`` heading with at least one numbered entry beneath it.
+- **Export readiness** — an :class:`~src.deliverable_pipeline.ExportArtifact`
+  must have non-blank output paths and a well-formed ISO 8601 timestamp.
+
+Both checkers return a list of :class:`VerificationViolation` objects so
+callers can report, log, or block pipeline advancement as appropriate.
+
+The citation heading regex is shared with :mod:`src.references` via
+:data:`~src.references.REFS_HEADING_RE` to ensure generation and
+verification cannot drift from each other.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from datetime import datetime
+
+from src.deliverables.classes import DeliverableClassConfig
+from src.deliverables.pipeline import ExportArtifact, SynthesisArtifact
+from src.evidence.references import REFS_HEADING_RE
+
+# Matches a numbered citation entry: "1. ..." (with optional leading whitespace)
+_CITATION_ENTRY_RE = re.compile(r"^\s*\d+\.\s+\S", re.MULTILINE)
+
+
+# ---------------------------------------------------------------------------
+# VerificationViolation
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class VerificationViolation:
+    """A single violation found during citation or export verification.
+
+    Attributes
+    ----------
+    code:
+        Machine-readable identifier, e.g. ``"missing_references_section"``.
+    message:
+        Human-readable description suitable for logs and reports.
+    """
+
+    code: str
+    message: str
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _extract_section_body(markdown: str, heading_match: re.Match) -> str:  # type: ignore[type-arg]
+    """Return the content between *heading_match* and the next same-or-higher heading."""
+    heading_level = len(heading_match.group(0).split()[0])  # count '#' chars
+    after = markdown[heading_match.end():]
+    next_heading_re = re.compile(
+        r"^#{1," + str(heading_level) + r"}\s+\S",
+        re.MULTILINE,
+    )
+    next_match = next_heading_re.search(after)
+    return after[: next_match.start()] if next_match else after
+
+
+# ---------------------------------------------------------------------------
+# Citation verification
+# ---------------------------------------------------------------------------
+
+
+def verify_body_citations(
+    body: str,
+    config: DeliverableClassConfig,
+) -> list[VerificationViolation]:
+    """Return violations for *body* based on citation requirements in *config*.
+
+    This is the text-level implementation used by both
+    :func:`verify_synthesis_citations` and :func:`~src.doctor.doctor_pipeline`
+    so diagnostics can check whichever stage's text is most authoritative.
+
+    When ``config.requires_citations`` is ``False``, always returns ``[]``.
+    """
+    if not config.requires_citations:
+        return []
+
+    match = REFS_HEADING_RE.search(body)
+    if not match:
+        return [
+            VerificationViolation(
+                code="missing_references_section",
+                message="body is missing a References or Bibliography heading",
+            )
+        ]
+
+    section = _extract_section_body(body, match)
+    if not _CITATION_ENTRY_RE.search(section):
+        return [
+            VerificationViolation(
+                code="empty_references_section",
+                message="References section exists but contains no numbered citation entries",
+            )
+        ]
+
+    return []
+
+
+def verify_synthesis_citations(
+    synthesis: SynthesisArtifact,
+    config: DeliverableClassConfig,
+) -> list[VerificationViolation]:
+    """Return violations for *synthesis* based on citation requirements in *config*.
+
+    Delegates to :func:`verify_body_citations` using the synthesis body.
+    Use :func:`verify_body_citations` directly when you need to check a
+    revised body or any other plain text.
+
+    When ``config.requires_citations`` is ``False``, the check is a no-op and
+    always returns an empty list.
+
+    When ``True``, two things are checked:
+
+    1. A Markdown ``## References`` or ``## Bibliography`` heading (any level
+       1-6) must appear in the synthesis body.
+    2. The section under that heading must contain at least one numbered entry
+       of the form ``N. <non-whitespace>``.  Numbered entries in sections that
+       follow the References heading (e.g. an Appendix) are not counted.
+    """
+    return verify_body_citations(synthesis.body, config)
+
+
+# ---------------------------------------------------------------------------
+# Export verification
+# ---------------------------------------------------------------------------
+
+
+def verify_export_artifact(export: ExportArtifact) -> list[VerificationViolation]:
+    """Return violations for *export* based on publication packaging requirements.
+
+    Checks performed:
+
+    - ``output_paths`` must be non-empty.
+    - No path in ``output_paths`` may be blank (empty or whitespace-only).
+    - ``exported_at`` must be non-empty and match the ISO 8601
+      date format (at minimum ``YYYY-MM-DD``).
+    """
+    violations: list[VerificationViolation] = []
+
+    if not export.output_paths:
+        violations.append(
+            VerificationViolation(
+                code="no_output_paths",
+                message="ExportArtifact has no output paths",
+            )
+        )
+    else:
+        for path in export.output_paths:
+            if not path.strip():
+                violations.append(
+                    VerificationViolation(
+                        code="empty_output_path",
+                        message="ExportArtifact contains a blank output path",
+                    )
+                )
+                break  # one violation is enough; caller can iterate paths if needed
+
+    exported_at = export.exported_at.strip()
+    if not exported_at:
+        violations.append(
+            VerificationViolation(
+                code="missing_exported_at",
+                message="ExportArtifact.exported_at is empty or whitespace",
+            )
+        )
+    else:
+        # Normalise trailing Z (Python < 3.11 fromisoformat doesn't accept it)
+        normalised = exported_at
+        if normalised.endswith("Z"):
+            normalised = normalised[:-1] + "+00:00"
+        try:
+            datetime.fromisoformat(normalised)
+        except ValueError:
+            violations.append(
+                VerificationViolation(
+                    code="invalid_exported_at",
+                    message=(
+                        f"ExportArtifact.exported_at is not a valid ISO 8601 "
+                        f"timestamp: {export.exported_at!r}"
+                    ),
+                )
+            )
+
+    return violations

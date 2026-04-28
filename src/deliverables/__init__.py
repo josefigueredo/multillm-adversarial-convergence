@@ -1,10 +1,9 @@
-"""Deliverables domain package — MM12 Step 2.
+"""Deliverables domain package — MM12 Step 2 / MM15 Step 2.
 
 Re-exports the full public API of the publication pipeline so callers can
 import from this single package boundary instead of reaching into individual
 flat modules.  Existing imports (``from src.deliverable_pipeline import …``)
-remain valid — this package adds a new canonical import path without moving
-files.
+remain valid via compatibility shims.
 
 Contexts exposed:
 - Pipeline model (stages, artifacts, :class:`DeliverablePipeline`)
@@ -16,7 +15,7 @@ Contexts exposed:
 from __future__ import annotations
 
 # ── Pipeline model ────────────────────────────────────────────────────────────
-from ..deliverable_pipeline import (
+from .pipeline import (
     DeliverablePipeline,
     ExportArtifact,
     PackageArtifact,
@@ -26,7 +25,7 @@ from ..deliverable_pipeline import (
 )
 
 # ── Deliverable class configs and factory ─────────────────────────────────────
-from ..deliverable_classes import (
+from .classes import (
     CLASS_CONFIGS,
     DECISION_MEMO_CONFIG,
     EXECUTIVE_BRIEF_CONFIG,
@@ -40,7 +39,7 @@ from ..deliverable_classes import (
 )
 
 # ── Citation/export verification ──────────────────────────────────────────────
-from ..citation_verification import (
+from .citation_verification import (
     VerificationViolation,
     verify_body_citations,
     verify_export_artifact,
@@ -48,7 +47,7 @@ from ..citation_verification import (
 )
 
 # ── Export bundle assembly ────────────────────────────────────────────────────
-from ..export_bundle import (
+from src.export_bundle import (
     BundleManifest,
     BundleProvenance,
     ExportBundle,
