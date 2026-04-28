@@ -1,0 +1,18 @@
+"Implementation Methods
+Method A: Customizing in Amazon Bedrock (Fine-tuning)
+Prepare Data: Create training data in JSONL format, specifying prompt-response pairs for Supervised Fine-tuning (SFT) or unlabeled text for Continued Pre-training.
+Upload to S3: Store data in an Amazon S3 bucket.
+Launch Fine-tuning: Go to the Bedrock console, choose a model (e.g., Llama 3 or Titan), and start a model customization job.
+Deploy: Once complete, the fine-tuned model is available for inference via API using Provisioned Throughput. 
+
+Method B: Customizing via SageMaker JumpStart (No-Code/Low-Code)
+Access JumpStart: Open Amazon SageMaker Studio and navigate to JumpStart.
+Select Model: Select an LLM (e.g., Llama 3 8B).
+Fine-tune: Select the "Fine-tuning" tab, upload data, and choose training instances (e.g., ml.g5.12xlarge or ml.p4de.24xlarge for larger models).
+Deploy Endpoint: After training, deploy the fine-tuned model directly as a real-time inference endpoint. 
+
+Method C: Self-Hosting on EC2/EKS (High Performance)
+Launch Instance: Launch a GPU-enabled EC2 instance (g4dn, g5, or p4d instances).
+Install Environment: Install NVIDIA drivers, CUDA, and specialized inference libraries like vLLM or llama.cpp.
+Convert Model: Convert the fine-tuned model to the required format (e.g., GGUF for llama.cpp).
+Serve Model: Use a containerized approach (Docker) or script to serve the model as an API endpoint. "

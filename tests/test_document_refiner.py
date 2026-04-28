@@ -88,9 +88,9 @@ class TestPhase1Convergence:
 
         clean_state = _clean_state()
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
         ):
             code = refiner.run(interactive=True)
 
@@ -102,9 +102,9 @@ class TestPhase1Convergence:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
         ):
             refiner.run(interactive=True)
 
@@ -117,9 +117,9 @@ class TestPhase1Convergence:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
         ):
             refiner.run(interactive=True)
 
@@ -132,9 +132,9 @@ class TestPhase1Convergence:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
         ):
             refiner.run(interactive=True)
 
@@ -164,9 +164,9 @@ class TestHITLPause:
             return (1, 0, 0)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", side_effect=inject_pending),
-            patch("src.document_refiner._should_stop", return_value=False),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", side_effect=inject_pending),
+            patch("src.implement.document_refiner._should_stop", return_value=False),
         ):
             code = refiner.run(interactive=False)
 
@@ -187,9 +187,9 @@ class TestHITLPause:
             return (1, 0, 0)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", side_effect=inject_pending),
-            patch("src.document_refiner._should_stop", return_value=False),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", side_effect=inject_pending),
+            patch("src.implement.document_refiner._should_stop", return_value=False),
         ):
             refiner.run(interactive=False)
 
@@ -209,10 +209,10 @@ class TestPhase2Expansion:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
-            patch("src.document_refiner.render", return_value="prompt text"),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.render", return_value="prompt text"),
         ):
             refiner.run(interactive=True)
 
@@ -230,10 +230,10 @@ class TestPhase2Expansion:
             raise FileNotFoundError(name)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
-            patch("src.document_refiner.render", side_effect=_render_side_effect),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.render", side_effect=_render_side_effect),
         ):
             refiner.run(interactive=True)
 
@@ -252,10 +252,10 @@ class TestPhase2Expansion:
         mock_strategy.run_arbitrator.return_value = []
 
         with (
-            patch("src.document_refiner.ConvergeStrategy", return_value=mock_strategy),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
-            patch("src.document_refiner.render", return_value="prompt text"),
+            patch("src.implement.document_refiner.ConvergeStrategy", return_value=mock_strategy),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.render", return_value="prompt text"),
         ):
             refiner.run(interactive=True)
 
@@ -273,10 +273,10 @@ class TestPhase3Indexing:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
-            patch("src.document_refiner.render", return_value="prompt"),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.render", return_value="prompt"),
         ):
             refiner.run(interactive=True)
 
@@ -288,10 +288,10 @@ class TestPhase3Indexing:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
-            patch("src.document_refiner.render", return_value="prompt"),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.render", return_value="prompt"),
         ):
             refiner.run(interactive=True)
 
@@ -369,10 +369,10 @@ class TestRunManifest:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
-            patch("src.document_refiner.render", return_value="prompt"),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.render", return_value="prompt"),
         ):
             refiner.run(interactive=True)
 
@@ -395,10 +395,10 @@ class TestRunManifest:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
-            patch("src.document_refiner.render", return_value="prompt"),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.render", return_value="prompt"),
         ):
             refiner.run(interactive=True)
 
@@ -419,10 +419,10 @@ class TestDirectorySetup:
         refiner = DocumentRefiner(config, out, backends)
 
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
-            patch("src.document_refiner.render", return_value="prompt"),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.render", return_value="prompt"),
         ):
             refiner.run(interactive=True)
 
@@ -439,9 +439,9 @@ class TestWorkflowTerminalTransitions:
     def test_converged_emitted_on_successful_run(self, tmp_path):
         refiner = DocumentRefiner(_make_config(), tmp_path, _make_backends())
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
         ):
             refiner.run(interactive=True)
 
@@ -454,9 +454,9 @@ class TestWorkflowTerminalTransitions:
     def test_interrupted_emitted_on_exception_during_phase1(self, tmp_path):
         refiner = DocumentRefiner(_make_config(), tmp_path, _make_backends())
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", side_effect=RuntimeError("backend crash")),
-            patch("src.document_refiner._should_stop", return_value=False),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", side_effect=RuntimeError("backend crash")),
+            patch("src.implement.document_refiner._should_stop", return_value=False),
             pytest.raises(RuntimeError),
         ):
             refiner.run(interactive=True)
@@ -470,9 +470,9 @@ class TestWorkflowTerminalTransitions:
     def test_interrupted_emitted_on_later_phase_failure(self, tmp_path):
         refiner = DocumentRefiner(_make_config(), tmp_path, _make_backends())
         with (
-            patch("src.document_refiner.ConvergeStrategy"),
-            patch("src.document_refiner.run_cycle", return_value=(0, 0, 0)),
-            patch("src.document_refiner._should_stop", side_effect=[False, True]),
+            patch("src.implement.document_refiner.ConvergeStrategy"),
+            patch("src.implement.document_refiner.run_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.document_refiner._should_stop", side_effect=[False, True]),
             patch.object(refiner, "_run_phase2", side_effect=RuntimeError("phase2 crash")),
             pytest.raises(RuntimeError),
         ):

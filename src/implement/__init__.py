@@ -1,4 +1,4 @@
-"""Implement domain package — MM12 Step 3.
+"""Implement domain package — MM12 Step 3 / MM15 Step 4.
 
 Re-exports the implement / plan / document subsystem API under a single package
 boundary.  Existing flat-module imports (``from src.implement_loop import …``)
@@ -19,7 +19,7 @@ Contexts exposed:
 from __future__ import annotations
 
 # ── Implement loop ─────────────────────────────────────────────────────────────
-from ..implement_loop import (
+from .implement_loop import (
     CandidatePatch,
     ImplementConfig,
     ImplementCritique,
@@ -33,28 +33,28 @@ from ..implement_loop import (
 )
 
 # ── Implement runner ───────────────────────────────────────────────────────────
-from ..implement_runner import ImplementRunner
+from .implement_runner import ImplementRunner
 
 # ── Implement strategy ─────────────────────────────────────────────────────────
-from ..implement_strategy import ImplementStrategy
+from .implement_strategy import ImplementStrategy
 
 # ── Plan loop ─────────────────────────────────────────────────────────────────
-from ..plan_loop import PlanCycleContext, PlanCycleState, run_plan_cycle
+from .plan_loop import PlanCycleContext, PlanCycleState, run_plan_cycle
 
 # ── Plan refiner ──────────────────────────────────────────────────────────────
-from ..plan_refiner import PlanRefiner
+from .plan_refiner import PlanRefiner
 
 # ── Plan strategy ─────────────────────────────────────────────────────────────
-from ..plan_strategy import PlanStrategy
+from .plan_strategy import PlanStrategy
 
 # ── Document loop ─────────────────────────────────────────────────────────────
-from ..document_loop import CycleContext, CycleState, Issue, run_cycle
+from .document_loop import CycleContext, CycleState, Issue, run_cycle
 
 # ── Document refiner ──────────────────────────────────────────────────────────
-from ..document_refiner import DocumentRefiner
+from .document_refiner import DocumentRefiner
 
 # ── Document strategy ─────────────────────────────────────────────────────────
-from ..document_strategy import ConvergeStrategy, Patch, RawCritique, VerifiedCritique
+from .document_strategy import ConvergeStrategy, Patch, RawCritique, VerifiedCritique
 
 __all__ = [
     # implement loop

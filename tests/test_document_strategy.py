@@ -390,7 +390,7 @@ def test_run_builder_injects_source_files(tmp_path):
         source_files=(SourceFileConfig(path=str(f), roles=("builder",)),),
     )
     s = ConvergeStrategy(cfg, {"claude-cli": _make_backend("# PRD Output")})
-    with patch("src.document_strategy.render", return_value="prompt") as mock_render:
+    with patch("src.implement.document_strategy.render", return_value="prompt") as mock_render:
         s.run_builder("", [], _call_with, human_decisions=[])
     _, kwargs = mock_render.call_args
     assert "# Reference Doc" in kwargs["source_files"]
@@ -404,7 +404,7 @@ def test_run_challenger_injects_source_files(tmp_path):
         source_files=(SourceFileConfig(path=str(f), roles=("challenger",)),),
     )
     s = ConvergeStrategy(cfg, {"claude-cli": _make_backend("[]")})
-    with patch("src.document_strategy.render", return_value="[]") as mock_render:
+    with patch("src.implement.document_strategy.render", return_value="[]") as mock_render:
         s.run_challenger("prd text", _call_with)
     _, kwargs = mock_render.call_args
     assert "# Challenger Ref" in kwargs["source_files"]
@@ -419,7 +419,7 @@ def test_invoke_persona_injects_source_files(tmp_path):
         source_files=(SourceFileConfig(path=str(f), roles=("architect",)),),
     )
     s = ConvergeStrategy(cfg, {"claude-cli": _make_backend("[]")})
-    with patch("src.document_strategy.render", return_value="[]") as mock_render:
+    with patch("src.implement.document_strategy.render", return_value="[]") as mock_render:
         s._invoke_persona(cfg.personas[0], "prd", _call_with)
     _, kwargs = mock_render.call_args
     assert "# Architect Ref" in kwargs["source_files"]
@@ -433,7 +433,7 @@ def test_run_builder_source_files_empty_when_no_match(tmp_path):
         source_files=(SourceFileConfig(path=str(f), roles=("architect",)),),
     )
     s = ConvergeStrategy(cfg, {"claude-cli": _make_backend("# PRD")})
-    with patch("src.document_strategy.render", return_value="prompt") as mock_render:
+    with patch("src.implement.document_strategy.render", return_value="prompt") as mock_render:
         s.run_builder("", [], _call_with, human_decisions=[])
     _, kwargs = mock_render.call_args
     assert kwargs["source_files"] == ""

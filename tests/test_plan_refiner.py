@@ -77,9 +77,9 @@ class TestPhase1Convergence:
         refiner = PlanRefiner(config, tmp_path, _make_backends())
 
         with (
-            patch("src.plan_refiner.PlanStrategy"),
-            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
-            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.implement.plan_refiner.PlanStrategy"),
+            patch("src.implement.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.plan_refiner._plan_should_stop", side_effect=[False, True]),
         ):
             code = refiner.run(interactive=True)
 
@@ -90,9 +90,9 @@ class TestPhase1Convergence:
         refiner = PlanRefiner(config, tmp_path, _make_backends())
 
         with (
-            patch("src.plan_refiner.PlanStrategy") as mock_strat_cls,
-            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
-            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.implement.plan_refiner.PlanStrategy") as mock_strat_cls,
+            patch("src.implement.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.plan_refiner._plan_should_stop", side_effect=[False, True]),
         ):
             mock_strat = mock_strat_cls.return_value
             mock_strat.run_builder.return_value = "# Final Plan"
@@ -118,9 +118,9 @@ class TestPhase1Convergence:
             return (0, 0, 1)
 
         with (
-            patch("src.plan_refiner.PlanStrategy"),
-            patch("src.plan_refiner.run_plan_cycle", side_effect=_cycle_with_hitl),
-            patch("src.plan_refiner._plan_should_stop", return_value=False),
+            patch("src.implement.plan_refiner.PlanStrategy"),
+            patch("src.implement.plan_refiner.run_plan_cycle", side_effect=_cycle_with_hitl),
+            patch("src.implement.plan_refiner._plan_should_stop", return_value=False),
         ):
             code = refiner.run(interactive=False)
 
@@ -131,9 +131,9 @@ class TestPhase1Convergence:
         refiner = PlanRefiner(config, tmp_path, _make_backends())
 
         with (
-            patch("src.plan_refiner.PlanStrategy"),
-            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
-            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.implement.plan_refiner.PlanStrategy"),
+            patch("src.implement.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.plan_refiner._plan_should_stop", side_effect=[False, True]),
         ):
             refiner.run(interactive=True)
 
@@ -160,10 +160,10 @@ class TestPhase2Expansion:
             return "content"
 
         with (
-            patch("src.plan_refiner.PlanStrategy"),
-            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
-            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
-            patch("src.plan_refiner.render", side_effect=_side_effect),
+            patch("src.implement.plan_refiner.PlanStrategy"),
+            patch("src.implement.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.implement.plan_refiner.render", side_effect=_side_effect),
         ):
             refiner.run(interactive=True)
 
@@ -177,10 +177,10 @@ class TestPhase3Indexing:
         refiner = PlanRefiner(config, tmp_path, _make_backends())
 
         with (
-            patch("src.plan_refiner.PlanStrategy"),
-            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
-            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
-            patch("src.plan_refiner.render", return_value="# Generated"),
+            patch("src.implement.plan_refiner.PlanStrategy"),
+            patch("src.implement.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.implement.plan_refiner.render", return_value="# Generated"),
         ):
             refiner.run(interactive=True)
 
@@ -257,9 +257,9 @@ class TestPlanWorkflowTerminalTransitions:
     def test_converged_emitted_on_successful_run(self, tmp_path):
         refiner = PlanRefiner(_make_config(), tmp_path, _make_backends())
         with (
-            patch("src.plan_refiner.PlanStrategy"),
-            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
-            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.implement.plan_refiner.PlanStrategy"),
+            patch("src.implement.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.plan_refiner._plan_should_stop", side_effect=[False, True]),
         ):
             refiner.run(interactive=True)
 
@@ -272,9 +272,9 @@ class TestPlanWorkflowTerminalTransitions:
     def test_interrupted_emitted_on_exception_during_phase1(self, tmp_path):
         refiner = PlanRefiner(_make_config(), tmp_path, _make_backends())
         with (
-            patch("src.plan_refiner.PlanStrategy"),
-            patch("src.plan_refiner.run_plan_cycle", side_effect=RuntimeError("backend crash")),
-            patch("src.plan_refiner._plan_should_stop", return_value=False),
+            patch("src.implement.plan_refiner.PlanStrategy"),
+            patch("src.implement.plan_refiner.run_plan_cycle", side_effect=RuntimeError("backend crash")),
+            patch("src.implement.plan_refiner._plan_should_stop", return_value=False),
             pytest.raises(RuntimeError),
         ):
             refiner.run(interactive=True)
@@ -288,9 +288,9 @@ class TestPlanWorkflowTerminalTransitions:
     def test_interrupted_emitted_on_later_phase_failure(self, tmp_path):
         refiner = PlanRefiner(_make_config(), tmp_path, _make_backends())
         with (
-            patch("src.plan_refiner.PlanStrategy"),
-            patch("src.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
-            patch("src.plan_refiner._plan_should_stop", side_effect=[False, True]),
+            patch("src.implement.plan_refiner.PlanStrategy"),
+            patch("src.implement.plan_refiner.run_plan_cycle", return_value=(0, 0, 0)),
+            patch("src.implement.plan_refiner._plan_should_stop", side_effect=[False, True]),
             patch.object(refiner, "_run_phase2", side_effect=RuntimeError("phase2 crash")),
             pytest.raises(RuntimeError),
         ):
