@@ -712,7 +712,7 @@ class TestValidateToolRequestDestinationTypeValidation:
     """Invalid destination_type values must fail with a clear denial reason."""
 
     def test_invalid_destination_type_raises_policy_denied(self, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         policy = _make_policy(tmp_path, network_access="unrestricted")
         executor = SandboxExecutor(policy, policy.workspace_dir)
         with pytest.raises(PolicyDeniedError) as exc_info:
@@ -721,7 +721,7 @@ class TestValidateToolRequestDestinationTypeValidation:
 
     def test_invalid_destination_type_denied_even_in_unrestricted_mode(self, tmp_path):
         """Invalid destination_type must fail even when network policy is unrestricted."""
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         policy = _make_policy(tmp_path, network_access="unrestricted")
         executor = SandboxExecutor(policy, policy.workspace_dir)
         with pytest.raises(PolicyDeniedError) as exc_info:
@@ -730,7 +730,7 @@ class TestValidateToolRequestDestinationTypeValidation:
         assert exc_info.value.policy_field == "sandbox.network_access"
 
     def test_invalid_destination_type_carries_requested_action(self, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         policy = _make_policy(tmp_path, network_access="unrestricted")
         executor = SandboxExecutor(policy, policy.workspace_dir)
         with pytest.raises(PolicyDeniedError) as exc_info:

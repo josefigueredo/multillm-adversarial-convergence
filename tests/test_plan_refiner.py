@@ -104,7 +104,7 @@ class TestPhase1Convergence:
         assert plan_path.exists()
 
     def test_run_returns_2_on_hitl_pause_non_interactive(self, tmp_path):
-        from src.hitl import HumanInputRequest
+        from src.policy.hitl import HumanInputRequest
         config = _make_config()
         refiner = PlanRefiner(config, tmp_path, _make_backends())
 

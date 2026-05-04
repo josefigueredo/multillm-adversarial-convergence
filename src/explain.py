@@ -352,8 +352,8 @@ def explain_domain_packages() -> str:
         "  src.backends       LLM backend adapters",
         "  src.sandbox        Sandbox execution backends",
         "",
-        "Backward compat: flat-module imports (e.g. from src.hitl import …) remain",
-        "valid during migration.  New code should prefer the domain package paths.",
+        "Domain migration complete (MM15): canonical package paths are the only",
+        "supported public API.  Flat-module shims (e.g. src.hitl) were removed.",
     ]
     return "\n".join(lines)
 
@@ -368,7 +368,7 @@ def explain_pipeline_text(pipeline: "Any") -> str:  # DeliverablePipeline
 
     Pure inspection — no side effects.
     """
-    from .deliverable_pipeline import PipelineStage
+    from .deliverables.pipeline import PipelineStage
 
     lines: list[str] = []
 

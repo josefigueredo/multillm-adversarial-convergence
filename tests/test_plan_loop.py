@@ -119,7 +119,7 @@ def test_run_plan_cycle_increments_cycle():
 
 
 def test_run_plan_cycle_returns_counts():
-    from src.document_strategy import VerifiedCritique
+    from src.implement.document_strategy import VerifiedCritique
     cfg = _make_config()
     state = PlanCycleState(plan="# Plan")
     ctx = _make_ctx(cfg)
@@ -147,7 +147,7 @@ def test_run_plan_cycle_returns_counts():
 
 
 def test_run_plan_cycle_collects_human_decisions_interactively():
-    from src.document_strategy import VerifiedCritique
+    from src.implement.document_strategy import VerifiedCritique
     from unittest.mock import patch
 
     cfg = _make_config()

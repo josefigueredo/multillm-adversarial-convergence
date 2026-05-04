@@ -757,7 +757,7 @@ class TestDispatchContractRiskNotes:
 
     def test_custom_host_shell_tool_triggers_risk_note(self, monkeypatch):
         """A non-Bash tool with uses_host_shell=True must trigger the host-shell risk note."""
-        from src import tool_capabilities as tc
+        from src.policy import tool_capabilities as tc
         monkeypatch.setitem(
             tc._TOOL_CAPABILITIES,
             "CustomShell",

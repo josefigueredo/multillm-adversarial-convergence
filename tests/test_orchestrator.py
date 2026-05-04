@@ -2210,7 +2210,7 @@ class TestAutoResearcherEnforcement:
     # -- host bash enforcement ---------------------------------------------
 
     def test_bash_denied_when_allow_host_bash_false(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_host_bash=False
         )
@@ -2220,7 +2220,7 @@ class TestAutoResearcherEnforcement:
         assert exc_info.value.policy_field == "allow_host_bash"
 
     def test_denied_call_never_invokes_backend(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         invoke_called = []
         class TrackingBackend(FakeBackend):
             def invoke(self, prompt, opts, timeout=300):
@@ -2235,7 +2235,7 @@ class TestAutoResearcherEnforcement:
         assert invoke_called == [], "backend.invoke must not be called when policy denies"
 
     def test_bash_allowed_when_allow_host_bash_true(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_host_bash=True
         )
@@ -2244,7 +2244,7 @@ class TestAutoResearcherEnforcement:
         assert result is not None
 
     def test_no_denial_when_bash_not_in_tools(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_host_bash=False
         )
@@ -2254,7 +2254,7 @@ class TestAutoResearcherEnforcement:
 
     def test_no_denial_when_backend_strips_tools(self, research_config, tmp_path):
         """Backend with supports_tools=False → allowed_tools cleared → no Bash denial."""
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         from src.backends.types import BackendCapabilities
         class NoToolsBackend(FakeBackend):
             @property
@@ -2272,7 +2272,7 @@ class TestAutoResearcherEnforcement:
     # -- filesystem write guard --------------------------------------------
 
     def test_guard_write_raises_outside_output_dir(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_filesystem_write_outside_output=False
         )
@@ -2283,7 +2283,7 @@ class TestAutoResearcherEnforcement:
 
     def test_guard_write_allows_within_output_dir(self, researcher):
         # Default policy: filesystem_access=output_only, output_dir is allowed
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         allowed_path = researcher.output_dir / "artifact.json"
         # Should not raise
         researcher.guard_path_write(allowed_path)
@@ -2304,7 +2304,7 @@ class TestAutoResearcherEnforcement:
 
     def test_guard_write_blocks_output_dir_when_workspace_only(self, research_config, fake_backend, tmp_path):
         from src.config import SandboxConfig, SecurityConfig
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         import dataclasses
         config = dataclasses.replace(
             research_config,
@@ -2319,7 +2319,7 @@ class TestAutoResearcherEnforcement:
         assert exc_info.value.reason_code == "write_outside_allowed_roots"
 
     def test_guard_write_allows_any_path_when_outside_output_permitted(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_filesystem_write_outside_output=True
         )
@@ -2335,7 +2335,7 @@ class TestAutoResearcherEnforcement:
         return [json.loads(line) for line in trail.read_text(encoding="utf-8").splitlines()]
 
     def test_bash_denial_emits_policy_denied_audit_event(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_host_bash=False
         )
@@ -2349,7 +2349,7 @@ class TestAutoResearcherEnforcement:
         assert evt["policy_field"] == "allow_host_bash"
 
     def test_write_denial_emits_policy_denied_audit_event(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_filesystem_write_outside_output=False
         )
@@ -2364,7 +2364,7 @@ class TestAutoResearcherEnforcement:
         assert evt["requested_path"] == "/tmp/outside/evil.txt"
 
     def test_policy_denied_event_is_emitted_before_exception_propagates(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_researcher_with_security(
             research_config, fake_backend, tmp_path, allow_host_bash=False
         )
@@ -2392,7 +2392,7 @@ class TestAutoResearcherEnforcement:
         return AutoResearcher(config=config, backend=fake_backend, output_dir=tmp_path / "output")
 
     def test_web_tool_denied_when_sandbox_active_and_network_none(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
         with pytest.raises(PolicyDeniedError) as exc_info:
             researcher._call_with(fake_backend, "prompt", allowed_tools="WebSearch,Read")
@@ -2401,7 +2401,7 @@ class TestAutoResearcherEnforcement:
         assert err.policy_field == "sandbox.network_access"
 
     def test_webfetch_denied_when_sandbox_active_and_network_none(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
         with pytest.raises(PolicyDeniedError) as exc_info:
             researcher._call_with(fake_backend, "prompt", allowed_tools="WebFetch")
@@ -2458,7 +2458,7 @@ class TestAutoResearcherEnforcement:
         assert result is not None
 
     def test_network_denied_call_never_invokes_backend(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         invoke_called = []
 
         class TrackingBackend(FakeBackend):
@@ -2473,7 +2473,7 @@ class TestAutoResearcherEnforcement:
         assert invoke_called == [], "backend.invoke must not be called when network policy denies"
 
     def test_network_denial_emits_policy_denied_audit_event(self, research_config, fake_backend, tmp_path):
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="none")
         with pytest.raises(PolicyDeniedError):
             researcher._call_with(fake_backend, "prompt", allowed_tools="WebSearch")
@@ -2486,7 +2486,7 @@ class TestAutoResearcherEnforcement:
         """allow_host_bash=False + sandbox_active + network=none + Bash,WebSearch → bash denial wins."""
         import dataclasses
         from src.config import SandboxConfig, SecurityConfig
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         config = dataclasses.replace(
             research_config,
             security=SecurityConfig(
@@ -2513,7 +2513,7 @@ class TestAutoResearcherEnforcement:
 
     def test_unknown_tool_denied_when_sandbox_active(self, research_config, fake_backend, tmp_path):
         """Unclassified tools are denied with tool_unclassified when sandbox_active=True."""
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="unrestricted")
         with pytest.raises(PolicyDeniedError) as exc_info:
             researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownTool,Read")
@@ -2540,7 +2540,7 @@ class TestAutoResearcherEnforcement:
 
     def test_unclassified_denial_emits_audit_event(self, research_config, fake_backend, tmp_path):
         """tool_unclassified denial must be recorded in audit_trail.jsonl."""
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="unrestricted")
         with pytest.raises(PolicyDeniedError):
             researcher._call_with(fake_backend, "prompt", allowed_tools="UnknownTool")
@@ -2551,7 +2551,7 @@ class TestAutoResearcherEnforcement:
 
     def test_bash_denial_precedes_unclassified_denial(self, research_config, fake_backend, tmp_path):
         """When Bash + unknown tool both present, bash denial takes precedence."""
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         import dataclasses
         from src.config import SandboxConfig, SecurityConfig
         config = dataclasses.replace(
@@ -2575,8 +2575,8 @@ class TestAutoResearcherEnforcement:
 
     def test_new_host_shell_tool_blocked_via_capability(self, research_config, fake_backend, tmp_path, monkeypatch):
         """A tool classified with uses_host_shell=True is blocked by bash policy (not by hardcoded name)."""
-        from src import tool_capabilities as tc
-        from src.policy_denial import PolicyDeniedError
+        from src.policy import tool_capabilities as tc
+        from src.policy.policy_denial import PolicyDeniedError
         monkeypatch.setitem(
             tc._TOOL_CAPABILITIES,
             "CustomShell",
@@ -2591,8 +2591,8 @@ class TestAutoResearcherEnforcement:
 
     def test_new_networked_tool_blocked_via_capability(self, research_config, fake_backend, tmp_path, monkeypatch):
         """A tool classified with uses_network=True/destination_type='web' is blocked by network policy."""
-        from src import tool_capabilities as tc
-        from src.policy_denial import PolicyDeniedError
+        from src.policy import tool_capabilities as tc
+        from src.policy.policy_denial import PolicyDeniedError
         monkeypatch.setitem(
             tc._TOOL_CAPABILITIES,
             "CustomWebTool",
@@ -2605,8 +2605,8 @@ class TestAutoResearcherEnforcement:
 
     def test_other_destination_type_blocked_by_web_only_policy(self, research_config, fake_backend, tmp_path, monkeypatch):
         """A tool with destination_type='other' is blocked when network_access='web_only'."""
-        from src import tool_capabilities as tc
-        from src.policy_denial import PolicyDeniedError
+        from src.policy import tool_capabilities as tc
+        from src.policy.policy_denial import PolicyDeniedError
         monkeypatch.setitem(
             tc._TOOL_CAPABILITIES,
             "CustomOtherTool",
@@ -2685,7 +2685,7 @@ class TestSandboxedExecutionWorkspace:
 
     def test_sandboxed_network_denied_call_does_not_reach_backend(self, research_config, tmp_path):
         """Network-denied sandboxed call must not invoke backend.invoke."""
-        from src.policy_denial import PolicyDeniedError
+        from src.policy.policy_denial import PolicyDeniedError
         researcher, backend = self._make_sandboxed(research_config, tmp_path, network_access="none")
         with pytest.raises(PolicyDeniedError):
             researcher._call_with(backend, "prompt", allowed_tools="WebSearch")

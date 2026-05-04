@@ -2,7 +2,7 @@
 
 TDD tests that verify:
 - src.policy exposes the full HITL/trust/policy/security API
-- All original flat-module imports remain backward-compatible
+- Package __all__ is canonical and complete
 """
 from __future__ import annotations
 
@@ -145,51 +145,3 @@ class TestPolicyAllList:
         import src.policy as pkg
         for name in pkg.__all__:
             assert hasattr(pkg, name), f"src.policy.__all__ lists {name!r} but it is not present"
-
-
-# ── Backward compatibility ────────────────────────────────────────────────────
-
-class TestPolicyBackwardCompat:
-    def test_hitl_flat_import(self):
-        from src.hitl import HumanDecision
-        assert HumanDecision is not None
-
-    def test_policy_denial_flat_import(self):
-        from src.policy_denial import PolicyDeniedError
-        assert PolicyDeniedError is not None
-
-    def test_trust_flat_import(self):
-        from src.trust import classify_claim_trust
-        assert callable(classify_claim_trust)
-
-    def test_security_runtime_flat_import(self):
-        from src.security_runtime import RuntimeSecurityPolicy
-        assert RuntimeSecurityPolicy is not None
-
-    def test_tool_capabilities_flat_import(self):
-        from src.tool_capabilities import ToolCapabilities
-        assert ToolCapabilities is not None
-
-    def test_sandbox_executor_flat_import(self):
-        from src.sandbox_executor import SandboxExecutor
-        assert SandboxExecutor is not None
-
-    def test_human_decision_same_type(self):
-        from src.policy import HumanDecision as pkg_HD
-        from src.hitl import HumanDecision as flat_HD
-        assert pkg_HD is flat_HD
-
-    def test_policy_denied_error_same_type(self):
-        from src.policy import PolicyDeniedError as pkg_PDE
-        from src.policy_denial import PolicyDeniedError as flat_PDE
-        assert pkg_PDE is flat_PDE
-
-    def test_tool_capabilities_same_type(self):
-        from src.policy import ToolCapabilities as pkg_TC
-        from src.tool_capabilities import ToolCapabilities as flat_TC
-        assert pkg_TC is flat_TC
-
-    def test_sandbox_executor_same_type(self):
-        from src.policy import SandboxExecutor as pkg_SE
-        from src.sandbox_executor import SandboxExecutor as flat_SE
-        assert pkg_SE is flat_SE

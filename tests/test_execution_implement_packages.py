@@ -3,7 +3,7 @@
 TDD tests that verify:
 - src.execution exposes the full execution subsystem API
 - src.implement exposes the full implement/plan/document subsystem API
-- All original flat-module imports remain backward-compatible
+- Package __all__ entries are present and importable
 """
 from __future__ import annotations
 
@@ -125,36 +125,6 @@ class TestExecutionAllList:
         import src.execution as pkg
         for name in pkg.__all__:
             assert hasattr(pkg, name), f"src.execution.__all__ lists {name!r} but it is not present"
-
-
-# ── Backward compatibility ────────────────────────────────────────────────────
-
-class TestExecutionBackwardCompat:
-    def test_execution_plan_flat_import(self):
-        from src.execution_plan import ExecutionPlan
-        assert ExecutionPlan is not None
-
-    def test_execution_validator_flat_import(self):
-        from src.execution_validator import ValidationResult
-        assert ValidationResult is not None
-
-    def test_execution_diagnosis_flat_import(self):
-        from src.execution_diagnosis import DiagnosisArtifact
-        assert DiagnosisArtifact is not None
-
-    def test_repair_loop_flat_import(self):
-        from src.repair_loop import RepairLoop
-        assert RepairLoop is not None
-
-    def test_package_exports_same_type_as_flat(self):
-        from src.execution import ExecutionPlan as pkg_EP
-        from src.execution_plan import ExecutionPlan as flat_EP
-        assert pkg_EP is flat_EP
-
-    def test_repair_loop_same_type(self):
-        from src.execution import RepairLoop as pkg_RL
-        from src.repair_loop import RepairLoop as flat_RL
-        assert pkg_RL is flat_RL
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -300,36 +270,3 @@ class TestImplementAllList:
             assert hasattr(pkg, name), f"src.implement.__all__ lists {name!r} but it is not present"
 
 
-# ── Backward compatibility ────────────────────────────────────────────────────
-
-class TestImplementBackwardCompat:
-    def test_implement_loop_flat_import(self):
-        from src.implement_loop import ImplementTarget
-        assert ImplementTarget is not None
-
-    def test_implement_runner_flat_import(self):
-        from src.implement_runner import ImplementRunner
-        assert ImplementRunner is not None
-
-    def test_plan_loop_flat_import(self):
-        from src.plan_loop import PlanCycleState
-        assert PlanCycleState is not None
-
-    def test_document_loop_flat_import(self):
-        from src.document_loop import Issue
-        assert Issue is not None
-
-    def test_implement_target_same_type(self):
-        from src.implement import ImplementTarget as pkg_IT
-        from src.implement_loop import ImplementTarget as flat_IT
-        assert pkg_IT is flat_IT
-
-    def test_issue_same_type(self):
-        from src.implement import Issue as pkg_I
-        from src.document_loop import Issue as flat_I
-        assert pkg_I is flat_I
-
-    def test_plan_refiner_same_type(self):
-        from src.implement import PlanRefiner as pkg_PR
-        from src.plan_refiner import PlanRefiner as flat_PR
-        assert pkg_PR is flat_PR

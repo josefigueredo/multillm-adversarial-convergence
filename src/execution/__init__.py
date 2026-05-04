@@ -1,9 +1,9 @@
-"""Execution domain package — MM12 Step 3 / MM15 Step 3.
+"""Execution domain package.
 
 Re-exports the MM10 execution subsystem API under a single package boundary:
 execution plans, validation, diagnosis, integration adapters, and repair loops.
-Existing flat-module imports (``from src.execution_plan import …``) remain valid
-via compatibility shims.
+Canonical paths are ``src.execution.<module>``; flat-module imports were
+removed in MM15 Step 7.
 
 Contexts exposed:
 - Execution plans: step/context/plan models

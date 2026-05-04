@@ -1,8 +1,8 @@
-"""Implement domain package — MM12 Step 3 / MM15 Step 4.
+"""Implement domain package.
 
 Re-exports the implement / plan / document subsystem API under a single package
-boundary.  Existing flat-module imports (``from src.implement_loop import …``)
-remain valid.
+boundary.  Canonical paths are ``src.implement.<module>``; flat-module imports
+were removed in MM15 Step 7.
 
 Contexts exposed:
 - Implement loop: target, config, task, patch, critique, cycle, validation

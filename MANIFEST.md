@@ -14,10 +14,11 @@ Purpose: quick inventory of the repository so a reader can understand where the 
 - `src/cli.py` — CLI entrypoint (`run`, `refine`, `plan`)
 - `src/orchestrator.py` — `run` orchestration lifecycle and synthesis/finalization wiring
 - `src/research_loop.py` — iterative research loop
-- `src/document_refiner.py` — refine-mode orchestrator
-- `src/document_loop.py` — refine-mode convergence loop
-- `src/plan_refiner.py` — plan-mode orchestrator
-- `src/plan_loop.py` — plan-mode convergence loop
+- `src/evidence/` — references, provenance, and evidence artifact pipeline
+- `src/deliverables/` — deliverable staging, citation verification, and export helpers
+- `src/execution/` — execution plan, validation, diagnosis, repair, and integration
+- `src/implement/` — implement/refine/plan loop orchestration and strategies
+- `src/policy/` — HITL, trust, policy denial, runtime security, and sandbox execution
 - `src/config.py` — YAML config schema and validation
 - `src/strategy.py` — single / ensemble / adversarial / related runtime strategies
 - `src/backends/` — backend adapters and registry
@@ -25,7 +26,6 @@ Purpose: quick inventory of the repository so a reader can understand where the 
 - `src/reporting.py` — HTML report rendering
 - `src/artifacts.py` — artifact payload builders and report-writing helpers
 - `src/audit_trail.py` — structured execution audit trail writer
-- `src/provenance.py` — claims, citations, evidence linking, contradictions, evidence quality
 - `src/portfolio.py` — cross-run portfolio aggregation
 - `src/templates/` — HTML templates and CSS assets
 

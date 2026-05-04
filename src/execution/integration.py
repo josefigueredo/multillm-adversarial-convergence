@@ -17,7 +17,7 @@ from src.execution.plan import ExecutionPlan, ExecutionStep, TargetContext
 from src.execution.validator import ExecutionResult, validate_plan
 
 if TYPE_CHECKING:
-    from .implement_loop import ImplementConfig, TaskState
+    from ..implement.implement_loop import ImplementConfig, TaskState
 
 
 # ---------------------------------------------------------------------------

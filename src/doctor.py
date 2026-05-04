@@ -1021,9 +1021,9 @@ def doctor_pipeline(pipeline: "Any") -> DoctorReport:  # DeliverablePipeline
     Returns:
         DoctorReport with exit_code=0 if healthy, exit_code=1 if issues found.
     """
-    from .citation_verification import verify_body_citations, verify_export_artifact
-    from .deliverable_classes import get_config_for_pipeline
-    from .deliverable_pipeline import PipelineStage
+    from .deliverables.citation_verification import verify_body_citations, verify_export_artifact
+    from .deliverables.classes import get_config_for_pipeline
+    from .deliverables.pipeline import PipelineStage
 
     issues: list[str] = []
     parts: list[str] = []

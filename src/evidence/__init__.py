@@ -1,9 +1,9 @@
-"""Evidence domain package — MM12 Step 2 / MM15 Step 1.
+"""Evidence domain package.
 
 Re-exports the public API for research evidence — deterministic references,
 provenance tracking, and claim/citation extraction — under a single package
-boundary.  Existing flat-module imports (``from src.references import …``)
-remain valid via compatibility shims.
+boundary.  Canonical paths are ``src.evidence.<module>``; flat-module imports
+were removed in MM15 Step 7.
 
 Contexts exposed:
 - References: heading regex, deduplication, building, injection, extraction

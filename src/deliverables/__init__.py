@@ -1,9 +1,9 @@
-"""Deliverables domain package — MM12 Step 2 / MM15 Step 2.
+"""Deliverables domain package.
 
 Re-exports the full public API of the publication pipeline so callers can
 import from this single package boundary instead of reaching into individual
-flat modules.  Existing imports (``from src.deliverable_pipeline import …``)
-remain valid via compatibility shims.
+modules.  Canonical paths are ``src.deliverables.<module>``; flat-module
+imports were removed in MM15 Step 7.
 
 Contexts exposed:
 - Pipeline model (stages, artifacts, :class:`DeliverablePipeline`)

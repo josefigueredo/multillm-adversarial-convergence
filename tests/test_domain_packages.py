@@ -3,7 +3,6 @@
 Verifies that:
 1. src.deliverables exposes the full publication pipeline public API.
 2. src.evidence exposes the references/provenance public API.
-3. Original flat-module imports remain backward-compatible.
 
 All tests fail before the __init__.py files are created.
 """
@@ -191,27 +190,3 @@ class TestEvidencePackageProvenance:
         assert callable(write_provenance_artifacts_bundle)
 
 
-# ---------------------------------------------------------------------------
-# Backward compatibility — flat imports still work
-# ---------------------------------------------------------------------------
-
-class TestBackwardCompatibility:
-    def test_deliverable_pipeline_still_importable(self):
-        from src.deliverable_pipeline import DeliverablePipeline
-        assert DeliverablePipeline
-
-    def test_deliverable_classes_still_importable(self):
-        from src.deliverable_classes import DeliverableClass, create_pipeline
-        assert DeliverableClass.PAPER
-
-    def test_citation_verification_still_importable(self):
-        from src.citation_verification import VerificationViolation
-        assert VerificationViolation
-
-    def test_export_bundle_still_importable(self):
-        from src.export_bundle import ExportBundle, build_export_bundle
-        assert build_export_bundle
-
-    def test_references_still_importable(self):
-        from src.references import REFS_HEADING_RE, extract_references_section
-        assert REFS_HEADING_RE

@@ -610,7 +610,7 @@ def _run_explain_implement(args: argparse.Namespace, log: logging.Logger) -> int
         log.error("Config file not found: %s", config_path)
         return 1
 
-    from .implement_loop import ImplementConfig
+    from .implement.implement_loop import ImplementConfig
 
     try:
         config = ImplementConfig.from_yaml(config_path)

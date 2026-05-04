@@ -50,7 +50,7 @@ artefacts.
 | File | Role |
 |---|---|
 | `src/knowledge_base.py` *(if present)* | KB assembly |
-| `src/references.py` | Deterministic references section builder/extractor |
+| `src/evidence/references.py` | Deterministic references section builder/extractor |
 | `src/artifacts.py` | Generic artifact helpers |
 | `src/evaluation_artifacts.py` | Evaluation-specific artifacts |
 | `src/run_metadata_artifacts.py` | Run metadata persistence |
@@ -60,9 +60,9 @@ artefacts.
 | `src/certainty.py` | Certainty / confidence tracking |
 | `src/comparison.py` | Source comparison utilities |
 | `src/constraints.py` | Research constraint models |
-| `src/provenance.py` | Provenance tracking |
-| `src/provenance_artifacts.py` | Provenance artifact models |
-| `src/provenance_pipeline.py` | Provenance pipeline |
+| `src/evidence/provenance.py` | Provenance tracking |
+| `src/evidence/provenance_artifacts.py` | Provenance artifact models |
+| `src/evidence/provenance_pipeline.py` | Provenance pipeline |
 
 **Target package seam:** `src/evidence/`
 
@@ -75,13 +75,13 @@ citation verification into publication-grade deliverables.
 
 | File | Role |
 |---|---|
-| `src/deliverable_pipeline.py` | Staged pipeline model (MM11 Step 1) |
-| `src/deliverable_classes.py` | Class configs and factory (MM11 Step 2) |
-| `src/citation_verification.py` | Citation/export verification (MM11 Step 3) |
-| `src/export_bundle.py` | Export bundle assembly (MM11 Step 4) |
+| `src/deliverables/pipeline.py` | Staged pipeline model (MM11 Step 1) |
+| `src/deliverables/classes.py` | Class configs and factory (MM11 Step 2) |
+| `src/deliverables/citation_verification.py` | Citation/export verification (MM11 Step 3) |
+| `src/deliverables/export_bundle.py` | Export bundle assembly (MM11 Step 4) |
 | `src/pdf_report.py` | PDF report generation |
 | `src/reporting.py` | Report generation orchestration |
-| `src/report_exports.py` | Report export helpers |
+| `src/deliverables/report_exports.py` | Report export helpers |
 | `src/output_style.py` | Output style config and presentation |
 
 **Target package seam:** `src/deliverables/`
@@ -95,20 +95,20 @@ implementation-automation work; bridge research outputs to code changes.
 
 | File | Role |
 |---|---|
-| `src/implement_loop.py` | Implement-mode loop driver |
-| `src/implement_runner.py` | Runner and step executor |
-| `src/implement_strategy.py` | Implement strategy models |
-| `src/execution_plan.py` | Execution plan model (MM10) |
-| `src/execution_validator.py` | Execution result validator (MM10) |
-| `src/execution_diagnosis.py` | Diagnosis artifact model (MM10) |
-| `src/execution_integration.py` | Adapter layer bridging loops to execution subsystem (MM10) |
-| `src/repair_loop.py` | Execution repair loop (MM10) |
-| `src/plan_loop.py` | Plan-mode loop |
-| `src/plan_refiner.py` | Plan refinement |
-| `src/plan_strategy.py` | Plan strategy models |
-| `src/document_loop.py` | Document-mode loop |
-| `src/document_refiner.py` | Document refinement |
-| `src/document_strategy.py` | Document strategy models |
+| `src/implement/implement_loop.py` | Implement-mode loop driver |
+| `src/implement/implement_runner.py` | Runner and step executor |
+| `src/implement/implement_strategy.py` | Implement strategy models |
+| `src/execution/plan.py` | Execution plan model (MM10) |
+| `src/execution/validator.py` | Execution result validator (MM10) |
+| `src/execution/diagnosis.py` | Diagnosis artifact model (MM10) |
+| `src/execution/integration.py` | Adapter layer bridging loops to execution subsystem (MM10) |
+| `src/execution/repair_loop.py` | Execution repair loop (MM10) |
+| `src/implement/plan_loop.py` | Plan-mode loop |
+| `src/implement/plan_refiner.py` | Plan refinement |
+| `src/implement/plan_strategy.py` | Plan strategy models |
+| `src/implement/document_loop.py` | Document-mode loop |
+| `src/implement/document_refiner.py` | Document refinement |
+| `src/implement/document_strategy.py` | Document strategy models |
 
 **Target package seam:** `src/execution/` + `src/implement/`
 
@@ -145,13 +145,13 @@ trust decisions — independent of loop orchestration.
 
 | File | Role |
 |---|---|
-| `src/hitl.py` | HITL pause/resume and artifact management |
-| `src/policy_denial.py` | Policy denial model and enforcement |
-| `src/trust.py` | Trust model |
-| `src/security_runtime.py` | Runtime security enforcement |
-| `src/tool_capabilities.py` | Tool capability declarations |
-| `src/tool_runtime.py` | Tool runtime dispatch |
-| `src/sandbox_executor.py` | Sandbox executor |
+| `src/policy/hitl.py` | HITL pause/resume and artifact management |
+| `src/policy/policy_denial.py` | Policy denial model and enforcement |
+| `src/policy/trust.py` | Trust model |
+| `src/policy/security_runtime.py` | Runtime security enforcement |
+| `src/policy/tool_capabilities.py` | Tool capability declarations |
+| `src/policy/tool_runtime.py` | Tool runtime dispatch |
+| `src/policy/sandbox_executor.py` | Sandbox executor |
 | `src/sandbox/` | Sandbox backends |
 
 **Target package seam:** `src/policy/` for HITL/trust/denial;
@@ -199,11 +199,11 @@ cross-cutting runtime utilities.
 | Context | Current state | Gap |
 |---|---|---|
 | Research Orchestration | flat in `src/` | large; tolerable for now |
-| Evidence | flat in `src/` | scattered across artifact helpers |
-| Deliverables | flat in `src/` | coherent — ready for `src/deliverables/` |
-| Execution / Implement | flat in `src/` | coherent — ready for `src/execution/` |
+| Evidence | `src/evidence/` ✓ | canonical package paths active |
+| Deliverables | `src/deliverables/` ✓ | canonical package paths active |
+| Execution / Implement | `src/execution/`, `src/implement/` ✓ | canonical package paths active |
 | Workflow State Machine | `src/workflows/` ✓ | clean |
-| HITL / Policy | flat in `src/` | policy and sandbox partially separable |
+| HITL / Policy | `src/policy/` + `src/sandbox/` ✓ | canonical package paths active |
 | Diagnostics | flat in `src/` | small surface — easy to extract |
 | Infrastructure / Backends | `src/backends/`, `src/templates/` ✓ | CLI still flat |
 
@@ -222,8 +222,8 @@ cross-cutting runtime utilities.
 
 ## Principles
 
-1. **No big-bang refactor** — seams are introduced incrementally; existing
-   imports continue to work via `__init__.py` re-exports during migration.
+1. **No big-bang refactor** — seams were introduced incrementally; MM15
+   completed the migration and removed the temporary flat-module shims.
 2. **Tests stay green** — each step commits with a passing full suite.
 3. **Diagnostics lead** — `doctor` and `explain` are updated alongside or
    immediately after each structural change.

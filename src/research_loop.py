@@ -343,7 +343,7 @@ def _emit_research_failure_diagnosis(ctx: LoopContext, dimension: str) -> None:
     """
     try:
         import json as _json
-        from .execution_integration import diagnose_research_failure
+        from .execution.integration import diagnose_research_failure
         artifact = diagnose_research_failure(dimension, ctx.artifact_root)
         log.warning(
             "[research][diagnosis] dimension=%r type=%s — %s",

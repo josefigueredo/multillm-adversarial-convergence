@@ -3,7 +3,7 @@
 TDD tests that verify:
 - explain_domain_packages() surfaces the active bounded-context package seams
 - Pre-existing packages are also reported
-- Backward-compat statement is present
+- Migration-complete statement is present
 """
 from __future__ import annotations
 
@@ -79,13 +79,15 @@ class TestExplainDomainPackagesPreExisting:
         assert "sandbox" in result
 
 
-class TestExplainDomainPackagesBackwardCompat:
-    def test_backward_compat_note_present(self):
+class TestExplainDomainPackagesMigrationComplete:
+    def test_migration_complete_note_present(self):
         from src.explain import explain_domain_packages
         result = explain_domain_packages()
-        # Should state that flat imports still work
+        # Should state that the domain migration is complete and the
+        # canonical package paths are the supported public API.
         lower = result.lower()
-        assert "backward" in lower or "flat" in lower or "compat" in lower
+        assert "migration complete" in lower
+        assert "canonical" in lower
 
 
 class TestExplainDomainPackagesResponsibilities:

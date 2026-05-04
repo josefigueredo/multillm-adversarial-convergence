@@ -1179,7 +1179,7 @@ class TestSelfHostingGuard:
     """from_yaml() must reject same-repo targets unless allow_same_repo: true."""
 
     def _repo_root(self):
-        import src.implement_loop as m
+        import src.implement.implement_loop as m
         return Path(m.__file__).parent.parent
 
     def test_same_repo_target_raises_without_flag(self, tmp_path):

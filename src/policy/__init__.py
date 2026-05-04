@@ -1,8 +1,8 @@
-"""Policy domain package — MM12 Step 4 / MM15 Step 5.
+"""Policy domain package.
 
 Re-exports the HITL / trust / policy / security / sandbox API under a single
-package boundary.  Existing flat-module imports (``from src.hitl import …``)
-remain valid via compatibility shims.
+package boundary.  Canonical paths are ``src.policy.<module>``; flat-module
+imports were removed in MM15 Step 7.
 
 Contexts exposed:
 - HITL: human-in-the-loop models and I/O helpers

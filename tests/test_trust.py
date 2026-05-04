@@ -161,7 +161,7 @@ class TestTrustSummary:
 
 class TestProvenanceCitationIntegration:
     def test_extract_citations_adds_trust_class(self):
-        from src.provenance import extract_citations
+        from src.evidence.provenance import extract_citations
 
         text = "See [example](https://example.com) for details."
         cits = extract_citations(text, scope="test", retrieved_at="2024-01-01")
@@ -170,7 +170,7 @@ class TestProvenanceCitationIntegration:
             assert "trust_class" in c
 
     def test_extract_citations_trust_class_is_untrusted_web_content(self):
-        from src.provenance import extract_citations
+        from src.evidence.provenance import extract_citations
 
         text = "See [example](https://example.com) for details."
         cits = extract_citations(text, scope="test", retrieved_at="2024-01-01")
@@ -178,7 +178,7 @@ class TestProvenanceCitationIntegration:
             assert c["trust_class"] == "untrusted_web_content"
 
     def test_extract_citations_trust_class_is_valid(self):
-        from src.provenance import extract_citations
+        from src.evidence.provenance import extract_citations
 
         text = "Reference: https://arxiv.org/abs/2301.00001"
         cits = extract_citations(text, scope="test", retrieved_at="2024-01-01")
@@ -197,7 +197,7 @@ class TestProvenanceClaimIntegration:
     )
 
     def test_extract_claims_adds_trust_class(self):
-        from src.provenance import extract_claims
+        from src.evidence.provenance import extract_claims
 
         claims = extract_claims(self.LONG_CLAIM, scope="test")
         assert len(claims) >= 1
@@ -205,14 +205,14 @@ class TestProvenanceClaimIntegration:
             assert "trust_class" in c
 
     def test_extract_claims_trust_class_is_inferred_claim(self):
-        from src.provenance import extract_claims
+        from src.evidence.provenance import extract_claims
 
         claims = extract_claims(self.LONG_CLAIM, scope="test")
         for c in claims:
             assert c["trust_class"] == "inferred_claim"
 
     def test_extract_claims_trust_class_is_valid(self):
-        from src.provenance import extract_claims
+        from src.evidence.provenance import extract_claims
 
         claims = extract_claims(self.LONG_CLAIM, scope="test")
         for c in claims:
@@ -276,51 +276,51 @@ class FakeSourceFile:
 
 class TestBuildSourceFileProvenance:
     def test_returns_list(self):
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
         assert isinstance(result, list)
 
     def test_one_record_per_source_file(self):
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         files = [FakeSourceFile("/a.pdf"), FakeSourceFile("/b.md")]
         result = build_source_file_provenance(files)
         assert len(result) == 2
 
     def test_each_record_has_trust_class(self):
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
         for record in result:
             assert "trust_class" in record
 
     def test_trust_class_is_user_provided_source_material(self):
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
         for record in result:
             assert record["trust_class"] == "user_provided_source_material"
 
     def test_records_have_path_field(self):
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
         assert result[0]["path"] == "/docs/spec.pdf"
 
     def test_records_have_source_type_local_file(self):
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         result = build_source_file_provenance([FakeSourceFile("/docs/spec.pdf")])
         assert result[0]["source_type"] == "local_file"
 
     def test_empty_source_files_returns_empty_list(self):
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         assert build_source_file_provenance([]) == []
 
     def test_trust_class_is_valid(self):
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         result = build_source_file_provenance([FakeSourceFile("/x.pdf")])
         assert result[0]["trust_class"] in TRUST_CLASSES
@@ -351,7 +351,7 @@ class TestLocalSourceTrustIntegration:
     def test_local_source_records_in_citations_appear_in_dashboard_trust_summary(self, tmp_path):
         import json
         from src.artifacts import write_dashboard
-        from src.provenance import build_source_file_provenance
+        from src.evidence.provenance import build_source_file_provenance
 
         # Build local source provenance records
         records = build_source_file_provenance([
@@ -379,7 +379,7 @@ class TestLocalSourceTrustIntegration:
     def test_mixed_local_and_url_citations_both_appear_in_trust_summary(self, tmp_path):
         import json
         from src.artifacts import write_dashboard
-        from src.provenance import build_source_file_provenance, extract_citations
+        from src.evidence.provenance import build_source_file_provenance, extract_citations
 
         local_records = build_source_file_provenance([FakeSourceFile("/input/doc.md")])
         url_records = extract_citations(

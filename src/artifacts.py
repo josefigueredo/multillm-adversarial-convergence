@@ -734,7 +734,7 @@ def write_dashboard(
     tool_loop_summary: dict[str, Any] | None = None,
 ) -> None:
     """Write a stakeholder-friendly summary dashboard artifact."""
-    from .trust import trust_summary as compute_trust_summary
+    from .policy.trust import trust_summary as compute_trust_summary
 
     rubric = load_json_if_exists(output_dir / "rubric.json", {})
     evidence_quality = load_json_if_exists(output_dir / "evidence_quality.json", {})
