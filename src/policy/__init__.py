@@ -1,8 +1,8 @@
-"""Policy domain package — MM12 Step 4.
+"""Policy domain package — MM12 Step 4 / MM15 Step 5.
 
 Re-exports the HITL / trust / policy / security / sandbox API under a single
 package boundary.  Existing flat-module imports (``from src.hitl import …``)
-remain valid.
+remain valid via compatibility shims.
 
 Contexts exposed:
 - HITL: human-in-the-loop models and I/O helpers
@@ -17,7 +17,7 @@ Contexts exposed:
 from __future__ import annotations
 
 # ── HITL ──────────────────────────────────────────────────────────────────────
-from ..hitl import (
+from .hitl import (
     DeferReason,
     HumanDecision,
     HumanInputRequest,
@@ -28,16 +28,16 @@ from ..hitl import (
 )
 
 # ── Policy denial ─────────────────────────────────────────────────────────────
-from ..policy_denial import PolicyDeniedError
+from .policy_denial import PolicyDeniedError
 
 # ── Trust ─────────────────────────────────────────────────────────────────────
-from ..trust import classify_citation_trust, classify_claim_trust, trust_summary
+from .trust import classify_citation_trust, classify_claim_trust, trust_summary
 
 # ── Security runtime ──────────────────────────────────────────────────────────
-from ..security_runtime import RuntimeSecurityPolicy, resolve_runtime_security_policy
+from .security_runtime import RuntimeSecurityPolicy, resolve_runtime_security_policy
 
 # ── Tool capabilities ─────────────────────────────────────────────────────────
-from ..tool_capabilities import (
+from .tool_capabilities import (
     ToolCapabilities,
     check_capability_consistency,
     classify_allowed_tools,
@@ -46,10 +46,10 @@ from ..tool_capabilities import (
 )
 
 # ── Tool runtime ──────────────────────────────────────────────────────────────
-from ..tool_runtime import run_function_tool_loop
+from .tool_runtime import run_function_tool_loop
 
 # ── Sandbox executor ──────────────────────────────────────────────────────────
-from ..sandbox_executor import SandboxExecutor
+from .sandbox_executor import SandboxExecutor
 
 __all__ = [
     # hitl
