@@ -1,6 +1,6 @@
-"""Tests for src.provenance — claim and citation extraction."""
+"""Tests for src.evidence.provenance — claim and citation extraction."""
 
-from src.provenance import (
+from src.evidence.provenance import (
     detect_claim_conflicts,
     extract_citations,
     extract_claims,

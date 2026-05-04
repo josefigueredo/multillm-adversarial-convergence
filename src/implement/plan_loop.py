@@ -13,7 +13,7 @@ from src.implement.document_loop import (
     _make_human_requests,
     _register_issues,
 )
-from src.hitl import DeferReason, HumanDecision, HumanInputRequest
+from src.policy.hitl import DeferReason, HumanDecision, HumanInputRequest
 from src.run_state import BaseContext
 from src.workflows.plan_states import PlanState
 from src.workflows.transitions import WorkflowTransitionEmitter
@@ -203,7 +203,7 @@ def run_plan_cycle(
         state.pending_human_inputs = requests
         emitter.transition(PlanState.PAUSED_FOR_HUMAN, cycle=state.cycle)
         if interactive:
-            from src.hitl import collect_interactive
+            from src.policy.hitl import collect_interactive
             decisions = collect_interactive(requests)
             state.human_decisions.extend(decisions)
             ctx.human_decisions.extend(decisions)

@@ -8,7 +8,7 @@ import pytest
 
 from src.config import SandboxConfig, SecurityConfig
 from src.run_paths import RunPaths
-from src.security_runtime import RuntimeSecurityPolicy, resolve_runtime_security_policy
+from src.policy.security_runtime import RuntimeSecurityPolicy, resolve_runtime_security_policy
 
 
 def _paths(tmp_path: Path) -> RunPaths:

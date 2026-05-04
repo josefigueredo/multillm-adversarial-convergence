@@ -190,8 +190,8 @@ class ImplementRunner:
         :class:`~src.execution_diagnosis.DiagnosisArtifact` and persists it
         via :func:`~src.execution_diagnosis.persist_diagnosis`.
         """
-        from src.execution_diagnosis import persist_diagnosis
-        from src.execution_integration import diagnose_implement_failure
+        from src.execution.diagnosis import persist_diagnosis
+        from src.execution.integration import diagnose_implement_failure
 
         artifacts = diagnose_implement_failure(state, self._config)
         persist_diagnosis(artifacts, self._output_dir)

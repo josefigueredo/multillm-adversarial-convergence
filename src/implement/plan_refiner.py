@@ -16,7 +16,7 @@ from src.backends import AgentResponse, Backend
 from src.backend_options import apply_backend_capabilities, build_call_options
 from src.audit_trail import AuditTrailWriter
 from src.config import ArtifactConfig, PlanConfig, ProviderConfig
-from src.hitl import (
+from src.policy.hitl import (
     append_human_decisions,
     load_human_decisions,
     write_pending_questions,

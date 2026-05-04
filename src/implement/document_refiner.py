@@ -19,7 +19,7 @@ from src.audit_trail import AuditTrailWriter
 from src.config import ArtifactConfig, DocumentConfig, ProviderConfig
 from src.implement.document_loop import CycleContext, CycleState, _should_stop, run_cycle
 from src.implement.document_strategy import ConvergeStrategy
-from src.hitl import (
+from src.policy.hitl import (
     append_human_decisions,
     load_human_decisions,
     write_pending_questions,

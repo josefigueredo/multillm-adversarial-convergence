@@ -15,9 +15,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.execution_plan import ExecutionPlan, ExecutionStep, TargetContext
-from src.execution_validator import ExecutionResult, ValidationResult, validate_step, validate_plan
-from src.execution_diagnosis import DiagnosisArtifact, diagnose_plan
+from src.execution.plan import ExecutionPlan, ExecutionStep, TargetContext
+from src.execution.validator import ExecutionResult, ValidationResult, validate_step, validate_plan
+from src.execution.diagnosis import DiagnosisArtifact, diagnose_plan
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ def _failing_result():
 
 class TestRepairAttempt:
     def _make(self, tmp_path):
-        from src.repair_loop import RepairAttempt
+        from src.execution.repair_loop import RepairAttempt
         plan = _plan(tmp_path)
         results = [_result()]
         vrs = validate_plan(plan, results)
@@ -64,7 +64,7 @@ class TestRepairAttempt:
         )
 
     def test_fields_accessible(self, tmp_path):
-        from src.repair_loop import RepairAttempt
+        from src.execution.repair_loop import RepairAttempt
         a = self._make(tmp_path)
         assert a.cycle == 1
         assert isinstance(a.diagnosis, tuple)
@@ -73,13 +73,13 @@ class TestRepairAttempt:
         assert isinstance(a.validations, tuple)
 
     def test_is_frozen(self, tmp_path):
-        from src.repair_loop import RepairAttempt
+        from src.execution.repair_loop import RepairAttempt
         a = self._make(tmp_path)
         with pytest.raises((AttributeError, TypeError)):
             a.cycle = 99  # type: ignore[misc]
 
     def test_to_dict_has_required_keys(self, tmp_path):
-        from src.repair_loop import RepairAttempt
+        from src.execution.repair_loop import RepairAttempt
         d = self._make(tmp_path).to_dict()
         assert "cycle" in d
         assert "diagnosis" in d
@@ -94,7 +94,7 @@ class TestRepairAttempt:
 
 class TestRepairOutcome:
     def _make(self, tmp_path, resolved=True):
-        from src.repair_loop import RepairOutcome
+        from src.execution.repair_loop import RepairOutcome
         plan = _plan(tmp_path)
         results = [_result()]
         vrs = validate_plan(plan, results)
@@ -109,25 +109,25 @@ class TestRepairOutcome:
         )
 
     def test_fields_accessible(self, tmp_path):
-        from src.repair_loop import RepairOutcome
+        from src.execution.repair_loop import RepairOutcome
         o = self._make(tmp_path)
         assert isinstance(o.original_plan, ExecutionPlan)
         assert o.resolved is True
         assert o.cycles_run == 0
 
     def test_is_frozen(self, tmp_path):
-        from src.repair_loop import RepairOutcome
+        from src.execution.repair_loop import RepairOutcome
         o = self._make(tmp_path)
         with pytest.raises((AttributeError, TypeError)):
             o.resolved = False  # type: ignore[misc]
 
     def test_resolved_false_when_not_fixed(self, tmp_path):
-        from src.repair_loop import RepairOutcome
+        from src.execution.repair_loop import RepairOutcome
         o = self._make(tmp_path, resolved=False)
         assert o.resolved is False
 
     def test_to_dict_has_required_keys(self, tmp_path):
-        from src.repair_loop import RepairOutcome
+        from src.execution.repair_loop import RepairOutcome
         d = self._make(tmp_path).to_dict()
         assert "resolved" in d
         assert "cycles_run" in d
@@ -150,7 +150,7 @@ class TestRepairLoopRun:
         return [_failing_result()]
 
     def test_resolved_immediately_when_no_initial_failures(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         results = [_result()]
         vrs = validate_plan(plan, results)
@@ -161,7 +161,7 @@ class TestRepairLoopRun:
         assert outcome.cycles_run == 0
 
     def test_repair_fn_not_called_when_already_passing(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         results = [_result()]
         vrs = validate_plan(plan, results)
@@ -171,7 +171,7 @@ class TestRepairLoopRun:
         repair_fn.assert_not_called()
 
     def test_resolves_after_one_repair(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         initial_results = [_failing_result()]
         initial_vrs = validate_plan(plan, initial_results)
@@ -187,7 +187,7 @@ class TestRepairLoopRun:
         assert outcome.cycles_run == 1
 
     def test_stops_at_max_cycles_when_never_resolved(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         initial_results = [_failing_result()]
         initial_vrs = validate_plan(plan, initial_results)
@@ -202,7 +202,7 @@ class TestRepairLoopRun:
         assert outcome.cycles_run == 2
 
     def test_attempts_recorded_in_outcome(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         initial_results = [_failing_result()]
         initial_vrs = validate_plan(plan, initial_results)
@@ -216,7 +216,7 @@ class TestRepairLoopRun:
         assert len(outcome.attempts) == 2
 
     def test_repair_fn_called_with_diagnosis(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         initial_results = [_failing_result()]
         initial_vrs = validate_plan(plan, initial_results)
@@ -235,7 +235,7 @@ class TestRepairLoopRun:
         assert all(isinstance(d, DiagnosisArtifact) for d in received_diags)
 
     def test_execute_fn_called_with_repaired_plan(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         initial_results = [_failing_result()]
         initial_vrs = validate_plan(plan, initial_results)
@@ -253,7 +253,7 @@ class TestRepairLoopRun:
         assert len(executed_plans) == 1
 
     def test_final_plan_is_last_repaired_plan(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         initial_results = [_failing_result()]
         initial_vrs = validate_plan(plan, initial_results)
@@ -267,12 +267,12 @@ class TestRepairLoopRun:
         assert isinstance(outcome.final_plan, ExecutionPlan)
 
     def test_max_cycles_zero_raises(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         with pytest.raises(ValueError, match="max_cycles"):
             RepairLoop(max_cycles=0)
 
     def test_attempt_cycle_numbers_are_sequential(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = self._plan(tmp_path)
         initial_results = [_failing_result()]
         initial_vrs = validate_plan(plan, initial_results)
@@ -285,7 +285,7 @@ class TestRepairLoopRun:
         assert [a.cycle for a in outcome.attempts] == [1, 2, 3]
 
     def test_empty_results_for_nonempty_plan_raises(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = _plan(tmp_path, _step(), _step())
         with pytest.raises(ValueError, match="initial_results"):
             RepairLoop(max_cycles=1).run(
@@ -294,7 +294,7 @@ class TestRepairLoopRun:
             )
 
     def test_too_few_initial_results_raises(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = _plan(tmp_path, _step(), _step())
         result = _result()
         vr = validate_plan(_plan(tmp_path, _step()), [result])
@@ -305,7 +305,7 @@ class TestRepairLoopRun:
             )
 
     def test_too_few_initial_validations_raises(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = _plan(tmp_path, _step(), _step())
         results = [_result(), _result()]
         vr_one = validate_plan(_plan(tmp_path, _step()), [_result()])
@@ -316,7 +316,7 @@ class TestRepairLoopRun:
             )
 
     def test_matching_lengths_all_pass_resolves_immediately(self, tmp_path):
-        from src.repair_loop import RepairLoop
+        from src.execution.repair_loop import RepairLoop
         plan = _plan(tmp_path, _step(), _step())
         results = [_result(), _result()]
         vrs = validate_plan(plan, results)

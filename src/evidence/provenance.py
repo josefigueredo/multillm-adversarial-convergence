@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from src.trust import classify_citation_trust, classify_claim_trust
+from src.policy.trust import classify_citation_trust, classify_claim_trust
 
 
 _URL_PATTERN = re.compile(r"https?://[^\s)>\]]+")

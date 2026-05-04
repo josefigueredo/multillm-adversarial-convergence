@@ -24,7 +24,7 @@ from src.implement.document_strategy import (
     _parse_raw_critiques,
     _parse_verified_critiques,
 )
-from src.hitl import HumanDecision
+from src.policy.hitl import HumanDecision
 from src.prompts import render
 from src.workflows.decisions import CritiqueStatus
 

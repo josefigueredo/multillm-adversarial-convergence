@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from src.policy_denial import PolicyDeniedError
-from src.sandbox_executor import SandboxExecutor
-from src.security_runtime import RuntimeSecurityPolicy
+from src.policy.policy_denial import PolicyDeniedError
+from src.policy.sandbox_executor import SandboxExecutor
+from src.policy.security_runtime import RuntimeSecurityPolicy
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

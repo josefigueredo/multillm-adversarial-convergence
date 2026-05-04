@@ -1329,7 +1329,7 @@ class TestLastPauseLifecycle:
     def test_document_refiner_clears_last_pause_on_resume(self, tmp_path):
         """The resume block in DocumentRefiner must delete last_pause.json after reading it."""
         import json
-        from src.document_refiner import _LAST_PAUSE_FILE
+        from src.implement.document_refiner import _LAST_PAUSE_FILE
         from src.workflows.gates import GateTrigger
         from src.workflows.guidance import GuidanceStore, format_guidance_block
 
@@ -1354,7 +1354,7 @@ class TestLastPauseLifecycle:
     def test_plan_refiner_clears_last_pause_on_resume(self, tmp_path):
         """PlanRefiner mirrors DocumentRefiner — last_pause.json cleared on resume."""
         import json
-        from src.plan_refiner import _LAST_PAUSE_FILE
+        from src.implement.plan_refiner import _LAST_PAUSE_FILE
         from src.workflows.gates import GateTrigger
         from src.workflows.guidance import GuidanceStore, format_guidance_block
 
@@ -1382,7 +1382,7 @@ class TestLastPauseLifecycle:
 # MM09 Step 5 — doctor_implement_config_text
 # ---------------------------------------------------------------------------
 
-from src.implement_loop import ImplementConfig, ImplementTarget
+from src.implement.implement_loop import ImplementConfig, ImplementTarget
 
 
 def _make_implement_config(tmp_path: Path, **kwargs) -> ImplementConfig:

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.hitl import (
+from src.policy.hitl import (
     DeferReason,
     HumanDecision,
     HumanInputRequest,

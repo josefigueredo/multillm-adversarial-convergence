@@ -12,8 +12,8 @@ from unittest.mock import MagicMock
 
 from src.backends.types import AgentResponse
 from src.config import DocumentConfig, PlanConfig
-from src.document_strategy import ConvergeStrategy
-from src.plan_strategy import PlanStrategy
+from src.implement.document_strategy import ConvergeStrategy
+from src.implement.plan_strategy import PlanStrategy
 from src.workflows.gates import GateTrigger, GateTarget
 from src.workflows.guidance import (
     GuidanceStore,
@@ -218,7 +218,7 @@ def test_resume_with_no_matching_sequence_gives_empty(tmp_path):
 
 def test_guidance_cleared_after_first_run_cycle():
     from unittest.mock import MagicMock
-    from src.document_loop import CycleContext, CycleState, run_cycle
+    from src.implement.document_loop import CycleContext, CycleState, run_cycle
     from src.audit_trail import NullAuditTrailWriter
     from pathlib import Path
 
@@ -253,7 +253,7 @@ def test_guidance_cleared_after_first_run_cycle():
 
 def test_guidance_not_replayed_in_second_cycle():
     from unittest.mock import MagicMock
-    from src.document_loop import CycleContext, CycleState, run_cycle
+    from src.implement.document_loop import CycleContext, CycleState, run_cycle
     from src.audit_trail import NullAuditTrailWriter
     from pathlib import Path
 

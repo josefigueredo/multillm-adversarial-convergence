@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 from src.backends.types import AgentResponse
 from src.config import BackendsConfig, PlanConfig, PlanPersonaConfig, SourceFileConfig
-from src.document_strategy import Patch, RawCritique, VerifiedCritique
-from src.plan_strategy import PlanStrategy
+from src.implement.document_strategy import Patch, RawCritique, VerifiedCritique
+from src.implement.plan_strategy import PlanStrategy
 
 
 def _make_backend(text: str = "[]") -> MagicMock:

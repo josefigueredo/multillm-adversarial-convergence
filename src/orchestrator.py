@@ -48,7 +48,7 @@ from .constraints import (
 from .comparison import benchmark_summary, reference_run_comparison
 from .evaluation_artifacts import write_evaluation_artifacts
 from .output_style import build_output_style_contract
-from .provenance import (
+from .evidence.provenance import (
     extract_citations,
     extract_claims,
 )
@@ -56,12 +56,12 @@ from .prompts import render as _render
 from . import research_loop as loop_mod
 from .pdf_report import render_simple_pdf
 from .portfolio import build_portfolio, render_portfolio_html
-from .provenance_artifacts import write_provenance_artifacts_bundle
-from .references import build_references_section, inject_references_section
+from .evidence.provenance_artifacts import write_provenance_artifacts_bundle
+from .evidence.references import build_references_section, inject_references_section
 from .workflows.research_states import ResearchState
 from .workflows.transitions import WorkflowTransitionEmitter
 from .reporting import render_html_report as render_html_report_fn
-from .report_exports import write_reporting_artifacts
+from .deliverables.report_exports import write_reporting_artifacts
 from .reproducibility import write_prompt_snapshot, write_rerun_script
 from .run_finalize import finalize_run_artifacts
 from .run_io import setup_output_dir, write_results_header
@@ -69,7 +69,7 @@ from .run_metadata_artifacts import write_run_metadata_artifacts
 from .run_paths import RunPaths
 from .run_state import UsageTotals, resume_state, track_candidate_usage, track_cost, track_usage
 from .runtime_telemetry import accumulate_retries, accumulate_tool_loop
-from .provenance_pipeline import build_provenance_bundle
+from .evidence.provenance_pipeline import build_provenance_bundle
 from .semantic_eval import (
     semantic_calibration,
     semantic_review_disabled,
@@ -78,12 +78,12 @@ from .semantic_eval import (
     semantic_review_from_payload,
 )
 from .strategy import ResearchCandidate, Strategy, get_strategy
-from .tool_runtime import run_function_tool_loop
-from .sandbox_executor import SandboxExecutor
+from .policy.tool_runtime import run_function_tool_loop
+from .policy.sandbox_executor import SandboxExecutor
 from .sandbox import select_sandbox_backend
-from .security_runtime import resolve_runtime_security_policy
-from .policy_denial import PolicyDeniedError
-from .tool_capabilities import classify_allowed_tools
+from .policy.security_runtime import resolve_runtime_security_policy
+from .policy.policy_denial import PolicyDeniedError
+from .policy.tool_capabilities import classify_allowed_tools
 
 log = logging.getLogger("autoresearch")
 

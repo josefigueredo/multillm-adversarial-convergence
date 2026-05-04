@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.trust import (
+from src.policy.trust import (
     TRUST_CLASSES,
     classify_citation_trust,
     classify_claim_trust,

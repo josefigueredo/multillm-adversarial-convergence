@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 from src.backends.types import AgentResponse
 from src.audit_trail import AuditTrailWriter, NullAuditTrailWriter
 from src.config import BackendsConfig, PlanConfig
-from src.document_loop import Issue
-from src.hitl import DeferReason, HumanDecision
-from src.plan_loop import (
+from src.implement.document_loop import Issue
+from src.policy.hitl import DeferReason, HumanDecision
+from src.implement.plan_loop import (
     PlanCycleContext,
     PlanCycleState,
     _plan_should_stop,
@@ -179,7 +179,7 @@ def test_run_plan_cycle_collects_human_decisions_interactively():
         answered_by="human",
     )
 
-    with patch("src.hitl.collect_interactive", return_value=[fake_decision]):
+    with patch("src.policy.hitl.collect_interactive", return_value=[fake_decision]):
         run_plan_cycle(state, ctx, strategy, interactive=True)
 
     assert len(state.human_decisions) == 1

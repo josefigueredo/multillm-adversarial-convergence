@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 from src.backends import AgentResponse, Backend, CallOptions
 from src.config import DocumentConfig
-from src.hitl import DeferReason, HumanDecision, HumanInputRequest
+from src.policy.hitl import DeferReason, HumanDecision, HumanInputRequest
 from src.prompts import render
 from src.workflows.decisions import CritiqueStatus, classify_critique_status
 

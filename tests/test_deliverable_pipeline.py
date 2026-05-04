@@ -21,23 +21,23 @@ import pytest
 
 class TestPipelineStage:
     def test_pending_value(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         assert PipelineStage.PENDING.value == "pending"
 
     def test_synthesize_value(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         assert PipelineStage.SYNTHESIZE.value == "synthesize"
 
     def test_revise_value(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         assert PipelineStage.REVISE.value == "revise"
 
     def test_package_value(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         assert PipelineStage.PACKAGE.value == "package"
 
     def test_export_value(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         assert PipelineStage.EXPORT.value == "export"
 
 
@@ -47,12 +47,12 @@ class TestPipelineStage:
 
 class TestSynthesisArtifact:
     def _make(self, **kw):
-        from src.deliverable_pipeline import SynthesisArtifact
+        from src.deliverables.pipeline import SynthesisArtifact
         defaults = dict(title="LLM Safety", body="Body text")
         return SynthesisArtifact(**{**defaults, **kw})
 
     def test_title_and_body_required(self):
-        from src.deliverable_pipeline import SynthesisArtifact
+        from src.deliverables.pipeline import SynthesisArtifact
         a = SynthesisArtifact(title="T", body="B")
         assert a.title == "T"
         assert a.body == "B"
@@ -77,7 +77,7 @@ class TestSynthesisArtifact:
         assert {"title", "body", "key_findings", "source_count"} <= d.keys()
 
     def test_to_dict_from_dict_round_trip(self):
-        from src.deliverable_pipeline import SynthesisArtifact
+        from src.deliverables.pipeline import SynthesisArtifact
         a = SynthesisArtifact(title="T", body="B", key_findings=("f1", "f2"), source_count=3)
         a2 = SynthesisArtifact.from_dict(a.to_dict())
         assert a2 == a
@@ -89,12 +89,12 @@ class TestSynthesisArtifact:
 
 class TestRevisionArtifact:
     def _make(self, **kw):
-        from src.deliverable_pipeline import RevisionArtifact
+        from src.deliverables.pipeline import RevisionArtifact
         defaults = dict(revised_body="Revised body text")
         return RevisionArtifact(**{**defaults, **kw})
 
     def test_revised_body_required(self):
-        from src.deliverable_pipeline import RevisionArtifact
+        from src.deliverables.pipeline import RevisionArtifact
         a = RevisionArtifact(revised_body="Revised")
         assert a.revised_body == "Revised"
 
@@ -114,7 +114,7 @@ class TestRevisionArtifact:
         assert {"revised_body", "revision_notes"} <= d.keys()
 
     def test_to_dict_from_dict_round_trip(self):
-        from src.deliverable_pipeline import RevisionArtifact
+        from src.deliverables.pipeline import RevisionArtifact
         a = RevisionArtifact(revised_body="R", revision_notes=("note1",))
         a2 = RevisionArtifact.from_dict(a.to_dict())
         assert a2 == a
@@ -126,12 +126,12 @@ class TestRevisionArtifact:
 
 class TestPackageArtifact:
     def _make(self, **kw):
-        from src.deliverable_pipeline import PackageArtifact
+        from src.deliverables.pipeline import PackageArtifact
         defaults = dict(format="markdown")
         return PackageArtifact(**{**defaults, **kw})
 
     def test_format_required(self):
-        from src.deliverable_pipeline import PackageArtifact
+        from src.deliverables.pipeline import PackageArtifact
         a = PackageArtifact(format="markdown")
         assert a.format == "markdown"
 
@@ -140,13 +140,13 @@ class TestPackageArtifact:
         assert len(a.metadata) == 0
 
     def test_metadata_is_immutable(self):
-        from src.deliverable_pipeline import PackageArtifact
+        from src.deliverables.pipeline import PackageArtifact
         a = PackageArtifact(format="markdown", metadata={"author": "Alice"})
         with pytest.raises((TypeError, AttributeError)):
             a.metadata["author"] = "Bob"  # type: ignore[index]
 
     def test_metadata_source_dict_isolation(self):
-        from src.deliverable_pipeline import PackageArtifact
+        from src.deliverables.pipeline import PackageArtifact
         d = {"author": "Alice"}
         a = PackageArtifact(format="pdf", metadata=d)
         d["author"] = "Bob"
@@ -164,12 +164,12 @@ class TestPackageArtifact:
         assert {"format", "metadata"} <= d.keys()
 
     def test_to_dict_metadata_is_plain_dict(self):
-        from src.deliverable_pipeline import PackageArtifact
+        from src.deliverables.pipeline import PackageArtifact
         a = PackageArtifact(format="pdf", metadata={"k": "v"})
         assert isinstance(a.to_dict()["metadata"], dict)
 
     def test_to_dict_from_dict_round_trip(self):
-        from src.deliverable_pipeline import PackageArtifact
+        from src.deliverables.pipeline import PackageArtifact
         a = PackageArtifact(format="latex", metadata={"author": "Alice", "year": "2025"})
         a2 = PackageArtifact.from_dict(a.to_dict())
         assert a2.format == a.format
@@ -182,7 +182,7 @@ class TestPackageArtifact:
 
 class TestExportArtifact:
     def _make(self, **kw):
-        from src.deliverable_pipeline import ExportArtifact
+        from src.deliverables.pipeline import ExportArtifact
         return ExportArtifact(**kw)
 
     def test_output_paths_defaults_to_empty_tuple(self):
@@ -209,7 +209,7 @@ class TestExportArtifact:
         assert {"output_paths", "exported_at"} <= d.keys()
 
     def test_to_dict_from_dict_round_trip(self):
-        from src.deliverable_pipeline import ExportArtifact
+        from src.deliverables.pipeline import ExportArtifact
         a = ExportArtifact(output_paths=("/out/a.pdf", "/out/b.pdf"), exported_at="2025-01-01T00:00:00Z")
         a2 = ExportArtifact.from_dict(a.to_dict())
         assert a2 == a
@@ -220,62 +220,62 @@ class TestExportArtifact:
 # ---------------------------------------------------------------------------
 
 def _synthesis():
-    from src.deliverable_pipeline import SynthesisArtifact
+    from src.deliverables.pipeline import SynthesisArtifact
     return SynthesisArtifact(title="T", body="B")
 
 
 def _revision():
-    from src.deliverable_pipeline import RevisionArtifact
+    from src.deliverables.pipeline import RevisionArtifact
     return RevisionArtifact(revised_body="R")
 
 
 def _package():
-    from src.deliverable_pipeline import PackageArtifact
+    from src.deliverables.pipeline import PackageArtifact
     return PackageArtifact(format="markdown")
 
 
 def _export():
-    from src.deliverable_pipeline import ExportArtifact
+    from src.deliverables.pipeline import ExportArtifact
     return ExportArtifact(output_paths=("/out/r.md",))
 
 
 class TestDeliverablePipeline:
     def _pipeline(self, **kw):
-        from src.deliverable_pipeline import DeliverablePipeline
+        from src.deliverables.pipeline import DeliverablePipeline
         defaults = dict(topic="LLM safety")
         return DeliverablePipeline(**{**defaults, **kw})
 
     # ── topic validation ─────────────────────────────────────────────────────
 
     def test_empty_topic_raises(self):
-        from src.deliverable_pipeline import DeliverablePipeline
+        from src.deliverables.pipeline import DeliverablePipeline
         with pytest.raises(ValueError, match="topic"):
             DeliverablePipeline(topic="")
 
     # ── completed_stage ───────────────────────────────────────────────────────
 
     def test_initial_completed_stage_is_pending(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         p = self._pipeline()
         assert p.completed_stage == PipelineStage.PENDING
 
     def test_after_synthesis_completed_stage_is_synthesize(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         p = self._pipeline(synthesis=_synthesis())
         assert p.completed_stage == PipelineStage.SYNTHESIZE
 
     def test_after_revision_completed_stage_is_revise(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         p = self._pipeline(synthesis=_synthesis(), revision=_revision())
         assert p.completed_stage == PipelineStage.REVISE
 
     def test_after_package_completed_stage_is_package(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         p = self._pipeline(synthesis=_synthesis(), revision=_revision(), package=_package())
         assert p.completed_stage == PipelineStage.PACKAGE
 
     def test_after_export_completed_stage_is_export(self):
-        from src.deliverable_pipeline import PipelineStage
+        from src.deliverables.pipeline import PipelineStage
         p = self._pipeline(
             synthesis=_synthesis(), revision=_revision(),
             package=_package(), export=_export(),
@@ -285,17 +285,17 @@ class TestDeliverablePipeline:
     # ── stage-ordering enforcement ───────────────────────────────────────────
 
     def test_revision_without_synthesis_raises(self):
-        from src.deliverable_pipeline import DeliverablePipeline
+        from src.deliverables.pipeline import DeliverablePipeline
         with pytest.raises(ValueError, match="revision requires synthesis"):
             DeliverablePipeline(topic="T", revision=_revision())
 
     def test_package_without_revision_raises(self):
-        from src.deliverable_pipeline import DeliverablePipeline
+        from src.deliverables.pipeline import DeliverablePipeline
         with pytest.raises(ValueError, match="package requires revision"):
             DeliverablePipeline(topic="T", synthesis=_synthesis(), package=_package())
 
     def test_export_without_package_raises(self):
-        from src.deliverable_pipeline import DeliverablePipeline
+        from src.deliverables.pipeline import DeliverablePipeline
         with pytest.raises(ValueError, match="export requires package"):
             DeliverablePipeline(
                 topic="T", synthesis=_synthesis(),
@@ -375,14 +375,14 @@ class TestDeliverablePipeline:
         assert {"topic", "synthesis", "revision", "package", "export", "deliverable_class"} <= d.keys()
 
     def test_to_dict_from_dict_round_trip_empty(self):
-        from src.deliverable_pipeline import DeliverablePipeline
+        from src.deliverables.pipeline import DeliverablePipeline
         p = self._pipeline()
         p2 = DeliverablePipeline.from_dict(p.to_dict())
         assert p2.topic == p.topic
         assert p2.synthesis is None
 
     def test_to_dict_from_dict_round_trip_full(self):
-        from src.deliverable_pipeline import DeliverablePipeline
+        from src.deliverables.pipeline import DeliverablePipeline
         p = self._pipeline(
             synthesis=_synthesis(), revision=_revision(),
             package=_package(), export=_export(),

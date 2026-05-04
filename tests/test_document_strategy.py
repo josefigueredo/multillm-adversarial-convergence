@@ -9,7 +9,7 @@ import pytest
 
 from src.backends.types import AgentResponse
 from src.config import BackendsConfig, DocumentConfig, PersonaConfig, SourceFileConfig
-from src.document_strategy import (
+from src.implement.document_strategy import (
     ConvergeStrategy,
     Patch,
     RawCritique,
@@ -21,7 +21,7 @@ from src.document_strategy import (
     _parse_raw_critiques,
     _parse_verified_critiques,
 )
-from src.hitl import DeferReason, HumanDecision
+from src.policy.hitl import DeferReason, HumanDecision
 
 
 def _make_backend(text: str = "{}") -> MagicMock:

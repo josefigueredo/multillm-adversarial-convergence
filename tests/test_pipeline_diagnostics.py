@@ -5,7 +5,7 @@ All tests are written before the implementation exists.
 
 import pytest
 
-from src.deliverable_pipeline import (
+from src.deliverables.pipeline import (
     DeliverablePipeline,
     ExportArtifact,
     PackageArtifact,

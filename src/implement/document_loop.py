@@ -9,7 +9,7 @@ import logging
 
 from src.backends import AgentResponse
 from src.config import DocumentConfig
-from src.hitl import DeferReason, HumanDecision, HumanInputRequest
+from src.policy.hitl import DeferReason, HumanDecision, HumanInputRequest
 from src.run_state import BaseContext
 from src.workflows.refine_states import RefineState
 from src.workflows.transitions import WorkflowTransitionEmitter
@@ -228,7 +228,7 @@ def run_cycle(
         state.pending_human_inputs = requests
         emitter.transition(RefineState.PAUSED_FOR_HUMAN, cycle=state.cycle)
         if interactive:
-            from src.hitl import collect_interactive
+            from src.policy.hitl import collect_interactive
             decisions = collect_interactive(requests)
             state.human_decisions.extend(decisions)
             ctx.human_decisions.extend(decisions)

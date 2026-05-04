@@ -10,8 +10,8 @@ import pytest
 
 from src.backends.types import AgentResponse, BackendCapabilities
 from src.config import ArtifactConfig, BackendsConfig, ExecutionConfig, PlanConfig, ProviderConfig
-from src.plan_loop import PlanCycleState
-from src.plan_refiner import EXIT_HUMAN_REQUIRED, PlanRefiner
+from src.implement.plan_loop import PlanCycleState
+from src.implement.plan_refiner import EXIT_HUMAN_REQUIRED, PlanRefiner
 
 
 # ---------------------------------------------------------------------------

@@ -10,9 +10,9 @@ import pytest
 
 from src.backends.types import AgentResponse, BackendCapabilities
 from src.config import ArtifactConfig, BackendsConfig, DocumentConfig, ExecutionConfig, PersonaConfig, ProviderConfig
-from src.document_loop import CycleState, Issue
-from src.document_refiner import EXIT_HUMAN_REQUIRED, DocumentRefiner
-from src.hitl import HumanInputRequest
+from src.implement.document_loop import CycleState, Issue
+from src.implement.document_refiner import EXIT_HUMAN_REQUIRED, DocumentRefiner
+from src.policy.hitl import HumanInputRequest
 
 
 # ---------------------------------------------------------------------------

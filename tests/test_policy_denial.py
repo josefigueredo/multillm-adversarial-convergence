@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.policy_denial import PolicyDeniedError
+from src.policy.policy_denial import PolicyDeniedError
 
 
 # ---------------------------------------------------------------------------

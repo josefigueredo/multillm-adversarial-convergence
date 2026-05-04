@@ -14,11 +14,11 @@ from pathlib import Path
 from .backends import VALID_BACKENDS, get_backend, get_backends
 from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
 from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
-from .document_refiner import DocumentRefiner
+from .implement.document_refiner import DocumentRefiner
 from .doctor import doctor_config_from_path, doctor_implement_config_from_path, doctor_output_text
 from .explain import explain_config_text, explain_domain_packages, explain_implement_config_text, explain_resume_text
 from .orchestrator import AutoResearcher
-from .plan_refiner import PlanRefiner
+from .implement.plan_refiner import PlanRefiner
 from .provider_instances import instantiate_provider_backends
 from .strategy import get_strategy
 
@@ -282,8 +282,8 @@ def _build_parser() -> argparse.ArgumentParser:
 def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
     from pathlib import Path as _Path
 
-    from .implement_loop import ImplementConfig
-    from .implement_runner import ImplementRunner
+    from .implement.implement_loop import ImplementConfig
+    from .implement.implement_runner import ImplementRunner
     from .provider_instances import instantiate_provider_backends
 
     config_path: _Path = args.config

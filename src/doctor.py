@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.config import ResearchConfig
-    from src.implement_loop import ImplementConfig
+    from src.implement.implement_loop import ImplementConfig
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ def _tool_coverage_lines(config: "ResearchConfig") -> tuple[list[str], list[str]
     Issues are emitted when ``sandbox_active=True`` and unclassified tools
     exist in ``allowed_tools`` — those tools will be denied at runtime.
     """
-    from src.tool_capabilities import classify_tool, coverage_stats
+    from src.policy.tool_capabilities import classify_tool, coverage_stats
 
     sec = config.security
     sandbox_active = sec.tool_execution_mode == "sandboxed" and sec.sandbox.mode == "tool_calls"
@@ -456,7 +456,7 @@ def _risk_note_lines(config: "ResearchConfig") -> tuple[list[str], list[str]]:
 
     Every risk note is also added to *issues* so that it drives exit_code = 1.
     """
-    from src.tool_capabilities import classify_allowed_tools
+    from src.policy.tool_capabilities import classify_allowed_tools
 
     sec = config.security
     tools = _parse_tools(config.execution.allowed_tools)
@@ -962,7 +962,7 @@ def doctor_implement_config_from_path(config_path: Path) -> DoctorReport:
     Returns:
         DoctorReport — exit_code=1 if the file cannot be parsed.
     """
-    from src.implement_loop import ImplementConfig
+    from src.implement.implement_loop import ImplementConfig
 
     try:
         config = ImplementConfig.from_yaml(config_path)

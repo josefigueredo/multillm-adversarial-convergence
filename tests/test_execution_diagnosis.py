@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from src.execution_plan import ExecutionStep, ExecutionPlan, TargetContext
-from src.execution_validator import ExecutionResult, ValidationResult, validate_step
+from src.execution.plan import ExecutionStep, ExecutionPlan, TargetContext
+from src.execution.validator import ExecutionResult, ValidationResult, validate_step
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +48,7 @@ class TestDiagnosisArtifact:
         return s, r, validate_step(s, r)
 
     def test_fields_accessible(self):
-        from src.execution_diagnosis import DiagnosisArtifact
+        from src.execution.diagnosis import DiagnosisArtifact
         s, r, vr = self._vr_fail()
         artifact = DiagnosisArtifact(step=s, result=r, validation=vr,
                                      diagnosis_type="exit_code_mismatch", summary="bad exit")
@@ -59,7 +59,7 @@ class TestDiagnosisArtifact:
         assert artifact.summary == "bad exit"
 
     def test_is_frozen(self):
-        from src.execution_diagnosis import DiagnosisArtifact
+        from src.execution.diagnosis import DiagnosisArtifact
         s, r, vr = self._vr_fail()
         artifact = DiagnosisArtifact(step=s, result=r, validation=vr,
                                      diagnosis_type="exit_code_mismatch", summary="x")
@@ -67,7 +67,7 @@ class TestDiagnosisArtifact:
             artifact.summary = "changed"  # type: ignore[misc]
 
     def test_to_dict_has_expected_keys(self):
-        from src.execution_diagnosis import DiagnosisArtifact
+        from src.execution.diagnosis import DiagnosisArtifact
         s, r, vr = self._vr_fail()
         d = DiagnosisArtifact(step=s, result=r, validation=vr,
                                diagnosis_type="exit_code_mismatch", summary="bad").to_dict()
@@ -78,7 +78,7 @@ class TestDiagnosisArtifact:
         assert "failures" in d
 
     def test_from_dict_round_trips(self):
-        from src.execution_diagnosis import DiagnosisArtifact
+        from src.execution.diagnosis import DiagnosisArtifact
         s, r, vr = self._vr_fail()
         original = DiagnosisArtifact(step=s, result=r, validation=vr,
                                       diagnosis_type="exit_code_mismatch", summary="bad exit")
@@ -95,14 +95,14 @@ class TestDiagnosisArtifact:
 
 class TestDiagnoseStep:
     def test_returns_none_for_passing_validation(self):
-        from src.execution_diagnosis import diagnose_step
+        from src.execution.diagnosis import diagnose_step
         s = _step()
         r = _passing_result()
         vr = validate_step(s, r)
         assert diagnose_step(s, r, vr) is None
 
     def test_returns_artifact_for_failed_validation(self):
-        from src.execution_diagnosis import diagnose_step
+        from src.execution.diagnosis import diagnose_step
         s = _step(expected_exit_code=0)
         r = _failing_result(exit_code=1)
         vr = validate_step(s, r)
@@ -110,7 +110,7 @@ class TestDiagnoseStep:
         assert artifact is not None
 
     def test_timeout_diagnosis_type(self):
-        from src.execution_diagnosis import diagnose_step
+        from src.execution.diagnosis import diagnose_step
         s = _step(timeout_seconds=5)
         r = ExecutionResult(exit_code=0, stdout="", stderr="", timed_out=True)
         vr = validate_step(s, r)
@@ -119,7 +119,7 @@ class TestDiagnoseStep:
         assert artifact.diagnosis_type == "timeout"
 
     def test_exit_code_mismatch_diagnosis_type(self):
-        from src.execution_diagnosis import diagnose_step
+        from src.execution.diagnosis import diagnose_step
         s = _step(expected_exit_code=0)
         r = _failing_result(exit_code=2)
         vr = validate_step(s, r)
@@ -128,7 +128,7 @@ class TestDiagnoseStep:
         assert artifact.diagnosis_type == "exit_code_mismatch"
 
     def test_pattern_missing_diagnosis_type(self):
-        from src.execution_diagnosis import diagnose_step
+        from src.execution.diagnosis import diagnose_step
         s = _step(expected_output_patterns=("PASS",))
         r = _passing_result(stdout="FAIL")
         vr = validate_step(s, r)
@@ -137,7 +137,7 @@ class TestDiagnoseStep:
         assert artifact.diagnosis_type == "pattern_missing"
 
     def test_multiple_failures_diagnosis_type(self):
-        from src.execution_diagnosis import diagnose_step
+        from src.execution.diagnosis import diagnose_step
         s = _step(expected_exit_code=0, expected_output_patterns=("PASS",))
         r = ExecutionResult(exit_code=1, stdout="FAIL", stderr="", timed_out=True)
         vr = validate_step(s, r)
@@ -146,7 +146,7 @@ class TestDiagnoseStep:
         assert artifact.diagnosis_type == "multiple"
 
     def test_summary_is_non_empty(self):
-        from src.execution_diagnosis import diagnose_step
+        from src.execution.diagnosis import diagnose_step
         s = _step(expected_exit_code=0)
         r = _failing_result(exit_code=1)
         vr = validate_step(s, r)
@@ -155,7 +155,7 @@ class TestDiagnoseStep:
         assert len(artifact.summary) > 0
 
     def test_summary_mentions_command(self):
-        from src.execution_diagnosis import diagnose_step
+        from src.execution.diagnosis import diagnose_step
         s = ExecutionStep(command="make test", expected_exit_code=0)
         r = _failing_result(exit_code=1)
         vr = validate_step(s, r)
@@ -173,16 +173,16 @@ class TestDiagnosePlan:
         return ExecutionPlan(steps=steps, target=_ctx(tmp_path))
 
     def test_returns_empty_list_when_all_pass(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
-        from src.execution_validator import validate_plan
+        from src.execution.diagnosis import diagnose_plan
+        from src.execution.validator import validate_plan
         plan = self._plan(tmp_path, _step(), _step())
         results = [_passing_result(), _passing_result()]
         vrs = validate_plan(plan, results)
         assert diagnose_plan(plan, results, vrs) == []
 
     def test_returns_one_artifact_per_failed_step(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
-        from src.execution_validator import validate_plan
+        from src.execution.diagnosis import diagnose_plan
+        from src.execution.validator import validate_plan
         plan = self._plan(tmp_path,
                           _step(expected_exit_code=0),
                           _step(expected_exit_code=0))
@@ -192,8 +192,8 @@ class TestDiagnosePlan:
         assert len(artifacts) == 1
 
     def test_does_not_include_passing_steps(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
-        from src.execution_validator import validate_plan
+        from src.execution.diagnosis import diagnose_plan
+        from src.execution.validator import validate_plan
         plan = self._plan(tmp_path, _step(), _step(expected_exit_code=0))
         results = [_passing_result(), _failing_result(exit_code=1)]
         vrs = validate_plan(plan, results)
@@ -201,8 +201,8 @@ class TestDiagnosePlan:
         assert all(not a.validation.passed for a in artifacts)
 
     def test_all_failing_returns_all_artifacts(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
-        from src.execution_validator import validate_plan
+        from src.execution.diagnosis import diagnose_plan
+        from src.execution.validator import validate_plan
         plan = self._plan(tmp_path, _step(expected_exit_code=0), _step(expected_exit_code=0))
         results = [_failing_result(exit_code=1), _failing_result(exit_code=2)]
         vrs = validate_plan(plan, results)
@@ -216,7 +216,7 @@ class TestDiagnosePlan:
 
 class TestPersistDiagnosis:
     def _artifact(self):
-        from src.execution_diagnosis import DiagnosisArtifact
+        from src.execution.diagnosis import DiagnosisArtifact
         s = _step(expected_exit_code=0)
         r = _failing_result(exit_code=1)
         vr = validate_step(s, r)
@@ -224,33 +224,33 @@ class TestPersistDiagnosis:
                                   diagnosis_type="exit_code_mismatch", summary="failed")
 
     def test_writes_diagnosis_json(self, tmp_path):
-        from src.execution_diagnosis import persist_diagnosis
+        from src.execution.diagnosis import persist_diagnosis
         persist_diagnosis([self._artifact()], tmp_path)
         assert (tmp_path / "diagnosis.json").exists()
 
     def test_creates_output_dir_if_missing(self, tmp_path):
-        from src.execution_diagnosis import persist_diagnosis
+        from src.execution.diagnosis import persist_diagnosis
         new_dir = tmp_path / "nested" / "out"
         persist_diagnosis([self._artifact()], new_dir)
         assert (new_dir / "diagnosis.json").exists()
 
     def test_empty_list_writes_empty_array(self, tmp_path):
         import json
-        from src.execution_diagnosis import persist_diagnosis
+        from src.execution.diagnosis import persist_diagnosis
         persist_diagnosis([], tmp_path)
         data = json.loads((tmp_path / "diagnosis.json").read_text())
         assert data == []
 
     def test_written_json_is_list(self, tmp_path):
         import json
-        from src.execution_diagnosis import persist_diagnosis
+        from src.execution.diagnosis import persist_diagnosis
         persist_diagnosis([self._artifact()], tmp_path)
         data = json.loads((tmp_path / "diagnosis.json").read_text())
         assert isinstance(data, list)
 
     def test_written_entries_have_required_fields(self, tmp_path):
         import json
-        from src.execution_diagnosis import persist_diagnosis
+        from src.execution.diagnosis import persist_diagnosis
         persist_diagnosis([self._artifact()], tmp_path)
         data = json.loads((tmp_path / "diagnosis.json").read_text())
         assert len(data) == 1
@@ -259,7 +259,7 @@ class TestPersistDiagnosis:
         assert "failures" in data[0]
 
     def test_returns_path_of_written_file(self, tmp_path):
-        from src.execution_diagnosis import persist_diagnosis
+        from src.execution.diagnosis import persist_diagnosis
         path = persist_diagnosis([self._artifact()], tmp_path)
         assert path == tmp_path / "diagnosis.json"
 
@@ -274,15 +274,15 @@ class TestDiagnosePlanLengthContract:
         return ExecutionPlan(steps=steps, target=_ctx(tmp_path))
 
     def _vrs(self, n=2):
-        from src.execution_validator import validate_plan
+        from src.execution.validator import validate_plan
         # We don't have a real plan for vrs — build them directly.
         results = [_passing_result() for _ in range(n)]
         vrs = [validate_step(ExecutionStep(command=f"step{i}"), r) for i, r in enumerate(results)]
         return results, vrs
 
     def test_too_few_results_raises(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
-        from src.execution_validator import validate_plan
+        from src.execution.diagnosis import diagnose_plan
+        from src.execution.validator import validate_plan
         plan = self._plan(tmp_path, n=2)
         results = [_passing_result()]          # only 1 for 2 steps
         vrs = [validate_step(plan.steps[0], results[0])]
@@ -290,7 +290,7 @@ class TestDiagnosePlanLengthContract:
             diagnose_plan(plan, results, vrs)
 
     def test_too_many_results_raises(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
+        from src.execution.diagnosis import diagnose_plan
         plan = self._plan(tmp_path, n=1)
         results = [_passing_result(), _passing_result()]  # 2 for 1 step
         vrs = [validate_step(plan.steps[0], results[0]), validate_step(plan.steps[0], results[1])]
@@ -298,7 +298,7 @@ class TestDiagnosePlanLengthContract:
             diagnose_plan(plan, results, vrs)
 
     def test_too_few_validation_results_raises(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
+        from src.execution.diagnosis import diagnose_plan
         plan = self._plan(tmp_path, n=2)
         results = [_passing_result(), _passing_result()]
         vrs = [validate_step(plan.steps[0], results[0])]  # only 1 vr for 2 steps
@@ -306,7 +306,7 @@ class TestDiagnosePlanLengthContract:
             diagnose_plan(plan, results, vrs)
 
     def test_too_many_validation_results_raises(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
+        from src.execution.diagnosis import diagnose_plan
         plan = self._plan(tmp_path, n=1)
         results = [_passing_result()]
         vrs = [validate_step(plan.steps[0], results[0]),
@@ -315,7 +315,7 @@ class TestDiagnosePlanLengthContract:
             diagnose_plan(plan, results, vrs)
 
     def test_matching_lengths_behave_unchanged(self, tmp_path):
-        from src.execution_diagnosis import diagnose_plan
+        from src.execution.diagnosis import diagnose_plan
         plan = self._plan(tmp_path, n=2)
         results = [_passing_result(), _failing_result(exit_code=1)]
         vrs = [validate_step(plan.steps[0], results[0]),

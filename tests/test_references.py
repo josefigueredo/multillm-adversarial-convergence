@@ -1,4 +1,4 @@
-"""Unit tests for src.references — deterministic references assembly."""
+"""Unit tests for src.evidence.references — deterministic references assembly."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.references import (
+from src.evidence.references import (
     normalize_url,
     dedupe_citations,
     build_references_section,

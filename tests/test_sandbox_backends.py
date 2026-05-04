@@ -9,8 +9,8 @@ import pytest
 
 from src.sandbox.backends.base import SandboxBackend
 from src.sandbox.backends.local_process import LocalProcessBackend
-from src.sandbox_executor import SandboxExecutor
-from src.security_runtime import RuntimeSecurityPolicy
+from src.policy.sandbox_executor import SandboxExecutor
+from src.policy.security_runtime import RuntimeSecurityPolicy
 
 
 # ---------------------------------------------------------------------------

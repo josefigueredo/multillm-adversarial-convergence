@@ -290,7 +290,7 @@ class TestExplainHitlPolicy:
 
 from pathlib import Path as _Path
 
-from src.implement_loop import ImplementConfig, ImplementTarget
+from src.implement.implement_loop import ImplementConfig, ImplementTarget
 
 
 def _make_impl_config(tmp_path: _Path, **kwargs) -> ImplementConfig:

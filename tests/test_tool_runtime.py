@@ -4,7 +4,7 @@ import json
 
 from src.backends import AgentResponse, get_backend
 from src.backends.types import CallOptions, ToolDefinition
-from src.tool_runtime import run_function_tool_loop
+from src.policy.tool_runtime import run_function_tool_loop
 
 
 def test_run_function_tool_loop_executes_single_codex_tool_round_trip():

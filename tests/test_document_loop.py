@@ -9,7 +9,7 @@ import pytest
 
 from src.audit_trail import AuditTrailWriter, NullAuditTrailWriter
 from src.config import DocumentConfig
-from src.document_loop import (
+from src.implement.document_loop import (
     CycleContext,
     CycleState,
     Issue,
@@ -17,7 +17,7 @@ from src.document_loop import (
     _update_convergence,
     run_cycle,
 )
-from src.hitl import DeferReason, HumanDecision, HumanInputRequest
+from src.policy.hitl import DeferReason, HumanDecision, HumanInputRequest
 from src.workflows.refine_states import RefineState
 
 
@@ -138,7 +138,7 @@ def _make_strategy_mock(
     verified=None,
     patches=None,
 ) -> MagicMock:
-    from src.document_strategy import VerifiedCritique
+    from src.implement.document_strategy import VerifiedCritique
     s = MagicMock()
     s.run_builder.return_value = builder_text
     s.run_challenger.return_value = []
@@ -173,7 +173,7 @@ def test_run_cycle_clean_increments_consecutive():
 
 
 def test_run_cycle_valid_critiques_reset_consecutive():
-    from src.document_strategy import VerifiedCritique
+    from src.implement.document_strategy import VerifiedCritique
     state = CycleState(consecutive_clean_cycles=2)
     verified = [VerifiedCritique(description="d", section_ref="§1",
                                   raised_by="challenger", status="valid")]
@@ -182,7 +182,7 @@ def test_run_cycle_valid_critiques_reset_consecutive():
 
 
 def test_run_cycle_human_required_noninteractive_leaves_pending():
-    from src.document_strategy import VerifiedCritique
+    from src.implement.document_strategy import VerifiedCritique
     state = CycleState()
     verified = [VerifiedCritique(
         description="d", section_ref="§5", raised_by="architect",
@@ -195,7 +195,7 @@ def test_run_cycle_human_required_noninteractive_leaves_pending():
 
 
 def test_run_cycle_returns_counts():
-    from src.document_strategy import VerifiedCritique
+    from src.implement.document_strategy import VerifiedCritique
     valid = [VerifiedCritique(description="d", section_ref="§1",
                                raised_by="challenger", status="valid")]
     stale = [VerifiedCritique(description="s", section_ref="§2",
@@ -210,7 +210,7 @@ def test_run_cycle_returns_counts():
 
 
 def test_run_cycle_adds_issues_to_registry():
-    from src.document_strategy import VerifiedCritique
+    from src.implement.document_strategy import VerifiedCritique
     verified = [VerifiedCritique(description="d", section_ref="§1",
                                   raised_by="challenger", status="valid")]
     state = CycleState()
@@ -333,7 +333,7 @@ class TestWorkflowTransitionEmission:
         assert first["to_state"] == "builder"
 
     def test_run_cycle_emits_paused_for_human_transition(self):
-        from src.document_strategy import VerifiedCritique
+        from src.implement.document_strategy import VerifiedCritique
         state = CycleState()
         ctx, audit = self._make_capturing_ctx()
         verified = [VerifiedCritique(
@@ -346,7 +346,7 @@ class TestWorkflowTransitionEmission:
         assert "paused_for_human" in to_states
 
     def test_run_cycle_paused_for_human_before_arbitrator(self):
-        from src.document_strategy import VerifiedCritique
+        from src.implement.document_strategy import VerifiedCritique
         state = CycleState()
         ctx, audit = self._make_capturing_ctx()
         verified = [VerifiedCritique(

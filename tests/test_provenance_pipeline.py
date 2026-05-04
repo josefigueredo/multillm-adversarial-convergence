@@ -1,6 +1,6 @@
 """Tests for provenance pipeline extraction."""
 
-from src.provenance_pipeline import build_provenance_bundle
+from src.evidence.provenance_pipeline import build_provenance_bundle
 
 
 def test_build_provenance_bundle_computes_expected_artifacts():

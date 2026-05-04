@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.tool_capabilities import (
+from src.policy.tool_capabilities import (
     ToolCapabilities,
     classify_tool,
     classify_allowed_tools,
