@@ -7,7 +7,7 @@
 | MM14_CONTAINER_SUBPROCESS_EXECUTION.md | Actual Container Subprocess Execution | ✅ complete | argv contract; ABC first |
 | MM16_ITERATION_WORKSPACE_ISOLATION.md | Per-Iteration Workspace Isolation | ✅ complete | explicit path contract |
 | MM15_RESEARCH_OS_FILE_MIGRATION.md | Research OS File Migration | ✅ complete | move+shim; 7 steps |
-| MM17_FLAT_MODULE_MIGRATION.md | Complete Flat Module Migration | pending | 22 flat modules → domain packages; rename 9 test files |
+| MM17_FLAT_MODULE_MIGRATION.md | Complete Flat Module Migration | pending | 20 flat modules → domain packages; doc truth step first; all prompts in one file |
 
 ## Why MM17 follows MM15
 
