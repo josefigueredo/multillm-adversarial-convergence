@@ -7,6 +7,27 @@ import json
 from .types import AgentResponse
 
 
+def strip_markdown_fences(text: str) -> str:
+    """Remove a single outer ``\\`\\`\\`lang\\n...\\n\\`\\`\\``` markdown fence.
+
+    Several CLI backends wrap structured output (especially JSON) in
+    markdown code fences even when the prompt forbids it — Gemini does it
+    by default; Copilot's ``session.task_complete.summary`` field does it
+    when the inner answer is JSON-shaped. Stripping at the adapter layer
+    means downstream JSON parsing and synthesis writers see clean content.
+    """
+    text = text.strip()
+    if not text.startswith("```"):
+        return text
+    first_newline = text.find("\n")
+    if first_newline == -1:
+        return text
+    body = text[first_newline + 1:]
+    if body.endswith("```"):
+        body = body[:-3]
+    return body.strip()
+
+
 def parse_jsonl_last_result(stdout: str, *, cost_key: str = "cost_usd") -> AgentResponse:
     """Parse JSONL output, returning the last agent message or result.
 

@@ -158,6 +158,51 @@ class TestCopilotBackend:
         resp = self.backend.parse_response(stdout)
         assert resp.text == "fallback output"
 
+    def test_parse_response_extracts_task_complete_summary(self):
+        """Copilot's autopilot agent delivers structured final answers via
+        the session.task_complete tool's `data.summary` field, not via
+        assistant.message. The summary often wraps content in markdown
+        fences (especially JSON). task_complete takes priority over
+        assistant.message because the assistant.message in this flow is
+        just the model's intro prose ("Now I have findings...")."""
+        lines = [
+            json.dumps({"type": "session.mcp_servers_loaded", "data": {}}),
+            json.dumps({
+                "type": "user.message",
+                "data": {"interactionId": "x", "content": "..."},
+            }),
+            json.dumps({
+                "type": "assistant.message",
+                "data": {
+                    "interactionId": "x",
+                    "content": "Now I have comprehensive findings. Let me formulate the JSON.",
+                },
+            }),
+            json.dumps({
+                "type": "session.task_complete",
+                "data": {
+                    "summary": '```json\n{"dimension":"X","questions":["Q1"]}\n```',
+                    "success": True,
+                },
+            }),
+        ]
+        resp = self.backend.parse_response("\n".join(lines))
+        assert resp.text == '{"dimension":"X","questions":["Q1"]}'
+        assert resp.is_error is False
+
+    def test_parse_response_task_complete_without_fence(self):
+        """task_complete summary may also be plain text without fences."""
+        lines = [
+            json.dumps({"type": "user.message", "data": {"interactionId": "x"}}),
+            json.dumps({
+                "type": "session.task_complete",
+                "data": {"summary": "plain answer text", "success": True},
+            }),
+        ]
+        resp = self.backend.parse_response("\n".join(lines))
+        assert resp.text == "plain answer text"
+        assert resp.is_error is False
+
     def test_parse_response_copilot_shaped_no_message_returns_error(self):
         """If Copilot CLI emits its session events but no usable
         assistant.message (rate limit, quota exhausted, mid-session error),

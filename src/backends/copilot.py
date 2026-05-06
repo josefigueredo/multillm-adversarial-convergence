@@ -10,7 +10,7 @@ import json
 import logging
 
 from .base import Backend
-from .jsonl import parse_jsonl_last_result
+from .jsonl import parse_jsonl_last_result, strip_markdown_fences
 from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode
 
 log = logging.getLogger("autoresearch")
@@ -51,22 +51,28 @@ class CopilotBackend(Backend):
     def parse_response(self, stdout: str) -> AgentResponse:
         """Parse Copilot JSONL output.
 
-        Copilot emits JSONL with ``assistant.message`` events. In autopilot
-        mode the CLI injects follow-up ``user.message`` events ("you have
-        not yet called task_complete...") that trigger additional turns;
-        each new turn carries a fresh ``interactionId``. The actual answer
-        to the user's original prompt lives in the FIRST interaction, so
-        we anchor on the first ``user.message``'s ``interactionId`` and
-        ignore any ``assistant.message`` produced under a later interaction.
-        Without that filter, the parser picks up the autopilot continuation's
-        "task complete, I submitted my JSON" prose instead of the JSON itself.
+        Three extraction paths in priority order:
 
-        When the output is Copilot-shaped (carries ``session.*`` or
-        ``assistant.*`` events) but lacks a usable ``assistant.message`` —
-        rate-limit, quota, or mid-session error — return ``is_error=True``
-        rather than leaking raw JSONL to the caller. The generic JSONL
-        fallback only runs for non-Copilot-shaped output (test fixtures,
-        unexpected formats).
+        1. **``session.task_complete.data.summary``** — when Copilot's
+           autopilot agent runs to completion, the model delivers its
+           structured final answer through the ``task_complete`` tool, not
+           through ``assistant.message``. The summary often wraps content
+           in markdown code fences (especially JSON) which we strip.
+        2. **Last ``assistant.message`` in the primary interaction** —
+           for non-autopilot or short-circuit flows, the model puts its
+           answer directly in an assistant message. We anchor on the
+           first ``user.message``'s ``interactionId`` so autopilot's
+           injected "you have not yet called task_complete" continuations
+           (which carry fresh ``interactionId`` values) don't pollute the
+           result with their "task complete, I submitted my JSON" prose.
+        3. **``is_error=True``** when the output is Copilot-shaped (carries
+           ``session.*`` or ``assistant.*`` events) but neither path
+           yielded usable content — rate-limit, quota, or mid-session
+           error. Returning the raw JSONL would feed the framework's
+           hypothesis parser garbage.
+
+        Non-Copilot-shaped output (test fixtures, unexpected formats)
+        falls back to the generic JSONL helper.
         """
         if not stdout.strip():
             return AgentResponse(text="", cost_usd=0.0, is_error=True)
@@ -75,6 +81,7 @@ class CopilotBackend(Backend):
 
         primary_interaction_id: str | None = None
         is_copilot_shaped = False
+        task_complete_summary: str | None = None
         for line in lines:
             line = line.strip()
             if not line:
@@ -90,6 +97,17 @@ class CopilotBackend(Backend):
                 is_copilot_shaped = True
             if event_type == "user.message" and primary_interaction_id is None:
                 primary_interaction_id = obj.get("data", {}).get("interactionId")
+            if event_type == "session.task_complete":
+                summary = obj.get("data", {}).get("summary", "")
+                if summary:
+                    task_complete_summary = summary
+
+        if task_complete_summary:
+            return AgentResponse(
+                text=strip_markdown_fences(task_complete_summary),
+                cost_usd=0.0,
+                is_error=False,
+            )
 
         last_text = ""
         for line in reversed(lines):
