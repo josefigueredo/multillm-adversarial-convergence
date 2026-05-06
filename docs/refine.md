@@ -6,22 +6,22 @@ The `refine` subcommand runs a **multi-LLM convergence loop** on a document — 
 
 ```bash
 # Refine a document interactively (human-in-the-loop enabled)
-uv run python -m src.cli refine --config configs/prd_template.yaml
+uv run python -m src.cli refine --config configs/refine/prd_template.yaml
 
 # Non-interactive (exits with code 2 if human input is required)
-uv run python -m src.cli refine --config configs/my_prd.yaml --no-interactive
+uv run python -m src.cli refine --config configs/refine/my_prd.yaml --no-interactive
 
 # Resume after answering deferred questions
-uv run python -m src.cli refine --config configs/my_prd.yaml --resume
+uv run python -m src.cli refine --config configs/refine/my_prd.yaml --resume
 
 # Write output to a custom directory
-uv run python -m src.cli refine --config configs/my_prd.yaml --output ./docs/output
+uv run python -m src.cli refine --config configs/refine/my_prd.yaml --output ./docs/output
 
 # Validate config, backend wiring, and planned outputs without running refinement
-uv run python -m src.cli refine --config configs/prd_template.yaml --dry-run
+uv run python -m src.cli refine --config configs/refine/prd_template.yaml --dry-run
 ```
 
-Copy `configs/prd_template.yaml` to create a new document refinement config.
+Copy `configs/refine/prd_template.yaml` to create a new document refinement config.
 
 ## Dry Run
 
@@ -43,7 +43,7 @@ Real `refine` runs now also emit:
 Useful smoke command:
 
 ```bash
-uv run python -m src.cli refine --config configs/prd_template.yaml --dry-run
+uv run python -m src.cli refine --config configs/refine/prd_template.yaml --dry-run
 ```
 
 ## How It Works
@@ -173,7 +173,7 @@ document:
     utility: challenger_fast       # Verifier (cheap, fast classification)
 ```
 
-See `configs/prd_template.yaml` for the full annotated reference.
+See `configs/refine/prd_template.yaml` for the full annotated reference.
 
 ## Backends
 
@@ -361,7 +361,7 @@ The `sequence` field ensures guidance is injected into the correct resumed step 
 
 ```bash
 # After filling in hitl_guidance.jsonl and/or .run/pending_questions.json
-uv run python -m src.cli refine --config configs/my_prd.yaml --resume
+uv run python -m src.cli refine --config configs/refine/my_prd.yaml --resume
 ```
 
 Use `autoresearch doctor output --output <dir>` to inspect HITL artifact status and see pending-gate warnings before resuming.

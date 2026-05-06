@@ -48,7 +48,7 @@ This is already an adversarial workflow engine.
 
 ### Existing Copilot -> Codex example
 A working pattern already exists in:
-- `configs/localstack_alternatives_copilot_codex_technical.yaml`
+- `configs/research/localstack_alternatives_copilot_codex_technical.yaml`
 
 with:
 - `research_coder` -> `copilot-cli` using Sonnet

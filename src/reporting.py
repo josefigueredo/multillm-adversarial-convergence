@@ -1,4 +1,4 @@
-"""HTML reporting helpers for autoresearch run artifacts.
+"""HTML reporting helpers for autoresearch artifacts.
 
 Renders a standalone HTML report using client-side marked.js for markdown
 and inline JS for collapsible JSON tables.  Raw content is embedded as

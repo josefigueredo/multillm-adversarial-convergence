@@ -172,7 +172,7 @@ def rerun_script_text(
         "set -euo pipefail\n\n"
         "# Re-run this research job with the same config and output directory.\n"
         "# Tip: override the output directory by editing the command below or copying it elsewhere.\n"
-        f"autoresearch run --config {config_arg} --output {output_arg} \"$@\"\n"
+        f"autoresearch research --config {config_arg} --output {output_arg} \"$@\"\n"
     )
 
 

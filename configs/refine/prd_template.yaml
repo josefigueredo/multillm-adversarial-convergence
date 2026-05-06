@@ -1,6 +1,6 @@
 # DocumentRefiner configuration template.
 # Copy this file and fill in your topic, goal, and output artifact name.
-# Run with: autoresearch refine --config configs/your_copy.yaml
+# Run with: autoresearch refine --config configs/refine/your_copy.yaml
 
 document:
   topic: "Your feature or product area here"

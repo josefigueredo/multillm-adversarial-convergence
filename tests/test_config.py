@@ -397,7 +397,7 @@ class TestResearchConfigFromYaml:
 
 class TestConvergenceSmokeConfigs:
     def test_smoke_test_refine_config_parses(self):
-        cfg = DocumentConfig.from_yaml(Path("configs/smoke_test_refine.yaml"))
+        cfg = DocumentConfig.from_yaml(Path("configs/refine/smoke_test_refine.yaml"))
         assert cfg.topic == "Tiny PRD smoke test"
         assert cfg.convergence_cycles == 1
         assert cfg.max_cycles == 1
@@ -410,7 +410,7 @@ class TestConvergenceSmokeConfigs:
         assert cfg.execution.lightweight_mode is True
 
     def test_smoke_test_plan_config_parses(self):
-        cfg = PlanConfig.from_yaml(Path("configs/smoke_test_plan.yaml"))
+        cfg = PlanConfig.from_yaml(Path("configs/plan/smoke_test_plan.yaml"))
         assert cfg.topic == "Tiny plan smoke test"
         assert cfg.convergence_cycles == 1
         assert cfg.max_cycles == 1
@@ -634,29 +634,29 @@ class TestConvergenceSmokeConfigs:
             ResearchConfig.from_yaml(p)
 
     def test_example_github_models_config_parses(self):
-        cfg = ResearchConfig.from_yaml(Path("configs/example_github_models.yaml"))
+        cfg = ResearchConfig.from_yaml(Path("configs/research/example_github_models.yaml"))
         assert cfg.providers["github_models"].adapter == "copilot-api"
         assert cfg.providers["gateway_fast"].adapter == "litellm-api"
 
     def test_example_bedrock_config_parses(self):
-        cfg = ResearchConfig.from_yaml(Path("configs/example_bedrock.yaml"))
+        cfg = ResearchConfig.from_yaml(Path("configs/research/example_bedrock.yaml"))
         assert cfg.providers["aws_foundation"].adapter == "bedrock-api"
         assert cfg.providers["gateway_fast"].adapter == "litellm-api"
 
     def test_example_direct_api_config_parses(self):
-        cfg = ResearchConfig.from_yaml(Path("configs/example_direct_api.yaml"))
+        cfg = ResearchConfig.from_yaml(Path("configs/research/example_direct_api.yaml"))
         assert cfg.providers["anthropic_primary"].adapter == "claude-api"
         assert cfg.providers["openai_research"].adapter == "codex-api"
         assert cfg.providers["google_utility"].adapter == "gemini-api"
 
     def test_example_mixed_cli_api_config_parses(self):
-        cfg = ResearchConfig.from_yaml(Path("configs/example_mixed_cli_api.yaml"))
+        cfg = ResearchConfig.from_yaml(Path("configs/research/example_mixed_cli_api.yaml"))
         assert cfg.providers["primary_cli"].adapter == "claude-cli"
         assert cfg.providers["research_api"].adapter == "codex-api"
         assert cfg.providers["utility_gateway"].adapter == "litellm-api"
 
     def test_example_litellm_only_config_parses(self):
-        cfg = ResearchConfig.from_yaml(Path("configs/example_litellm_only.yaml"))
+        cfg = ResearchConfig.from_yaml(Path("configs/research/example_litellm_only.yaml"))
         assert cfg.providers["primary_gateway"].adapter == "litellm-api"
         assert cfg.providers["research_gateway"].adapter == "litellm-api"
         assert cfg.providers["utility_gateway"].adapter == "litellm-api"

@@ -790,7 +790,7 @@ Prove all three modes can consume the same provider configuration model.
 
 - `README.md`
 - `MANIFEST.md`
-- `docs/run.md`
+- `docs/research.md`
 - `docs/refine.md`
 - `docs/plan.md`
 - `docs/design/...`

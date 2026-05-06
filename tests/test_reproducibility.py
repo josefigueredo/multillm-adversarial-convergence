@@ -38,4 +38,4 @@ def test_write_rerun_script_writes_executable_script(tmp_path: Path):
     content = path.read_text(encoding="utf-8")
     assert path.exists()
     assert content.startswith("#!/usr/bin/env bash")
-    assert "autoresearch run" in content
+    assert "autoresearch research" in content

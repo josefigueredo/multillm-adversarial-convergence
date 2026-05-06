@@ -303,7 +303,7 @@ def test_prompt_snapshot_payload_and_rerun_script(tmp_path: Path):
         config_path=tmp_path / "config.yaml",
         output_dir=tmp_path / "run-output",
     )
-    assert "autoresearch run" in script
+    assert "autoresearch research" in script
     assert "--config" in script
     assert "--output" in script
 

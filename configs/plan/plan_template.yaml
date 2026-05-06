@@ -1,6 +1,6 @@
 # Plan Refiner configuration template.
 # Copy this file and fill in your topic, goal, and primary_artifact.
-# Run with: uv run python -m src.cli plan --config configs/your_copy.yaml
+# Run with: uv run python -m src.cli plan --config configs/plan/your_copy.yaml
 
 plan:
   topic: "Your feature or component here"

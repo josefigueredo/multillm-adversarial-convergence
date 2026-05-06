@@ -22,28 +22,28 @@ A **methodologically-aware autonomous research system** — not a fully validate
 uv sync
 
 # Single backend (Claude)
-uv run python -m src.cli run --config configs/aws_api_gateway.yaml
+uv run python -m src.cli research --config configs/research/aws_api_gateway.yaml
 
 # Multi-backend adversarial (codex researches, claude-cli critiques)
-uv run python -m src.cli run --config configs/localstack_alternatives.yaml
+uv run python -m src.cli research --config configs/research/localstack_alternatives.yaml
 
 # Resume a previous session
-uv run python -m src.cli run --config configs/aws_api_gateway.yaml --resume
+uv run python -m src.cli research --config configs/research/aws_api_gateway.yaml --resume
 
 # Generate synthesis from existing iterations
-uv run python -m src.cli run --config configs/aws_api_gateway.yaml --synthesize
+uv run python -m src.cli research --config configs/research/aws_api_gateway.yaml --synthesize
 
 # Validate config, backend wiring, and planned artifact paths only
-uv run python -m src.cli run --config configs/aws_api_gateway.yaml --dry-run
+uv run python -m src.cli research --config configs/research/aws_api_gateway.yaml --dry-run
 
 # Example: GitHub Models + LiteLLM aggregators
-uv run python -m src.cli run --config configs/example_github_models.yaml
+uv run python -m src.cli research --config configs/research/example_github_models.yaml
 
 # Example: Bedrock Converse + LiteLLM utility
-uv run python -m src.cli run --config configs/example_bedrock.yaml
+uv run python -m src.cli research --config configs/research/example_bedrock.yaml
 ```
 
-Copy `configs/_template.yaml` to create a new research topic.
+Copy `configs/research/_template.yaml` to create a new research topic.
 
 ## Dry Run
 
@@ -72,7 +72,7 @@ Exit codes:
 Useful smoke command:
 
 ```bash
-uv run python -m src.cli run --config configs/example_github_models.yaml --dry-run
+uv run python -m src.cli research --config configs/research/example_github_models.yaml --dry-run
 ```
 
 ## The Pattern
@@ -266,11 +266,11 @@ Examples:
 For provider-instance contract details, see `docs/design/api-provider-contracts.md`.
 For ready-to-copy examples, see:
 
-- `configs/example_direct_api.yaml`
-- `configs/example_mixed_cli_api.yaml`
-- `configs/example_litellm_only.yaml`
-- `configs/example_github_models.yaml`
-- `configs/example_bedrock.yaml`
+- `configs/research/example_direct_api.yaml`
+- `configs/research/example_mixed_cli_api.yaml`
+- `configs/research/example_litellm_only.yaml`
+- `configs/research/example_github_models.yaml`
+- `configs/research/example_bedrock.yaml`
 
 ### `system_prompt` contract
 
@@ -514,7 +514,7 @@ Active trust classes:
 
 ## Configuration
 
-See `configs/_template.yaml` for the full reference with inline documentation.
+See `configs/research/_template.yaml` for the full reference with inline documentation.
 
 Key fields:
 
@@ -774,7 +774,7 @@ Use `autoresearch doctor config --config <path>` to see this table for a specifi
 ### `explain config`
 
 ```bash
-uv run python -m src.cli explain config --config configs/aws_api_gateway.yaml
+uv run python -m src.cli explain config --config configs/research/aws_api_gateway.yaml
 ```
 
 Prints a human-readable summary of the resolved research config:
@@ -815,7 +815,7 @@ Returns exit code `1` if the output directory does not exist.
 ### `doctor config`
 
 ```bash
-uv run python -m src.cli doctor config --config configs/aws_api_gateway.yaml
+uv run python -m src.cli doctor config --config configs/research/aws_api_gateway.yaml
 ```
 
 Validates a config file and prints a structured diagnostic report covering:

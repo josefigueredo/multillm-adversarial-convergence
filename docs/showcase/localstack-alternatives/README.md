@@ -2,9 +2,9 @@
 
 This showcase persists the outputs of three configs built from the same completed research run:
 
-- `configs/localstack_alternatives_copilot_codex.yaml` → raw/default rendering
-- `configs/localstack_alternatives_copilot_codex_paper.yaml` → paper rendering
-- `configs/localstack_alternatives_copilot_codex_technical.yaml` → technical-document rendering
+- `configs/research/localstack_alternatives_copilot_codex.yaml` → raw/default rendering
+- `configs/research/localstack_alternatives_copilot_codex_paper.yaml` → paper rendering
+- `configs/research/localstack_alternatives_copilot_codex_technical.yaml` → technical-document rendering
 
 The artifacts below are stored in this folder so the repo can demonstrate the differences in output style without rerunning the research loop.
 

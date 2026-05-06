@@ -201,7 +201,7 @@ class TestAutoResearcherSetup:
         rerun_script = researcher.output_dir / "rerun.sh"
         assert rerun_script.exists()
         content = rerun_script.read_text(encoding="utf-8")
-        assert "autoresearch run" in content
+        assert "autoresearch research" in content
         assert "--config" in content
         assert "configs/example.yaml" in content
         assert "--output" in content

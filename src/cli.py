@@ -52,42 +52,42 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="subcommand", required=True)
 
     # ── run subcommand ───────────────────────────────────────────────────────
-    run_p = subparsers.add_parser("run", help="Run the autonomous research loop.")
-    run_p.add_argument(
+    research_p = subparsers.add_parser("research", help="Run the autonomous research loop.")
+    research_p.add_argument(
         "--config",
         type=Path,
         required=True,
-        help="Path to a research config YAML (see configs/_template.yaml).",
+        help="Path to a research config YAML (see configs/research/_template.yaml).",
     )
-    run_p.add_argument(
+    research_p.add_argument(
         "--backend",
         choices=VALID_BACKENDS,
         default=None,
         help="CLI backend to use. Overrides the config file.",
     )
-    run_p.add_argument(
+    research_p.add_argument(
         "--output",
         type=Path,
         default=None,
         help="Output directory. Defaults to output/<config-stem>/.",
     )
-    run_p.add_argument(
+    research_p.add_argument(
         "--resume",
         action="store_true",
         help="Resume from existing iteration files in the output directory.",
     )
-    run_p.add_argument(
+    research_p.add_argument(
         "--synthesize",
         action="store_true",
         help="Generate a synthesis report from existing data and exit.",
     )
-    run_p.add_argument(
+    research_p.add_argument(
         "--strategy",
         choices=VALID_STRATEGIES,
         default=None,
         help="Multi-backend strategy. Overrides the config file.",
     )
-    run_p.add_argument(
+    research_p.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate config, backend wiring, and planned outputs without running the research loop.",
@@ -136,7 +136,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         required=True,
-        help="Path to a plan config YAML (see configs/plan_template.yaml).",
+        help="Path to a plan config YAML (see configs/plan/plan_template.yaml).",
     )
     plan_p.add_argument(
         "--output",
@@ -500,7 +500,7 @@ def _run_refine(args: argparse.Namespace, log: logging.Logger) -> int:
         return 1
 
 
-def _run_plan(args: argparse.Namespace, log: logging.Logger) -> int:
+def _research_plan(args: argparse.Namespace, log: logging.Logger) -> int:
     config_path: Path = args.config
     if not config_path.exists():
         log.error("Config file not found: %s", config_path)
@@ -639,12 +639,12 @@ def main(argv: list[str] | None = None) -> int:
     _setup_logging(args.verbose)
     log = logging.getLogger("autoresearch")
 
-    if args.subcommand == "run":
+    if args.subcommand == "research":
         return _run_research(args, log)
     if args.subcommand == "refine":
         return _run_refine(args, log)
     if args.subcommand == "plan":
-        return _run_plan(args, log)
+        return _research_plan(args, log)
     if args.subcommand == "implement":
         return _run_implement(args, log)
     if args.subcommand == "explain":

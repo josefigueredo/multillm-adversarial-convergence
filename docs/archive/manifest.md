@@ -91,7 +91,7 @@ Primary entrypoint:
 
 ## Documentation map
 
-- `docs/run.md` — research mode
+- `docs/research.md` — research mode
 - `docs/refine.md` — document refinement mode
 - `docs/plan.md` — plan refinement mode
 - `docs/design/evaluation-architecture.md` — evaluation/reporting architecture

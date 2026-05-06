@@ -6,22 +6,22 @@ The `plan` subcommand runs a **multi-LLM convergence loop** on an implementation
 
 ```bash
 # Refine a plan interactively (human-in-the-loop enabled)
-uv run python -m src.cli plan --config configs/plan_template.yaml
+uv run python -m src.cli plan --config configs/plan/plan_template.yaml
 
 # Non-interactive (exits with code 2 if human input is required)
-uv run python -m src.cli plan --config configs/my_plan.yaml --no-interactive
+uv run python -m src.cli plan --config configs/plan/my_plan.yaml --no-interactive
 
 # Resume after answering deferred questions
-uv run python -m src.cli plan --config configs/my_plan.yaml --resume
+uv run python -m src.cli plan --config configs/plan/my_plan.yaml --resume
 
 # Write output to a custom directory
-uv run python -m src.cli plan --config configs/my_plan.yaml --output ./docs/output
+uv run python -m src.cli plan --config configs/plan/my_plan.yaml --output ./docs/output
 
 # Validate config, backend wiring, and planned outputs without running refinement
-uv run python -m src.cli plan --config configs/plan_template.yaml --dry-run
+uv run python -m src.cli plan --config configs/plan/plan_template.yaml --dry-run
 ```
 
-Copy `configs/plan_template.yaml` to create a new plan refinement config.
+Copy `configs/plan/plan_template.yaml` to create a new plan refinement config.
 
 ## Dry Run
 
@@ -43,7 +43,7 @@ Real `plan` runs now also emit:
 Useful smoke command:
 
 ```bash
-uv run python -m src.cli plan --config configs/plan_template.yaml --dry-run
+uv run python -m src.cli plan --config configs/plan/plan_template.yaml --dry-run
 ```
 
 ## How It Works
@@ -178,7 +178,7 @@ plan:
     utility: verifier_fast         # Verifier (cheap, fast classification)
 ```
 
-See `configs/plan_template.yaml` for the full annotated reference.
+See `configs/plan/plan_template.yaml` for the full annotated reference.
 
 ## Backends
 
@@ -318,7 +318,7 @@ In interactive mode (the default), the CLI prompts you inline. In non-interactiv
 
 ```bash
 # After filling in .run/pending_questions.json
-uv run python -m src.cli plan --config configs/my_plan.yaml --resume
+uv run python -m src.cli plan --config configs/plan/my_plan.yaml --resume
 ```
 
 ## Project Structure
