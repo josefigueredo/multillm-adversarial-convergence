@@ -9,6 +9,7 @@ combined with configurable weights.
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -62,6 +63,44 @@ JUDGE_SCHEMA: dict[str, Any] = {
 
 
 @dataclass
+class HeuristicBreakdown:
+    """Per-component breakdown of the deterministic heuristic score.
+
+    All values are absolute points awarded for each component (not
+    normalised to 0-100).  ``total`` is the normalised 0-100 score
+    derived from these components — exactly what ``heuristic_score()``
+    returns.
+
+    Attributes:
+        dimension_points: Points awarded for dimension-relevance (out of
+            ``_DIMENSION_POINTS``).  In target-dimension mode this rewards
+            depth on the assigned dimension and penalises off-topic drift;
+            in legacy "all-dimensions" mode it rewards mentioning many of
+            the configured dimensions.
+        evidence_points: Points awarded for finding configured evidence
+            types in the findings (out of ``_EVIDENCE_POINTS``).
+        new_questions_points: Points awarded for the count of new
+            questions in the ``## New Questions`` section (out of
+            ``_NEW_QUESTIONS_POINTS``).
+        length_points: Points awarded for substantive word count, on a
+            logarithmic curve that saturates near ``_TARGET_WORD_COUNT``
+            and gives no extra credit for verbose padding (out of
+            ``_LENGTH_POINTS``).
+        total: Normalised 0-100 score combining all components.
+        target_dimension: When set, indicates the breakdown was computed
+            in target-dimension mode for this dimension.  ``None`` means
+            legacy all-dimensions mode.
+    """
+
+    dimension_points: float = 0.0
+    evidence_points: float = 0.0
+    new_questions_points: float = 0.0
+    length_points: float = 0.0
+    total: float = 0.0
+    target_dimension: str | None = None
+
+
+@dataclass
 class IterationScore:
     """Scores for a single research iteration.
 
@@ -72,6 +111,15 @@ class IterationScore:
         dimensions_covered: Dimensions the judge identified as covered.
         gaps: Knowledge gaps the judge identified.
         judge_raw: Raw JSON response from the LLM judge.
+        heuristic_breakdown: Per-component decomposition of ``coverage``.
+        judge_depth: Judge's depth axis score (1-10) extracted from
+            ``judge_raw``; 0 when missing.
+        judge_accuracy: Judge's accuracy axis score (1-10).
+        judge_novelty: Judge's novelty axis score (1-10).  Surfaced
+            independently so downstream consumers (and Phase 2 of the
+            scoring plan) can use novelty as a signal without re-rolling
+            the judge call.
+        judge_actionability: Judge's actionability axis score (1-10).
     """
 
     coverage: float = 0.0
@@ -80,6 +128,11 @@ class IterationScore:
     dimensions_covered: list[str] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
     judge_raw: dict[str, Any] = field(default_factory=dict)
+    heuristic_breakdown: HeuristicBreakdown = field(default_factory=HeuristicBreakdown)
+    judge_depth: int = 0
+    judge_accuracy: int = 0
+    judge_novelty: int = 0
+    judge_actionability: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -99,44 +152,82 @@ _EVIDENCE_PATTERNS: dict[str, re.Pattern[str]] = {
 }
 
 
-def heuristic_score(
+def heuristic_breakdown(
     findings: str,
     config: ResearchConfig,
-    explored_dimensions: list[str],
-) -> float:
-    """Score research findings using deterministic heuristics.
+    explored_dimensions: list[str] | None = None,
+    *,
+    target_dimension: str | None = None,
+) -> HeuristicBreakdown:
+    """Score research findings using deterministic heuristics, returning
+    the per-component breakdown.
 
     Evaluates four components:
-    - Dimension mentions (``_DIMENSION_POINTS`` pts)
-    - Evidence types found (``_EVIDENCE_POINTS`` pts)
-    - New questions discovered (``_NEW_QUESTIONS_POINTS`` pts)
-    - Substantive word count (``_LENGTH_POINTS`` pts)
+    - Dimension relevance (``_DIMENSION_POINTS`` pts).  When
+      ``target_dimension`` is provided, 70% of the weight goes to depth
+      on the target dimension and 30% goes to "no off-topic drift" — a
+      penalty for excessive mentions of other configured dimensions.
+      When ``target_dimension`` is None, falls back to legacy behavior:
+      one point per configured dimension that appears in the findings.
+    - Evidence types found (``_EVIDENCE_POINTS`` pts).
+    - New questions discovered (``_NEW_QUESTIONS_POINTS`` pts).
+    - Substantive word count (``_LENGTH_POINTS`` pts).  Logarithmic curve
+      that saturates near ``_TARGET_WORD_COUNT`` and gives no padding
+      bonus for verbose findings beyond the target.
 
     Args:
         findings: Raw markdown findings text.
         config: Research config with dimensions and scoring settings.
-        explored_dimensions: Previously explored dimensions (unused
-            currently, reserved for future weighting).
+        explored_dimensions: Previously explored dimensions.  Currently
+            unused (reserved for future weighting); accepted for
+            backward compatibility.
+        target_dimension: When set, score dimension-relevance against
+            this specific dimension instead of the full configured list.
+            Required for focused-iteration scoring; ``None`` recovers
+            the legacy all-dimensions behavior.
 
     Returns:
-        A coverage score from 0.0 to 100.0.
+        A ``HeuristicBreakdown`` with per-component points and the
+        normalised 0-100 ``total``.
     """
+    breakdown = HeuristicBreakdown(target_dimension=target_dimension)
+
     if not findings:
-        return 0.0
+        return breakdown
 
-    points = 0.0
     max_points = _DIMENSION_POINTS + _EVIDENCE_POINTS + _NEW_QUESTIONS_POINTS + _LENGTH_POINTS
-
-    # --- Dimension mentions ---
     all_dims = list(config.dimensions)
-    if all_dims:
+
+    # --- Dimension relevance ---
+    if not all_dims:
+        # No dimensions configured — don't penalise, redistribute weight.
+        max_points -= _DIMENSION_POINTS
+    elif target_dimension is not None:
+        # Target-dimension mode: reward depth on the assigned dimension,
+        # penalise off-topic drift.  Splits _DIMENSION_POINTS 70/30.
+        on_target_weight = _DIMENSION_POINTS * 0.7
+        drift_weight = _DIMENSION_POINTS * 0.3
+
+        if _fuzzy_match(target_dimension, findings):
+            breakdown.dimension_points += on_target_weight
+
+        # Drift score: full credit when no other dimensions are
+        # mentioned; linear penalty up to the full drift_weight as the
+        # number of off-target dimensions present grows.
+        other_dims = [d for d in all_dims if d != target_dimension]
+        if other_dims:
+            mentions = sum(1 for d in other_dims if _fuzzy_match(d, findings))
+            drift_ratio = mentions / len(other_dims)
+            breakdown.dimension_points += drift_weight * (1.0 - drift_ratio)
+        else:
+            breakdown.dimension_points += drift_weight
+    else:
+        # Legacy mode: one point per configured dimension mentioned,
+        # normalised to ``min_dimensions_per_iteration``.
         mentioned = sum(1 for d in all_dims if _fuzzy_match(d, findings))
-        points += _DIMENSION_POINTS * min(
+        breakdown.dimension_points = _DIMENSION_POINTS * min(
             mentioned / max(config.scoring.min_dimensions_per_iteration, 1), 1.0
         )
-    else:
-        # No dimensions configured — don't penalise, redistribute weight
-        max_points -= _DIMENSION_POINTS
 
     # --- Evidence types ---
     types_found = sum(
@@ -144,21 +235,53 @@ def heuristic_score(
         for etype, pattern in _EVIDENCE_PATTERNS.items()
         if etype in config.scoring.evidence_types and pattern.search(findings)
     )
-    target = len(config.scoring.evidence_types)
-    if target:
-        points += _EVIDENCE_POINTS * min(types_found / target, 1.0)
+    target_evidence = len(config.scoring.evidence_types)
+    if target_evidence:
+        breakdown.evidence_points = _EVIDENCE_POINTS * min(types_found / target_evidence, 1.0)
 
     # --- New questions discovered ---
     new_q_section = _extract_section(findings, "New Questions")
     if new_q_section:
         bullet_count = len(re.findall(r"^[\s]*[-*]\s", new_q_section, re.MULTILINE))
-        points += _NEW_QUESTIONS_POINTS * min(bullet_count / _TARGET_NEW_QUESTIONS, 1.0)
+        breakdown.new_questions_points = _NEW_QUESTIONS_POINTS * min(
+            bullet_count / _TARGET_NEW_QUESTIONS, 1.0
+        )
 
-    # --- Substantive length ---
+    # --- Substantive length (logarithmic curve, no padding bonus) ---
     word_count = len(findings.split())
-    points += _LENGTH_POINTS * min(word_count / _TARGET_WORD_COUNT, 1.0)
+    if word_count > 0:
+        # Calibrated so words ~= _TARGET_WORD_COUNT (500) lands near the
+        # cap.  log(501) * 1.61 ~= 10.0.  Capped so verbose findings
+        # don't beat focused ones on this axis.
+        breakdown.length_points = min(_LENGTH_POINTS, math.log(word_count + 1) * 1.61)
 
-    return round(100.0 * points / max_points, 1) if max_points > 0 else 0.0
+    points = (
+        breakdown.dimension_points
+        + breakdown.evidence_points
+        + breakdown.new_questions_points
+        + breakdown.length_points
+    )
+    breakdown.total = round(100.0 * points / max_points, 1) if max_points > 0 else 0.0
+    return breakdown
+
+
+def heuristic_score(
+    findings: str,
+    config: ResearchConfig,
+    explored_dimensions: list[str] | None = None,
+    *,
+    target_dimension: str | None = None,
+) -> float:
+    """Thin wrapper over :func:`heuristic_breakdown` returning only the
+    normalised 0-100 total.  Preserved for backward-compatible call
+    sites that don't need the component breakdown.
+    """
+    return heuristic_breakdown(
+        findings,
+        config,
+        explored_dimensions,
+        target_dimension=target_dimension,
+    ).total
 
 
 # ---------------------------------------------------------------------------

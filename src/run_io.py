@@ -24,6 +24,16 @@ RESULTS_FIELDS = [
     "cumulative_cost_usd",
     "cumulative_input_tokens",
     "cumulative_output_tokens",
+    # --- Score component breakdown (additive; new columns at end so
+    # existing tsv readers continue to work without changes) ---
+    "dimension_points",
+    "evidence_points",
+    "new_questions_points",
+    "length_points",
+    "judge_depth",
+    "judge_accuracy",
+    "judge_novelty",
+    "judge_actionability",
 ]
 
 
@@ -52,6 +62,7 @@ def build_result_row(
     total_output_tokens: int,
 ) -> dict[str, str]:
     """Build a results.tsv row."""
+    breakdown = score.heuristic_breakdown
     return {
         "iteration": f"{iteration:03d}",
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
@@ -65,6 +76,14 @@ def build_result_row(
         "cumulative_cost_usd": f"{total_cost_usd:.3f}",
         "cumulative_input_tokens": str(total_input_tokens),
         "cumulative_output_tokens": str(total_output_tokens),
+        "dimension_points": f"{breakdown.dimension_points:.1f}",
+        "evidence_points": f"{breakdown.evidence_points:.1f}",
+        "new_questions_points": f"{breakdown.new_questions_points:.1f}",
+        "length_points": f"{breakdown.length_points:.1f}",
+        "judge_depth": str(score.judge_depth),
+        "judge_accuracy": str(score.judge_accuracy),
+        "judge_novelty": str(score.judge_novelty),
+        "judge_actionability": str(score.judge_actionability),
     }
 
 
@@ -84,13 +103,25 @@ def write_iteration_markdown(
     score: IterationScore,
     kept: bool,
 ) -> Path:
-    """Write a numbered iteration markdown file."""
+    """Write a numbered iteration markdown file with a per-component
+    score breakdown so operators can read why a score landed where it
+    did without having to crack open dashboard.json or results.tsv.
+    """
     path = iterations_dir / f"iter_{iteration:03d}.md"
+    breakdown = score.heuristic_breakdown
     content = (
         f"# Iteration {iteration:03d} — {dimension}\n\n"
         f"**Status:** {'keep' if kept else 'discard'}  \n"
         f"**Scores:** coverage={score.coverage}, quality={score.quality}, "
         f"total={score.total}  \n"
+        f"**Heuristic breakdown:** "
+        f"target/dimension={breakdown.dimension_points:.1f}/40, "
+        f"evidence={breakdown.evidence_points:.1f}/35, "
+        f"new_questions={breakdown.new_questions_points:.1f}/15, "
+        f"length={breakdown.length_points:.1f}/10  \n"
+        f"**Judge axes (1-10):** depth={score.judge_depth}, "
+        f"accuracy={score.judge_accuracy}, novelty={score.judge_novelty}, "
+        f"actionability={score.judge_actionability}  \n"
         f"**Timestamp:** {datetime.now(timezone.utc).isoformat()}  \n\n"
         f"---\n\n{findings}\n"
     )

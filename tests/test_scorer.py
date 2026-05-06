@@ -6,10 +6,12 @@ import pytest
 
 from src.config import ExecutionConfig, ResearchConfig, ScoringConfig
 from src.scorer import (
+    HeuristicBreakdown,
     IterationScore,
     _extract_section,
     _fuzzy_match,
     combine_scores,
+    heuristic_breakdown,
     heuristic_score,
     parse_judge_response,
     quality_score_from_judge,
@@ -168,6 +170,172 @@ class TestHeuristicScore:
     def test_score_range(self, sample_config):
         score = heuristic_score(RICH_FINDINGS, sample_config, [])
         assert 0.0 <= score <= 100.0
+
+
+# ---------------------------------------------------------------------------
+# heuristic_breakdown — per-component decomposition
+# ---------------------------------------------------------------------------
+
+class TestHeuristicBreakdown:
+    """Cover the breakdown structure and the scorer plan Phase 1 changes:
+    target-dimension coverage and the logarithmic length curve."""
+
+    def test_breakdown_total_matches_heuristic_score(self, sample_config):
+        """The wrapper should be a thin pass-through to .total."""
+        bd = heuristic_breakdown(RICH_FINDINGS, sample_config, [])
+        assert bd.total == heuristic_score(RICH_FINDINGS, sample_config, [])
+
+    def test_breakdown_components_are_populated(self, sample_config):
+        bd = heuristic_breakdown(RICH_FINDINGS, sample_config, [])
+        assert bd.dimension_points > 0
+        assert bd.evidence_points > 0
+        assert bd.new_questions_points > 0
+        assert bd.length_points > 0
+
+    def test_empty_findings_produce_empty_breakdown(self, sample_config):
+        bd = heuristic_breakdown("", sample_config, [])
+        assert bd.total == 0.0
+        assert bd.dimension_points == 0.0
+        assert bd.evidence_points == 0.0
+        assert bd.new_questions_points == 0.0
+        assert bd.length_points == 0.0
+
+    def test_target_dimension_mode_marks_target(self, sample_config):
+        bd = heuristic_breakdown(
+            RICH_FINDINGS, sample_config, [], target_dimension="REST vs HTTP API"
+        )
+        assert bd.target_dimension == "REST vs HTTP API"
+
+    def test_target_dimension_rewards_focus(self, sample_config):
+        """A finding that focuses on the target dimension scores higher
+        on the dimension axis than one that scatters across multiple
+        configured dimensions."""
+        focused = (
+            "REST vs HTTP API: REST API differs from HTTP API in caching, "
+            "WAF support, and pricing tiers. The REST API has caching; the "
+            "HTTP API does not. Both expose 4566. Pricing for REST API is "
+            "$3.50 per million requests, HTTP API is $1.00 per million. "
+            "However, the trade-off is REST is more expensive."
+        )
+        scattered = (
+            "WebSocket API and Authentication and REST vs HTTP API are all "
+            "different things. WebSocket API is for streams. Authentication "
+            "covers IAM. REST and HTTP differ on caching."
+        )
+        focused_bd = heuristic_breakdown(
+            focused, sample_config, [], target_dimension="REST vs HTTP API"
+        )
+        scattered_bd = heuristic_breakdown(
+            scattered, sample_config, [], target_dimension="REST vs HTTP API"
+        )
+        assert focused_bd.dimension_points > scattered_bd.dimension_points
+
+    def test_target_dimension_mode_full_credit_when_only_target_mentioned(self, sample_config):
+        """If the findings mention ONLY the target dimension, dimension
+        points should land at the full _DIMENSION_POINTS = 40 (70% on
+        target + 30% drift bonus)."""
+        text = (
+            "REST API differs from HTTP API in caching, WAF support, and "
+            "pricing tiers. The REST API has caching; the HTTP API does not."
+        )
+        bd = heuristic_breakdown(
+            text, sample_config, [], target_dimension="REST vs HTTP API"
+        )
+        # 70% target hit + 30% no-drift = 40.0
+        assert bd.dimension_points == 40.0
+
+    def test_target_dimension_mode_penalises_drift(self, sample_config):
+        """A finding that mentions every other dimension instead of the
+        target should score very low on the dimension axis."""
+        text = (
+            "WebSocket API is great for streaming. Authentication options "
+            "include IAM, Cognito, and Lambda authorizers."
+        )
+        bd = heuristic_breakdown(
+            text, sample_config, [], target_dimension="REST vs HTTP API"
+        )
+        # No on-target hit + full drift = 0.0
+        assert bd.dimension_points == 0.0
+
+    def test_legacy_mode_when_target_dimension_is_none(self, sample_config):
+        """Without target_dimension, legacy 'count of dimensions
+        mentioned' scoring kicks in."""
+        bd_legacy = heuristic_breakdown(RICH_FINDINGS, sample_config, [])
+        bd_target = heuristic_breakdown(
+            RICH_FINDINGS, sample_config, [], target_dimension="REST vs HTTP API"
+        )
+        # Both modes are valid; the values just differ by scoring strategy.
+        # Sanity-check both are within range.
+        assert 0.0 <= bd_legacy.dimension_points <= 40.0
+        assert 0.0 <= bd_target.dimension_points <= 40.0
+
+
+class TestLengthCurve:
+    """Verify the logarithmic length component (scorer plan Phase 1, #6)."""
+
+    def _length_only(self, words: int, sample_config) -> float:
+        text = " ".join(["foo"] * words) if words > 0 else ""
+        return heuristic_breakdown(text, sample_config, []).length_points
+
+    def test_zero_words_zero_points(self, sample_config):
+        assert self._length_only(0, sample_config) == 0.0
+
+    def test_target_word_count_near_cap(self, sample_config):
+        # 500 words should land at or just under the cap.
+        pts = self._length_only(500, sample_config)
+        assert 9.0 <= pts <= 10.0
+
+    def test_long_findings_capped(self, sample_config):
+        # Padding past the target should not earn extra credit.
+        pts_500 = self._length_only(500, sample_config)
+        pts_5000 = self._length_only(5000, sample_config)
+        assert pts_5000 <= 10.0
+        assert pts_5000 == pytest.approx(pts_500, abs=1.5)
+
+    def test_short_findings_get_substantial_credit(self, sample_config):
+        # Log curve gives short-but-substantive findings a meaningful
+        # share of the points (linear curve gave 100 words just 2.0).
+        pts = self._length_only(100, sample_config)
+        assert pts > 5.0
+
+
+class TestIterationScoreBreakdownFields:
+    """Phase 1 (#3): IterationScore now carries component breakdowns and
+    per-axis judge scores so the run.log + dashboard can surface them."""
+
+    def test_default_iteration_score_has_breakdown(self):
+        score = IterationScore()
+        assert isinstance(score.heuristic_breakdown, HeuristicBreakdown)
+        assert score.heuristic_breakdown.total == 0.0
+
+    def test_default_iteration_score_has_judge_axes(self):
+        score = IterationScore()
+        assert score.judge_depth == 0
+        assert score.judge_accuracy == 0
+        assert score.judge_novelty == 0
+        assert score.judge_actionability == 0
+
+    def test_iteration_score_can_carry_populated_breakdown(self):
+        bd = HeuristicBreakdown(
+            dimension_points=20.0,
+            evidence_points=15.0,
+            new_questions_points=10.0,
+            length_points=8.0,
+            total=70.0,
+            target_dimension="X",
+        )
+        score = IterationScore(
+            coverage=70.0,
+            quality=65.0,
+            total=67.5,
+            heuristic_breakdown=bd,
+            judge_depth=8,
+            judge_accuracy=7,
+            judge_novelty=6,
+            judge_actionability=7,
+        )
+        assert score.heuristic_breakdown.target_dimension == "X"
+        assert score.judge_novelty == 6
 
 
 # ---------------------------------------------------------------------------

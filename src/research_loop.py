@@ -22,6 +22,7 @@ from .run_state import BaseContext, maybe_exhaust_dimension, merge_findings
 from .scorer import (
     IterationScore,
     combine_scores,
+    heuristic_breakdown,
     heuristic_score,
     parse_judge_response,
     quality_score_from_judge,
@@ -150,9 +151,19 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
 
     score = _score(ctx, state, dimension, findings)
     prev_best = state.best_scores.get(dimension, 0.0)
+    breakdown = score.heuristic_breakdown
     log.info(
-        "Scores — coverage: %.1f, quality: %.1f, total: %.1f (dim best: %.1f, global best: %.1f)",
-        score.coverage, score.quality, score.total, prev_best, state.best_score,
+        "Scores — coverage: %.1f [target=%.1f/%.0f evidence=%.1f/%.0f questions=%.1f/%.0f length=%.1f/%.0f] "
+        "quality: %.1f [d=%d a=%d n=%d act=%d] total: %.1f (dim best: %.1f, global best: %.1f)",
+        score.coverage,
+        breakdown.dimension_points, 40.0,
+        breakdown.evidence_points, 35.0,
+        breakdown.new_questions_points, 15.0,
+        breakdown.length_points, 10.0,
+        score.quality,
+        score.judge_depth, score.judge_accuracy, score.judge_novelty, score.judge_actionability,
+        score.total,
+        prev_best, state.best_score,
     )
     emitter.transition(ResearchState.SCORE, iteration=state.iteration, dimension=dimension)
 
@@ -370,7 +381,12 @@ def _select_candidate_findings(
 
     ranked = sorted(
         candidates,
-        key=lambda c: heuristic_score(c.findings, ctx.config, state.explored_dimensions),
+        key=lambda c: heuristic_score(
+            c.findings,
+            ctx.config,
+            state.explored_dimensions,
+            target_dimension=dimension,
+        ),
         reverse=True,
     )
     merge_mode = ctx.config.execution.strategy_config.merge_mode
@@ -422,8 +438,19 @@ def _select_candidate_findings(
 
 
 def _score(ctx: LoopContext, state: LoopState, dimension: str, findings: str) -> IterationScore:
-    """Score findings using heuristics and an LLM judge."""
-    coverage = heuristic_score(findings, ctx.config, state.explored_dimensions)
+    """Score findings using heuristics and an LLM judge.
+
+    The heuristic component is computed in ``target_dimension`` mode so
+    findings focused on the assigned dimension are scored on depth rather
+    than breadth across the whole configured dimension list.
+    """
+    breakdown = heuristic_breakdown(
+        findings,
+        ctx.config,
+        state.explored_dimensions,
+        target_dimension=dimension,
+    )
+    coverage = breakdown.total
 
     quality = 50.0
     judge_raw: dict[str, Any] = {}
@@ -466,6 +493,11 @@ def _score(ctx: LoopContext, state: LoopState, dimension: str, findings: str) ->
         dimensions_covered=judge_raw.get("dimensions_covered", [dimension]),
         gaps=judge_raw.get("gaps_identified", []),
         judge_raw=judge_raw,
+        heuristic_breakdown=breakdown,
+        judge_depth=int(judge_raw.get("depth", 0) or 0),
+        judge_accuracy=int(judge_raw.get("accuracy", 0) or 0),
+        judge_novelty=int(judge_raw.get("novelty", 0) or 0),
+        judge_actionability=int(judge_raw.get("actionability", 0) or 0),
     )
 
 

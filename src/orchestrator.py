@@ -220,6 +220,9 @@ class AutoResearcher:
         }
         self._tool_trace: list[dict[str, Any]] = []
         self._prompt_snapshots: list[dict[str, Any]] = []
+        # Cached most-recent IterationScore for dashboard breakdown
+        # surfacing.  ``None`` until the first iteration completes.
+        self._latest_score: Any = None
         self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="research", run_id=self.output_dir.name)
 
     def _sync_paths(self) -> None:
@@ -844,6 +847,8 @@ class AutoResearcher:
             iterations_dir=self.iterations_dir, iteration=self.iteration,
             dimension=dimension, findings=findings, score=score, kept=kept,
         )
+        # Cache the latest score so the dashboard can surface its breakdown.
+        self._latest_score = score
         self._collect_provenance(findings, scope=f"iteration-{self.iteration:03d}", dimension=dimension)
 
     def _log_result(self, dimension: str, score, hypothesis: str, *, status: str) -> None:
@@ -1458,7 +1463,38 @@ class AutoResearcher:
             explored_dimensions=self.explored_dimensions,
             retry_summary=self._retry_summary,
             tool_loop_summary=self._tool_loop_summary,
+            latest_score_breakdown=self._latest_score_breakdown_payload(),
         )
+
+    def _latest_score_breakdown_payload(self) -> dict[str, Any] | None:
+        """Build the dashboard payload for the most recent iteration's
+        score components.  Returns ``None`` when no iteration has scored
+        yet (e.g. cold-start dashboard, synthesise-only mode without
+        loaded prior state).
+        """
+        score = getattr(self, "_latest_score", None)
+        if score is None:
+            return None
+        breakdown = score.heuristic_breakdown
+        return {
+            "iteration": self.iteration,
+            "coverage": score.coverage,
+            "quality": score.quality,
+            "total": score.total,
+            "components": {
+                "dimension_points": breakdown.dimension_points,
+                "evidence_points": breakdown.evidence_points,
+                "new_questions_points": breakdown.new_questions_points,
+                "length_points": breakdown.length_points,
+                "target_dimension": breakdown.target_dimension,
+            },
+            "judge_axes": {
+                "depth": score.judge_depth,
+                "accuracy": score.judge_accuracy,
+                "novelty": score.judge_novelty,
+                "actionability": score.judge_actionability,
+            },
+        }
 
     def _write_tool_trace_artifact(self) -> None:
         from .artifacts import tool_trace_payload

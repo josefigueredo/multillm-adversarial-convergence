@@ -307,8 +307,16 @@ def dashboard_payload(
     tool_loop_summary: dict[str, Any] | None = None,
     tool_trace_summary: dict[str, Any] | None = None,
     trust_summary: dict[str, int] | None = None,
+    latest_score_breakdown: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build the stakeholder-facing dashboard artifact payload."""
+    """Build the stakeholder-facing dashboard artifact payload.
+
+    ``latest_score_breakdown`` is optional and additive: when supplied,
+    it surfaces the most recent iteration's heuristic component points
+    and judge axes alongside the headline scores so dashboard consumers
+    can show "why this score" without parsing results.tsv. Omitted for
+    backward compatibility on cold-start dashboards or older runs.
+    """
     tool_usage_summary = _tool_usage_summary(tool_loop_summary or {})
     retry_insights = _retry_insights(retry_summary or {})
     return {
@@ -370,6 +378,7 @@ def dashboard_payload(
             "top_failure_codes": [],
         },
         "trust_summary": trust_summary or {},
+        "latest_score_breakdown": latest_score_breakdown or {},
     }
 
 
@@ -732,6 +741,7 @@ def write_dashboard(
     explored_dimensions: list[str],
     retry_summary: dict[str, Any] | None = None,
     tool_loop_summary: dict[str, Any] | None = None,
+    latest_score_breakdown: dict[str, Any] | None = None,
 ) -> None:
     """Write a stakeholder-friendly summary dashboard artifact."""
     from .policy.trust import trust_summary as compute_trust_summary
@@ -780,6 +790,7 @@ def write_dashboard(
         tool_loop_summary=tool_loop_summary,
         tool_trace_summary=tool_trace.get("summary", {}) if isinstance(tool_trace, dict) else {},
         trust_summary=run_trust_summary,
+        latest_score_breakdown=latest_score_breakdown,
     )
     (output_dir / "dashboard.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
