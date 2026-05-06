@@ -44,7 +44,10 @@ def sample_config() -> ResearchConfig:
 RICH_FINDINGS = """\
 ### Findings
 
-REST API costs $3.50 per million requests while HTTP API costs $1.00.
+REST API costs $3.50 per million requests while HTTP API costs $1.00,
+representing a 71% cost reduction. As of 2026-04-15, the v2.4.0 release
+adds private endpoint support. See [source: aws.amazon.com/api-gateway](https://aws.amazon.com/api-gateway/)
+and [Issue #1234](https://github.com/aws/aws-cdk/issues/1234) for context.
 
 | Feature | REST API | HTTP API |
 |---------|----------|----------|
@@ -59,6 +62,10 @@ client = boto3.client('apigateway')
 However, the trade-off is that REST API is more expensive.
 
 The architecture of the system involves a flow from client to gateway.
+
+Latency benchmarks: REST API averages 35ms, HTTP API averages 12ms.
+Memory footprint: REST API ~512MB, HTTP API ~128MB. See more at
+https://aws.amazon.com/blogs/api-gateway-perf and the official docs.
 
 ### New Questions
 
@@ -231,8 +238,8 @@ class TestHeuristicBreakdown:
         assert focused_bd.dimension_points > scattered_bd.dimension_points
 
     def test_target_dimension_mode_full_credit_when_only_target_mentioned(self, sample_config):
-        """If the findings mention ONLY the target dimension, dimension
-        points should land at the full _DIMENSION_POINTS = 40 (70% on
+        """If the findings mention ONLY the target dimension, target_focus
+        points should land at the full _TARGET_FOCUS_POINTS = 25 (70% on
         target + 30% drift bonus)."""
         text = (
             "REST API differs from HTTP API in caching, WAF support, and "
@@ -241,8 +248,10 @@ class TestHeuristicBreakdown:
         bd = heuristic_breakdown(
             text, sample_config, [], target_dimension="REST vs HTTP API"
         )
-        # 70% target hit + 30% no-drift = 40.0
-        assert bd.dimension_points == 40.0
+        # 70% target hit + 30% no-drift = 25.0 (the new universal-signal max)
+        assert bd.target_focus_points == 25.0
+        # Backward-compat alias still readable.
+        assert bd.dimension_points == 25.0
 
     def test_target_dimension_mode_penalises_drift(self, sample_config):
         """A finding that mentions every other dimension instead of the
@@ -268,6 +277,101 @@ class TestHeuristicBreakdown:
         # Sanity-check both are within range.
         assert 0.0 <= bd_legacy.dimension_points <= 40.0
         assert 0.0 <= bd_target.dimension_points <= 40.0
+
+
+class TestUniversalSignalCitations:
+    """Citations are dimension-agnostic: any well-evidenced finding has
+    URLs, source markers, and issue references regardless of topic."""
+
+    def test_zero_citations_zero_points(self, sample_config):
+        bd = heuristic_breakdown("plain prose with no urls or sources", sample_config, [])
+        assert bd.citations_points == 0.0
+
+    def test_url_counts_as_citation(self, sample_config):
+        text = "See https://example.com/docs for details."
+        bd = heuristic_breakdown(text, sample_config, [])
+        assert bd.citations_points > 0.0
+
+    def test_source_marker_counts(self, sample_config):
+        text = "Per [source: docs.example.com](https://example.com), the price is $5."
+        bd = heuristic_breakdown(text, sample_config, [])
+        # Both [source:..] and [text](url) and the inner URL match.
+        assert bd.citations_points > 0.0
+
+    def test_issue_reference_counts(self, sample_config):
+        text = "Bug confirmed in [Issue #470](https://github.com/x/y/issues/470)."
+        bd = heuristic_breakdown(text, sample_config, [])
+        assert bd.citations_points > 0.0
+
+    def test_citations_saturate(self, sample_config):
+        text = " ".join(f"https://example.com/{i}" for i in range(50))
+        bd = heuristic_breakdown(text, sample_config, [])
+        # Saturates at _CITATIONS_POINTS = 25.0
+        assert bd.citations_points <= 25.0
+        assert bd.citations_points >= 24.0  # near the cap with 50 URLs
+
+
+class TestUniversalSignalConcreteData:
+    """Concrete data is dimension-agnostic: prices, percentages, sizes,
+    durations, versions, and dates are all verifiable across any topic."""
+
+    def test_zero_concrete_data_zero_points(self, sample_config):
+        bd = heuristic_breakdown("vague prose about things", sample_config, [])
+        assert bd.concrete_data_points == 0.0
+
+    def test_price_counts(self, sample_config):
+        bd = heuristic_breakdown("Costs $39/month", sample_config, [])
+        assert bd.concrete_data_points > 0.0
+
+    def test_percentage_counts(self, sample_config):
+        bd = heuristic_breakdown("CPU usage drops by 35% under load", sample_config, [])
+        assert bd.concrete_data_points > 0.0
+
+    def test_size_unit_counts(self, sample_config):
+        bd = heuristic_breakdown("Image size: 270 MB; idle RAM: 21 MB", sample_config, [])
+        assert bd.concrete_data_points > 0.0
+
+    def test_duration_counts(self, sample_config):
+        bd = heuristic_breakdown("Startup time: 24 ms (vs 15 sec for LocalStack)", sample_config, [])
+        assert bd.concrete_data_points > 0.0
+
+    def test_version_tag_counts(self, sample_config):
+        bd = heuristic_breakdown("Released v1.4.0 last week, fix in v1.5.2", sample_config, [])
+        assert bd.concrete_data_points > 0.0
+
+    def test_iso_date_counts(self, sample_config):
+        bd = heuristic_breakdown("On 2026-03-23 the repo was archived", sample_config, [])
+        assert bd.concrete_data_points > 0.0
+
+
+class TestUniversalSignalStructure:
+    """Structure is dimension-agnostic: tables, code blocks, nested
+    headings, and bullet lists distinguish well-organised findings from
+    unstructured prose."""
+
+    def test_zero_structure_zero_points(self, sample_config):
+        bd = heuristic_breakdown("just one paragraph of plain prose.", sample_config, [])
+        assert bd.structure_points == 0.0
+
+    def test_table_contributes(self, sample_config):
+        text = "| Col A | Col B |\n|---|---|\n| x | y |\n"
+        bd = heuristic_breakdown(text, sample_config, [])
+        assert bd.structure_points > 0.0
+
+    def test_code_block_contributes(self, sample_config):
+        text = "```\nimport boto3\n```\n"
+        bd = heuristic_breakdown(text, sample_config, [])
+        assert bd.structure_points > 0.0
+
+    def test_nested_heading_contributes(self, sample_config):
+        text = "## Section\n\n### Subsection content here.\n"
+        bd = heuristic_breakdown(text, sample_config, [])
+        assert bd.structure_points > 0.0
+
+    def test_bullets_contribute(self, sample_config):
+        text = "- item one\n- item two\n- item three\n"
+        bd = heuristic_breakdown(text, sample_config, [])
+        assert bd.structure_points > 0.0
 
 
 class TestLengthCurve:
@@ -317,17 +421,18 @@ class TestIterationScoreBreakdownFields:
 
     def test_iteration_score_can_carry_populated_breakdown(self):
         bd = HeuristicBreakdown(
-            dimension_points=20.0,
-            evidence_points=15.0,
-            new_questions_points=10.0,
+            target_focus_points=20.0,
+            citations_points=18.0,
+            concrete_data_points=15.0,
+            structure_points=10.0,
             length_points=8.0,
-            total=70.0,
+            total=71.0,
             target_dimension="X",
         )
         score = IterationScore(
-            coverage=70.0,
+            coverage=71.0,
             quality=65.0,
-            total=67.5,
+            total=67.4,
             heuristic_breakdown=bd,
             judge_depth=8,
             judge_accuracy=7,
@@ -336,6 +441,10 @@ class TestIterationScoreBreakdownFields:
         )
         assert score.heuristic_breakdown.target_dimension == "X"
         assert score.judge_novelty == 6
+        # Backward-compat property aliases:
+        assert score.heuristic_breakdown.dimension_points == 20.0
+        assert score.heuristic_breakdown.evidence_points == 15.0
+        assert score.heuristic_breakdown.new_questions_points == 10.0
 
 
 # ---------------------------------------------------------------------------

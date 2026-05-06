@@ -23,14 +23,41 @@ from .config import ResearchConfig
 HEURISTIC_WEIGHT = 0.4
 JUDGE_WEIGHT = 0.6
 
-# Point allocation for heuristic scoring components
-_DIMENSION_POINTS = 40.0
-_EVIDENCE_POINTS = 35.0
-_NEW_QUESTIONS_POINTS = 15.0
+# Point allocation for heuristic scoring components.
+#
+# The original split (40/35/15/10) was ``dimension`` / ``evidence`` /
+# ``new_questions`` / ``length``.  Empirical calibration against the
+# localstack_alternatives_copilot_gemini run revealed three weaknesses:
+#
+# 1. ``dimension`` saturated at full credit on every iteration with the
+#    default ``min_dimensions_per_iteration: 1`` — no signal.
+# 2. ``evidence`` was driven by per-config regex matches that were
+#    misfit for some dimensions (Community activity, Terraform/CDK)
+#    yielding 0/35 on legitimate findings.
+# 3. ``new_questions`` looked for a ``## New Questions`` section that
+#    no shipped research prompt actually asks the model to produce —
+#    permanently 0/15.
+#
+# The redesign replaces those with universal, dimension-agnostic
+# signals that correlate with finding quality regardless of topic.
+_TARGET_FOCUS_POINTS = 25.0
+_CITATIONS_POINTS = 25.0
+_CONCRETE_DATA_POINTS = 25.0
+_STRUCTURE_POINTS = 15.0
 _LENGTH_POINTS = 10.0
+
 _TARGET_WORD_COUNT = 500.0
-_TARGET_NEW_QUESTIONS = 3.0
+_TARGET_CITATIONS = 6.0      # findings with 6+ source/url markers max out
+_TARGET_CONCRETE_DATA = 12.0 # 12+ specific data points max out
+_TARGET_STRUCTURE = 8.0      # 8+ structural elements max out
 _MAX_FINDINGS_CHARS = 8000
+
+# Legacy constants retained for backward-compat with any external
+# importer; new code should use the universal-signal constants above.
+_DIMENSION_POINTS = _TARGET_FOCUS_POINTS
+_EVIDENCE_POINTS = _CONCRETE_DATA_POINTS
+_NEW_QUESTIONS_POINTS = _STRUCTURE_POINTS
+_TARGET_NEW_QUESTIONS = 3.0
 
 JUDGE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -71,33 +98,62 @@ class HeuristicBreakdown:
     derived from these components — exactly what ``heuristic_score()``
     returns.
 
+    The five components are dimension-agnostic universal signals:
+
     Attributes:
-        dimension_points: Points awarded for dimension-relevance (out of
-            ``_DIMENSION_POINTS``).  In target-dimension mode this rewards
-            depth on the assigned dimension and penalises off-topic drift;
-            in legacy "all-dimensions" mode it rewards mentioning many of
-            the configured dimensions.
-        evidence_points: Points awarded for finding configured evidence
-            types in the findings (out of ``_EVIDENCE_POINTS``).
-        new_questions_points: Points awarded for the count of new
-            questions in the ``## New Questions`` section (out of
-            ``_NEW_QUESTIONS_POINTS``).
+        target_focus_points: Points awarded for keyword density of the
+            target dimension within the findings, plus a penalty for
+            excessive mentions of other configured dimensions
+            ("off-topic drift").  Falls back to legacy all-dimensions
+            scoring when ``target_dimension`` is None.
+        citations_points: Points awarded for citation density —
+            URLs, ``[source: ..]`` markers, ``[Issue #..]`` / ``[PR #..]``
+            references, and markdown link tokens.  Saturates at
+            ``_TARGET_CITATIONS`` matches.
+        concrete_data_points: Points awarded for verifiable concrete
+            facts — prices, percentages, sizes, durations, version tags,
+            ISO dates, full-month dates.  Saturates at
+            ``_TARGET_CONCRETE_DATA`` matches.
+        structure_points: Points awarded for structural quality —
+            markdown tables, code blocks, nested headings, bullet lists.
+            Saturates at ``_TARGET_STRUCTURE`` total elements.
         length_points: Points awarded for substantive word count, on a
             logarithmic curve that saturates near ``_TARGET_WORD_COUNT``
-            and gives no extra credit for verbose padding (out of
-            ``_LENGTH_POINTS``).
+            and gives no extra credit for verbose padding.
         total: Normalised 0-100 score combining all components.
         target_dimension: When set, indicates the breakdown was computed
             in target-dimension mode for this dimension.  ``None`` means
             legacy all-dimensions mode.
+
+    Backward-compatibility properties: ``dimension_points``,
+    ``evidence_points``, ``new_questions_points`` are aliased to
+    ``target_focus_points``, ``concrete_data_points``,
+    ``structure_points`` respectively so existing readers (tests,
+    log-line, results.tsv writers, dashboard JSON) keep working.
     """
 
-    dimension_points: float = 0.0
-    evidence_points: float = 0.0
-    new_questions_points: float = 0.0
+    target_focus_points: float = 0.0
+    citations_points: float = 0.0
+    concrete_data_points: float = 0.0
+    structure_points: float = 0.0
     length_points: float = 0.0
     total: float = 0.0
     target_dimension: str | None = None
+
+    # Aliases for backward-compatible field access. The old four-
+    # component model (dimension/evidence/new_questions/length) is
+    # mapped onto the new five-component universal-signal model.
+    @property
+    def dimension_points(self) -> float:
+        return self.target_focus_points
+
+    @property
+    def evidence_points(self) -> float:
+        return self.concrete_data_points
+
+    @property
+    def new_questions_points(self) -> float:
+        return self.structure_points
 
 
 @dataclass
@@ -151,6 +207,47 @@ _EVIDENCE_PATTERNS: dict[str, re.Pattern[str]] = {
     ),
 }
 
+# Universal-signal patterns. These are dimension-agnostic and reward
+# concreteness over topic-specific evidence shape.
+#
+# CITATIONS: bare URLs, [source:..] markers, [Issue #..] / [PR #..]
+# refs, and any markdown link `[text](url)` form. Each match counts
+# once toward the citation density score.
+_CITATION_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"https?://\S+"),
+    re.compile(r"\[source:\s*[^\]]+\]", re.IGNORECASE),
+    re.compile(r"\[(?:Issue|PR|RFC)\s*#\d+\]", re.IGNORECASE),
+    re.compile(r"\[[^\]]+\]\([^)]+\)"),
+]
+
+# CONCRETE DATA: numbers with units. Each match is a verifiable fact
+# (a price, a percentage, a release date, a version, a size, a latency,
+# a throughput). Tuned to count co-occurring facts only once per
+# variant — e.g., a price like "$3.50" matches the price pattern but
+# the bare digits inside it don't double-count via the percent pattern.
+_CONCRETE_DATA_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"\$\d[\d,]*(?:\.\d+)?\b"),                    # prices
+    re.compile(r"\b\d+(?:\.\d+)?\s*%"),                       # percentages
+    re.compile(r"\b\d+(?:\.\d+)?\s*(?:GB|MB|KB|TB|kB|gB)\b"), # sizes
+    re.compile(r"\b\d+(?:\.\d+)?\s*(?:ms|sec|min|hr|s|h)\b"), # durations
+    re.compile(r"\bv\d+\.\d+(?:\.\d+)?\b", re.IGNORECASE),    # version tags
+    re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),                     # ISO dates
+    re.compile(
+        r"\b(?:January|February|March|April|May|June|July|August|"
+        r"September|October|November|December)\s+\d{1,2},?\s+\d{4}\b",
+        re.IGNORECASE,
+    ),
+]
+
+# STRUCTURE: presence of formatting elements that distinguish well-
+# organised findings from unstructured prose dumps.
+_STRUCTURE_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"^\s*\|.*\|.*\|", re.MULTILINE),    # markdown tables
+    re.compile(r"```"),                              # code/config blocks
+    re.compile(r"^#{2,4}\s+\S", re.MULTILINE),      # nested headings
+    re.compile(r"^[\s]*[-*+]\s+\S", re.MULTILINE), # bullet list items
+]
+
 
 def heuristic_breakdown(
     findings: str,
@@ -162,29 +259,29 @@ def heuristic_breakdown(
     """Score research findings using deterministic heuristics, returning
     the per-component breakdown.
 
-    Evaluates four components:
-    - Dimension relevance (``_DIMENSION_POINTS`` pts).  When
-      ``target_dimension`` is provided, 70% of the weight goes to depth
-      on the target dimension and 30% goes to "no off-topic drift" — a
-      penalty for excessive mentions of other configured dimensions.
-      When ``target_dimension`` is None, falls back to legacy behavior:
-      one point per configured dimension that appears in the findings.
-    - Evidence types found (``_EVIDENCE_POINTS`` pts).
-    - New questions discovered (``_NEW_QUESTIONS_POINTS`` pts).
-    - Substantive word count (``_LENGTH_POINTS`` pts).  Logarithmic curve
-      that saturates near ``_TARGET_WORD_COUNT`` and gives no padding
-      bonus for verbose findings beyond the target.
+    Five universal, dimension-agnostic components:
+
+    - **target_focus** (``_TARGET_FOCUS_POINTS``): keyword density of
+      the assigned dimension when ``target_dimension`` is set; legacy
+      "any configured dimension mentioned" credit otherwise.  In
+      target mode the score splits 70% on-target / 30% no-drift.
+    - **citations** (``_CITATIONS_POINTS``): count of URLs, source
+      markers, issue refs, markdown links — saturated via log curve.
+    - **concrete_data** (``_CONCRETE_DATA_POINTS``): count of verifiable
+      facts (prices, percentages, sizes, durations, versions, dates) —
+      saturated via log curve.
+    - **structure** (``_STRUCTURE_POINTS``): tables + code blocks +
+      nested headings + bullet density — saturated via log curve.
+    - **length** (``_LENGTH_POINTS``): word count on a log curve.
 
     Args:
         findings: Raw markdown findings text.
-        config: Research config with dimensions and scoring settings.
-        explored_dimensions: Previously explored dimensions.  Currently
-            unused (reserved for future weighting); accepted for
-            backward compatibility.
-        target_dimension: When set, score dimension-relevance against
-            this specific dimension instead of the full configured list.
-            Required for focused-iteration scoring; ``None`` recovers
-            the legacy all-dimensions behavior.
+        config: Research config; used for dimension list when scoring
+            target focus.
+        explored_dimensions: Accepted for backward compatibility;
+            currently unused.
+        target_dimension: When set, score target_focus against this
+            specific dimension; otherwise legacy any-dimension credit.
 
     Returns:
         A ``HeuristicBreakdown`` with per-component points and the
@@ -195,70 +292,79 @@ def heuristic_breakdown(
     if not findings:
         return breakdown
 
-    max_points = _DIMENSION_POINTS + _EVIDENCE_POINTS + _NEW_QUESTIONS_POINTS + _LENGTH_POINTS
+    max_points = (
+        _TARGET_FOCUS_POINTS
+        + _CITATIONS_POINTS
+        + _CONCRETE_DATA_POINTS
+        + _STRUCTURE_POINTS
+        + _LENGTH_POINTS
+    )
     all_dims = list(config.dimensions)
 
-    # --- Dimension relevance ---
+    # --- Target focus (dimension relevance) ---
     if not all_dims:
-        # No dimensions configured — don't penalise, redistribute weight.
-        max_points -= _DIMENSION_POINTS
+        max_points -= _TARGET_FOCUS_POINTS
     elif target_dimension is not None:
-        # Target-dimension mode: reward depth on the assigned dimension,
-        # penalise off-topic drift.  Splits _DIMENSION_POINTS 70/30.
-        on_target_weight = _DIMENSION_POINTS * 0.7
-        drift_weight = _DIMENSION_POINTS * 0.3
+        on_target_weight = _TARGET_FOCUS_POINTS * 0.7
+        drift_weight = _TARGET_FOCUS_POINTS * 0.3
 
         if _fuzzy_match(target_dimension, findings):
-            breakdown.dimension_points += on_target_weight
+            breakdown.target_focus_points += on_target_weight
 
-        # Drift score: full credit when no other dimensions are
-        # mentioned; linear penalty up to the full drift_weight as the
-        # number of off-target dimensions present grows.
         other_dims = [d for d in all_dims if d != target_dimension]
         if other_dims:
             mentions = sum(1 for d in other_dims if _fuzzy_match(d, findings))
             drift_ratio = mentions / len(other_dims)
-            breakdown.dimension_points += drift_weight * (1.0 - drift_ratio)
+            breakdown.target_focus_points += drift_weight * (1.0 - drift_ratio)
         else:
-            breakdown.dimension_points += drift_weight
+            breakdown.target_focus_points += drift_weight
     else:
-        # Legacy mode: one point per configured dimension mentioned,
-        # normalised to ``min_dimensions_per_iteration``.
         mentioned = sum(1 for d in all_dims if _fuzzy_match(d, findings))
-        breakdown.dimension_points = _DIMENSION_POINTS * min(
+        breakdown.target_focus_points = _TARGET_FOCUS_POINTS * min(
             mentioned / max(config.scoring.min_dimensions_per_iteration, 1), 1.0
         )
 
-    # --- Evidence types ---
-    types_found = sum(
-        1
-        for etype, pattern in _EVIDENCE_PATTERNS.items()
-        if etype in config.scoring.evidence_types and pattern.search(findings)
+    # --- Citations (universal — works for any dimension) ---
+    citation_count = sum(
+        len(pattern.findall(findings)) for pattern in _CITATION_PATTERNS
     )
-    target_evidence = len(config.scoring.evidence_types)
-    if target_evidence:
-        breakdown.evidence_points = _EVIDENCE_POINTS * min(types_found / target_evidence, 1.0)
+    if citation_count > 0:
+        breakdown.citations_points = min(
+            _CITATIONS_POINTS,
+            _CITATIONS_POINTS * math.log(citation_count + 1) / math.log(_TARGET_CITATIONS + 1),
+        )
 
-    # --- New questions discovered ---
-    new_q_section = _extract_section(findings, "New Questions")
-    if new_q_section:
-        bullet_count = len(re.findall(r"^[\s]*[-*]\s", new_q_section, re.MULTILINE))
-        breakdown.new_questions_points = _NEW_QUESTIONS_POINTS * min(
-            bullet_count / _TARGET_NEW_QUESTIONS, 1.0
+    # --- Concrete data (verifiable facts; universal) ---
+    concrete_count = sum(
+        len(pattern.findall(findings)) for pattern in _CONCRETE_DATA_PATTERNS
+    )
+    if concrete_count > 0:
+        breakdown.concrete_data_points = min(
+            _CONCRETE_DATA_POINTS,
+            _CONCRETE_DATA_POINTS * math.log(concrete_count + 1) / math.log(_TARGET_CONCRETE_DATA + 1),
+        )
+
+    # --- Structure (formatting elements; universal) ---
+    structure_count = sum(
+        len(pattern.findall(findings)) for pattern in _STRUCTURE_PATTERNS
+    )
+    if structure_count > 0:
+        breakdown.structure_points = min(
+            _STRUCTURE_POINTS,
+            _STRUCTURE_POINTS * math.log(structure_count + 1) / math.log(_TARGET_STRUCTURE + 1),
         )
 
     # --- Substantive length (logarithmic curve, no padding bonus) ---
     word_count = len(findings.split())
     if word_count > 0:
-        # Calibrated so words ~= _TARGET_WORD_COUNT (500) lands near the
-        # cap.  log(501) * 1.61 ~= 10.0.  Capped so verbose findings
-        # don't beat focused ones on this axis.
+        # log(501) * 1.61 ~= 10.0; calibrated so 500 words lands at cap.
         breakdown.length_points = min(_LENGTH_POINTS, math.log(word_count + 1) * 1.61)
 
     points = (
-        breakdown.dimension_points
-        + breakdown.evidence_points
-        + breakdown.new_questions_points
+        breakdown.target_focus_points
+        + breakdown.citations_points
+        + breakdown.concrete_data_points
+        + breakdown.structure_points
         + breakdown.length_points
     )
     breakdown.total = round(100.0 * points / max_points, 1) if max_points > 0 else 0.0
