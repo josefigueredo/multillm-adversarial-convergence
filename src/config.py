@@ -378,6 +378,32 @@ class DiscoveryConfig:
 
 
 @dataclass(frozen=True)
+class JudgeConfig:
+    """One member of a multi-judge ensemble.
+
+    Scoring plan Proposal #4: optional multi-judge consensus.  When
+    ``evaluation.judges`` lists 2+ entries, the scorer calls each in
+    sequence and averages their scores weighted by ``weight`` —
+    reducing single-judge variance.  Per-judge breakdowns end up in
+    ``IterationScore.per_judge`` for transparency.
+
+    Attributes:
+        adapter: Backend adapter id (e.g. ``"claude-cli"``,
+            ``"gemini-cli"``).  Resolved through the same backend
+            registry used by the strategy's research backends.
+        model: Model id passed to the adapter.  Optional; falls back
+            to the adapter's default.
+        weight: Relative weight of this judge in the consensus
+            average.  Weights need not sum to 1; they're normalised at
+            consensus time.  Default ``1.0``.
+    """
+
+    adapter: str
+    model: str = ""
+    weight: float = 1.0
+
+
+@dataclass(frozen=True)
 class EvaluationConfig:
     """Optional evaluation settings for benchmark/baseline comparisons.
 
@@ -398,6 +424,15 @@ class EvaluationConfig:
     reference_runs: tuple[str, ...] = ()
     semantic_calibration: bool = True
     semantic_review: bool = False
+    # Scoring plan Proposal #4: multi-judge consensus.  When this tuple
+    # is empty (the default), the strategy's single judge backend is
+    # used.  When it has entries, the scorer calls each judge listed
+    # and averages their scores weighted by JudgeConfig.weight.
+    judges: tuple[JudgeConfig, ...] = ()
+    # Disagreement threshold (1-10 axis points).  When two judges
+    # differ by >= this on any per-axis score, an audit event is
+    # emitted.  Default 2 (substantial disagreement, not noise).
+    judge_disagreement_threshold: int = 2
 
 
 @dataclass(frozen=True)
@@ -797,6 +832,17 @@ class ResearchConfig:
 
         # --- Evaluation -------------------------------------------------------
         evaluation_raw: dict[str, Any] = research.get("evaluation", {})
+        # Parse multi-judge ensemble (Scoring plan Proposal #4).
+        judges_raw = evaluation_raw.get("judges", [])
+        judges: list[JudgeConfig] = []
+        for j in judges_raw:
+            if not isinstance(j, dict) or "adapter" not in j:
+                continue
+            judges.append(JudgeConfig(
+                adapter=str(j["adapter"]),
+                model=str(j.get("model", "")),
+                weight=float(j.get("weight", 1.0)),
+            ))
         evaluation = EvaluationConfig(
             benchmark_id=evaluation_raw.get("benchmark_id", ""),
             run_baselines=evaluation_raw.get("run_baselines", False),
@@ -805,6 +851,10 @@ class ResearchConfig:
             reference_runs=tuple(evaluation_raw.get("reference_runs", [])),
             semantic_calibration=evaluation_raw.get("semantic_calibration", True),
             semantic_review=evaluation_raw.get("semantic_review", False),
+            judges=tuple(judges),
+            judge_disagreement_threshold=int(
+                evaluation_raw.get("judge_disagreement_threshold", 2)
+            ),
         )
 
         # --- Reporting --------------------------------------------------------

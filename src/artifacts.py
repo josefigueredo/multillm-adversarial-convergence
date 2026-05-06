@@ -308,6 +308,7 @@ def dashboard_payload(
     tool_trace_summary: dict[str, Any] | None = None,
     trust_summary: dict[str, int] | None = None,
     latest_score_breakdown: dict[str, Any] | None = None,
+    total_cost_usd: float = 0.0,
 ) -> dict[str, Any]:
     """Build the stakeholder-facing dashboard artifact payload.
 
@@ -379,6 +380,21 @@ def dashboard_payload(
         },
         "trust_summary": trust_summary or {},
         "latest_score_breakdown": latest_score_breakdown or {},
+        # Scoring plan Proposal #7: cost-adjusted view.  Score per
+        # dollar (best_score / total_cost_usd) so operators can compare
+        # backend choices on cost-efficiency, not just raw quality.
+        # Guarded against div-by-zero; subscription-based runs (cost=0)
+        # report None to signal "not measurable here".
+        "cost_efficiency": (
+            {
+                "total_cost_usd": total_cost_usd,
+                "best_score": best_score,
+                "score_per_dollar": (
+                    round(best_score / total_cost_usd, 1)
+                    if total_cost_usd > 0 else None
+                ),
+            }
+        ),
     }
 
 
@@ -742,6 +758,7 @@ def write_dashboard(
     retry_summary: dict[str, Any] | None = None,
     tool_loop_summary: dict[str, Any] | None = None,
     latest_score_breakdown: dict[str, Any] | None = None,
+    total_cost_usd: float = 0.0,
 ) -> None:
     """Write a stakeholder-friendly summary dashboard artifact."""
     from .policy.trust import trust_summary as compute_trust_summary
@@ -791,6 +808,7 @@ def write_dashboard(
         tool_trace_summary=tool_trace.get("summary", {}) if isinstance(tool_trace, dict) else {},
         trust_summary=run_trust_summary,
         latest_score_breakdown=latest_score_breakdown,
+        total_cost_usd=total_cost_usd,
     )
     (output_dir / "dashboard.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 

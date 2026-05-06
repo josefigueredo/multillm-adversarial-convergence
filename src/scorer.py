@@ -386,6 +386,107 @@ def novelty_score(findings: str, knowledge_base: str) -> float:
     return round(100.0 * (1.0 - overlap / len(f_grams)), 1)
 
 
+def average_judge_responses(
+    responses: list[tuple[str, dict[str, Any], float]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Combine multiple judge responses into a consensus dict.
+
+    Scoring plan Proposal #4: weighted-average of per-axis scores
+    across multiple judges.  Returns ``(consensus, per_judge)`` where
+    ``consensus`` has the same shape as a single judge response (the
+    structured form ``parse_judge_response`` returns), and
+    ``per_judge`` is the list of per-judge breakdowns for the
+    dashboard / IterationScore.
+
+    Args:
+        responses: List of ``(backend_name, judge_dict, weight)``
+            tuples.  Each ``judge_dict`` is the output of
+            ``parse_judge_response()`` on that judge's reply.
+
+    Returns:
+        A tuple ``(consensus, per_judge_list)``:
+        - ``consensus``: averaged depth/accuracy/novelty/actionability
+          (rounded to nearest int 1-10) plus union of
+          dimensions_covered and gaps_identified.
+        - ``per_judge_list``: each entry is
+          ``{name, weight, depth, accuracy, novelty, actionability}``
+          for transparency / dashboard surfacing.
+    """
+    if not responses:
+        return {}, []
+
+    total_w = sum(max(w, 0) for _, _, w in responses) or 1.0
+    axes = ["depth", "accuracy", "novelty", "actionability"]
+    sums = {a: 0.0 for a in axes}
+    per_judge: list[dict[str, Any]] = []
+    union_dims_covered: list[str] = []
+    union_gaps: list[Any] = []
+    reasonings: list[str] = []
+
+    for name, judge_raw, weight in responses:
+        w = max(weight, 0)
+        for axis in axes:
+            try:
+                v = int(judge_raw.get(axis, 5) or 5)
+            except (TypeError, ValueError):
+                v = 5
+            sums[axis] += v * w
+        per_judge.append({
+            "name": name,
+            "weight": w,
+            "depth": int(judge_raw.get("depth", 0) or 0),
+            "accuracy": int(judge_raw.get("accuracy", 0) or 0),
+            "novelty": int(judge_raw.get("novelty", 0) or 0),
+            "actionability": int(judge_raw.get("actionability", 0) or 0),
+        })
+        for d in judge_raw.get("dimensions_covered", []) or []:
+            if d not in union_dims_covered:
+                union_dims_covered.append(d)
+        for g in judge_raw.get("gaps_identified", []) or []:
+            union_gaps.append(g)
+        if judge_raw.get("reasoning"):
+            reasonings.append(f"[{name}] {judge_raw['reasoning']}")
+
+    consensus = {
+        axis: max(1, min(10, round(sums[axis] / total_w))) for axis in axes
+    }
+    consensus.update({
+        "dimensions_covered": union_dims_covered,
+        "gaps_identified": union_gaps,
+        "reasoning": " | ".join(reasonings) if reasonings else "",
+    })
+    return consensus, per_judge
+
+
+def detect_judge_disagreement(
+    per_judge: list[dict[str, Any]],
+    threshold: int = 2,
+) -> list[dict[str, Any]]:
+    """Return per-axis disagreement records when judges differ by
+    >= ``threshold`` points on the 1-10 scale.
+
+    Each record: ``{axis, max, min, delta, judges: [{name, value}, ...]}``.
+    Caller decides what to do with them (typically: emit a
+    ``judge_disagreement`` audit event or surface in the dashboard).
+    """
+    if len(per_judge) < 2:
+        return []
+    axes = ["depth", "accuracy", "novelty", "actionability"]
+    out: list[dict[str, Any]] = []
+    for axis in axes:
+        values = [(j["name"], int(j.get(axis, 0) or 0)) for j in per_judge]
+        nums = [v for _, v in values]
+        if max(nums) - min(nums) >= threshold:
+            out.append({
+                "axis": axis,
+                "max": max(nums),
+                "min": min(nums),
+                "delta": max(nums) - min(nums),
+                "judges": [{"name": n, "value": v} for n, v in values],
+            })
+    return out
+
+
 def combine_scores_weighted(
     *,
     coverage: float,

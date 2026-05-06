@@ -474,6 +474,96 @@ class TestCombineScoresWeighted:
         assert high >= 60.0
 
 
+class TestMultiJudgeAveraging:
+    """Scoring plan Proposal #4: multi-judge consensus."""
+
+    def test_empty_input(self):
+        from src.scorer import average_judge_responses
+        consensus, per_judge = average_judge_responses([])
+        assert consensus == {}
+        assert per_judge == []
+
+    def test_single_judge_passes_through(self):
+        from src.scorer import average_judge_responses
+        judge_raw = {
+            "depth": 7, "accuracy": 8, "novelty": 6, "actionability": 7,
+            "dimensions_covered": ["A"], "gaps_identified": [], "reasoning": "ok",
+        }
+        consensus, per_judge = average_judge_responses([("g1", judge_raw, 1.0)])
+        assert consensus["depth"] == 7
+        assert consensus["actionability"] == 7
+        assert len(per_judge) == 1
+        assert per_judge[0]["name"] == "g1"
+
+    def test_two_judges_averaged(self):
+        from src.scorer import average_judge_responses
+        a = {"depth": 8, "accuracy": 9, "novelty": 5, "actionability": 7,
+             "dimensions_covered": ["A"], "gaps_identified": [], "reasoning": "x"}
+        b = {"depth": 4, "accuracy": 5, "novelty": 9, "actionability": 7,
+             "dimensions_covered": ["B"], "gaps_identified": [], "reasoning": "y"}
+        consensus, per_judge = average_judge_responses([
+            ("alpha", a, 1.0), ("beta", b, 1.0),
+        ])
+        assert consensus["depth"] == 6  # round((8+4)/2)
+        assert consensus["accuracy"] == 7  # round((9+5)/2)
+        assert consensus["novelty"] == 7  # round((5+9)/2)
+        assert consensus["actionability"] == 7
+        # Union of dims_covered
+        assert set(consensus["dimensions_covered"]) == {"A", "B"}
+        assert len(per_judge) == 2
+
+    def test_weighted_averaging(self):
+        from src.scorer import average_judge_responses
+        a = {"depth": 10, "accuracy": 10, "novelty": 10, "actionability": 10,
+             "dimensions_covered": [], "gaps_identified": [], "reasoning": ""}
+        b = {"depth": 2, "accuracy": 2, "novelty": 2, "actionability": 2,
+             "dimensions_covered": [], "gaps_identified": [], "reasoning": ""}
+        # Weight a = 3x b
+        consensus, _ = average_judge_responses([("a", a, 3.0), ("b", b, 1.0)])
+        # Weighted avg: (10*3 + 2*1)/4 = 32/4 = 8
+        assert consensus["depth"] == 8
+
+    def test_clamped_to_1_10_range(self):
+        from src.scorer import average_judge_responses
+        # Even if averages drift, clamped 1..10
+        a = {"depth": 0, "accuracy": 11, "novelty": 5, "actionability": 5,
+             "dimensions_covered": [], "gaps_identified": [], "reasoning": ""}
+        consensus, _ = average_judge_responses([("a", a, 1.0)])
+        assert 1 <= consensus["depth"] <= 10
+        assert 1 <= consensus["accuracy"] <= 10
+
+
+class TestJudgeDisagreement:
+    """Scoring plan Proposal #4: disagreement detection."""
+
+    def test_no_disagreement_when_single_judge(self):
+        from src.scorer import detect_judge_disagreement
+        per = [{"name": "x", "depth": 5, "accuracy": 5, "novelty": 5, "actionability": 5}]
+        assert detect_judge_disagreement(per) == []
+
+    def test_no_disagreement_when_within_threshold(self):
+        from src.scorer import detect_judge_disagreement
+        per = [
+            {"name": "a", "depth": 5, "accuracy": 5, "novelty": 5, "actionability": 5},
+            {"name": "b", "depth": 6, "accuracy": 5, "novelty": 5, "actionability": 6},
+        ]
+        # Default threshold = 2; deltas are 1, 0, 0, 1 — all below
+        assert detect_judge_disagreement(per, threshold=2) == []
+
+    def test_disagreement_detected(self):
+        from src.scorer import detect_judge_disagreement
+        per = [
+            {"name": "a", "depth": 9, "accuracy": 5, "novelty": 5, "actionability": 5},
+            {"name": "b", "depth": 3, "accuracy": 5, "novelty": 5, "actionability": 5},
+        ]
+        records = detect_judge_disagreement(per, threshold=2)
+        assert len(records) == 1
+        assert records[0]["axis"] == "depth"
+        assert records[0]["delta"] == 6
+        names = {j["name"] for j in records[0]["judges"]}
+        assert names == {"a", "b"}
+
+
 class TestParseGapsIdentified:
     """Discovery plan Phase 1 #1: gap shape upgrade with backward
     compatibility for the legacy bare-string form."""
