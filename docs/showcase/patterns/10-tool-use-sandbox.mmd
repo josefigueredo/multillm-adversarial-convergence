@@ -1,0 +1,21 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 55, 'nodeSpacing': 25, 'curve': 'basis'}}}%%
+flowchart LR
+    AG["**Agent**\nclaude-cli"]
+    REQ["**Tool call**\nWebFetch · Bash · Write"]
+    REG{"**Capability\nregistry**\nallowlist"}
+    SBX["**Sandbox**\n.workspace/ only\nweb_only · none"]
+    OK["**Execute**"]
+    DENY["**Denied**"]
+    AUD["audit_trail.jsonl"]
+
+    AG --> REQ --> REG
+    REG -- allowed --> SBX --> OK --> AUD
+    REG -- denied --> DENY --> AUD
+
+    style AG fill:#1e3a5f,color:#fff,stroke:none
+    style REQ fill:#1e3a5f,color:#fff,stroke:none
+    style REG fill:#d97706,color:#fff,stroke:none
+    style SBX fill:#0e7490,color:#fff,stroke:none
+    style OK fill:#16a34a,color:#fff,stroke:none
+    style DENY fill:#dc2626,color:#fff,stroke:none
+    style AUD fill:#475569,color:#fff,stroke:none

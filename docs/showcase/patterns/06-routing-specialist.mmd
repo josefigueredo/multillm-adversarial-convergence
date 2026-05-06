@@ -1,0 +1,23 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 60, 'nodeSpacing': 30, 'curve': 'basis'}}}%%
+flowchart LR
+    T["**Dimension**\ne.g. 'IaC toolchain'"]
+    R{"**Router**\nspecialist strategy"}
+    A["**Coverage specialist**\ncopilot-cli\npersona: breadth"]
+    B["**Critic specialist**\ncodex-cli\npersona: precision"]
+    C["**Synthesis specialist**\nclaude-cli\npersona: structure"]
+    OUT["**Best-fit answer**"]
+
+    T --> R
+    R --> A
+    R --> B
+    R --> C
+    A --> OUT
+    B --> OUT
+    C --> OUT
+
+    style T fill:#1e3a5f,color:#fff,stroke:none
+    style R fill:#d97706,color:#fff,stroke:none
+    style A fill:#0e7490,color:#fff,stroke:none
+    style B fill:#6d28d9,color:#fff,stroke:none
+    style C fill:#16a34a,color:#fff,stroke:none
+    style OUT fill:#1e3a5f,color:#fff,stroke:none

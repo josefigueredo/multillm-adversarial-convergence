@@ -1,0 +1,21 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 55, 'nodeSpacing': 30, 'curve': 'basis'}}}%%
+flowchart LR
+    G["**Generate**\nproposal · code · text"]
+    E["**Evaluate**\nheuristic + judge"]
+    D{"**Score ≥ τ?**"}
+    K["**Keep**\ngrow corpus"]
+    R["**Reject**\nretry"]
+    OUT(["**Converged**"])
+
+    G --> E --> D
+    D -- yes --> K
+    D -- no --> R --> G
+    K --> G
+    K -. plateau .-> OUT
+
+    style G fill:#1e3a5f,color:#fff,stroke:none
+    style E fill:#1e3a5f,color:#fff,stroke:none
+    style D fill:#d97706,color:#fff,stroke:none
+    style K fill:#16a34a,color:#fff,stroke:none
+    style R fill:#dc2626,color:#fff,stroke:none
+    style OUT fill:#0e7490,color:#fff,stroke:none

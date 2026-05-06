@@ -1,0 +1,27 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 50, 'nodeSpacing': 25, 'curve': 'basis'}}}%%
+flowchart LR
+    I1["iter 1"]
+    I2["iter 2"]
+    I3["iter 3"]
+    I4["iter 4"]
+    Z["**⚙ Compress**\ndistill\ndrop noise\nrank by merit"]
+    I5["iter 5"]
+    I6["iter 6"]
+    I7["iter 7"]
+    I8["iter 8"]
+    Z2["**⚙ Compress**"]
+    DOTS["..."]
+
+    I1 --> I2 --> I3 --> I4 --> Z --> I5 --> I6 --> I7 --> I8 --> Z2 --> DOTS
+
+    style I1 fill:#1e3a5f,color:#fff,stroke:none
+    style I2 fill:#1e3a5f,color:#fff,stroke:none
+    style I3 fill:#1e3a5f,color:#fff,stroke:none
+    style I4 fill:#1e3a5f,color:#fff,stroke:none
+    style I5 fill:#1e3a5f,color:#fff,stroke:none
+    style I6 fill:#1e3a5f,color:#fff,stroke:none
+    style I7 fill:#1e3a5f,color:#fff,stroke:none
+    style I8 fill:#1e3a5f,color:#fff,stroke:none
+    style Z fill:#0e7490,color:#fff,stroke:none
+    style Z2 fill:#0e7490,color:#fff,stroke:none
+    style DOTS fill:#fafafa,color:#64748b,stroke:#cbd5e1

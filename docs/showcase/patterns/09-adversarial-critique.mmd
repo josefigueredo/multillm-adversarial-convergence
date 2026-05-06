@@ -1,0 +1,19 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 60, 'nodeSpacing': 30, 'curve': 'basis'}}}%%
+flowchart LR
+    R["**Researcher**\ncopilot-cli\nfamily: GPT"]
+    C["**Critic**\ncodex-cli\nfamily: GPT*"]
+    A["**Arbitrator**\nclaude-cli\nfamily: Claude"]
+    OK["**Verdict**\nkeep / revise / reject"]
+
+    R -- 'claim' --> C
+    C -- 'flagged: weak citation' --> A
+    R -. revise on reject .- A
+    A --> OK
+
+    note["*Different RLHF =\ndifferent blind spots*"]
+    style note fill:#fef3c7,color:#92400e,stroke:#fde68a
+
+    style R fill:#0e7490,color:#fff,stroke:none
+    style C fill:#6d28d9,color:#fff,stroke:none
+    style A fill:#1e3a5f,color:#fff,stroke:none
+    style OK fill:#16a34a,color:#fff,stroke:none

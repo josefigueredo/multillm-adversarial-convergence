@@ -1,0 +1,25 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 55, 'nodeSpacing': 25, 'curve': 'basis'}}}%%
+flowchart LR
+    P1["**Phase N**\nresearch · plan · refine"]
+    G{"**HITL gate?**\nphase transition"}
+    H["**Operator review**\nartifacts · plan diff · cost estimate"]
+    A["**Approve**"]
+    X["**Abort**"]
+    P2["**Phase N+1**"]
+    AUD["audit_trail.jsonl"]
+
+    P1 --> G
+    G -- gated --> H
+    G -- ungated --> P2
+    H --> A --> P2
+    H --> X
+    A -. event .-> AUD
+    X -. event .-> AUD
+
+    style P1 fill:#1e3a5f,color:#fff,stroke:none
+    style G fill:#d97706,color:#fff,stroke:none
+    style H fill:#6d28d9,color:#fff,stroke:none
+    style A fill:#16a34a,color:#fff,stroke:none
+    style X fill:#dc2626,color:#fff,stroke:none
+    style P2 fill:#1e3a5f,color:#fff,stroke:none
+    style AUD fill:#475569,color:#fff,stroke:none

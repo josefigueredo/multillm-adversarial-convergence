@@ -1,0 +1,30 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 70, 'nodeSpacing': 25, 'curve': 'basis'}}}%%
+flowchart LR
+    subgraph Roles["Roles (config)"]
+        P["primary"]
+        J["judge"]
+        U["utility"]
+        R["research[]"]
+    end
+
+    subgraph Backends["Backends (registry)"]
+        BC["claude-cli"]
+        BX["codex-cli"]
+        BG["gemini-cli"]
+        BCo["copilot-cli"]
+    end
+
+    P --> BC
+    J --> BX
+    U --> BX
+    R --> BCo
+    R --> BG
+
+    style P fill:#1e3a5f,color:#fff,stroke:none
+    style J fill:#6d28d9,color:#fff,stroke:none
+    style U fill:#d97706,color:#fff,stroke:none
+    style R fill:#0e7490,color:#fff,stroke:none
+    style BC fill:#475569,color:#fff,stroke:none
+    style BX fill:#475569,color:#fff,stroke:none
+    style BG fill:#475569,color:#fff,stroke:none
+    style BCo fill:#475569,color:#fff,stroke:none

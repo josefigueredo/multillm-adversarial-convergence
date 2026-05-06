@@ -1,0 +1,23 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 50, 'nodeSpacing': 30, 'curve': 'basis'}}}%%
+flowchart TB
+    O["**Orchestrator**\n`src/orchestrator.py`\nlifecycle · convergence · compression"]
+    A["**Backend A**\nresearch[]\ncopilot-cli"]
+    B["**Backend B**\njudge\ncodex-cli"]
+    C["**Backend C**\nprimary\nclaude-cli"]
+    D["**Backend D**\nutility\ncodex-cli"]
+
+    O --> A
+    O --> B
+    O --> C
+    O --> D
+
+    A -. result .-> O
+    B -. score .-> O
+    C -. synthesis .-> O
+    D -. tool exec .-> O
+
+    style O fill:#1e3a5f,color:#fff,stroke:none
+    style A fill:#0e7490,color:#fff,stroke:none
+    style B fill:#6d28d9,color:#fff,stroke:none
+    style C fill:#16a34a,color:#fff,stroke:none
+    style D fill:#d97706,color:#fff,stroke:none
