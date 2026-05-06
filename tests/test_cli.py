@@ -47,7 +47,7 @@ class TestParserSmoke:
         parser = _build_parser()
 
         with pytest.raises(SystemExit):
-            parser.parse_args(["run", "--help"])
+            parser.parse_args(["research", "--help"])
         run_help = capsys.readouterr().out
         assert "--dry-run" in run_help
 
@@ -81,13 +81,13 @@ class TestRunSubcommand:
         return p
 
     def test_missing_config(self, tmp_path):
-        result = main(["run", "--config", str(tmp_path / "nonexistent.yaml")])
+        result = main(["research", "--config", str(tmp_path / "nonexistent.yaml")])
         assert result == 1
 
     def test_malformed_config(self, tmp_path):
         bad = tmp_path / "bad.yaml"
         bad.write_text("not_research: true\n", encoding="utf-8")
-        result = main(["run", "--config", str(bad)])
+        result = main(["research", "--config", str(bad)])
         assert result == 1
 
     def _mock_cli_deps(self):
@@ -108,7 +108,7 @@ class TestRunSubcommand:
         mock_backend.cli_executable.return_value = "claude-cli"
         mock_get.return_value = mock_backend
         mock_get_backends.return_value = {"claude-cli": mock_backend}
-        result = main(["run", "--config", str(config_file)])
+        result = main(["research", "--config", str(config_file)])
         assert result == 1
 
     @patch("src.cli.get_strategy")
@@ -122,7 +122,7 @@ class TestRunSubcommand:
         mock_get_strat.return_value = mock_strategy
         mock_instance = MagicMock()
         mock_researcher_cls.return_value = mock_instance
-        result = main(["run", "--config", str(config_file), "--synthesize"])
+        result = main(["research", "--config", str(config_file), "--synthesize"])
         assert result == 0
         mock_instance.synthesize_only.assert_called_once()
 
@@ -137,7 +137,7 @@ class TestRunSubcommand:
         mock_get_strat.return_value = mock_strategy
         mock_instance = MagicMock()
         mock_researcher_cls.return_value = mock_instance
-        result = main(["run", "--config", str(config_file)])
+        result = main(["research", "--config", str(config_file)])
         assert result == 0
         mock_instance.run.assert_called_once()
         _, kwargs = mock_researcher_cls.call_args
@@ -156,7 +156,7 @@ class TestRunSubcommand:
         mock_researcher_cls.return_value = MagicMock()
         output_dir = tmp_path / "run-output"
 
-        result = main(["run", "--config", str(config_file), "--output", str(output_dir)])
+        result = main(["research", "--config", str(config_file), "--output", str(output_dir)])
 
         assert result == 0
         assert (output_dir / "run.log").exists()
@@ -171,7 +171,7 @@ class TestRunSubcommand:
         mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
 
-        result = main(["run", "--config", str(config_file), "--dry-run"])
+        result = main(["research", "--config", str(config_file), "--dry-run"])
 
         assert result == 0
         mock_researcher_cls.assert_not_called()
@@ -188,16 +188,16 @@ class TestRunSubcommand:
         mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = MagicMock()
 
-        result = main(["run", "--config", str(config_file), "--dry-run"])
+        result = main(["research", "--config", str(config_file), "--dry-run"])
 
         assert result == 1
 
     def test_dry_run_rejects_resume(self, config_file):
-        result = main(["run", "--config", str(config_file), "--dry-run", "--resume"])
+        result = main(["research", "--config", str(config_file), "--dry-run", "--resume"])
         assert result == 1
 
     def test_dry_run_rejects_synthesize(self, config_file):
-        result = main(["run", "--config", str(config_file), "--dry-run", "--synthesize"])
+        result = main(["research", "--config", str(config_file), "--dry-run", "--synthesize"])
         assert result == 1
 
     @patch("src.cli.get_strategy")
@@ -210,7 +210,7 @@ class TestRunSubcommand:
         mock_get_strat.return_value = mock_strategy
         output_dir = tmp_path / "dry-output"
 
-        result = main(["run", "--config", str(config_file), "--dry-run", "--output", str(output_dir)])
+        result = main(["research", "--config", str(config_file), "--dry-run", "--output", str(output_dir)])
 
         assert result == 0
         assert not output_dir.exists()
@@ -224,7 +224,7 @@ class TestRunSubcommand:
         mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
 
-        result = main(["run", "--config", str(config_file), "--dry-run"])
+        result = main(["research", "--config", str(config_file), "--dry-run"])
         captured = capsys.readouterr()
 
         assert result == 0
@@ -266,7 +266,7 @@ class TestRunSubcommand:
             "fast_research": be2,
         }
 
-        result = main(["run", "--config", str(config_file), "--dry-run"])
+        result = main(["research", "--config", str(config_file), "--dry-run"])
 
         assert result == 0
         mock_instantiate.assert_called_once()
@@ -282,7 +282,7 @@ class TestRunSubcommand:
         mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
-        main(["run", "--config", str(config_file), "--resume"])
+        main(["research", "--config", str(config_file), "--resume"])
         _, kwargs = mock_researcher_cls.call_args
         assert kwargs["resume"] is True
 
@@ -296,7 +296,7 @@ class TestRunSubcommand:
         mock_get_backends.return_value = {"codex-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
-        main(["run", "--config", str(config_file), "--backend", "codex-cli"])
+        main(["research", "--config", str(config_file), "--backend", "codex-cli"])
         mock_get.assert_called_with("codex-cli")
 
     @patch("src.cli.get_strategy")
@@ -309,7 +309,7 @@ class TestRunSubcommand:
         mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
-        main(["run", "--config", str(config_file)])
+        main(["research", "--config", str(config_file)])
         mock_get.assert_called_with("claude-cli")
 
     @patch("src.cli.get_strategy")
@@ -323,7 +323,7 @@ class TestRunSubcommand:
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
         custom = tmp_path / "custom_out"
-        main(["run", "--config", str(config_file), "--output", str(custom)])
+        main(["research", "--config", str(config_file), "--output", str(custom)])
         _, kwargs = mock_researcher_cls.call_args
         assert kwargs["output_dir"] == custom.resolve()
 
@@ -337,7 +337,7 @@ class TestRunSubcommand:
         mock_get_backends.return_value = {"claude-cli": mock_backend}
         mock_get_strat.return_value = mock_strategy
         mock_researcher_cls.return_value = MagicMock()
-        main(["run", "--config", str(config_file)])
+        main(["research", "--config", str(config_file)])
         _, kwargs = mock_researcher_cls.call_args
         assert kwargs["backend"] is mock_backend
 
@@ -378,7 +378,7 @@ class TestRunSubcommand:
         mock_instance.run.return_value = None
         mock_researcher_cls.return_value = mock_instance
 
-        result = main(["run", "--config", str(config_file)])
+        result = main(["research", "--config", str(config_file)])
 
         assert result == 0
         mock_instantiate.assert_called_once()
