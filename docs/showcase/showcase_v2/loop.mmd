@@ -1,0 +1,24 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 60, 'nodeSpacing': 30, 'curve': 'basis'}}}%%
+flowchart LR
+    A["**1 · Hypothesise**\nHighest knowledge gap"]
+    B["**2 · Execute**\nWeb · docs · code"]
+    C["**3 · Critique**\nDifferent backend\nerrors · gaps · weak claims"]
+    D["**4 · Score**\nHeuristic 40%\n+ LLM judge 60%"]
+    E{"**5 · Decide**\nImproved?"}
+    G["**✓ Grow corpus**"]
+    F["**6 · Compress**\nDistill · drop noise"]
+    STOP(["Stop"])
+
+    A --> B --> C --> D --> E
+    E -- KEEP --> G --> F --> A
+    E -- DISCARD --> A
+    G -. max_iterations .-> STOP
+
+    style A fill:#1e3a5f,color:#fff,stroke:none
+    style B fill:#1e3a5f,color:#fff,stroke:none
+    style C fill:#6d28d9,color:#fff,stroke:none
+    style D fill:#1e3a5f,color:#fff,stroke:none
+    style E fill:#d97706,color:#fff,stroke:none
+    style G fill:#16a34a,color:#fff,stroke:none
+    style F fill:#0e7490,color:#fff,stroke:none
+    style STOP fill:#dc2626,color:#fff,stroke:none

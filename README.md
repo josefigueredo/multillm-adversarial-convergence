@@ -69,6 +69,7 @@ uv run pytest tests/ -v
 
 ## Design documents
 
+- [`agentic-design-patterns.md`](docs/design/agentic-design-patterns.md) — 11 agentic patterns used, with architectural rationale and canonical references
 - [`evaluation-architecture.md`](docs/design/evaluation-architecture.md) — evaluation pipeline rationale
 - [`scientific-rigor-roadmap.md`](docs/design/scientific-rigor-roadmap.md) — PRISMA / GRADE roadmap
 - [`api-provider-contracts.md`](docs/design/api-provider-contracts.md) — API adapter contracts
