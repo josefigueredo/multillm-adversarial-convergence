@@ -267,6 +267,15 @@ class IterationScore:
     total: float = 0.0
     dimensions_covered: list[str] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
+    # Structured gap records that survived intake filtering. Each item
+    # has the shape produced by parse_gaps_identified() plus a
+    # canonical_topic field added by process_discovered_gaps(). The
+    # bare-string ``gaps`` list above is derived from these records'
+    # ``topic`` fields and kept for backward compat. Phase 2 of the
+    # discovery plan persists these records via the
+    # discovered_gaps.json sidecar; Phase 3 will use them for
+    # cross-iteration clustering.
+    gap_records: list[dict[str, Any]] = field(default_factory=list)
     judge_raw: dict[str, Any] = field(default_factory=dict)
     heuristic_breakdown: HeuristicBreakdown = field(default_factory=HeuristicBreakdown)
     judge_depth: int = 0

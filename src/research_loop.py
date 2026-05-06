@@ -19,7 +19,13 @@ from .backends import AgentResponse
 from .config import ResearchConfig
 from .prompts import render as _render
 from .run_io import append_result_row, build_result_row, write_iteration_markdown
-from .run_state import BaseContext, maybe_exhaust_dimension, merge_findings
+from .run_state import (
+    BaseContext,
+    GapEntry,
+    maybe_exhaust_dimension,
+    merge_findings,
+    record_gap,
+)
 from .scorer import (
     IterationScore,
     combine_scores,
@@ -83,7 +89,14 @@ class LoopState:
     knowledge_base: str = ""
     kb_path: Path = field(default_factory=lambda: Path("knowledge_base.md"))
     explored_dimensions: list[str] = field(default_factory=list)
+    # Legacy bare-string view of discovered gaps.  Kept in lock-step
+    # with ``discovered_gaps`` (the structured dict) via the
+    # ``record_gap`` helper.  The hypothesis prompt and other
+    # downstream consumers continue to use this list directly; the
+    # structured dict is the source of truth for sidecar persistence,
+    # Phase 3 clustering, and Phase 4 dispatch.
     discovered_dimensions: list[str] = field(default_factory=list)
+    discovered_gaps: dict[str, "GapEntry"] = field(default_factory=dict)
     dimension_attempts: dict[str, int] = field(default_factory=dict)
     best_score: float = 0.0
     best_scores: dict[str, float] = field(default_factory=dict)
@@ -668,6 +681,7 @@ def _score(ctx: LoopContext, state: LoopState, dimension: str, findings: str) ->
         total=total,
         dimensions_covered=judge_raw.get("dimensions_covered", [dimension]),
         gaps=accepted_topics,
+        gap_records=accepted_records,
         judge_raw=judge_raw,
         heuristic_breakdown=breakdown,
         judge_depth=int(judge_raw.get("depth", 0) or 0),
@@ -698,9 +712,54 @@ def _merge(ctx: LoopContext, state: LoopState, dimension: str, findings: str, sc
         state.explored_dimensions = merged["explored_dimensions"]
         state.discovered_dimensions = merged["discovered_dimensions"]
         state.kb_path.write_text(state.knowledge_base, encoding="utf-8")
+
+        # Discovery plan Phase 2: persist structured gap metadata
+        # alongside the bare-string view.  Each surviving record from
+        # intake either creates a new GapEntry (gap_promoted audit
+        # event) or increments an existing one (gap_seen_again event).
+        judge_name = getattr(ctx.strategy.get_judge_backend(), "name", "")
+        for record in score.gap_records:
+            canonical = record.get("canonical_topic") or _canonical_topic(record["topic"])
+            entry, is_new = record_gap(
+                discovered_gaps=state.discovered_gaps,
+                discovered_dimensions=state.discovered_dimensions,
+                canonical_topic=canonical,
+                display_topic=record["topic"],
+                iteration=state.iteration,
+                judge_name=judge_name,
+                kind=record.get("kind", "research_target"),
+                confidence=record.get("confidence", 5),
+            )
+            if is_new:
+                _emit_audit(ctx.audit_trail, "gap_promoted", {
+                    "iteration": state.iteration,
+                    "dimension": dimension,
+                    "canonical_topic": canonical,
+                    "display_topic": entry.display_topic,
+                    "kind": entry.kind,
+                    "confidence": record.get("confidence", 5),
+                })
+            else:
+                _emit_audit(ctx.audit_trail, "gap_seen_again", {
+                    "iteration": state.iteration,
+                    "dimension": dimension,
+                    "canonical_topic": canonical,
+                    "occurrences": entry.occurrences,
+                })
         for gap in score.gaps:
             if gap in state.discovered_dimensions:
                 log.info("New dimension discovered: %s", gap)
+
+
+def _emit_audit(audit_trail: Any, event_type: str, payload: dict[str, Any]) -> None:
+    """Best-effort audit event emit; swallows errors so audit issues
+    never block the research loop."""
+    try:
+        emit = getattr(audit_trail, "emit", None)
+        if callable(emit):
+            emit(event_type, payload)
+    except Exception:
+        log.debug("Failed to emit audit event %s", event_type, exc_info=True)
 
 
 def _maybe_exhaust(state: LoopState, dimension: str) -> None:

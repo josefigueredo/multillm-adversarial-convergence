@@ -4,13 +4,147 @@ from __future__ import annotations
 
 import csv
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 from .backends import AgentResponse
 from .strategy import ResearchCandidate
 from .workflows.decisions import IterationDecision, classify_iteration_decision
+
+
+# ---------------------------------------------------------------------------
+# Discovery plan Phase 2: persistent gap state
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class GapEntry:
+    """Structured record for a single discovered gap.
+
+    Replaces the bare-string entries in the legacy
+    ``state.discovered_dimensions: list[str]`` with the metadata needed
+    by Discovery plan Phase 3 (clustering with re-discovery promotion)
+    and Phase 4 (kind-based dispatch).  Phase 2 just lays the schema —
+    every gap that survives the intake filter creates an entry, and
+    the entry's ``occurrences`` count is incremented when the same
+    canonical_topic is recorded again from a later iteration.
+
+    Attributes:
+        canonical_topic: Normalised form used for matching (lowercased,
+            whitespace-collapsed, punctuation-stripped).  This is the
+            key in ``state.discovered_gaps``.
+        display_topic: Most recent display form (preserves casing,
+            punctuation).  This is what gets fed to the hypothesis
+            prompt's ``{unexplored_dimensions}`` placeholder.
+        first_seen_iter: Iteration number when this canonical_topic
+            first appeared.
+        occurrences: How many distinct iterations have produced this
+            gap.  Phase 3 will use this for re-discovery promotion.
+        iterations_seen: Per-iteration log; the index into the
+            iteration corpus where each occurrence happened.
+        judges_seen: Backend names of the judges that emitted this gap.
+            Phase 3 cross-judge promotion uses this.
+        kind: One of GAP_KINDS — ``research_target``, ``refinement``,
+            or ``critique``.
+        confidences: Per-occurrence confidence scores (1-10 each) from
+            the judge.  Mean confidence is a Phase 3 promotion signal.
+        promoted: Whether this gap is currently eligible to feed back
+            into the hypothesis pool.  Phase 2 promotes everything
+            that passes intake; Phase 3 will gate this.
+    """
+
+    canonical_topic: str
+    display_topic: str
+    first_seen_iter: int
+    occurrences: int = 1
+    iterations_seen: list[int] = field(default_factory=list)
+    judges_seen: list[str] = field(default_factory=list)
+    kind: str = "research_target"
+    confidences: list[int] = field(default_factory=list)
+    promoted: bool = True
+
+
+def record_gap(
+    *,
+    discovered_gaps: dict[str, GapEntry],
+    discovered_dimensions: list[str],
+    canonical_topic: str,
+    display_topic: str,
+    iteration: int,
+    judge_name: str = "",
+    kind: str = "research_target",
+    confidence: int = 5,
+) -> tuple[GapEntry, bool]:
+    """Add or update a discovered gap.
+
+    Mutates ``discovered_gaps`` and ``discovered_dimensions`` in place
+    so the legacy list-of-strings view stays in sync with the new
+    dict-of-GapEntry source of truth.
+
+    Returns ``(entry, is_new)`` — ``is_new`` is ``True`` when this
+    canonical_topic was added for the first time, ``False`` when an
+    existing entry was updated.
+    """
+    existing = discovered_gaps.get(canonical_topic)
+    if existing is not None:
+        existing.occurrences += 1
+        if iteration not in existing.iterations_seen:
+            existing.iterations_seen.append(iteration)
+        if judge_name and judge_name not in existing.judges_seen:
+            existing.judges_seen.append(judge_name)
+        existing.confidences.append(confidence)
+        # Most-recent display form wins.
+        existing.display_topic = display_topic
+        return existing, False
+
+    entry = GapEntry(
+        canonical_topic=canonical_topic,
+        display_topic=display_topic,
+        first_seen_iter=iteration,
+        occurrences=1,
+        iterations_seen=[iteration],
+        judges_seen=[judge_name] if judge_name else [],
+        kind=kind,
+        confidences=[confidence],
+        promoted=True,
+    )
+    discovered_gaps[canonical_topic] = entry
+    if display_topic not in discovered_dimensions:
+        discovered_dimensions.append(display_topic)
+    return entry, True
+
+
+def serialise_discovered_gaps(gaps: dict[str, GapEntry]) -> dict[str, dict[str, Any]]:
+    """Convert the dict-of-GapEntry to a JSON-serialisable form for the
+    sidecar file."""
+    return {topic: asdict(entry) for topic, entry in gaps.items()}
+
+
+def deserialise_discovered_gaps(payload: dict[str, dict[str, Any]]) -> dict[str, GapEntry]:
+    """Reconstruct the dict-of-GapEntry from a sidecar JSON payload.
+    Tolerates missing fields (uses GapEntry defaults) and skips entries
+    whose value isn't a dict, so legacy or partial sidecars don't
+    crash resume."""
+    result: dict[str, GapEntry] = {}
+    for topic, raw in payload.items():
+        if not isinstance(raw, dict):
+            continue
+        try:
+            result[topic] = GapEntry(
+                canonical_topic=raw.get("canonical_topic", topic),
+                display_topic=raw.get("display_topic", topic),
+                first_seen_iter=int(raw.get("first_seen_iter", 0)),
+                occurrences=int(raw.get("occurrences", 1)),
+                iterations_seen=list(raw.get("iterations_seen", [])),
+                judges_seen=list(raw.get("judges_seen", [])),
+                kind=raw.get("kind", "research_target"),
+                confidences=list(raw.get("confidences", [])),
+                promoted=bool(raw.get("promoted", True)),
+            )
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return result
 
 
 @dataclass
@@ -79,8 +213,17 @@ def resume_state(
     knowledge_base_path: Path,
     configured_dimensions: tuple[str, ...] | list[str],
     max_attempts_per_dimension: int,
+    discovered_gaps_sidecar: Path | None = None,
 ) -> dict[str, Any]:
-    """Rebuild mutable state from existing iteration files and TSV."""
+    """Rebuild mutable state from existing iteration files and TSV.
+
+    When ``discovered_gaps_sidecar`` is supplied AND the file exists,
+    structured ``GapEntry`` records are loaded from it.  Otherwise the
+    legacy fallback parses the ``discovered_gaps`` column from
+    ``results.tsv`` and synthesises ``GapEntry`` records with
+    conservative defaults — preserving ``--resume`` from runs that
+    pre-date the schema upgrade.
+    """
     existing = sorted(iterations_dir.glob("iter_*.md"))
     if not existing:
         return {
@@ -90,6 +233,7 @@ def resume_state(
             "best_scores": {},
             "explored_dimensions": [],
             "discovered_dimensions": [],
+            "discovered_gaps": {},
             "dimension_attempts": {},
             "knowledge_base": knowledge_base_path.read_text(encoding="utf-8") if knowledge_base_path.exists() else "",
         }
@@ -99,7 +243,19 @@ def resume_state(
     best_scores: dict[str, float] = {}
     explored_dimensions: list[str] = []
     discovered_dimensions: list[str] = []
+    discovered_gaps: dict[str, GapEntry] = {}
     dimension_attempts: dict[str, int] = {}
+
+    # Try the sidecar first.  Sidecar is authoritative when present.
+    sidecar_loaded = False
+    if discovered_gaps_sidecar and discovered_gaps_sidecar.exists():
+        try:
+            payload = json.loads(discovered_gaps_sidecar.read_text(encoding="utf-8"))
+            discovered_gaps = deserialise_discovered_gaps(payload)
+            discovered_dimensions = [entry.display_topic for entry in discovered_gaps.values()]
+            sidecar_loaded = True
+        except (json.JSONDecodeError, OSError, TypeError):
+            sidecar_loaded = False
 
     if results_path.exists():
         with open(results_path, encoding="utf-8") as f:
@@ -128,20 +284,49 @@ def resume_state(
                     if score > best_score:
                         best_score = score
 
-                gaps_raw = row.get("discovered_gaps", "")
-                if gaps_raw:
-                    try:
-                        gaps = json.loads(gaps_raw)
-                    except (json.JSONDecodeError, TypeError):
-                        gaps = []
-                    for gap in gaps:
-                        if (
-                            gap
-                            and gap not in explored_dimensions
-                            and gap not in configured_dimensions
-                            and gap not in discovered_dimensions
-                        ):
-                            discovered_dimensions.append(gap)
+                # Legacy fallback: synthesise GapEntry records from the
+                # discovered_gaps TSV column when the sidecar wasn't
+                # available.  Sidecar runs skip this branch entirely.
+                if not sidecar_loaded:
+                    gaps_raw = row.get("discovered_gaps", "")
+                    if gaps_raw:
+                        try:
+                            gaps = json.loads(gaps_raw)
+                        except (json.JSONDecodeError, TypeError):
+                            gaps = []
+                        try:
+                            iter_num = int(row.get("iteration", "0"))
+                        except (ValueError, TypeError):
+                            iter_num = 0
+                        for gap in gaps:
+                            if (
+                                gap
+                                and gap not in explored_dimensions
+                                and gap not in configured_dimensions
+                                and gap not in discovered_dimensions
+                            ):
+                                discovered_dimensions.append(gap)
+                                # Also synthesise a GapEntry so Phase 3+
+                                # consumers see something even on legacy
+                                # resume.  Conservative defaults:
+                                # confidence=5, kind=research_target,
+                                # promoted=True.
+                                # Use lazy canonical-topic computation —
+                                # avoids importing the full helper here.
+                                from .research_loop import _canonical_topic
+                                canonical = _canonical_topic(gap)
+                                if canonical not in discovered_gaps:
+                                    discovered_gaps[canonical] = GapEntry(
+                                        canonical_topic=canonical,
+                                        display_topic=gap,
+                                        first_seen_iter=iter_num,
+                                        occurrences=1,
+                                        iterations_seen=[iter_num] if iter_num else [],
+                                        judges_seen=[],
+                                        kind="research_target",
+                                        confidences=[5],
+                                        promoted=True,
+                                    )
 
                 if dim and dimension_attempts.get(dim, 0) >= max_attempts_per_dimension:
                     if dim not in explored_dimensions:
@@ -155,6 +340,7 @@ def resume_state(
         "best_scores": best_scores,
         "explored_dimensions": explored_dimensions,
         "discovered_dimensions": discovered_dimensions,
+        "discovered_gaps": discovered_gaps,
         "dimension_attempts": dimension_attempts,
         "knowledge_base": knowledge_base,
     }
@@ -170,7 +356,17 @@ def merge_findings(
     discovered_dimensions: list[str],
     configured_dimensions: tuple[str, ...] | list[str],
 ) -> dict[str, Any]:
-    """Merge kept findings into the knowledge base and update dimension tracking."""
+    """Merge kept findings into the knowledge base and update dimension
+    tracking.
+
+    The ``gaps`` list is a backward-compatible bare-string interface;
+    callers that want the structured ``discovered_gaps`` dict updated
+    in lock-step should call :func:`record_gap` directly instead of
+    relying on this function to populate metadata.  When called via
+    the legacy bare-string path, this function only updates
+    ``discovered_dimensions`` — the structured dict is left to the
+    caller.
+    """
     if dimension not in explored_dimensions:
         explored_dimensions.append(dimension)
 

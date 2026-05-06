@@ -8,7 +8,47 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .run_state import GapEntry, deserialise_discovered_gaps, serialise_discovered_gaps
 from .scorer import IterationScore
+
+
+DISCOVERED_GAPS_SIDECAR = "discovered_gaps.json"
+
+
+def write_discovered_gaps_sidecar(
+    output_dir: Path,
+    discovered_gaps: dict[str, GapEntry],
+) -> Path:
+    """Persist the structured discovered_gaps state to the sidecar JSON.
+
+    Discovery plan Phase 2: the sidecar is the authoritative store for
+    GapEntry metadata.  ``results.tsv``'s ``discovered_gaps`` column is
+    a backward-compat fallback for old-format loaders.
+    """
+    path = output_dir / DISCOVERED_GAPS_SIDECAR
+    payload = serialise_discovered_gaps(discovered_gaps)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return path
+
+
+def read_discovered_gaps_sidecar(output_dir: Path) -> dict[str, GapEntry]:
+    """Load the discovered_gaps sidecar if it exists; empty dict otherwise.
+
+    Tolerates a missing or malformed sidecar — callers that want
+    legacy-fallback parsing should branch on the return value being
+    empty and fall through to ``results.tsv`` parsing.
+    """
+    path = output_dir / DISCOVERED_GAPS_SIDECAR
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, TypeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return deserialise_discovered_gaps(payload)
 
 
 RESULTS_FIELDS = [

@@ -188,6 +188,12 @@ class AutoResearcher:
         self.knowledge_base: str = ""
         self.explored_dimensions: list[str] = []
         self.discovered_dimensions: list[str] = []
+        # Discovery plan Phase 2: structured gap state alongside the
+        # legacy bare-string list.  Lock-step updated via record_gap()
+        # in the loop, persisted to discovered_gaps.json sidecar after
+        # each iteration, restored on --resume from the sidecar (or
+        # via legacy TSV fallback for runs that pre-date the schema).
+        self.discovered_gaps: dict[str, Any] = {}
         self.total_cost: float = 0.0
         self.total_input_tokens: int = 0
         self.total_output_tokens: int = 0
@@ -705,6 +711,7 @@ class AutoResearcher:
             knowledge_base_path=self.kb_path,
             configured_dimensions=self.config.dimensions,
             max_attempts_per_dimension=self.MAX_ATTEMPTS_PER_DIMENSION,
+            discovered_gaps_sidecar=self.output_dir / "discovered_gaps.json",
         )
         if not state["iteration"]:
             return
@@ -716,6 +723,7 @@ class AutoResearcher:
         self.best_scores = state["best_scores"]
         self.explored_dimensions = state["explored_dimensions"]
         self.discovered_dimensions = state["discovered_dimensions"]
+        self.discovered_gaps = state.get("discovered_gaps", {})
         self._dimension_attempts = state["dimension_attempts"]
         self.knowledge_base = state["knowledge_base"]
         self.iteration = state["iteration"]
@@ -759,6 +767,7 @@ class AutoResearcher:
             kb_path=self.kb_path,
             explored_dimensions=self.explored_dimensions,
             discovered_dimensions=self.discovered_dimensions,
+            discovered_gaps=self.discovered_gaps,
             dimension_attempts=self._dimension_attempts,
             best_score=self.best_score,
             best_scores=self.best_scores,
@@ -778,6 +787,7 @@ class AutoResearcher:
         self.knowledge_base = state.knowledge_base
         self.explored_dimensions = state.explored_dimensions
         self.discovered_dimensions = state.discovered_dimensions
+        self.discovered_gaps = state.discovered_gaps
         self._dimension_attempts = state.dimension_attempts
         self.best_score = state.best_score
         self.best_scores = state.best_scores
@@ -842,13 +852,17 @@ class AutoResearcher:
         self._sync_from_loop_state(state)
 
     def _save_iteration(self, dimension: str, findings: str, score, kept: bool) -> None:
-        from .run_io import write_iteration_markdown
+        from .run_io import write_discovered_gaps_sidecar, write_iteration_markdown
         write_iteration_markdown(
             iterations_dir=self.iterations_dir, iteration=self.iteration,
             dimension=dimension, findings=findings, score=score, kept=kept,
         )
         # Cache the latest score so the dashboard can surface its breakdown.
         self._latest_score = score
+        # Discovery plan Phase 2: persist the structured gap state so
+        # --resume can restore it without re-deriving from results.tsv.
+        if self.discovered_gaps:
+            write_discovered_gaps_sidecar(self.output_dir, self.discovered_gaps)
         self._collect_provenance(findings, scope=f"iteration-{self.iteration:03d}", dimension=dimension)
 
     def _log_result(self, dimension: str, score, hypothesis: str, *, status: str) -> None:
