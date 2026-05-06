@@ -304,6 +304,13 @@ class ScoringWeights:
     quality_weight: float = 0.6
     novelty_weight: float = 0.0
     judge_novelty_share: float = 0.3
+    # Scoring plan Proposal #8: depth bonus for cross-iteration
+    # refinements.  When > 0 and a dimension is re-attempted (attempts
+    # >= 2), the KEEP gate's prev_best comparison is scaled by
+    # ``1 + depth_bonus * min(attempts - 1, 3)`` so a focused refinement
+    # can clear the bar even when its raw score is below the broad-
+    # pass score.  Default 0.0 = legacy behavior.
+    depth_bonus: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -863,6 +870,7 @@ class ResearchConfig:
             quality_weight=float(weights_raw.get("quality_weight", weights_defaults.quality_weight)),
             novelty_weight=float(weights_raw.get("novelty_weight", weights_defaults.novelty_weight)),
             judge_novelty_share=float(weights_raw.get("judge_novelty_share", weights_defaults.judge_novelty_share)),
+            depth_bonus=float(weights_raw.get("depth_bonus", weights_defaults.depth_bonus)),
         )
         scoring = ScoringConfig(
             min_dimensions_per_iteration=scoring_raw.get(

@@ -99,6 +99,14 @@ class LoopState:
     # Phase 3 clustering, and Phase 4 dispatch.
     discovered_dimensions: list[str] = field(default_factory=list)
     discovered_gaps: dict[str, "GapEntry"] = field(default_factory=dict)
+    # Discovery plan Phase 4: kind-based dispatch.  Refinement requests
+    # target existing explored dimensions for re-investigation;
+    # critiques are stored for the synthesis report but never enter
+    # the hypothesis pool.  Both are derived views of
+    # ``discovered_gaps`` filtered by ``kind`` and ``promoted`` —
+    # populated by ``rebuild_kind_views()`` after each iteration.
+    refinement_requests: list[str] = field(default_factory=list)
+    critiques: list[dict[str, Any]] = field(default_factory=list)
     dimension_attempts: dict[str, int] = field(default_factory=dict)
     best_score: float = 0.0
     best_scores: dict[str, float] = field(default_factory=dict)
@@ -190,7 +198,24 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
     )
     emitter.transition(ResearchState.SCORE, iteration=state.iteration, dimension=dimension)
 
-    kept = score.total > prev_best and score.total >= 30.0
+    # Scoring plan Proposal #8: cross-iteration depth bonus.  When a
+    # dimension is re-attempted (attempt N >= 2), the KEEP gate's
+    # ``> prev_best`` comparison is multiplied by a depth-multiplier so
+    # focused refinements can compete with the original broad pass
+    # without having to beat the broad-pass score outright.  The raw
+    # ``score.total >= 30.0`` floor still applies — we never keep
+    # garbage just because it's a re-attempt.
+    attempts = state.dimension_attempts.get(dimension, 0)
+    depth_bonus = float(getattr(ctx.config.scoring.weights, "depth_bonus", 0.0))
+    if depth_bonus > 0 and attempts >= 2:
+        # Scale prev_best DOWN proportionally — equivalent to scaling
+        # score.total UP, but easier to reason about in logs.
+        # Cap multiplier growth at 1.45 (3 boosted attempts).
+        depth_multiplier = 1.0 + depth_bonus * min(attempts - 1, 3)
+        prev_best_for_keep = prev_best / depth_multiplier
+    else:
+        prev_best_for_keep = prev_best
+    kept = score.total > prev_best_for_keep and score.total >= 30.0
     emitter.transition(
         ResearchState.DECIDE,
         iteration=state.iteration,
@@ -255,11 +280,20 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
 
 
 def _generate_hypothesis(ctx: LoopContext, state: LoopState) -> dict[str, Any] | None:
-    """Ask the agent to pick the next research dimension."""
+    """Ask the agent to pick the next research dimension.
+
+    Discovery plan Phase 4: refinement requests for already-explored
+    dimensions are surfaced alongside unexplored dimensions so the
+    hypothesis generator can pick "go deeper on X" as well as
+    "explore Y".  The prompt template prefixes refinements with
+    ``[refinement]`` so the model can distinguish them.
+    """
     unexplored = [
         d for d in [*ctx.config.dimensions, *state.discovered_dimensions]
         if d not in state.explored_dimensions
     ]
+    refinement_items = [f"[refinement] {topic}" for topic in state.refinement_requests]
+    eligible = unexplored + refinement_items
 
     prompt = _render(
         "research_hypothesis.md",
@@ -267,7 +301,7 @@ def _generate_hypothesis(ctx: LoopContext, state: LoopState) -> dict[str, Any] |
         methodology=ctx.methodology_summary(),
         knowledge_summary=ctx.kb_summary(),
         explored_dimensions=ctx.format_dimension_list(state.explored_dimensions),
-        unexplored_dimensions=ctx.format_dimension_list(unexplored),
+        unexplored_dimensions=ctx.format_dimension_list(eligible),
     )
 
     hypo_backend = ctx.strategy.get_hypothesis_backend()
@@ -787,6 +821,53 @@ def _merge(ctx: LoopContext, state: LoopState, dimension: str, findings: str, sc
         for gap in score.gaps:
             if gap in state.discovered_dimensions:
                 log.info("New dimension discovered: %s", gap)
+
+        # Discovery plan Phase 4: refresh kind-based views.  Refinement
+        # requests and critiques become observable to the hypothesis
+        # generator and the synthesis report respectively.
+        rebuild_kind_views(state)
+        if state.refinement_requests:
+            log.info(
+                "Refinement requests open: %d (e.g. %r)",
+                len(state.refinement_requests), state.refinement_requests[0][:80],
+            )
+        if state.critiques:
+            log.info("Open critiques: %d", len(state.critiques))
+
+
+def rebuild_kind_views(state: "LoopState") -> None:
+    """Discovery plan Phase 4: refresh per-kind views over discovered_gaps.
+
+    - ``state.discovered_dimensions``: promoted research_target topics
+      (the original list, kept in sync separately by record_gap so we
+      don't rewrite it here).
+    - ``state.refinement_requests``: promoted refinement topics —
+      target existing explored dimensions for re-investigation.
+      Consumed by the hypothesis prompt to suggest "go deeper on X".
+    - ``state.critiques``: every critique-kind gap with its full
+      structured metadata.  Stored for the synthesis report;
+      never enters the hypothesis pool.
+    """
+    refinement_topics: list[str] = []
+    critique_records: list[dict[str, Any]] = []
+    for entry in state.discovered_gaps.values():
+        if entry.kind == "refinement" and entry.promoted:
+            if entry.display_topic not in refinement_topics:
+                refinement_topics.append(entry.display_topic)
+        elif entry.kind == "critique":
+            critique_records.append({
+                "topic": entry.display_topic,
+                "canonical_topic": entry.canonical_topic,
+                "occurrences": entry.occurrences,
+                "iterations_seen": list(entry.iterations_seen),
+                "judges_seen": list(entry.judges_seen),
+                "confidence_mean": (
+                    sum(entry.confidences) / len(entry.confidences)
+                    if entry.confidences else 0.0
+                ),
+            })
+    state.refinement_requests = refinement_topics
+    state.critiques = critique_records
 
 
 def _emit_audit(audit_trail: Any, event_type: str, payload: dict[str, Any]) -> None:

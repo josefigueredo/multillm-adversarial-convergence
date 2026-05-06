@@ -463,6 +463,86 @@ class TestPromotionLogic:
         assert gaps["x"].promoted is True
 
 
+class TestRebuildKindViews:
+    """Discovery plan Phase 4: kind-based dispatch.  refinement_requests
+    surfaces promoted refinement-kind gaps for the hypothesis prompt;
+    critiques captures critique-kind gaps with their metadata for the
+    synthesis report.  research_target gaps populate
+    discovered_dimensions through the existing record_gap path."""
+
+    def _build_state_with_gaps(self, *gap_kinds_with_promotion):
+        """Helper: build a LoopState with a configurable mix of gap kinds."""
+        from src.research_loop import LoopState
+        state = LoopState()
+        for i, (kind, promoted, topic) in enumerate(gap_kinds_with_promotion):
+            state.discovered_gaps[topic] = GapEntry(
+                canonical_topic=topic,
+                display_topic=topic,
+                first_seen_iter=1,
+                occurrences=1,
+                kind=kind,
+                promoted=promoted,
+                confidences=[7],
+            )
+        return state
+
+    def test_research_target_does_not_appear_in_refinement_requests(self):
+        from src.research_loop import rebuild_kind_views
+        state = self._build_state_with_gaps(
+            ("research_target", True, "Some new dimension to explore"),
+        )
+        rebuild_kind_views(state)
+        assert state.refinement_requests == []
+
+    def test_promoted_refinement_appears_in_refinement_requests(self):
+        from src.research_loop import rebuild_kind_views
+        state = self._build_state_with_gaps(
+            ("refinement", True, "Re-investigate pricing tier breakdown"),
+        )
+        rebuild_kind_views(state)
+        assert state.refinement_requests == ["Re-investigate pricing tier breakdown"]
+
+    def test_unpromoted_refinement_excluded(self):
+        from src.research_loop import rebuild_kind_views
+        state = self._build_state_with_gaps(
+            ("refinement", False, "Should be excluded"),
+        )
+        rebuild_kind_views(state)
+        assert state.refinement_requests == []
+
+    def test_critiques_captured_with_metadata(self):
+        from src.research_loop import rebuild_kind_views
+        state = self._build_state_with_gaps(
+            ("critique", True, "Subjective claim lacks evidence"),
+        )
+        rebuild_kind_views(state)
+        assert len(state.critiques) == 1
+        assert state.critiques[0]["topic"] == "Subjective claim lacks evidence"
+        assert state.critiques[0]["confidence_mean"] == 7.0
+
+    def test_critiques_capture_unpromoted_too(self):
+        from src.research_loop import rebuild_kind_views
+        # Critiques don't need to be promoted — they're informational
+        state = self._build_state_with_gaps(
+            ("critique", False, "Vague claim about scalability"),
+        )
+        rebuild_kind_views(state)
+        assert len(state.critiques) == 1
+
+    def test_mixed_kinds_dispatched_correctly(self):
+        from src.research_loop import rebuild_kind_views
+        state = self._build_state_with_gaps(
+            ("research_target", True, "Container startup latency"),
+            ("refinement", True, "Re-investigate cost projections"),
+            ("critique", True, "Methodology lacks rigor"),
+            ("refinement", False, "Skipped refinement"),
+        )
+        rebuild_kind_views(state)
+        assert state.refinement_requests == ["Re-investigate cost projections"]
+        assert len(state.critiques) == 1
+        assert state.critiques[0]["topic"] == "Methodology lacks rigor"
+
+
 class TestResumeNoIterations:
     def test_empty_run_returns_blank_state(self, tmp_path: Path):
         state = resume_state(

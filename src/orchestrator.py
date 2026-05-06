@@ -194,6 +194,11 @@ class AutoResearcher:
         # each iteration, restored on --resume from the sidecar (or
         # via legacy TSV fallback for runs that pre-date the schema).
         self.discovered_gaps: dict[str, Any] = {}
+        # Discovery plan Phase 4: kind-based dispatch views.  Refresh
+        # each iteration via rebuild_kind_views() in research_loop.py;
+        # cached here for the orchestrator's _sync_from_loop_state().
+        self.refinement_requests: list[str] = []
+        self.critiques: list[dict[str, Any]] = []
         self.total_cost: float = 0.0
         self.total_input_tokens: int = 0
         self.total_output_tokens: int = 0
@@ -768,6 +773,8 @@ class AutoResearcher:
             explored_dimensions=self.explored_dimensions,
             discovered_dimensions=self.discovered_dimensions,
             discovered_gaps=self.discovered_gaps,
+            refinement_requests=self.refinement_requests,
+            critiques=self.critiques,
             dimension_attempts=self._dimension_attempts,
             best_score=self.best_score,
             best_scores=self.best_scores,
@@ -788,6 +795,8 @@ class AutoResearcher:
         self.explored_dimensions = state.explored_dimensions
         self.discovered_dimensions = state.discovered_dimensions
         self.discovered_gaps = state.discovered_gaps
+        self.refinement_requests = state.refinement_requests
+        self.critiques = state.critiques
         self._dimension_attempts = state.dimension_attempts
         self.best_score = state.best_score
         self.best_scores = state.best_scores
