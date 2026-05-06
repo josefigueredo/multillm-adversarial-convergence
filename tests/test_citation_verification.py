@@ -1,4 +1,4 @@
-"""TDD tests for MM11 Step 3 — citation/export verification.
+"""TDD tests for citation/export verification.
 
 All tests are written before the implementation exists.
 """

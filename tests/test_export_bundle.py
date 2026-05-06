@@ -1,4 +1,4 @@
-"""TDD tests for MM11 Step 4 — export bundles.
+"""TDD tests for export bundles.
 
 All tests are written before the implementation exists.
 """

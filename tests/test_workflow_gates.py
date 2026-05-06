@@ -1,4 +1,4 @@
-"""Tests for MM08 Step 2 — HITL workflow gate definitions.
+"""Tests for HITL workflow gate definitions.
 
 Covers:
 - HitlGate dataclass shape and immutability

@@ -1,4 +1,4 @@
-"""MM16 Step 4 — workspace isolation line in doctor; sandbox.scope in explain."""
+"""Workspace isolation line in doctor; sandbox.scope in explain."""
 
 from __future__ import annotations
 
@@ -72,13 +72,13 @@ class TestDoctorWorkspaceIsolationLine:
         assert ".workspace/" in text
 
     def test_scope_run_does_not_mention_iter_nnnn(self):
-        """scope=run should not show iter_NNNN in the workspace isolation line."""
+        """Scope=run should not show iter_NNNN in the workspace isolation line."""
         config = _make_config(SandboxConfig(scope="run"))
         text = doctor_config_text(config).text
         assert "iter_NNNN" not in text
 
     def test_scope_iteration_does_not_say_shared(self):
-        """scope=iteration should not say 'shared across iterations'."""
+        """Scope=iteration should not say 'shared across iterations'."""
         config = _make_config(SandboxConfig(scope="iteration"))
         text = doctor_config_text(config).text
         assert "shared across iterations" not in text

@@ -285,7 +285,7 @@ class TestExplainHitlPolicy:
 
 
 # ---------------------------------------------------------------------------
-# MM09 Step 5 — explain_implement_config_text
+# explain_implement_config_text
 # ---------------------------------------------------------------------------
 
 from pathlib import Path as _Path

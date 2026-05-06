@@ -1,4 +1,4 @@
-"""MM12 Step 5 — domain architecture diagnostics tests.
+"""Domain architecture diagnostics tests.
 
 TDD tests that verify:
 - explain_domain_packages() surfaces the active bounded-context package seams
@@ -32,7 +32,7 @@ class TestExplainDomainPackagesHeader:
 
 
 class TestExplainDomainPackagesMM12Seams:
-    """Verify each MM12 package seam is described."""
+    """Verify each package seam is described."""
 
     def test_mentions_evidence(self):
         from src.explain import explain_domain_packages

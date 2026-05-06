@@ -107,7 +107,7 @@ class TestSecurityEnforcementTable:
         assert "enforced" in result.text.lower()
 
     def test_tool_execution_mode_sandboxed_shown_as_dispatch_enforced_when_active(self):
-        """sandbox_active=True → truth table must show dispatch-enforced, not declared-only."""
+        """Sandbox_active=True → truth table must show dispatch-enforced, not declared-only."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -118,7 +118,7 @@ class TestSecurityEnforcementTable:
         assert "dispatch-enforced" in result.text.lower() or "dispatch enforced" in result.text.lower()
 
     def test_tool_execution_mode_sandboxed_not_active_shows_declared_intent(self):
-        """sandbox mode=off + tool_execution_mode=sandboxed → declared intent (no active enforcement)."""
+        """Sandbox mode=off + tool_execution_mode=sandboxed → declared intent (no active enforcement)."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -130,7 +130,7 @@ class TestSecurityEnforcementTable:
         assert "dispatch-enforced" not in result.text.lower()
 
     def test_network_access_dispatch_enforced_when_sandbox_active(self):
-        """sandbox_active=True + non-unrestricted network_access → dispatch-enforced in table."""
+        """Sandbox_active=True + non-unrestricted network_access → dispatch-enforced in table."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -142,7 +142,7 @@ class TestSecurityEnforcementTable:
         assert "dispatch-enforced" in result.text.lower() or "dispatch enforced" in result.text.lower()
 
     def test_network_access_dispatch_enforced_is_healthy(self):
-        """sandbox_active=True + non-unrestricted → healthy run (exit_code=0)."""
+        """Sandbox_active=True + non-unrestricted → healthy run (exit_code=0)."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -153,7 +153,7 @@ class TestSecurityEnforcementTable:
         assert result.exit_code == 0
 
     def test_network_access_no_effect_note_when_not_sandbox_active(self):
-        """sandbox_active=False + non-unrestricted network_access → warning about no effect."""
+        """Sandbox_active=False + non-unrestricted network_access → warning about no effect."""
         config = _make_config(
             security=SecurityConfig(
                 sandbox=SandboxConfig(network_access="web_only"),  # direct mode → sandbox_active=False
@@ -268,7 +268,7 @@ class TestOperatorRiskNotes:
         assert "host shell exposed" not in text_lower
 
     def test_sandboxed_active_is_healthy_no_warning(self):
-        """sandbox_active=True with default (unrestricted) network → no risk notes → exit_code=0."""
+        """Sandbox_active=True with default (unrestricted) network → no risk notes → exit_code=0."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -279,7 +279,7 @@ class TestOperatorRiskNotes:
         assert result.exit_code == 0
 
     def test_sandboxed_mode_off_produces_warning(self):
-        """tool_execution_mode=sandboxed but mode=off → sandbox not active → warning."""
+        """Tool_execution_mode=sandboxed but mode=off → sandbox not active → warning."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -292,7 +292,7 @@ class TestOperatorRiskNotes:
         assert result.exit_code == 1
 
     def test_network_policy_no_effect_without_sandbox_active_exits_1(self):
-        """network_access set but sandbox_active=False → no operational effect → warning → exit_code=1."""
+        """Network_access set but sandbox_active=False → no operational effect → warning → exit_code=1."""
         config = _make_config(
             security=SecurityConfig(
                 sandbox=SandboxConfig(network_access="web_only"),  # direct mode → sandbox_active=False
@@ -316,7 +316,7 @@ class TestOperatorRiskNotes:
 
 
 # ---------------------------------------------------------------------------
-# M5 Step 4: diagnostics for env shaping, tool coverage, unclassified tools
+# diagnostics for env shaping, tool coverage, unclassified tools
 # ---------------------------------------------------------------------------
 
 class TestDoctorM5Coverage:
@@ -325,7 +325,7 @@ class TestDoctorM5Coverage:
     # -- env shaping status ------------------------------------------------
 
     def test_env_shaping_shown_as_active_when_sandbox_active(self):
-        """sandbox_active=True → doctor output surfaces env shaping as active."""
+        """Sandbox_active=True → doctor output surfaces env shaping as active."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -339,7 +339,7 @@ class TestDoctorM5Coverage:
         assert "active" in text_lower
 
     def test_env_shaping_shown_as_inactive_in_direct_mode(self):
-        """tool_execution_mode=direct → doctor labels env shaping inactive with 'direct mode'."""
+        """Tool_execution_mode=direct → doctor labels env shaping inactive with 'direct mode'."""
         config = _make_config(
             security=SecurityConfig(tool_execution_mode="direct"),
         )
@@ -350,7 +350,7 @@ class TestDoctorM5Coverage:
         assert "direct" in text_lower
 
     def test_env_shaping_shown_as_inactive_sandbox_declared_but_not_active(self):
-        """sandboxed + mode=off → inactive; must NOT say 'direct mode'."""
+        """Sandboxed + mode=off → inactive; must NOT say 'direct mode'."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -404,7 +404,7 @@ class TestDoctorM5Coverage:
     # -- unclassified tool risk note ---------------------------------------
 
     def test_unclassified_tool_in_sandbox_exits_1(self):
-        """sandbox_active=True + unclassified tool → doctor exits 1 (will be denied at runtime)."""
+        """Sandbox_active=True + unclassified tool → doctor exits 1 (will be denied at runtime)."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -420,7 +420,7 @@ class TestDoctorM5Coverage:
         assert result.exit_code == 1
 
     def test_unclassified_tool_in_sandbox_shows_warning(self):
-        """sandbox_active=True + unclassified tool → doctor shows warning about denial."""
+        """Sandbox_active=True + unclassified tool → doctor shows warning about denial."""
         config = _make_config(
             security=SecurityConfig(
                 tool_execution_mode="sandboxed",
@@ -438,7 +438,7 @@ class TestDoctorM5Coverage:
         assert "unclassified" in text_lower or "denied" in text_lower
 
     def test_unclassified_tool_in_direct_mode_is_healthy(self):
-        """sandbox_active=False + unclassified tool → no warning (direct mode passes through)."""
+        """Sandbox_active=False + unclassified tool → no warning (direct mode passes through)."""
         config = _make_config(
             security=SecurityConfig(tool_execution_mode="direct"),
             execution=ExecutionConfig(
@@ -749,7 +749,7 @@ class TestDoctorOutputCLI:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 4 — capability-based host-shell risk note
+# capability-based host-shell risk note
 # ---------------------------------------------------------------------------
 
 class TestDispatchContractRiskNotes:
@@ -808,11 +808,11 @@ class TestDispatchContractRiskNotes:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 5 — isolation maturity diagnostics
+# isolation maturity diagnostics
 # ---------------------------------------------------------------------------
 
 class TestDoctorMM06Diagnostics:
-    """Doctor surfaces MM06 isolation maturity: backend type, env policy, coverage stats."""
+    """Doctor surfaces isolation maturity: backend type, env policy, coverage stats."""
 
     def _sandbox_active_config(self, tools: str = "Read,Grep") -> ResearchConfig:
         return _make_config(
@@ -852,24 +852,24 @@ class TestDoctorMM06Diagnostics:
     # -- sandbox backend type (3 states) -----------------------------------
 
     def test_sandbox_backend_type_shown_when_sandbox_active(self):
-        """sandbox_active=True → local-process backend type surfaced."""
+        """Sandbox_active=True → local-process backend type surfaced."""
         result = doctor_config_text(self._sandbox_active_config())
         text_lower = result.text.lower()
         assert "local-process" in text_lower or "localprocessbackend" in text_lower
 
     def test_sandbox_backend_type_shown_when_declared_not_active(self):
-        """sandboxed declared but not active → local-process still mentioned (as declared)."""
+        """Sandboxed declared but not active → local-process still mentioned (as declared)."""
         result = doctor_config_text(self._sandbox_declared_not_active_config())
         text_lower = result.text.lower()
         assert "local-process" in text_lower or "localprocessbackend" in text_lower
 
     def test_sandbox_backend_type_na_in_direct_mode(self):
-        """direct mode → sandbox backend shown as N/A (no substrate active)."""
+        """Direct mode → sandbox backend shown as N/A (no substrate active)."""
         result = doctor_config_text(self._direct_config())
         assert "N/A" in result.text
 
     def test_sandbox_backend_line_not_na_when_sandbox_active(self):
-        """sandbox_active=True → the sandbox backend line must not say N/A."""
+        """Sandbox_active=True → the sandbox backend line must not say N/A."""
         result = doctor_config_text(self._sandbox_active_config())
         lines = result.text.splitlines()
         backend_lines = [l for l in lines if "sandbox backend" in l.lower()]
@@ -879,30 +879,30 @@ class TestDoctorMM06Diagnostics:
     # -- env policy summary (3 states) ------------------------------------
 
     def test_env_policy_summary_shown_when_sandbox_active(self):
-        """sandbox_active=True → env policy line with required/denied counts surfaced."""
+        """Sandbox_active=True → env policy line with required/denied counts surfaced."""
         result = doctor_config_text(self._sandbox_active_config())
         text_lower = result.text.lower()
         assert "env policy" in text_lower
 
     def test_env_policy_shows_required_and_denied_counts(self):
-        """sandbox_active=True → required and denied counts visible in env policy line."""
+        """Sandbox_active=True → required and denied counts visible in env policy line."""
         result = doctor_config_text(self._sandbox_active_config())
         text_lower = result.text.lower()
         assert "required" in text_lower
         assert "denied" in text_lower
 
     def test_env_policy_shows_effective_count_when_sandbox_active(self):
-        """sandbox_active=True → effective allowlist size shown."""
+        """Sandbox_active=True → effective allowlist size shown."""
         result = doctor_config_text(self._sandbox_active_config())
         assert "effective" in result.text.lower()
 
     def test_env_policy_shown_when_sandbox_declared_not_active(self):
-        """sandbox declared but not active → env policy line shown (as default/inactive)."""
+        """Sandbox declared but not active → env policy line shown (as default/inactive)."""
         result = doctor_config_text(self._sandbox_declared_not_active_config())
         assert "env policy" in result.text.lower()
 
     def test_env_policy_not_shown_in_direct_mode(self):
-        """direct mode → env policy line NOT shown (no sandbox substrate)."""
+        """Direct mode → env policy line NOT shown (no sandbox substrate)."""
         result = doctor_config_text(self._direct_config())
         assert "env policy" not in result.text.lower()
 
@@ -953,7 +953,7 @@ class TestDoctorMM06Diagnostics:
     # -- write-intent audit -----------------------------------------------
 
     def test_write_intent_audit_shown_when_sandbox_active(self):
-        """sandbox_active=True → write-intent audit note present in output."""
+        """Sandbox_active=True → write-intent audit note present in output."""
         result = doctor_config_text(self._sandbox_active_config(tools="Read,Write"))
         text_lower = result.text.lower()
         assert "write-intent" in text_lower or ("write" in text_lower and "audit" in text_lower)
@@ -968,7 +968,7 @@ class TestDoctorMM06Diagnostics:
             assert "audit" in line.lower(), "Write-intent line must mention 'audit'"
 
     def test_write_intent_absent_in_direct_mode(self):
-        """direct mode → no write-intent audit line (dispatch audit events not active)."""
+        """Direct mode → no write-intent audit line (dispatch audit events not active)."""
         result = doctor_config_text(self._direct_config(tools="Read,Write"))
         lines = result.text.splitlines()
         write_intent_lines = [l for l in lines if "write-intent" in l.lower()]
@@ -1379,7 +1379,7 @@ class TestLastPauseLifecycle:
 
 
 # ---------------------------------------------------------------------------
-# MM09 Step 5 — doctor_implement_config_text
+# doctor_implement_config_text
 # ---------------------------------------------------------------------------
 
 from src.implement.implement_loop import ImplementConfig, ImplementTarget

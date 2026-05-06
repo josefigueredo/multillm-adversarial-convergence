@@ -1,4 +1,4 @@
-"""Tests for workflow transition emission in the research loop — MM07 Step 2."""
+"""Tests for workflow transition emission in the research loop."""
 
 from __future__ import annotations
 

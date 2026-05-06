@@ -1,4 +1,4 @@
-"""MM13 Step 4 — diagnostics and docs backend-aware truthfulness tests.
+"""Diagnostics and docs backend-aware truthfulness tests.
 
 TDD tests verifying that explain_config_text() and doctor_config_text()
 describe the configured sandbox backend honestly, including:

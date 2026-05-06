@@ -1,4 +1,4 @@
-"""Integration tests for MM08 Step 3: guidance persistence and injection wiring.
+"""Integration tests for guidance persistence and injection wiring.
 
 These tests verify that:
 1. Guidance saved at a pause is available after resume (store round-trip).

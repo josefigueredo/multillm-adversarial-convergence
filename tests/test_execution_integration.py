@@ -1,4 +1,4 @@
-"""Tests for MM10 Step 5 — Execution subsystem integration.
+"""Tests for Execution subsystem integration.
 
 Covers:
 - Adapter functions: build_implement_execution_plan, result_from_implement_state,

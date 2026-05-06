@@ -1,4 +1,4 @@
-"""MM13 Step 3 — workspace/env/write semantics mapped onto container execution.
+"""Workspace/env/write semantics mapped onto container execution.
 
 TDD tests that verify:
 - workspace_dir updates to the container-side path after prepare_workspace()

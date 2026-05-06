@@ -1,4 +1,4 @@
-"""Tests for MM11 Step 1 — Deliverable pipeline model.
+"""Tests for Deliverable pipeline model.
 
 Covers:
 - PipelineStage: enum values (pending, synthesize, revise, package, export)

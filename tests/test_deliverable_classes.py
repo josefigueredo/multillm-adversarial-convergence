@@ -1,4 +1,4 @@
-"""Tests for MM11 Step 2 — Deliverable class pipelines.
+"""Tests for Deliverable class pipelines.
 
 Covers:
 - DeliverableClass: enum values for paper, technical_doc, executive_brief, decision_memo

@@ -2376,7 +2376,7 @@ class TestAutoResearcherEnforcement:
         events = self._read_audit_events(researcher)
         assert any(e.get("event") == "policy_denied" for e in events)
 
-    # -- network policy enforcement (M4 Step 3) ----------------------------
+    # -- network policy enforcement ----------------------------
 
     def _make_sandboxed_researcher(self, research_config, fake_backend, tmp_path, *, network_access="none"):
         """Return a researcher with sandbox active (tool_execution_mode=sandboxed, mode=tool_calls)."""
@@ -2419,7 +2419,7 @@ class TestAutoResearcherEnforcement:
         assert result is not None
 
     def test_web_tool_allowed_in_direct_mode_even_with_network_none(self, research_config, fake_backend, tmp_path):
-        """sandbox_active=False (direct mode) → no network enforcement at _check_execution_policy."""
+        """Sandbox_active=False (direct mode) → no network enforcement at _check_execution_policy."""
         import dataclasses
         from src.config import SandboxConfig, SecurityConfig
         # direct mode + network_access=none but sandbox NOT active
@@ -2483,7 +2483,7 @@ class TestAutoResearcherEnforcement:
         assert denial_events[0]["reason_code"] == "network_access_disallowed"
 
     def test_bash_denial_precedes_network_denial_when_both_blocked(self, research_config, fake_backend, tmp_path):
-        """allow_host_bash=False + sandbox_active + network=none + Bash,WebSearch → bash denial wins."""
+        """Allow_host_bash=False + sandbox_active + network=none + Bash,WebSearch → bash denial wins."""
         import dataclasses
         from src.config import SandboxConfig, SecurityConfig
         from src.policy.policy_denial import PolicyDeniedError
@@ -2500,7 +2500,7 @@ class TestAutoResearcherEnforcement:
             researcher._call_with(fake_backend, "prompt", allowed_tools="Bash,WebSearch")
         assert exc_info.value.reason_code == "host_bash_disabled"
 
-    # -- capability-based dispatch (M5 Step 3) -----------------------------
+    # -- capability-based dispatch -----------------------------
 
     def test_unknown_tool_not_blocked_by_bash_policy(self, research_config, fake_backend, tmp_path):
         """Unclassified tools are NOT denied by bash policy when sandbox is NOT active."""
@@ -2539,7 +2539,7 @@ class TestAutoResearcherEnforcement:
         assert result is not None
 
     def test_unclassified_denial_emits_audit_event(self, research_config, fake_backend, tmp_path):
-        """tool_unclassified denial must be recorded in audit_trail.jsonl."""
+        """Tool_unclassified denial must be recorded in audit_trail.jsonl."""
         from src.policy.policy_denial import PolicyDeniedError
         researcher = self._make_sandboxed_researcher(research_config, fake_backend, tmp_path, network_access="unrestricted")
         with pytest.raises(PolicyDeniedError):
@@ -2693,7 +2693,7 @@ class TestSandboxedExecutionWorkspace:
 
 
 # ---------------------------------------------------------------------------
-# M5 Step 1 wiring: sandbox env shaping routed into backend subprocess
+# Sandbox env shaping routed into backend subprocess
 # ---------------------------------------------------------------------------
 
 class TestSandboxedEnvShaping:
@@ -2752,7 +2752,7 @@ class TestSandboxedEnvShaping:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 4 — write-intent dispatch contract
+# write-intent dispatch contract
 # ---------------------------------------------------------------------------
 
 class TestDispatchWriteIntentAudit:

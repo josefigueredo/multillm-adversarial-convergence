@@ -1,4 +1,4 @@
-"""Tests for MM08 Step 3 — HITL guidance persistence and injection.
+"""Tests for HITL guidance persistence and injection.
 
 Covers:
 - HitlGuidance dataclass: shape, validation, serialization round-trip

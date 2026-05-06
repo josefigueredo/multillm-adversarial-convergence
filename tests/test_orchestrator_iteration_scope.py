@@ -1,4 +1,4 @@
-"""MM16 Step 3 — Orchestrator loop wiring + audit events.
+"""Orchestrator loop wiring + audit events.
 
 TDD tests written before implementation.
 
@@ -108,14 +108,14 @@ def _run_setup(researcher) -> None:
 
 class TestScopeRunSetupBehavior:
     def test_run_scope_prepares_workspace_in_setup(self, tmp_path):
-        """scope=run → _setup() creates workspace dir."""
+        """Scope=run → _setup() creates workspace dir."""
         researcher = _make_researcher(_make_config(scope="run"), tmp_path)
         _run_setup(researcher)
         assert researcher._sandbox is not None
         assert researcher._sandbox.workspace_dir.exists()
 
     def test_run_scope_workspace_stable_across_run_iterations(self, tmp_path):
-        """scope=run → workspace_dir stays the same across multiple _run_iteration calls."""
+        """Scope=run → workspace_dir stays the same across multiple _run_iteration calls."""
         researcher = _make_researcher(_make_config(scope="run"), tmp_path)
         _run_setup(researcher)
         ws_before = researcher._sandbox.workspace_dir
@@ -130,7 +130,7 @@ class TestScopeRunSetupBehavior:
         assert ws_before == ws_after_1 == ws_after_2
 
     def test_run_scope_prepare_not_called_per_iteration(self, tmp_path):
-        """scope=run → prepare_workspace is NOT called again inside _run_iteration."""
+        """Scope=run → prepare_workspace is NOT called again inside _run_iteration."""
         researcher = _make_researcher(_make_config(scope="run"), tmp_path)
         _run_setup(researcher)
 
@@ -149,7 +149,7 @@ class TestScopeRunSetupBehavior:
 
 class TestScopeIterationSetupBehavior:
     def test_iteration_scope_skips_workspace_in_setup(self, tmp_path):
-        """scope=iteration (active sandbox) → _setup() does NOT create the workspace dir."""
+        """Scope=iteration (active sandbox) → _setup() does NOT create the workspace dir."""
         researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
         assert researcher._sandbox is not None
@@ -157,7 +157,7 @@ class TestScopeIterationSetupBehavior:
         assert not researcher._sandbox.workspace_dir.exists()
 
     def test_iteration_scope_workspace_prepared_before_iter1(self, tmp_path):
-        """scope=iteration → prepare_workspace(iteration=1) called before iteration 1."""
+        """Scope=iteration → prepare_workspace(iteration=1) called before iteration 1."""
         researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
 
@@ -169,7 +169,7 @@ class TestScopeIterationSetupBehavior:
         mock_prep.assert_called_once_with(iteration=1)
 
     def test_iteration_scope_workspace_prepared_before_iter2(self, tmp_path):
-        """scope=iteration → prepare_workspace(iteration=2) called before iteration 2."""
+        """Scope=iteration → prepare_workspace(iteration=2) called before iteration 2."""
         researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
 
@@ -184,7 +184,7 @@ class TestScopeIterationSetupBehavior:
         mock_prep.assert_any_call(iteration=2)
 
     def test_iteration_scope_workspace_dir_changes_between_iterations(self, tmp_path):
-        """scope=iteration → workspace_dir updates to iter_0001, iter_0002 path."""
+        """Scope=iteration → workspace_dir updates to iter_0001, iter_0002 path."""
         researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
 
@@ -200,7 +200,7 @@ class TestScopeIterationSetupBehavior:
         assert ws1 != ws2
 
     def test_iteration_scope_iter_dirs_created_on_disk(self, tmp_path):
-        """scope=iteration → iter_0001/ and iter_0002/ dirs exist after two iterations."""
+        """Scope=iteration → iter_0001/ and iter_0002/ dirs exist after two iterations."""
         researcher = _make_researcher(_make_config(scope="iteration", sandboxed=True), tmp_path)
         _run_setup(researcher)
 
@@ -227,7 +227,7 @@ class TestSandboxWorkspacePreparedAuditEvent:
         return researcher, trail
 
     def test_audit_event_emitted_per_iteration(self, tmp_path):
-        """scope=iteration → sandbox_workspace_prepared emitted for each iteration."""
+        """Scope=iteration → sandbox_workspace_prepared emitted for each iteration."""
         researcher, trail = self._make_researcher_with_capturing_trail(tmp_path, scope="iteration")
 
         with patch("src.research_loop.run_iteration") as mock_iter:
@@ -239,7 +239,7 @@ class TestSandboxWorkspacePreparedAuditEvent:
         assert len(events) == 2
 
     def test_audit_event_has_correct_iteration_field(self, tmp_path):
-        """sandbox_workspace_prepared event has correct iteration number."""
+        """Sandbox_workspace_prepared event has correct iteration number."""
         researcher, trail = self._make_researcher_with_capturing_trail(tmp_path, scope="iteration")
 
         with patch("src.research_loop.run_iteration") as mock_iter:
@@ -252,7 +252,7 @@ class TestSandboxWorkspacePreparedAuditEvent:
         assert events[1]["iteration"] == 2
 
     def test_audit_event_has_workspace_dir_field(self, tmp_path):
-        """sandbox_workspace_prepared event contains workspace_dir."""
+        """Sandbox_workspace_prepared event contains workspace_dir."""
         researcher, trail = self._make_researcher_with_capturing_trail(tmp_path, scope="iteration")
 
         with patch("src.research_loop.run_iteration") as mock_iter:
@@ -264,7 +264,7 @@ class TestSandboxWorkspacePreparedAuditEvent:
         assert "iter_0001" in events[0]["workspace_dir"]
 
     def test_audit_event_has_scope_field(self, tmp_path):
-        """sandbox_workspace_prepared event contains scope=iteration."""
+        """Sandbox_workspace_prepared event contains scope=iteration."""
         researcher, trail = self._make_researcher_with_capturing_trail(tmp_path, scope="iteration")
 
         with patch("src.research_loop.run_iteration") as mock_iter:
@@ -275,7 +275,7 @@ class TestSandboxWorkspacePreparedAuditEvent:
         assert events[0]["scope"] == "iteration"
 
     def test_no_audit_event_for_scope_run(self, tmp_path):
-        """scope=run → no sandbox_workspace_prepared events emitted."""
+        """Scope=run → no sandbox_workspace_prepared events emitted."""
         researcher, trail = self._make_researcher_with_capturing_trail(tmp_path, scope="run")
 
         with patch("src.research_loop.run_iteration") as mock_iter:
@@ -310,7 +310,7 @@ class TestDirectModeWithIterationScope:
         )
 
     def test_direct_mode_no_iteration_workspace_created(self, tmp_path):
-        """scope=iteration + direct mode → no iter_* dirs created during _run_iteration."""
+        """Scope=iteration + direct mode → no iter_* dirs created during _run_iteration."""
         from tests.test_orchestrator import FakeBackend
         from src.orchestrator import AutoResearcher
         researcher = AutoResearcher(
@@ -330,7 +330,7 @@ class TestDirectModeWithIterationScope:
         assert not (base_ws / "iter_0002").exists()
 
     def test_direct_mode_no_sandbox_workspace_prepared_event(self, tmp_path):
-        """scope=iteration + direct mode → no sandbox_workspace_prepared audit events."""
+        """Scope=iteration + direct mode → no sandbox_workspace_prepared audit events."""
         from tests.test_orchestrator import FakeBackend
         from src.orchestrator import AutoResearcher
         researcher = AutoResearcher(

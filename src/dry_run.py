@@ -26,7 +26,7 @@ def build_dry_run_summary(
         for name, provider in config.providers.items()
     }
     return {
-        "mode": "run",
+        "mode": "research",
         "config_path": str(config_path.resolve()),
         "topic": config.topic,
         "goal": config.goal,

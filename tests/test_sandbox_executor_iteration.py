@@ -1,4 +1,4 @@
-"""MM16 Step 2 — SandboxExecutor.prepare_workspace(iteration=N) and transient sandbox support.
+"""SandboxExecutor.prepare_workspace(iteration=N) and transient sandbox support.
 
 TDD tests written before implementation.
 
@@ -52,21 +52,21 @@ def _make_executor(
 
 class TestExecutorPrepareWorkspaceIteration:
     def test_no_arg_unchanged(self, tmp_path):
-        """prepare_workspace() (no arg) still returns base workspace."""
+        """Prepare_workspace() (no arg) still returns base workspace."""
         executor = _make_executor(tmp_path)
         path = executor.prepare_workspace()
         assert path == tmp_path / "output" / ".workspace"
         assert path.is_dir()
 
     def test_iteration_none_unchanged(self, tmp_path):
-        """prepare_workspace(iteration=None) returns base workspace."""
+        """Prepare_workspace(iteration=None) returns base workspace."""
         executor = _make_executor(tmp_path)
         path = executor.prepare_workspace(iteration=None)
         assert path == tmp_path / "output" / ".workspace"
         assert path.is_dir()
 
     def test_iteration_3_returns_iter_path(self, tmp_path):
-        """prepare_workspace(iteration=3) returns workspace/iter_0003."""
+        """Prepare_workspace(iteration=3) returns workspace/iter_0003."""
         executor = _make_executor(tmp_path)
         path = executor.prepare_workspace(iteration=3)
         expected = tmp_path / "output" / ".workspace" / "iter_0003"
@@ -86,7 +86,7 @@ class TestExecutorPrepareWorkspaceIteration:
         assert executor.workspace_dir == tmp_path / "output" / ".workspace" / "iter_0099"
 
     def test_base_workspace_unchanged_before_call(self, tmp_path):
-        """workspace_dir is the base path before any prepare_workspace call."""
+        """Workspace_dir is the base path before any prepare_workspace call."""
         executor = _make_executor(tmp_path)
         assert executor.workspace_dir == tmp_path / "output" / ".workspace"
 
@@ -99,7 +99,7 @@ class TestExecutorPrepareWorkspaceIteration:
         assert executor.workspace_dir == tmp_path / "output" / ".workspace"
 
     def test_iteration_delegates_to_backend(self, tmp_path):
-        """prepare_workspace(iteration=N) forwards iteration=N to the backend."""
+        """Prepare_workspace(iteration=N) forwards iteration=N to the backend."""
         policy = _make_policy(tmp_path)
         mock_backend = MagicMock()
         mock_backend.prepare_workspace.return_value = tmp_path / "output" / ".workspace" / "iter_0003"
@@ -108,7 +108,7 @@ class TestExecutorPrepareWorkspaceIteration:
         mock_backend.prepare_workspace.assert_called_once_with(iteration=3)
 
     def test_no_arg_delegates_none_to_backend(self, tmp_path):
-        """prepare_workspace() delegates iteration=None to the backend."""
+        """Prepare_workspace() delegates iteration=None to the backend."""
         policy = _make_policy(tmp_path)
         mock_backend = MagicMock()
         mock_backend.prepare_workspace.return_value = tmp_path / "output" / ".workspace"
@@ -262,7 +262,7 @@ class TestCallWithIterationScoping:
         return AutoResearcher(config=config, backend=FakeBackend(), output_dir=tmp_path / "out")
 
     def test_scope_run_calls_prepare_with_none(self, tmp_path):
-        """scope=run → _call_with passes iteration=None to prepare_workspace."""
+        """Scope=run → _call_with passes iteration=None to prepare_workspace."""
         from unittest.mock import patch
         from src.backends import AgentResponse
         researcher = self._make_researcher(tmp_path, scope="run")
@@ -280,7 +280,7 @@ class TestCallWithIterationScoping:
         mock_executor.prepare_workspace.assert_called_once_with(iteration=None)
 
     def test_scope_iteration_with_active_iter_calls_prepare_with_iter(self, tmp_path):
-        """scope=iteration + iteration=3 → _call_with passes iteration=3 to prepare_workspace."""
+        """Scope=iteration + iteration=3 → _call_with passes iteration=3 to prepare_workspace."""
         researcher = self._make_researcher(tmp_path, scope="iteration")
         mock_executor = MagicMock()
         mock_executor.policy.sandbox_active = True
@@ -298,7 +298,7 @@ class TestCallWithIterationScoping:
         mock_executor.prepare_workspace.assert_called_once_with(iteration=3)
 
     def test_scope_iteration_with_zero_iter_calls_prepare_with_none(self, tmp_path):
-        """scope=iteration but iteration=0 (pre-run) → _call_with passes iteration=None."""
+        """Scope=iteration but iteration=0 (pre-run) → _call_with passes iteration=None."""
         researcher = self._make_researcher(tmp_path, scope="iteration")
         mock_executor = MagicMock()
         mock_executor.policy.sandbox_active = True

@@ -1,4 +1,4 @@
-"""Tests for workflow phase contracts — MM07 Step 3."""
+"""Tests for workflow phase contracts."""
 
 from __future__ import annotations
 

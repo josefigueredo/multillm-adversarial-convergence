@@ -1,4 +1,4 @@
-"""Tests for MM10 Step 4 — Repair loop.
+"""Tests for Repair loop.
 
 Covers:
 - RepairAttempt: record of one repair cycle (before diagnosis, repaired plan,

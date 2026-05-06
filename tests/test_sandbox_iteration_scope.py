@@ -1,4 +1,4 @@
-"""MM16 Step 1 — iteration scope: config + backend prepare_workspace path contract.
+"""Iteration scope: config + backend prepare_workspace path contract.
 
 TDD tests written before implementation.
 
@@ -30,11 +30,11 @@ class TestSandboxConfigIterationScope:
         assert "iteration" in VALID_SANDBOX_SCOPES
 
     def test_run_still_valid(self):
-        """scope='run' is still valid."""
+        """Scope='run' is still valid."""
         assert "run" in VALID_SANDBOX_SCOPES
 
     def test_scope_call_still_invalid(self):
-        """scope='call' is still rejected — only run and iteration are valid."""
+        """Scope='call' is still rejected — only run and iteration are valid."""
         with pytest.raises(ValueError, match="scope"):
             SandboxConfig(scope="call")
 
@@ -50,21 +50,21 @@ class TestSandboxConfigIterationScope:
 
 class TestLocalProcessBackendIterationWorkspace:
     def test_none_iteration_unchanged(self, tmp_path):
-        """iteration=None returns the top-level workspace (existing behavior)."""
+        """Iteration=None returns the top-level workspace (existing behavior)."""
         backend = LocalProcessBackend(tmp_path / "ws")
         path = backend.prepare_workspace(iteration=None)
         assert path == tmp_path / "ws"
         assert path.exists()
 
     def test_no_arg_unchanged(self, tmp_path):
-        """prepare_workspace() (no arg) behaves identically to iteration=None."""
+        """Prepare_workspace() (no arg) behaves identically to iteration=None."""
         backend = LocalProcessBackend(tmp_path / "ws")
         path = backend.prepare_workspace()
         assert path == tmp_path / "ws"
         assert path.exists()
 
     def test_iteration_1_creates_iter_0001(self, tmp_path):
-        """iteration=1 creates and returns workspace/iter_0001/."""
+        """Iteration=1 creates and returns workspace/iter_0001/."""
         backend = LocalProcessBackend(tmp_path / "ws")
         path = backend.prepare_workspace(iteration=1)
         expected = tmp_path / "ws" / "iter_0001"
@@ -72,7 +72,7 @@ class TestLocalProcessBackendIterationWorkspace:
         assert expected.is_dir()
 
     def test_iteration_99_creates_iter_0099(self, tmp_path):
-        """iteration=99 creates and returns workspace/iter_0099/."""
+        """Iteration=99 creates and returns workspace/iter_0099/."""
         backend = LocalProcessBackend(tmp_path / "ws")
         path = backend.prepare_workspace(iteration=99)
         expected = tmp_path / "ws" / "iter_0099"
@@ -86,7 +86,7 @@ class TestLocalProcessBackendIterationWorkspace:
         assert (tmp_path / "ws").is_dir()
 
     def test_iteration_idempotent(self, tmp_path):
-        """prepare_workspace(iteration=N) is safe to call twice."""
+        """Prepare_workspace(iteration=N) is safe to call twice."""
         backend = LocalProcessBackend(tmp_path / "ws")
         p1 = backend.prepare_workspace(iteration=5)
         p2 = backend.prepare_workspace(iteration=5)
@@ -103,13 +103,13 @@ class TestLocalProcessBackendIterationWorkspace:
         assert p2.is_dir()
 
     def test_iteration_zero_raises(self, tmp_path):
-        """iteration=0 is rejected (must be >= 1)."""
+        """Iteration=0 is rejected (must be >= 1)."""
         backend = LocalProcessBackend(tmp_path / "ws")
         with pytest.raises(ValueError, match="iteration must be >= 1"):
             backend.prepare_workspace(iteration=0)
 
     def test_iteration_negative_raises(self, tmp_path):
-        """iteration=-1 is rejected (must be >= 1)."""
+        """Iteration=-1 is rejected (must be >= 1)."""
         backend = LocalProcessBackend(tmp_path / "ws")
         with pytest.raises(ValueError, match="iteration must be >= 1"):
             backend.prepare_workspace(iteration=-1)
@@ -128,25 +128,25 @@ class TestContainerBackendIterationWorkspace:
         )
 
     def test_none_iteration_returns_container_workspace(self, tmp_path):
-        """iteration=None returns the top-level container workspace (existing behavior)."""
+        """Iteration=None returns the top-level container workspace (existing behavior)."""
         backend = self._make_backend(tmp_path)
         path = backend.prepare_workspace(iteration=None)
         assert path == Path("/sandbox/workspace")
 
     def test_no_arg_unchanged(self, tmp_path):
-        """prepare_workspace() (no arg) still returns top-level container workspace."""
+        """Prepare_workspace() (no arg) still returns top-level container workspace."""
         backend = self._make_backend(tmp_path)
         path = backend.prepare_workspace()
         assert path == Path("/sandbox/workspace")
 
     def test_iteration_2_returns_container_iter_path(self, tmp_path):
-        """iteration=2 returns /sandbox/workspace/iter_0002."""
+        """Iteration=2 returns /sandbox/workspace/iter_0002."""
         backend = self._make_backend(tmp_path)
         path = backend.prepare_workspace(iteration=2)
         assert path == Path("/sandbox/workspace/iter_0002")
 
     def test_iteration_2_creates_host_subdir(self, tmp_path):
-        """iteration=2 creates host_workspace/iter_0002/ on the host."""
+        """Iteration=2 creates host_workspace/iter_0002/ on the host."""
         backend = self._make_backend(tmp_path)
         backend.prepare_workspace(iteration=2)
         assert (tmp_path / "host_ws" / "iter_0002").is_dir()
@@ -158,13 +158,13 @@ class TestContainerBackendIterationWorkspace:
         assert "iter_0007" in str(path)
 
     def test_iteration_zero_raises(self, tmp_path):
-        """iteration=0 is rejected (must be >= 1)."""
+        """Iteration=0 is rejected (must be >= 1)."""
         backend = self._make_backend(tmp_path)
         with pytest.raises(ValueError, match="iteration must be >= 1"):
             backend.prepare_workspace(iteration=0)
 
     def test_iteration_negative_raises(self, tmp_path):
-        """iteration=-1 is rejected (must be >= 1)."""
+        """Iteration=-1 is rejected (must be >= 1)."""
         backend = self._make_backend(tmp_path)
         with pytest.raises(ValueError, match="iteration must be >= 1"):
             backend.prepare_workspace(iteration=-1)

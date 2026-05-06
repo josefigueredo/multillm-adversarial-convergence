@@ -788,7 +788,7 @@ class TestExplainConfigSubcommand:
     def test_explain_config_container_backend_shows_sandbox_backend_and_image(
         self, tmp_path: Path, capsys
     ):
-        """explain config with container backend shows sandbox.backend and image name."""
+        """Explain config with container backend shows sandbox.backend and image name."""
         container_config = tmp_path / "container_research.yaml"
         container_config.write_text(textwrap.dedent("""\
             research:

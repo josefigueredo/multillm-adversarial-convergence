@@ -1,4 +1,4 @@
-"""MM14 Step 1 — run_subprocess on SandboxBackend ABC and LocalProcessBackend.
+"""Run_subprocess on SandboxBackend ABC and LocalProcessBackend.
 
 TDD tests written before implementation.
 
@@ -66,7 +66,7 @@ class TestSandboxBackendABCRunSubprocess:
         assert backend is not None
 
     def test_return_shape(self):
-        """run_subprocess returns a 3-tuple (returncode, stdout, stderr)."""
+        """Run_subprocess returns a 3-tuple (returncode, stdout, stderr)."""
         backend = _FullConcreteBackend()
         result = backend.run_subprocess(["echo", "hi"])
         assert isinstance(result, tuple)
@@ -95,7 +95,7 @@ class TestLocalProcessBackendRunSubprocess:
         assert rc != 0
 
     def test_cwd_forwarded(self, tmp_path):
-        """cwd parameter is forwarded to subprocess.run."""
+        """Cwd parameter is forwarded to subprocess.run."""
         backend = LocalProcessBackend(tmp_path)
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
@@ -106,7 +106,7 @@ class TestLocalProcessBackendRunSubprocess:
             assert kwargs["cwd"] == tmp_path
 
     def test_env_forwarded(self, tmp_path):
-        """env parameter is forwarded to subprocess.run."""
+        """Env parameter is forwarded to subprocess.run."""
         backend = LocalProcessBackend(tmp_path)
         custom_env = {"PATH": "/usr/bin", "MY_VAR": "42"}
         with patch("subprocess.run") as mock_run:
@@ -118,7 +118,7 @@ class TestLocalProcessBackendRunSubprocess:
             assert kwargs["env"] == custom_env
 
     def test_timeout_forwarded(self, tmp_path):
-        """timeout parameter is forwarded to subprocess.run."""
+        """Timeout parameter is forwarded to subprocess.run."""
         backend = LocalProcessBackend(tmp_path)
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
@@ -129,7 +129,7 @@ class TestLocalProcessBackendRunSubprocess:
             assert kwargs["timeout"] == 5.0
 
     def test_no_shell_flag(self, tmp_path):
-        """subprocess.run is called WITHOUT shell=True (no shell injection surface)."""
+        """Subprocess.run is called WITHOUT shell=True (no shell injection surface)."""
         backend = LocalProcessBackend(tmp_path)
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
@@ -140,7 +140,7 @@ class TestLocalProcessBackendRunSubprocess:
             assert not kwargs.get("shell", False)
 
     def test_capture_output_enabled(self, tmp_path):
-        """capture_output=True and text=True so we get str stdout/stderr."""
+        """Capture_output=True and text=True so we get str stdout/stderr."""
         backend = LocalProcessBackend(tmp_path)
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
@@ -152,7 +152,7 @@ class TestLocalProcessBackendRunSubprocess:
             assert kwargs.get("text") is True
 
     def test_stderr_captured(self, tmp_path):
-        """stderr from the subprocess is captured in the third tuple element."""
+        """Stderr from the subprocess is captured in the third tuple element."""
         backend = LocalProcessBackend(tmp_path)
         # Use a command that writes to stderr
         rc, out, err = backend.run_subprocess(

@@ -1,4 +1,4 @@
-"""MM12 Step 4 — policy domain package seam tests.
+"""Policy domain package seam tests.
 
 TDD tests that verify:
 - src.policy exposes the full HITL/trust/policy/security API

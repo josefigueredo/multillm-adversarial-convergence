@@ -1,4 +1,4 @@
-"""Tests for workflow state machine models — MM07 Step 1."""
+"""Tests for workflow state machine models."""
 
 from __future__ import annotations
 

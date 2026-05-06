@@ -1,4 +1,4 @@
-"""Tests for MM08 Step 4: structured HITL review packets."""
+"""Tests for structured HITL review packets."""
 
 from __future__ import annotations
 

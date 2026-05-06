@@ -82,7 +82,7 @@ class TestIterationScore:
         assert s.gaps == []
 
     def test_has_no_status_property(self):
-        """status property was removed — keep/discard is decided by orchestrator."""
+        """Status property was removed — keep/discard is decided by orchestrator."""
         s = IterationScore(total=50.0)
         assert not hasattr(s, "status")
 

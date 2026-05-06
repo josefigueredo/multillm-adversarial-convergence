@@ -1,4 +1,4 @@
-"""MM14 Step 3 — SandboxExecutor.run_subprocess() delegation.
+"""SandboxExecutor.run_subprocess() delegation.
 
 TDD tests written before implementation.
 

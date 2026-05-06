@@ -1,4 +1,4 @@
-"""Tests for src.sandbox_executor — SandboxExecutor abstraction (M4 Step 1)."""
+"""Tests for src.sandbox_executor — SandboxExecutor abstraction."""
 
 from __future__ import annotations
 
@@ -410,7 +410,7 @@ class TestOrchestratorSandboxIntegration:
 
 
 # ---------------------------------------------------------------------------
-# Orchestrator network policy integration — guard_network_action (M4 Step 3)
+# Orchestrator network policy integration — guard_network_action
 # ---------------------------------------------------------------------------
 
 def _make_sandboxed_researcher(tmp_path: Path, *, network_access: str = "none") -> object:
@@ -510,7 +510,7 @@ class TestOrchestratorNetworkPolicyIntegration:
     # -- direct mode: no enforcement ---------------------------------------
 
     def test_direct_mode_does_not_enforce_even_with_network_none(self, tmp_path):
-        """sandbox_active=False → guard_network_action is a no-op regardless of config."""
+        """Sandbox_active=False → guard_network_action is a no-op regardless of config."""
         researcher = _make_researcher(tmp_path, network_access="none")
         # direct mode: no PolicyDeniedError
         researcher.guard_network_action("fetch_url", "web")  # must not raise
@@ -530,7 +530,7 @@ class TestOrchestratorNetworkPolicyIntegration:
 
 
 # ---------------------------------------------------------------------------
-# SandboxExecutor.build_environment — M5 Step 1
+# SandboxExecutor.build_environment
 # ---------------------------------------------------------------------------
 
 class TestBuildEnvironment:
@@ -695,7 +695,7 @@ class TestResolveEnv:
         assert result is None
 
     def test_resolve_env_process_env_wins_over_sanitize(self):
-        """process_env takes precedence even when sanitize_environment=True."""
+        """Process_env takes precedence even when sanitize_environment=True."""
         from src.backends.types import CallOptions
         backend = self._make_backend()
         explicit_env = {"PATH": "/custom"}
@@ -705,7 +705,7 @@ class TestResolveEnv:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 4 — destination_type validation in _check_network
+# destination_type validation in _check_network
 # ---------------------------------------------------------------------------
 
 class TestValidateToolRequestDestinationTypeValidation:

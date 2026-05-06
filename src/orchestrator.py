@@ -220,7 +220,7 @@ class AutoResearcher:
         }
         self._tool_trace: list[dict[str, Any]] = []
         self._prompt_snapshots: list[dict[str, Any]] = []
-        self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="run", run_id=self.output_dir.name)
+        self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="research", run_id=self.output_dir.name)
 
     def _sync_paths(self) -> None:
         """Recompute derived artifact paths from the current output directory."""
@@ -257,7 +257,7 @@ class AutoResearcher:
         self.report_pdf_path = self.paths.report_pdf
         self.portfolio_path = self.paths.portfolio
         self.portfolio_html_path = self.paths.portfolio_html
-        self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="run", run_id=self.output_dir.name)
+        self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="research", run_id=self.output_dir.name)
 
     def _call(self, prompt: str, **kwargs: Any) -> AgentResponse:
         """Invoke the default backend with config defaults.

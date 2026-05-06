@@ -1,4 +1,4 @@
-"""MM13 Step 5 — container backend unavailability fallback tests.
+"""Container backend unavailability fallback tests.
 
 TDD tests verifying that select_sandbox_backend() raises a clear, actionable
 error when the container backend is configured but Docker is not available,
@@ -55,7 +55,7 @@ class TestContainerUnavailableFallback:
         assert "local_process" in msg or "install" in msg
 
     def test_local_process_backend_ignores_docker_availability(self, tmp_path):
-        """local_process must not check for Docker."""
+        """Local_process must not check for Docker."""
         from src.sandbox import select_sandbox_backend
         from src.sandbox.backends.local_process import LocalProcessBackend
         with patch("src.sandbox.backends.container.shutil.which", return_value=None):

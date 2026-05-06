@@ -1,4 +1,4 @@
-"""Unit tests for WorkflowTransitionEmitter — MM07 Step 2."""
+"""Unit tests for WorkflowTransitionEmitter."""
 
 from __future__ import annotations
 

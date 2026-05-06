@@ -1,4 +1,4 @@
-"""Tests for src.tool_capabilities — M5 Step 2 + MM06 Step 2."""
+"""Tests for src.tool_capabilities."""
 
 from __future__ import annotations
 
@@ -254,7 +254,7 @@ class TestToolCapabilitiesRegistry:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 2 — LS classification
+# LS classification
 # ---------------------------------------------------------------------------
 
 class TestLSClassification:
@@ -271,7 +271,7 @@ class TestLSClassification:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 2 — SHIPPED_TOOLS constant
+# SHIPPED_TOOLS constant
 # ---------------------------------------------------------------------------
 
 class TestShippedTools:
@@ -301,7 +301,7 @@ class TestShippedTools:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 2 — coverage_stats
+# coverage_stats
 # ---------------------------------------------------------------------------
 
 class TestCoverageStats:
@@ -356,7 +356,7 @@ class TestCoverageStats:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 2 — check_capability_consistency
+# check_capability_consistency
 # ---------------------------------------------------------------------------
 
 class TestCapabilityConsistency:

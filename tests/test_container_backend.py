@@ -1,4 +1,4 @@
-"""MM13 Step 1 — Container sandbox backend scaffold tests.
+"""Container sandbox backend scaffold tests.
 
 TDD tests that verify:
 - ContainerBackend implements SandboxBackend interface

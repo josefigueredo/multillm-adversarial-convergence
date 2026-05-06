@@ -1,4 +1,4 @@
-"""TDD tests for MM11 Step 5 — doctor/explain for publication pipeline states.
+"""TDD tests for doctor/explain for publication pipeline states.
 
 All tests are written before the implementation exists.
 """

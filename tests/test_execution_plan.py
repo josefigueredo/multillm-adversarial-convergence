@@ -1,4 +1,4 @@
-"""Tests for MM10 Step 1 — Execution plan model.
+"""Tests for Execution plan model.
 
 Covers:
 - ExecutionStep: command/tool spec, expectations, frozen contract
@@ -209,7 +209,7 @@ class TestExecutionPlan:
 
 
 # ---------------------------------------------------------------------------
-# MM10 Step 1 refinement — TargetContext deep immutability
+# TargetContext deep immutability
 # ---------------------------------------------------------------------------
 
 class TestTargetContextImmutability:

@@ -1,4 +1,4 @@
-"""MM14 Step 2 — ContainerBackend.run_subprocess() via docker run.
+"""ContainerBackend.run_subprocess() via docker run.
 
 TDD tests written before implementation.
 
@@ -51,7 +51,7 @@ class TestContainerBackendRunSubprocessArgv:
             assert "--rm" in argv
 
     def test_docker_run_command(self, tmp_path):
-        """argv begins with ['docker', 'run']."""
+        """Argv begins with ['docker', 'run']."""
         backend = _make_backend(tmp_path)
         with patch("subprocess.run", return_value=_mock_run()) as mock_run:
             backend.run_subprocess(["echo", "hi"])
@@ -174,7 +174,7 @@ class TestContainerBackendRunSubprocessEnv:
 
 class TestContainerBackendRunSubprocessKwargs:
     def test_no_shell_flag(self, tmp_path):
-        """subprocess.run must NOT use shell=True."""
+        """Subprocess.run must NOT use shell=True."""
         backend = _make_backend(tmp_path)
         with patch("subprocess.run", return_value=_mock_run()) as mock_run:
             backend.run_subprocess(["ls"])
@@ -182,7 +182,7 @@ class TestContainerBackendRunSubprocessKwargs:
             assert not kwargs.get("shell", False)
 
     def test_capture_output_and_text(self, tmp_path):
-        """capture_output=True and text=True so we get str stdout/stderr."""
+        """Capture_output=True and text=True so we get str stdout/stderr."""
         backend = _make_backend(tmp_path)
         with patch("subprocess.run", return_value=_mock_run()) as mock_run:
             backend.run_subprocess(["ls"])
@@ -191,7 +191,7 @@ class TestContainerBackendRunSubprocessKwargs:
             assert kwargs.get("text") is True
 
     def test_timeout_forwarded(self, tmp_path):
-        """timeout is forwarded to subprocess.run."""
+        """Timeout is forwarded to subprocess.run."""
         backend = _make_backend(tmp_path)
         with patch("subprocess.run", return_value=_mock_run()) as mock_run:
             backend.run_subprocess(["ls"], timeout=15.0)

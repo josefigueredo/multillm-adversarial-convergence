@@ -1,4 +1,4 @@
-"""TDD tests for MM12 Step 2 — domain package seams.
+"""TDD tests for domain package seams.
 
 Verifies that:
 1. src.deliverables exposes the full publication pipeline public API.

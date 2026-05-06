@@ -239,7 +239,7 @@ class TestExceptionContract:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 4 refinement — denial contract completeness
+# denial contract completeness
 # ---------------------------------------------------------------------------
 
 class TestReasonCodeDocumentation:
@@ -261,7 +261,7 @@ class TestReasonCodeDocumentation:
         assert missing == [], f"Reason code(s) missing from PolicyDeniedError docstring: {missing}"
 
     def test_invalid_destination_type_constructable(self):
-        """invalid_destination_type must be a valid reason code at construction time."""
+        """Invalid_destination_type must be a valid reason code at construction time."""
         err = PolicyDeniedError(
             reason_code="invalid_destination_type",
             policy_field="sandbox.network_access",

@@ -1,4 +1,4 @@
-"""Tests for MM10 Step 2 — Execution validator layer.
+"""Tests for Execution validator layer.
 
 Covers:
 - ExecutionResult: captured output from a real or simulated step execution

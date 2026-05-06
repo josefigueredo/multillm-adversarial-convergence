@@ -1,11 +1,11 @@
-"""MM14 Step 4 — doctor diagnostics for container execution readiness.
+"""Doctor diagnostics for container execution readiness.
 
 TDD tests written before implementation.
 
 The doctor output must distinguish three container states:
 1. container backend + Docker available  → "container backend ready; run_subprocess invokes docker run"
 2. container backend + Docker unavailable → "not found on $PATH" / "RuntimeError"
-3. local_process backend → unchanged from MM13 baseline
+3. local_process backend → unchanged from local_process baseline
 """
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ class TestDoctorContainerBackendAvailableHealthy:
 
 class TestDoctorLocalProcessUnchanged:
     def test_local_process_output_unchanged(self, tmp_path):
-        """local_process doctor output is unaffected by MM14 Step 4 changes."""
+        """Local_process doctor output is unaffected by container readiness diagnostics."""
         config = _make_config(backend="local_process")
         report = doctor_config_text(config)
         assert "local_process" in report.text
@@ -151,7 +151,7 @@ class TestDoctorLocalProcessUnchanged:
         assert "container backend ready" not in report.text
 
     def test_local_process_no_is_available_call(self, tmp_path):
-        """is_available() is NOT called for local_process backend."""
+        """Is_available() is NOT called for local_process backend."""
         config = _make_config(backend="local_process")
         with patch(
             "src.sandbox.backends.container.ContainerBackend.is_available",

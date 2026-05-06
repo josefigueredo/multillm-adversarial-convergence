@@ -1,4 +1,4 @@
-"""Tests for MM10 Step 3 — Diagnosis artifacts.
+"""Tests for Diagnosis artifacts.
 
 Covers:
 - DiagnosisArtifact: rich frozen record of a validation failure
@@ -265,7 +265,7 @@ class TestPersistDiagnosis:
 
 
 # ---------------------------------------------------------------------------
-# MM10 Step 3 refinement — diagnose_plan length contract
+# diagnose_plan length contract
 # ---------------------------------------------------------------------------
 
 class TestDiagnosePlanLengthContract:

@@ -1,4 +1,4 @@
-"""MM13 Step 2 — sandbox backend selection config tests.
+"""Sandbox backend selection config tests.
 
 TDD tests that verify:
 - ContainerBackendConfig holds container-specific settings

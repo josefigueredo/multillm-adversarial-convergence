@@ -135,7 +135,7 @@ def test_apply_backend_capabilities_normalizes_invalid_tool_choice_for_supported
 # ---------------------------------------------------------------------------
 
 def test_apply_backend_capabilities_preserves_process_env():
-    """apply_backend_capabilities must not drop process_env from the reconstructed CallOptions."""
+    """Apply_backend_capabilities must not drop process_env from the reconstructed CallOptions."""
     from src.backends import get_backend
     backend = get_backend("claude-cli")
     env = {"PATH": "/usr/bin", "HOME": "/home/user"}
@@ -145,7 +145,7 @@ def test_apply_backend_capabilities_preserves_process_env():
 
 
 def test_apply_backend_capabilities_preserves_none_process_env():
-    """apply_backend_capabilities must preserve process_env=None (the default case)."""
+    """Apply_backend_capabilities must preserve process_env=None (the default case)."""
     from src.backends import get_backend
     backend = get_backend("claude-cli")
     opts = CallOptions(model="claude-opus-4-5")

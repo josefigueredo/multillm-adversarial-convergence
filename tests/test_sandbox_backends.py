@@ -1,4 +1,4 @@
-"""Tests for src.sandbox.backends — sandbox backend seam (MM06 Step 1)."""
+"""Tests for src.sandbox.backends — sandbox backend seam."""
 
 from __future__ import annotations
 
@@ -204,7 +204,7 @@ class TestSandboxExecutorBackendDelegation:
 
 
 # ---------------------------------------------------------------------------
-# MM06 Step 3 — SandboxEnvPolicy
+# SandboxEnvPolicy
 # ---------------------------------------------------------------------------
 
 from src.sandbox.backends.local_process import (

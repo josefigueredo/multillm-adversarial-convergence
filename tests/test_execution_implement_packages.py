@@ -1,4 +1,4 @@
-"""MM12 Step 3 — execution and implement domain package seam tests.
+"""Execution and implement domain package seam tests.
 
 TDD tests that verify:
 - src.execution exposes the full execution subsystem API
@@ -17,7 +17,7 @@ def _has(module, name: str) -> bool:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# src.execution — MM10 execution subsystem
+# src.execution — execution subsystem
 # ══════════════════════════════════════════════════════════════════════════════
 
 

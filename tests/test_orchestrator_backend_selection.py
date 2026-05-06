@@ -1,4 +1,4 @@
-"""MM13 Step 3 — orchestrator backend selection integration tests.
+"""Orchestrator backend selection integration tests.
 
 TDD tests that verify:
 - _setup_run() injects ContainerBackend when backend=container is configured

@@ -1,4 +1,4 @@
-"""Tests for MM09 Step 1 — implement mode scaffolding.
+"""Tests for implement mode scaffolding.
 
 Covers:
 - ImplementTarget: fields, defaults, frozen, execution-level validation
@@ -337,7 +337,7 @@ class TestCliImplementSubcommand:
         assert rc == 1
 
     def test_dry_run_shows_resolved_target_from_config(self, tmp_path, capsys):
-        """dry-run must show the config-derived target path, not a fabricated default."""
+        """Dry-run must show the config-derived target path, not a fabricated default."""
         from src.cli import _run_implement
         import argparse, logging
 
@@ -427,7 +427,7 @@ class TestImplementConfig:
             ImplementConfig.from_yaml(cfg_file)
 
     def test_allowed_roots_as_string_raises(self, tmp_path):
-        """allowed_roots must be a list, not a bare string."""
+        """Allowed_roots must be a list, not a bare string."""
         from src.implement.implement_loop import ImplementConfig
         cfg_file = self._yaml(tmp_path, f"target:\n  path: {tmp_path}\n  allowed_roots: src\n")
         with pytest.raises(ValueError, match="allowed_roots"):
@@ -1168,7 +1168,7 @@ class TestImplementConfigProviderBranch:
 
 
 # ===========================================================================
-# MM09 Step 4 — Safety guardrails
+# Safety guardrails
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
@@ -1176,7 +1176,7 @@ class TestImplementConfigProviderBranch:
 # ---------------------------------------------------------------------------
 
 class TestSelfHostingGuard:
-    """from_yaml() must reject same-repo targets unless allow_same_repo: true."""
+    """From_yaml() must reject same-repo targets unless allow_same_repo: true."""
 
     def _repo_root(self):
         import src.implement.implement_loop as m
@@ -1222,7 +1222,7 @@ class TestSelfHostingGuard:
 # ---------------------------------------------------------------------------
 
 class TestValidatePatchBoundaries:
-    """validate_patch_boundaries(patch, target) -> list[str]."""
+    """Validate_patch_boundaries(patch, target) -> list[str]."""
 
     def test_no_allowed_roots_never_violates(self, tmp_path):
         from src.implement.implement_loop import ImplementTarget, CandidatePatch, validate_patch_boundaries
@@ -1358,7 +1358,7 @@ class TestBoundaryEnforcementInRunner:
 # ---------------------------------------------------------------------------
 
 class TestArbitratorBoundaryEnforcement:
-    """validate_patch_boundaries must also run on the arbitrator's revised patch."""
+    """Validate_patch_boundaries must also run on the arbitrator's revised patch."""
 
     def _make_config(self, tmp_path, allowed_roots=(Path("src"),)):
         from src.implement.implement_loop import ImplementConfig, ImplementTarget
@@ -1452,7 +1452,7 @@ class TestArbitratorBoundaryEnforcement:
 
 
 # ---------------------------------------------------------------------------
-# MM09 Step 5 refinement — artifact persistence
+# artifact persistence
 # ---------------------------------------------------------------------------
 
 class TestImplementArtifactPersistence:
