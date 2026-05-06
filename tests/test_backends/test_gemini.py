@@ -79,6 +79,29 @@ class TestGeminiBackend:
         assert resp.text == "not json"
         assert resp.is_error is False
 
+    def test_parse_dict_response_strips_json_fence(self):
+        """Gemini wraps JSON output in ```json\\n...\\n``` fences even when told not to."""
+        wrapped = '```json\n{"hello":"world"}\n```'
+        resp = self.backend.parse_response(json.dumps({"response": wrapped}))
+        assert resp.text == '{"hello":"world"}'
+        assert resp.is_error is False
+
+    def test_parse_dict_response_strips_anonymous_fence(self):
+        """Strip fences without a language tag too."""
+        wrapped = '```\n{"x":1}\n```'
+        resp = self.backend.parse_response(json.dumps({"response": wrapped}))
+        assert resp.text == '{"x":1}'
+
+    def test_parse_dict_response_leaves_unfenced_text_alone(self):
+        """Don't touch responses that aren't fenced."""
+        resp = self.backend.parse_response(json.dumps({"response": "plain prose answer"}))
+        assert resp.text == "plain prose answer"
+
+    def test_parse_plain_text_strips_fence(self):
+        """Fence stripping also applies to the JSONDecodeError fallback path."""
+        resp = self.backend.parse_response('```json\n{"k":"v"}\n```')
+        assert resp.text == '{"k":"v"}'
+
     @patch.object(GeminiBackend, "_run_process")
     def test_invoke_uses_stdin(self, mock_run):
         mock_run.return_value = MagicMock(

@@ -51,37 +51,56 @@ class CopilotBackend(Backend):
     def parse_response(self, stdout: str) -> AgentResponse:
         """Parse Copilot JSONL output.
 
-        Copilot emits JSONL with ``assistant.message`` events containing
-        a ``data.content`` field, and a final ``result`` event with usage.
+        Copilot emits JSONL with ``assistant.message`` events. In autopilot
+        mode the CLI injects follow-up ``user.message`` events ("you have
+        not yet called task_complete...") that trigger additional turns;
+        each new turn carries a fresh ``interactionId``. The actual answer
+        to the user's original prompt lives in the FIRST interaction, so
+        we anchor on the first ``user.message``'s ``interactionId`` and
+        ignore any ``assistant.message`` produced under a later interaction.
+        Without that filter, the parser picks up the autopilot continuation's
+        "task complete, I submitted my JSON" prose instead of the JSON itself.
         """
         if not stdout.strip():
             return AgentResponse(text="", cost_usd=0.0, is_error=True)
 
         lines = stdout.strip().splitlines()
-        last_text = ""
 
+        primary_interaction_id: str | None = None
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict) and obj.get("type") == "user.message":
+                primary_interaction_id = obj.get("data", {}).get("interactionId")
+                break
+
+        last_text = ""
         for line in reversed(lines):
             line = line.strip()
             if not line:
                 continue
             try:
                 obj = json.loads(line)
-                if not isinstance(obj, dict):
-                    continue
-
-                # Copilot format: {"type": "assistant.message", "data": {"content": "..."}}
-                if obj.get("type") == "assistant.message":
-                    data = obj.get("data", {})
-                    content = data.get("content", "")
-                    if content:
-                        last_text = content
-                        break
-
             except json.JSONDecodeError:
                 continue
+            if not isinstance(obj, dict) or obj.get("type") != "assistant.message":
+                continue
+            data = obj.get("data", {})
+            content = data.get("content", "")
+            if not content:
+                continue
+            if primary_interaction_id is not None:
+                if data.get("interactionId") != primary_interaction_id:
+                    continue
+            last_text = content
+            break
 
         if not last_text:
-            # Fallback to generic JSONL parser
             return parse_jsonl_last_result(stdout, cost_key="cost_usd")
 
         return AgentResponse(text=last_text, cost_usd=0.0, is_error=False)

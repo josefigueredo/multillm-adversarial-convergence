@@ -102,6 +102,57 @@ class TestCopilotBackend:
         resp = self.backend.parse_response("\n".join(lines))
         assert resp.text == "The answer is 4."
 
+    def test_parse_response_ignores_autopilot_continuation(self):
+        """Autopilot injects follow-up turns with a different interactionId.
+        The real answer lives in the first interaction; ignore later ones."""
+        lines = [
+            json.dumps({
+                "type": "user.message",
+                "data": {"interactionId": "first", "content": "give me JSON"},
+            }),
+            json.dumps({
+                "type": "assistant.message",
+                "data": {"interactionId": "first", "content": '{"answer": "real"}'},
+            }),
+            json.dumps({
+                "type": "session.info",
+                "data": {"infoType": "autopilot_continuation"},
+            }),
+            json.dumps({
+                "type": "user.message",
+                "data": {"interactionId": "second", "content": "have you called task_complete?"},
+            }),
+            json.dumps({
+                "type": "assistant.message",
+                "data": {
+                    "interactionId": "second",
+                    "content": "Yes the task is complete, I submitted my JSON earlier.",
+                },
+            }),
+        ]
+        resp = self.backend.parse_response("\n".join(lines))
+        assert resp.text == '{"answer": "real"}'
+
+    def test_parse_response_takes_last_assistant_in_first_interaction(self):
+        """In tool-using flows, one interaction can produce several assistant.messages.
+        Take the LAST one within the original interaction (the synthesised answer)."""
+        lines = [
+            json.dumps({
+                "type": "user.message",
+                "data": {"interactionId": "X", "content": "research foo"},
+            }),
+            json.dumps({
+                "type": "assistant.message",
+                "data": {"interactionId": "X", "content": "Let me search for foo..."},
+            }),
+            json.dumps({
+                "type": "assistant.message",
+                "data": {"interactionId": "X", "content": "Final synthesis: foo is bar."},
+            }),
+        ]
+        resp = self.backend.parse_response("\n".join(lines))
+        assert resp.text == "Final synthesis: foo is bar."
+
     def test_parse_response_fallback_to_jsonl(self):
         stdout = json.dumps({"result": "fallback output"})
         resp = self.backend.parse_response(stdout)
