@@ -367,6 +367,102 @@ class TestResumeFromLegacyTsv:
         assert len(state["discovered_gaps"]) == 1
 
 
+class TestPromotionLogic:
+    """Discovery plan Phase 3: cross-iteration clustering with
+    re-discovery promotion + confidence tiering."""
+
+    def test_disabled_auto_promotes_everything(self):
+        gaps: dict[str, GapEntry] = {}
+        topics: list[str] = []
+        record_gap(
+            discovered_gaps=gaps, discovered_dimensions=topics,
+            canonical_topic="x", display_topic="X",
+            iteration=1, confidence=3,
+            promotion_enabled=False,
+        )
+        assert gaps["x"].promoted is True
+        assert "X" in topics
+
+    def test_enabled_single_low_confidence_not_promoted(self):
+        gaps: dict[str, GapEntry] = {}
+        topics: list[str] = []
+        record_gap(
+            discovered_gaps=gaps, discovered_dimensions=topics,
+            canonical_topic="x", display_topic="X",
+            iteration=1, confidence=4,
+            promotion_enabled=True,
+        )
+        # 1 occurrence + low confidence + research_target → not promoted
+        assert gaps["x"].promoted is False
+        assert "X" not in topics  # absent from hypothesis pool view
+
+    def test_enabled_single_high_confidence_promoted(self):
+        gaps: dict[str, GapEntry] = {}
+        topics: list[str] = []
+        record_gap(
+            discovered_gaps=gaps, discovered_dimensions=topics,
+            canonical_topic="x", display_topic="X",
+            iteration=1, confidence=9,
+            promotion_enabled=True,
+        )
+        # Single occurrence with mean(confidences) >= 8 → promoted
+        assert gaps["x"].promoted is True
+        assert "X" in topics
+
+    def test_enabled_repeated_occurrence_promotes(self):
+        gaps: dict[str, GapEntry] = {}
+        topics: list[str] = []
+        record_gap(
+            discovered_gaps=gaps, discovered_dimensions=topics,
+            canonical_topic="x", display_topic="X",
+            iteration=1, confidence=3,
+            promotion_enabled=True,
+        )
+        assert gaps["x"].promoted is False
+        record_gap(
+            discovered_gaps=gaps, discovered_dimensions=topics,
+            canonical_topic="x", display_topic="X",
+            iteration=2, confidence=3,
+            promotion_enabled=True,
+        )
+        # 2 occurrences → promoted regardless of confidence
+        assert gaps["x"].promoted is True
+        assert "X" in topics
+
+    def test_enabled_refinement_kind_promotes_immediately(self):
+        gaps: dict[str, GapEntry] = {}
+        topics: list[str] = []
+        record_gap(
+            discovered_gaps=gaps, discovered_dimensions=topics,
+            canonical_topic="x", display_topic="X",
+            iteration=1, confidence=4, kind="refinement",
+            promotion_enabled=True,
+        )
+        # Refinements target an existing dim and don't need cross-iter
+        # confirmation — promoted on single sighting even at low conf
+        assert gaps["x"].promoted is True
+
+    def test_promotion_is_sticky_once_earned(self):
+        gaps: dict[str, GapEntry] = {}
+        topics: list[str] = []
+        # First sighting — single high-conf — promoted
+        record_gap(
+            discovered_gaps=gaps, discovered_dimensions=topics,
+            canonical_topic="x", display_topic="X",
+            iteration=1, confidence=9,
+            promotion_enabled=True,
+        )
+        assert gaps["x"].promoted is True
+        # Second sighting — low conf — should NOT demote
+        record_gap(
+            discovered_gaps=gaps, discovered_dimensions=topics,
+            canonical_topic="x", display_topic="X",
+            iteration=2, confidence=2,
+            promotion_enabled=True,
+        )
+        assert gaps["x"].promoted is True
+
+
 class TestResumeNoIterations:
     def test_empty_run_returns_blank_state(self, tmp_path: Path):
         state = resume_state(

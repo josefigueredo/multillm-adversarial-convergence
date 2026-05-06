@@ -749,6 +749,10 @@ def _merge(ctx: LoopContext, state: LoopState, dimension: str, findings: str, sc
         # intake either creates a new GapEntry (gap_promoted audit
         # event) or increments an existing one (gap_seen_again event).
         judge_name = getattr(ctx.strategy.get_judge_backend(), "name", "")
+        discovery_cfg = getattr(ctx.config, "discovery", None)
+        promotion_enabled = bool(getattr(discovery_cfg, "promotion_enabled", False))
+        promotion_min_occ = int(getattr(discovery_cfg, "promotion_min_occurrences", 2))
+        promotion_high_conf = int(getattr(discovery_cfg, "promotion_high_confidence", 8))
         for record in score.gap_records:
             canonical = record.get("canonical_topic") or _canonical_topic(record["topic"])
             entry, is_new = record_gap(
@@ -760,6 +764,9 @@ def _merge(ctx: LoopContext, state: LoopState, dimension: str, findings: str, sc
                 judge_name=judge_name,
                 kind=record.get("kind", "research_target"),
                 confidence=record.get("confidence", 5),
+                promotion_enabled=promotion_enabled,
+                promotion_min_occurrences=promotion_min_occ,
+                promotion_high_confidence=promotion_high_conf,
             )
             if is_new:
                 _emit_audit(ctx.audit_trail, "gap_promoted", {

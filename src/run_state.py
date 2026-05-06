@@ -75,12 +75,30 @@ def record_gap(
     judge_name: str = "",
     kind: str = "research_target",
     confidence: int = 5,
+    promotion_min_occurrences: int = 2,
+    promotion_high_confidence: int = 8,
+    promotion_enabled: bool = False,
 ) -> tuple[GapEntry, bool]:
     """Add or update a discovered gap.
 
     Mutates ``discovered_gaps`` and ``discovered_dimensions`` in place
     so the legacy list-of-strings view stays in sync with the new
     dict-of-GapEntry source of truth.
+
+    **Promotion (Discovery plan Phase 3).**  When ``promotion_enabled``
+    is True, ``GapEntry.promoted`` is computed dynamically from
+    convergence signal:
+
+      promoted = (
+        occurrences >= promotion_min_occurrences
+        OR (kind == "refinement" AND occurrences >= 1)
+        OR (occurrences == 1 AND mean(confidences) >= promotion_high_confidence)
+      )
+
+    Only promoted gaps appear in ``discovered_dimensions`` (the list
+    consumed by the hypothesis prompt).  When ``promotion_enabled`` is
+    False (the default), every gap is auto-promoted on first sight —
+    matching pre-Phase-3 behavior.
 
     Returns ``(entry, is_new)`` — ``is_new`` is ``True`` when this
     canonical_topic was added for the first time, ``False`` when an
@@ -96,7 +114,31 @@ def record_gap(
         existing.confidences.append(confidence)
         # Most-recent display form wins.
         existing.display_topic = display_topic
+        # Re-evaluate promotion with the updated counters.  Once
+        # promoted a gap stays promoted (avoids surprising drops if a
+        # later judge emits low confidence for an established topic).
+        if promotion_enabled and not existing.promoted:
+            existing.promoted = _evaluate_promotion(
+                occurrences=existing.occurrences,
+                kind=existing.kind,
+                confidences=existing.confidences,
+                min_occurrences=promotion_min_occurrences,
+                high_confidence=promotion_high_confidence,
+            )
+            if existing.promoted and existing.display_topic not in discovered_dimensions:
+                discovered_dimensions.append(existing.display_topic)
         return existing, False
+
+    if promotion_enabled:
+        promoted = _evaluate_promotion(
+            occurrences=1,
+            kind=kind,
+            confidences=[confidence],
+            min_occurrences=promotion_min_occurrences,
+            high_confidence=promotion_high_confidence,
+        )
+    else:
+        promoted = True
 
     entry = GapEntry(
         canonical_topic=canonical_topic,
@@ -107,12 +149,43 @@ def record_gap(
         judges_seen=[judge_name] if judge_name else [],
         kind=kind,
         confidences=[confidence],
-        promoted=True,
+        promoted=promoted,
     )
     discovered_gaps[canonical_topic] = entry
-    if display_topic not in discovered_dimensions:
+    if promoted and display_topic not in discovered_dimensions:
         discovered_dimensions.append(display_topic)
     return entry, True
+
+
+def _evaluate_promotion(
+    *,
+    occurrences: int,
+    kind: str,
+    confidences: list[int],
+    min_occurrences: int = 2,
+    high_confidence: int = 8,
+) -> bool:
+    """Decide whether a gap is eligible for the hypothesis pool.
+
+    Three positive paths:
+
+    - ``occurrences >= min_occurrences`` — repeated across iterations
+      is the strongest convergence signal.
+    - ``kind == "refinement"`` — refinement requests target the
+      *current* dimension and don't need to wait for cross-iteration
+      confirmation.  A single sighting is enough.
+    - ``occurrences == 1 AND mean(confidences) >= high_confidence`` —
+      one-shot insight that the judge marked highly confident.
+    """
+    if occurrences >= min_occurrences:
+        return True
+    if kind == "refinement" and occurrences >= 1:
+        return True
+    if occurrences == 1 and confidences:
+        mean_conf = sum(confidences) / len(confidences)
+        if mean_conf >= high_confidence:
+            return True
+    return False
 
 
 def serialise_discovered_gaps(gaps: dict[str, GapEntry]) -> dict[str, dict[str, Any]]:

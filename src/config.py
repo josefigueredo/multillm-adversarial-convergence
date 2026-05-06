@@ -350,10 +350,24 @@ class DiscoveryConfig:
             which two gap topics are considered duplicates.  Default
             ``0.85``.  Tighter (closer to 1.0) accepts near-duplicates as
             distinct; looser (closer to 0.0) merges aggressively.
+        promotion_enabled: When True, only gaps that pass the Phase 3
+            promotion check enter the hypothesis pool.  When False
+            (default), every gap that survives intake is auto-promoted —
+            matching pre-Phase-3 behavior.  Operators opt in once they
+            have multi-iteration runs to drive the convergence signal.
+        promotion_min_occurrences: Number of distinct iterations a gap
+            must appear in to be promoted by repetition alone.  Default
+            ``2``.
+        promotion_high_confidence: Mean confidence threshold for
+            single-occurrence promotion.  Default ``8`` (judge confident
+            enough to act on one-shot).
     """
 
     language_filter: str = "en"
     dedupe_threshold: float = 0.85
+    promotion_enabled: bool = False
+    promotion_min_occurrences: int = 2
+    promotion_high_confidence: int = 8
 
 
 @dataclass(frozen=True)
@@ -872,6 +886,15 @@ class ResearchConfig:
             ),
             dedupe_threshold=float(
                 discovery_raw.get("dedupe_threshold", discovery_defaults.dedupe_threshold)
+            ),
+            promotion_enabled=bool(
+                discovery_raw.get("promotion_enabled", discovery_defaults.promotion_enabled)
+            ),
+            promotion_min_occurrences=int(
+                discovery_raw.get("promotion_min_occurrences", discovery_defaults.promotion_min_occurrences)
+            ),
+            promotion_high_confidence=int(
+                discovery_raw.get("promotion_high_confidence", discovery_defaults.promotion_high_confidence)
             ),
         )
 
