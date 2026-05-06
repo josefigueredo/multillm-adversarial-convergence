@@ -92,6 +92,23 @@ style: |
   }
   footer { font-size: 13px; color: #94a3b8; }
   header { font-size: 13px; color: #94a3b8; }
+  /* Density classes — apply per-slide via <!-- _class: tight --> or tighter */
+  section.tight { font-size: 22px; padding: 32px 48px; }
+  section.tight h1 { font-size: 1.45em; margin-bottom: 0.25em; }
+  section.tight h2 { font-size: 1.15em; margin-bottom: 0.25em; }
+  section.tight table { font-size: 17px; }
+  section.tight th { padding: 6px 10px; }
+  section.tight td { padding: 4px 10px; }
+  section.tight pre { font-size: 16px; line-height: 1.35; padding: 12px 16px; }
+  section.tight blockquote { padding: 8px 14px; margin: 8px 0; font-size: 0.92em; }
+  section.tight p, section.tight li { margin: 0.25em 0; }
+  section.tighter { font-size: 20px; padding: 28px 44px; }
+  section.tighter h1 { font-size: 1.35em; margin-bottom: 0.2em; }
+  section.tighter h2 { font-size: 1.1em; margin-bottom: 0.2em; }
+  section.tighter pre { font-size: 14px; line-height: 1.3; padding: 10px 14px; }
+  section.tighter code { font-size: 0.85em; }
+  section.tighter blockquote { padding: 6px 12px; margin: 6px 0; font-size: 0.9em; }
+  section.tighter p, section.tighter li { margin: 0.2em 0; }
 ---
 
 <!--
@@ -200,6 +217,8 @@ from the research literature.*
 ---
 <!-- TIMING: 3 min — the engine group. This is the heart. Spend time on LLM-as-Judge independence. -->
 
+<!-- _class: tight -->
+
 ## Patterns: The Engine
 
 Three patterns drive every iteration.
@@ -217,6 +236,8 @@ Three patterns drive every iteration.
 ---
 <!-- TIMING: 2 min — topology group. Emphasise role isolation = cost control + replaceability. -->
 
+<!-- _class: tight -->
+
 ## Patterns: The Topology
 
 How backends are wired together.
@@ -231,6 +252,8 @@ How backends are wired together.
 
 ---
 <!-- TIMING: 2 min — guardrails group. Anchor sandbox to real enterprise concerns. -->
+
+<!-- _class: tight -->
 
 ## Patterns: The Guardrails
 
@@ -262,6 +285,8 @@ What prevents the agent from doing things it shouldn't.
   - 8 dimensions, max 10 iterations
   - allowed_tools: real web tools, not mocked
 -->
+
+<!-- _class: tighter -->
 
 ## The config — three backends, adversarial strategy
 
@@ -345,6 +370,8 @@ The loop forces the next iteration to resolve these gaps or be discarded.
 
 ---
 <!-- TIMING: 2 min — show the score table, draw attention to the dip in iter 007 (a harder dimension) and the jump to 76.3 in 009. -->
+
+<!-- _class: tight -->
 
 ## Score progression — convergence is measurable
 
@@ -438,6 +465,8 @@ Comparison tables, decision matrix, recommendation upfront, structured pros/cons
 ---
 <!-- TIMING: 1.5 min — show the output directory in terminal. Point to rerun.sh. -->
 
+<!-- _class: tight -->
+
 ## Every run is fully replayable
 
 ```
@@ -460,6 +489,8 @@ No "it worked on my machine."
 ---
 <!-- TIMING: 1 min — audit trail terminal: cat ... | python3 -m json.tool | head -40 -->
 
+<!-- _class: tight -->
+
 ## Trust + certainty — every claim is classified
 
 Every entry in `citations.json` and `claims.json` carries a `trust_class`:
@@ -479,6 +510,8 @@ Plus PRISMA-style evidence logs:
 
 ---
 <!-- TIMING: 30 sec — cost. Keep it short. Numbers from the real run. -->
+
+<!-- _class: tight -->
 
 ## This run
 
@@ -515,6 +548,8 @@ Real execution data from the `localstack_alternatives_copilot_codex` run:
 ---
 <!-- _class: lead -->
 <!-- _paginate: false -->
+
+<!-- _class: tighter -->
 
 ## Try it
 
