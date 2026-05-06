@@ -74,6 +74,8 @@ RESULTS_FIELDS = [
     "judge_accuracy",
     "judge_novelty",
     "judge_actionability",
+    # Scoring plan Phase 2: heuristic novelty (text overlap with KB).
+    "heuristic_novelty",
 ]
 
 
@@ -124,6 +126,7 @@ def build_result_row(
         "judge_accuracy": str(score.judge_accuracy),
         "judge_novelty": str(score.judge_novelty),
         "judge_actionability": str(score.judge_actionability),
+        "heuristic_novelty": f"{score.heuristic_novelty:.1f}",
     }
 
 

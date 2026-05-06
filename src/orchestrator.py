@@ -1502,6 +1502,7 @@ class AutoResearcher:
             "coverage": score.coverage,
             "quality": score.quality,
             "total": score.total,
+            "heuristic_novelty": score.heuristic_novelty,
             "components": {
                 "dimension_points": breakdown.dimension_points,
                 "evidence_points": breakdown.evidence_points,

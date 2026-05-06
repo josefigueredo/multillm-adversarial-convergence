@@ -12,12 +12,15 @@ from src.scorer import (
     _extract_section,
     _fuzzy_match,
     combine_scores,
+    combine_scores_weighted,
     heuristic_breakdown,
     heuristic_score,
+    novelty_score,
     parse_gaps_identified,
     parse_judge_response,
     quality_score_from_judge,
 )
+from src.config import ScoringWeights
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +377,101 @@ class TestUniversalSignalStructure:
         text = "- item one\n- item two\n- item three\n"
         bd = heuristic_breakdown(text, sample_config, [])
         assert bd.structure_points > 0.0
+
+
+class TestNoveltyScore:
+    """Scoring plan Phase 2: heuristic novelty signal."""
+
+    def test_empty_findings_score_zero(self):
+        # No tokens to compare → no novelty signal possible
+        assert novelty_score("", "any kb") == 0.0
+        # Findings with fewer than 4 tokens → also no n-grams
+        assert novelty_score("just three words", "kb") == 0.0
+
+    def test_empty_kb_full_novelty(self):
+        # Brand new corpus — everything is new
+        text = "the quick brown fox jumps over the lazy dog"
+        assert novelty_score(text, "") == 100.0
+        assert novelty_score(text, "    ") == 100.0
+
+    def test_identical_findings_zero_novelty(self):
+        text = "the quick brown fox jumps over the lazy dog"
+        # Same text → 100% overlap → 0 novelty
+        assert novelty_score(text, text) == 0.0
+
+    def test_partial_overlap(self):
+        # Half-overlapping — novelty should be in the middle range
+        kb = "the quick brown fox jumps over the lazy dog"
+        new_findings = "the quick brown fox is now playing in the garden"
+        n = novelty_score(new_findings, kb)
+        # Some 4-grams overlap, some don't; expect 30-90 range.
+        assert 30.0 <= n <= 90.0
+
+    def test_completely_new_content_full_novelty(self):
+        kb = "the quick brown fox jumps over the lazy dog"
+        new = "Photosynthesis converts light energy into chemical bonds via chloroplasts"
+        n = novelty_score(new, kb)
+        assert n >= 90.0  # essentially all new
+
+    def test_punctuation_ignored(self):
+        # Punctuation differences shouldn't affect novelty
+        kb = "Container starts in 24ms with 13 MB idle RAM."
+        find = "container starts in 24ms with 13 MB idle ram"
+        assert novelty_score(find, kb) == 0.0  # all 4-grams match
+
+
+class TestCombineScoresWeighted:
+    """Scoring plan Phase 2: composite formula with optional novelty."""
+
+    def test_default_weights_match_legacy_combine_scores(self):
+        # When novelty_weight = 0, the new function reduces to the legacy formula
+        weights = ScoringWeights()  # defaults
+        new = combine_scores_weighted(
+            coverage=80.0, quality=70.0,
+            judge_novelty_axis=5, heuristic_novelty=60.0,
+            weights=weights,
+        )
+        legacy = combine_scores(80.0, 70.0)
+        assert new == legacy
+
+    def test_novelty_weight_zero_ignores_novelty_inputs(self):
+        weights = ScoringWeights(coverage_weight=0.4, quality_weight=0.6, novelty_weight=0.0)
+        # Different novelty values shouldn't affect total
+        a = combine_scores_weighted(coverage=70.0, quality=70.0,
+                                    judge_novelty_axis=2, heuristic_novelty=10.0,
+                                    weights=weights)
+        b = combine_scores_weighted(coverage=70.0, quality=70.0,
+                                    judge_novelty_axis=9, heuristic_novelty=95.0,
+                                    weights=weights)
+        assert a == b == 70.0
+
+    def test_novelty_weight_active_lowers_score_for_low_novelty(self):
+        weights = ScoringWeights(coverage_weight=0.25, quality_weight=0.5,
+                                 novelty_weight=0.25, judge_novelty_share=0.3)
+        # Same coverage/quality, different novelty
+        high_nov = combine_scores_weighted(
+            coverage=70.0, quality=70.0,
+            judge_novelty_axis=8, heuristic_novelty=85.0,
+            weights=weights,
+        )
+        low_nov = combine_scores_weighted(
+            coverage=70.0, quality=70.0,
+            judge_novelty_axis=2, heuristic_novelty=15.0,
+            weights=weights,
+        )
+        assert high_nov > low_nov
+
+    def test_novelty_weight_active_raises_score_for_high_novelty(self):
+        # High novelty findings beat low novelty findings holding others equal
+        weights = ScoringWeights(coverage_weight=0.25, quality_weight=0.5,
+                                 novelty_weight=0.25)
+        high = combine_scores_weighted(
+            coverage=60.0, quality=60.0,
+            judge_novelty_axis=8, heuristic_novelty=90.0,
+            weights=weights,
+        )
+        # >= 60 because high novelty pulls the score up
+        assert high >= 60.0
 
 
 class TestParseGapsIdentified:

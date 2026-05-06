@@ -29,8 +29,10 @@ from .run_state import (
 from .scorer import (
     IterationScore,
     combine_scores,
+    combine_scores_weighted,
     heuristic_breakdown,
     heuristic_score,
+    novelty_score,
     parse_gaps_identified,
     parse_judge_response,
     quality_score_from_judge,
@@ -174,7 +176,7 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
     breakdown = score.heuristic_breakdown
     log.info(
         "Scores — coverage: %.1f [target=%.1f/%.0f evidence=%.1f/%.0f questions=%.1f/%.0f length=%.1f/%.0f] "
-        "quality: %.1f [d=%d a=%d n=%d act=%d] total: %.1f (dim best: %.1f, global best: %.1f)",
+        "quality: %.1f [d=%d a=%d n=%d act=%d] novelty: %.1f total: %.1f (dim best: %.1f, global best: %.1f)",
         score.coverage,
         breakdown.dimension_points, 40.0,
         breakdown.evidence_points, 35.0,
@@ -182,6 +184,7 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         breakdown.length_points, 10.0,
         score.quality,
         score.judge_depth, score.judge_accuracy, score.judge_novelty, score.judge_actionability,
+        score.heuristic_novelty,
         score.total,
         prev_best, state.best_score,
     )
@@ -676,7 +679,19 @@ def _score(ctx: LoopContext, state: LoopState, dimension: str, findings: str) ->
     except Exception as exc:
         log.warning("Judge scoring failed, using fallback: %s", exc)
 
-    total = combine_scores(coverage, quality)
+    # --- Scoring plan Phase 2: heuristic novelty against the KB ---
+    # Always computed for visibility (log line, dashboard, results.tsv);
+    # only enters the total when ``scoring.weights.novelty_weight > 0``.
+    h_novelty = novelty_score(findings, state.knowledge_base)
+    judge_novelty_axis = int(judge_raw.get("novelty", 0) or 0)
+
+    total = combine_scores_weighted(
+        coverage=coverage,
+        quality=quality,
+        judge_novelty_axis=judge_novelty_axis,
+        heuristic_novelty=h_novelty,
+        weights=ctx.config.scoring.weights,
+    )
 
     # --- Discovery plan Phase 1: normalise + filter the judge's gaps ---
     raw_gap_records = parse_gaps_identified(judge_raw.get("gaps_identified", []))
@@ -701,8 +716,9 @@ def _score(ctx: LoopContext, state: LoopState, dimension: str, findings: str) ->
         heuristic_breakdown=breakdown,
         judge_depth=int(judge_raw.get("depth", 0) or 0),
         judge_accuracy=int(judge_raw.get("accuracy", 0) or 0),
-        judge_novelty=int(judge_raw.get("novelty", 0) or 0),
+        judge_novelty=judge_novelty_axis,
         judge_actionability=int(judge_raw.get("actionability", 0) or 0),
+        heuristic_novelty=h_novelty,
     )
 
 

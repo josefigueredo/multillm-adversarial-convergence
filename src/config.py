@@ -269,6 +269,44 @@ class MethodologyConfig:
 
 
 @dataclass(frozen=True)
+class ScoringWeights:
+    """Composite-formula weights for iteration scoring.
+
+    Defaults preserve the legacy ``0.4 coverage + 0.6 quality`` formula
+    by setting ``novelty_weight = 0`` — operators opt into the
+    novelty-blended formula by setting it positive.
+
+    When ``novelty_weight > 0``, the formula becomes:
+
+        quality_blend = (1 - judge_novelty_share) * quality
+                        + judge_novelty_share * (judge_novelty * 10)
+        total = coverage_weight * coverage
+              + quality_weight * quality_blend
+              + novelty_weight * heuristic_novelty
+
+    The three top-level weights should sum to 1.0; values are not
+    re-normalised so operators can audit any drift.
+
+    Attributes:
+        coverage_weight: Weight on heuristic coverage score (default 0.4
+            to preserve legacy behavior).
+        quality_weight: Weight on the LLM judge quality score (default
+            0.6 to preserve legacy behavior).
+        novelty_weight: Weight on heuristic novelty (text overlap with
+            the knowledge base).  Default 0.0 = legacy formula.
+            Suggested calibrated value: 0.25.
+        judge_novelty_share: Sub-weight inside the quality term: when
+            > 0, blends the judge's per-axis ``novelty`` (1-10, scaled
+            to 0-100) into the quality slot.  Default 0.3.
+    """
+
+    coverage_weight: float = 0.4
+    quality_weight: float = 0.6
+    novelty_weight: float = 0.0
+    judge_novelty_share: float = 0.3
+
+
+@dataclass(frozen=True)
 class ScoringConfig:
     """Controls how each research iteration is scored.
 
@@ -279,6 +317,13 @@ class ScoringConfig:
             iterations.
         evidence_types: Tuple of evidence type labels the heuristic scorer
             looks for (e.g. ``"comparison_table"``, ``"pricing_data"``).
+            Deprecated: kept for backward-compat parsing but no longer
+            drives the universal-signal heuristic introduced by the
+            scoring plan's universal-signal redesign.
+        weights: Composite-formula weights.  Defaults preserve the
+            legacy 0.4 coverage + 0.6 quality formula; setting
+            ``weights.novelty_weight > 0`` enables the novelty-blended
+            formula.
     """
 
     min_dimensions_per_iteration: int = 1
@@ -290,6 +335,7 @@ class ScoringConfig:
         "architecture_diagram_description",
         "trade_off_analysis",
     )
+    weights: ScoringWeights = field(default_factory=ScoringWeights)
 
 
 @dataclass(frozen=True)
@@ -796,6 +842,14 @@ class ResearchConfig:
         scoring_raw: dict[str, Any] = research.get("scoring", {})
         evidence = scoring_raw.get("evidence_types")
         scoring_defaults = ScoringConfig()
+        weights_raw: dict[str, Any] = scoring_raw.get("weights", {})
+        weights_defaults = ScoringWeights()
+        weights = ScoringWeights(
+            coverage_weight=float(weights_raw.get("coverage_weight", weights_defaults.coverage_weight)),
+            quality_weight=float(weights_raw.get("quality_weight", weights_defaults.quality_weight)),
+            novelty_weight=float(weights_raw.get("novelty_weight", weights_defaults.novelty_weight)),
+            judge_novelty_share=float(weights_raw.get("judge_novelty_share", weights_defaults.judge_novelty_share)),
+        )
         scoring = ScoringConfig(
             min_dimensions_per_iteration=scoring_raw.get(
                 "min_dimensions_per_iteration",
@@ -806,6 +860,7 @@ class ResearchConfig:
                 scoring_defaults.target_dimensions_total,
             ),
             evidence_types=tuple(evidence) if evidence else scoring_defaults.evidence_types,
+            weights=weights,
         )
 
         # --- Discovery (gap intake filtering) ---------------------------------

@@ -282,6 +282,10 @@ class IterationScore:
     judge_accuracy: int = 0
     judge_novelty: int = 0
     judge_actionability: int = 0
+    # Scoring plan Phase 2: heuristic novelty (0-100).  Always computed
+    # for visibility (log line, dashboard, results.tsv).  Only enters
+    # the total score when ``scoring.weights.novelty_weight > 0``.
+    heuristic_novelty: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +344,97 @@ _STRUCTURE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^#{2,4}\s+\S", re.MULTILINE),      # nested headings
     re.compile(r"^[\s]*[-*+]\s+\S", re.MULTILINE), # bullet list items
 ]
+
+
+# ---------------------------------------------------------------------------
+# Scoring plan Phase 2: novelty signal
+# ---------------------------------------------------------------------------
+
+
+_NOVELTY_NGRAM = 4
+_NOVELTY_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def _ngrams(text: str, n: int = _NOVELTY_NGRAM) -> set[tuple[str, ...]]:
+    """Lowercase token n-grams. Punctuation/whitespace ignored."""
+    tokens = [m.group(0).lower() for m in _NOVELTY_TOKEN_RE.finditer(text)]
+    if len(tokens) < n:
+        return set()
+    return {tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)}
+
+
+def novelty_score(findings: str, knowledge_base: str) -> float:
+    """Heuristic novelty: 0-100 where higher = less overlap with the KB.
+
+    Computes the fraction of n-gram (n=4) tokens in ``findings`` that
+    do NOT appear in ``knowledge_base``.  Empty findings score 0 (no
+    novelty signal possible), empty KB scores 100 (everything is new).
+
+    Cheap (sub-millisecond on typical findings).  No LLM call.  Phase 2
+    of the scoring plan uses this as the third axis in the optional
+    composite formula gated by ``scoring.weights.novelty_weight``.
+    """
+    f_grams = _ngrams(findings)
+    if not f_grams:
+        return 0.0
+    if not knowledge_base or not knowledge_base.strip():
+        return 100.0
+    k_grams = _ngrams(knowledge_base)
+    if not k_grams:
+        return 100.0
+    overlap = len(f_grams & k_grams)
+    return round(100.0 * (1.0 - overlap / len(f_grams)), 1)
+
+
+def combine_scores_weighted(
+    *,
+    coverage: float,
+    quality: float,
+    judge_novelty_axis: int,
+    heuristic_novelty: float,
+    weights: Any,
+) -> float:
+    """Composite score with optional novelty blending.
+
+    When ``weights.novelty_weight == 0`` (the default), this reduces
+    exactly to the legacy ``combine_scores(coverage, quality)`` =
+    ``HEURISTIC_WEIGHT * coverage + JUDGE_WEIGHT * quality``.  When
+    novelty_weight > 0, the formula becomes:
+
+        quality_blend = (1 - judge_novelty_share) * quality
+                        + judge_novelty_share * (judge_novelty_axis * 10)
+        total = coverage_weight  * coverage
+              + quality_weight   * quality_blend
+              + novelty_weight   * heuristic_novelty
+
+    where the three weights sum to 1.  ``judge_novelty_share`` is a
+    sub-weight inside ``quality_weight``.
+
+    Args:
+        coverage: Heuristic coverage score (0-100).
+        quality: LLM judge quality score (0-100).
+        judge_novelty_axis: Judge's novelty axis (1-10) from the
+            structured judge response.  Scaled to 0-100 internally.
+        heuristic_novelty: Output of ``novelty_score()`` (0-100).
+        weights: ``ScoringWeights`` instance carrying coverage_weight,
+            quality_weight, novelty_weight, judge_novelty_share.
+
+    Returns:
+        Combined 0-100 score.
+    """
+    cov_w = getattr(weights, "coverage_weight", HEURISTIC_WEIGHT)
+    qual_w = getattr(weights, "quality_weight", JUDGE_WEIGHT)
+    nov_w = getattr(weights, "novelty_weight", 0.0)
+    jn_share = getattr(weights, "judge_novelty_share", 0.3)
+
+    if nov_w <= 0:
+        # Backward-compatible legacy path.
+        return round(cov_w * coverage + qual_w * quality, 1)
+
+    judge_nov_scaled = max(0, min(10, judge_novelty_axis)) * 10.0
+    quality_blend = (1.0 - jn_share) * quality + jn_share * judge_nov_scaled
+    total = cov_w * coverage + qual_w * quality_blend + nov_w * heuristic_novelty
+    return round(total, 1)
 
 
 def heuristic_breakdown(
