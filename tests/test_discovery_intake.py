@@ -22,13 +22,17 @@ from src.research_loop import (
 
 class _RecordingAudit:
     """Drop-in stand-in for the audit_trail object that records every
-    ``emit`` call so tests can assert on them."""
+    ``emit`` call so tests can assert on them.
+
+    Mirrors AuditTrailWriter's signature: ``emit(event: str, **fields)``.
+    Tests assert on ``self.events`` as ``[(event_name, fields_dict), ...]``.
+    """
 
     def __init__(self) -> None:
         self.events: list[tuple[str, dict]] = []
 
-    def emit(self, event_type: str, payload: dict) -> None:
-        self.events.append((event_type, payload))
+    def emit(self, event_type: str, **fields) -> None:
+        self.events.append((event_type, fields))
 
 
 def _gap(topic: str, **overrides) -> dict:
