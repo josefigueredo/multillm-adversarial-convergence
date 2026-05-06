@@ -225,7 +225,7 @@ class TestPhase2Expansion:
         refiner = DocumentRefiner(config, tmp_path, backends)
 
         def _render_side_effect(name, **_kwargs):
-            if name in ("generate_readme.md", "generate_docs_index.md"):
+            if name in ("cross_generate_readme.md", "cross_generate_docs_index.md"):
                 return "prompt"
             raise FileNotFoundError(name)
 

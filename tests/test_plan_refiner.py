@@ -153,7 +153,7 @@ class TestPhase2Expansion:
         refiner = PlanRefiner(config, tmp_path, _make_backends("# Risk Register"))
 
         def _side_effect(prompt_file, **kwargs):
-            if prompt_file in ("generate_readme.md", "generate_docs_index.md"):
+            if prompt_file in ("cross_generate_readme.md", "cross_generate_docs_index.md"):
                 return "# Index"
             if prompt_file == "artifact_risk_register.md":
                 raise FileNotFoundError(prompt_file)

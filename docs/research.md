@@ -908,7 +908,7 @@ configs/
     _template.yaml          Full annotated config reference
     smoke_test_*.yaml       Per-backend and per-strategy smoke tests
 prompts/                    Prompt templates (research phases)
-benchmarks/                 Reusable benchmark definitions
+benchmark_catalog/         Benchmark rubric catalog       
 ```
 
 ---

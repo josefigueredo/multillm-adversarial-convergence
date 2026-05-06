@@ -219,7 +219,7 @@ def _generate_hypothesis(ctx: LoopContext, state: LoopState) -> dict[str, Any] |
     ]
 
     prompt = _render(
-        "hypothesis.md",
+        "research_hypothesis.md",
         topic=ctx.config.topic,
         methodology=ctx.methodology_summary(),
         knowledge_summary=ctx.kb_summary(),
@@ -430,7 +430,7 @@ def _score(ctx: LoopContext, state: LoopState, dimension: str, findings: str) ->
 
     try:
         prompt = _render(
-            "evaluate.md",
+            "research_evaluate.md",
             topic=ctx.config.topic,
             goal=ctx.config.goal,
             methodology=ctx.methodology_summary(),

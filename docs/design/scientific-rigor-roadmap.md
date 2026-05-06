@@ -121,7 +121,7 @@ no one-command exact-rerun script.
 Benchmark tasks with human-verified gold answers, blinded human review,
 repeated runs, variance estimates, calibration curves.
 
-**Current state:** Benchmark catalog exists (`benchmarks/`). Rubric
+**Current state:** Benchmark catalog exists (`benchmark_catalog/`). Rubric
 calibration tests exist (positive/negative/mediocre controls).
 
 **Gap:** No human-verified gold answers, no blinded human review protocol, no

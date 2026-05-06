@@ -872,7 +872,7 @@ class AutoResearcher:
         knowledge_context = self._synthesis_knowledge_context()
 
         prompt = _render(
-            "synthesize.md",
+            "research_synthesize.md",
             topic=self.config.topic,
             goal=self.config.goal,
             methodology=self._methodology_summary(),
@@ -1394,7 +1394,7 @@ class AutoResearcher:
         if not self.config.evaluation.run_baselines:
             return
         prompt = _render(
-            "baseline.md",
+            "research_baseline.md",
             topic=self.config.topic,
             goal=self.config.goal,
             methodology=self._methodology_summary(),
@@ -1492,7 +1492,7 @@ class AutoResearcher:
             return semantic_review_empty(judge_backend=judge_backend.name)
 
         prompt = _render(
-            "semantic_judge.md",
+            "research_semantic_judge.md",
             topic=self.config.topic,
             methodology=self._methodology_summary(),
             synthesis=synthesis_text,

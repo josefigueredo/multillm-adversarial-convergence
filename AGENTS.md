@@ -109,7 +109,7 @@ uv run pytest tests/ -v
 
 ### Benchmarks
 
-- `benchmarks/` — reusable benchmark definitions and comparison inputs
+- `benchmark_catalog/` — reusable benchmark rubric definitions and comparison inputs
 
 ## Recommended reading order for a new agent
 

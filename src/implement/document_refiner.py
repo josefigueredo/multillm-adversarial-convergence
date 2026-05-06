@@ -236,7 +236,7 @@ class DocumentRefiner:
 
         readme_resp = self._invoke(
             render(
-                "generate_readme.md",
+                "cross_generate_readme.md",
                 topic=self._config.topic,
                 goal=self._config.goal,
                 primary_artifact=self._config.primary_artifact,
@@ -249,7 +249,7 @@ class DocumentRefiner:
 
         index_resp = self._invoke(
             render(
-                "generate_docs_index.md",
+                "cross_generate_docs_index.md",
                 topic=self._config.topic,
                 goal=self._config.goal,
                 primary_artifact=self._config.primary_artifact,

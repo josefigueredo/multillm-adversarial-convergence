@@ -388,7 +388,7 @@ class AdversarialStrategy(Strategy):
 
         try:
             critique_prompt = _render(
-                "critique.md",
+                "research_critique.md",
                 findings=findings,
                 depth_instruction=depth_instruction,
             )

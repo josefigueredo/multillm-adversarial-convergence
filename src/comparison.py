@@ -20,7 +20,7 @@ def load_benchmark_definition(benchmark_id: str, *, benchmarks_dir: Path | None 
     if not benchmark_id:
         return {}
 
-    benchmark_root = benchmarks_dir or Path("benchmarks")
+    benchmark_root = benchmarks_dir or Path("benchmark_catalog")
     benchmark_path = benchmark_root / f"{benchmark_id}.yaml"
     if not benchmark_path.exists():
         return {}
