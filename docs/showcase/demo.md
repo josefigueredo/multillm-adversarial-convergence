@@ -56,6 +56,9 @@ style: |
     border-radius: 8px;
     font-size: 19px;
     line-height: 1.5;
+    /* If Marp's auto-fit kicks in, scale toward the top-left edge
+       so code reads left-aligned (default origin is center). */
+    transform-origin: top left;
   }
   pre code { background: none; color: inherit; padding: 0; }
   table {
@@ -554,14 +557,13 @@ Real execution data from the `localstack_alternatives_copilot_codex` run:
 ```bash
 uv sync
 
+CONFIG=configs/research/localstack_alternatives_copilot_codex.yaml
+
 # Validate without spending tokens
-uv run python -m src.cli research \
-  --config configs/research/localstack_alternatives_copilot_codex.yaml \
-  --dry-run
+uv run python -m src.cli research --config "$CONFIG" --dry-run
 
 # Run for real
-uv run python -m src.cli research \
-  --config configs/research/localstack_alternatives_copilot_codex.yaml
+uv run python -m src.cli research --config "$CONFIG"
 ```
 
 Copy a template for your own topic: `configs/research/_template.yaml`
