@@ -546,10 +546,8 @@ Real execution data from the `localstack_alternatives_copilot_codex` run:
 > as code review: a second set of eyes with different priors catches different bugs.**
 
 ---
-<!-- _class: lead -->
-<!-- _paginate: false -->
-
 <!-- _class: tighter -->
+<!-- _paginate: false -->
 
 ## Try it
 
