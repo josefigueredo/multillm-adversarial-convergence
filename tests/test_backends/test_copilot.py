@@ -158,6 +158,26 @@ class TestCopilotBackend:
         resp = self.backend.parse_response(stdout)
         assert resp.text == "fallback output"
 
+    def test_parse_response_copilot_shaped_no_message_returns_error(self):
+        """If Copilot CLI emits its session events but no usable
+        assistant.message (rate limit, quota exhausted, mid-session error),
+        return is_error rather than leaking raw JSONL into the framework's
+        parser. The previous behavior fell through to the generic JSONL
+        helper, which returns ``stdout.strip()`` for non-matching shapes,
+        causing the framework's hypothesis parser to receive raw JSONL."""
+        lines = [
+            json.dumps({"type": "session.mcp_servers_loaded", "data": {}}),
+            json.dumps({"type": "session.tools_updated", "data": {}}),
+            json.dumps({
+                "type": "user.message",
+                "data": {"interactionId": "x", "content": "..."},
+            }),
+            json.dumps({"type": "assistant.turn_start", "data": {}}),
+        ]
+        resp = self.backend.parse_response("\n".join(lines))
+        assert resp.is_error is True
+        assert resp.text == ""
+
     @patch.object(CopilotBackend, "_run_process")
     def test_invoke_appends_prompt_as_arg(self, mock_run):
         mock_run.return_value = MagicMock(

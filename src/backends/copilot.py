@@ -60,6 +60,13 @@ class CopilotBackend(Backend):
         ignore any ``assistant.message`` produced under a later interaction.
         Without that filter, the parser picks up the autopilot continuation's
         "task complete, I submitted my JSON" prose instead of the JSON itself.
+
+        When the output is Copilot-shaped (carries ``session.*`` or
+        ``assistant.*`` events) but lacks a usable ``assistant.message`` —
+        rate-limit, quota, or mid-session error — return ``is_error=True``
+        rather than leaking raw JSONL to the caller. The generic JSONL
+        fallback only runs for non-Copilot-shaped output (test fixtures,
+        unexpected formats).
         """
         if not stdout.strip():
             return AgentResponse(text="", cost_usd=0.0, is_error=True)
@@ -67,6 +74,7 @@ class CopilotBackend(Backend):
         lines = stdout.strip().splitlines()
 
         primary_interaction_id: str | None = None
+        is_copilot_shaped = False
         for line in lines:
             line = line.strip()
             if not line:
@@ -75,9 +83,13 @@ class CopilotBackend(Backend):
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if isinstance(obj, dict) and obj.get("type") == "user.message":
+            if not isinstance(obj, dict):
+                continue
+            event_type = obj.get("type", "")
+            if event_type.startswith("session.") or event_type.startswith("assistant."):
+                is_copilot_shaped = True
+            if event_type == "user.message" and primary_interaction_id is None:
                 primary_interaction_id = obj.get("data", {}).get("interactionId")
-                break
 
         last_text = ""
         for line in reversed(lines):
@@ -100,7 +112,10 @@ class CopilotBackend(Backend):
             last_text = content
             break
 
-        if not last_text:
-            return parse_jsonl_last_result(stdout, cost_key="cost_usd")
+        if last_text:
+            return AgentResponse(text=last_text, cost_usd=0.0, is_error=False)
 
-        return AgentResponse(text=last_text, cost_usd=0.0, is_error=False)
+        if is_copilot_shaped:
+            return AgentResponse(text="", cost_usd=0.0, is_error=True)
+
+        return parse_jsonl_last_result(stdout, cost_key="cost_usd")
