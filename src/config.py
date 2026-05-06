@@ -293,6 +293,24 @@ class ScoringConfig:
 
 
 @dataclass(frozen=True)
+class DiscoveryConfig:
+    """Controls how judge-emitted gaps are filtered before they enter
+    ``state.discovered_dimensions``.
+
+    Attributes:
+        language_filter: ``"en"`` to drop gaps that read as Spanish via
+            stop-word heuristic; ``"none"`` to disable.  Default ``"en"``.
+        dedupe_threshold: Levenshtein-style similarity ratio (0..1) above
+            which two gap topics are considered duplicates.  Default
+            ``0.85``.  Tighter (closer to 1.0) accepts near-duplicates as
+            distinct; looser (closer to 0.0) merges aggressively.
+    """
+
+    language_filter: str = "en"
+    dedupe_threshold: float = 0.85
+
+
+@dataclass(frozen=True)
 class EvaluationConfig:
     """Optional evaluation settings for benchmark/baseline comparisons.
 
@@ -652,6 +670,7 @@ class ResearchConfig:
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     reporting: ReportingConfig = field(default_factory=ReportingConfig)
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
+    discovery: DiscoveryConfig = field(default_factory=DiscoveryConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     hitl: HitlConfig = field(default_factory=HitlConfig)
@@ -787,6 +806,18 @@ class ResearchConfig:
                 scoring_defaults.target_dimensions_total,
             ),
             evidence_types=tuple(evidence) if evidence else scoring_defaults.evidence_types,
+        )
+
+        # --- Discovery (gap intake filtering) ---------------------------------
+        discovery_raw: dict[str, Any] = research.get("discovery", {})
+        discovery_defaults = DiscoveryConfig()
+        discovery = DiscoveryConfig(
+            language_filter=discovery_raw.get(
+                "language_filter", discovery_defaults.language_filter
+            ),
+            dedupe_threshold=float(
+                discovery_raw.get("dedupe_threshold", discovery_defaults.dedupe_threshold)
+            ),
         )
 
         # --- Execution --------------------------------------------------------
@@ -929,6 +960,7 @@ class ResearchConfig:
             evaluation=evaluation,
             reporting=reporting,
             scoring=scoring,
+            discovery=discovery,
             execution=execution,
             security=security,
             hitl=hitl,

@@ -6,6 +6,7 @@ import pytest
 
 from src.config import ExecutionConfig, ResearchConfig, ScoringConfig
 from src.scorer import (
+    GAP_KINDS,
     HeuristicBreakdown,
     IterationScore,
     _extract_section,
@@ -13,6 +14,7 @@ from src.scorer import (
     combine_scores,
     heuristic_breakdown,
     heuristic_score,
+    parse_gaps_identified,
     parse_judge_response,
     quality_score_from_judge,
 )
@@ -372,6 +374,89 @@ class TestUniversalSignalStructure:
         text = "- item one\n- item two\n- item three\n"
         bd = heuristic_breakdown(text, sample_config, [])
         assert bd.structure_points > 0.0
+
+
+class TestParseGapsIdentified:
+    """Discovery plan Phase 1 #1: gap shape upgrade with backward
+    compatibility for the legacy bare-string form."""
+
+    def test_empty_input(self):
+        assert parse_gaps_identified([]) == []
+        assert parse_gaps_identified(None) == []  # type: ignore[arg-type]
+
+    def test_legacy_bare_string_normalises(self):
+        result = parse_gaps_identified(["Some gap topic that is long enough"])
+        assert len(result) == 1
+        item = result[0]
+        assert item["topic"] == "Some gap topic that is long enough"
+        assert item["kind"] == "research_target"
+        assert item["investigatable"] is True
+        assert item["confidence"] == 5
+        assert item["_source_shape"] == "bare_string"
+
+    def test_structured_form_passes_through(self):
+        gap = {
+            "topic": "Migration cost benchmarks for X under Y conditions",
+            "why_it_matters": "Operators need this to budget the migration timeline",
+            "kind": "refinement",
+            "investigatable": True,
+            "confidence": 8,
+        }
+        result = parse_gaps_identified([gap])
+        assert len(result) == 1
+        item = result[0]
+        assert item["topic"] == gap["topic"]
+        assert item["kind"] == "refinement"
+        assert item["confidence"] == 8
+        assert item["_source_shape"] == "structured"
+
+    def test_invalid_kind_falls_back_to_research_target(self):
+        gap = {
+            "topic": "A reasonably long topic for a gap",
+            "why_it_matters": "Reason",
+            "kind": "garbage_value",
+            "investigatable": True,
+            "confidence": 5,
+        }
+        result = parse_gaps_identified([gap])
+        assert result[0]["kind"] == "research_target"
+
+    def test_confidence_clamped_to_1_10(self):
+        gap_low = {"topic": "topic 1", "why_it_matters": "x", "kind": "research_target",
+                   "investigatable": True, "confidence": -3}
+        gap_high = {"topic": "topic 2", "why_it_matters": "x", "kind": "research_target",
+                    "investigatable": True, "confidence": 99}
+        gap_garbage = {"topic": "topic 3", "why_it_matters": "x", "kind": "research_target",
+                       "investigatable": True, "confidence": "lots"}
+        result = parse_gaps_identified([gap_low, gap_high, gap_garbage])
+        assert result[0]["confidence"] == 1
+        assert result[1]["confidence"] == 10
+        assert result[2]["confidence"] == 5  # default fallback
+
+    def test_empty_topic_skipped(self):
+        result = parse_gaps_identified([
+            {"topic": "", "why_it_matters": "x", "kind": "research_target",
+             "investigatable": True, "confidence": 5},
+            "",
+            "   ",
+        ])
+        assert result == []
+
+    def test_kinds_constant_lists_three_values(self):
+        # Sanity check the public constant exposes the documented kinds.
+        assert set(GAP_KINDS) == {"research_target", "refinement", "critique"}
+
+    def test_mixed_input(self):
+        result = parse_gaps_identified([
+            "bare string gap topic that is long enough",
+            {"topic": "structured gap topic that is also long",
+             "why_it_matters": "matters", "kind": "critique",
+             "investigatable": False, "confidence": 7},
+            42,  # invalid type — silently skipped
+        ])
+        assert len(result) == 2
+        assert result[0]["_source_shape"] == "bare_string"
+        assert result[1]["_source_shape"] == "structured"
 
 
 class TestLengthCurve:

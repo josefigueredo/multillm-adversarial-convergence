@@ -59,6 +59,33 @@ _EVIDENCE_POINTS = _CONCRETE_DATA_POINTS
 _NEW_QUESTIONS_POINTS = _STRUCTURE_POINTS
 _TARGET_NEW_QUESTIONS = 3.0
 
+# Discovery plan Proposal #1: structured gap shape.
+#
+# Each gap is now an object with:
+#   topic           — the gap itself, 20-200 chars
+#   why_it_matters  — one-sentence justification
+#   kind            — research_target | refinement | critique
+#   investigatable  — true if someone could go research it
+#   confidence      — 1 (speculative) to 10 (certain)
+#
+# The schema also accepts the legacy bare-string shape for transition
+# compatibility — `parse_gaps_identified()` normalises either form
+# into the structured representation. Once all judges reliably emit
+# the new shape we can drop the bare-string branch.
+GAP_KINDS = ("research_target", "refinement", "critique")
+
+_STRUCTURED_GAP_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "topic": {"type": "string", "minLength": 20, "maxLength": 200},
+        "why_it_matters": {"type": "string", "minLength": 30, "maxLength": 500},
+        "kind": {"type": "string", "enum": list(GAP_KINDS)},
+        "investigatable": {"type": "boolean"},
+        "confidence": {"type": "integer", "minimum": 1, "maximum": 10},
+    },
+    "required": ["topic", "why_it_matters", "kind", "investigatable", "confidence"],
+}
+
 JUDGE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -72,7 +99,12 @@ JUDGE_SCHEMA: dict[str, Any] = {
         },
         "gaps_identified": {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {
+                "oneOf": [
+                    _STRUCTURED_GAP_SCHEMA,
+                    {"type": "string"},
+                ],
+            },
         },
         "reasoning": {"type": "string"},
     },
@@ -87,6 +119,58 @@ JUDGE_SCHEMA: dict[str, Any] = {
     ],
     "additionalProperties": False,
 }
+
+
+def parse_gaps_identified(raw_gaps: list[Any]) -> list[dict[str, Any]]:
+    """Normalise judge-emitted gaps to the structured shape.
+
+    Accepts either the new structured object form or the legacy bare-
+    string form. Bare strings are wrapped with conservative defaults:
+    ``kind=research_target``, ``investigatable=true``, ``confidence=5``,
+    ``why_it_matters=""``. Items that aren't strings or objects are
+    skipped silently.
+
+    Returns a list of dicts with the structured fields plus a
+    synthetic ``_source_shape`` field set to "structured" or
+    "bare_string" so downstream auditing can tell which judges have
+    upgraded.
+    """
+    normalised: list[dict[str, Any]] = []
+    for item in raw_gaps or []:
+        if isinstance(item, str):
+            topic = item.strip()
+            if not topic:
+                continue
+            normalised.append({
+                "topic": topic,
+                "why_it_matters": "",
+                "kind": "research_target",
+                "investigatable": True,
+                "confidence": 5,
+                "_source_shape": "bare_string",
+            })
+        elif isinstance(item, dict):
+            topic = str(item.get("topic", "")).strip()
+            if not topic:
+                continue
+            kind = item.get("kind", "research_target")
+            if kind not in GAP_KINDS:
+                kind = "research_target"
+            try:
+                confidence = int(item.get("confidence", 5))
+            except (TypeError, ValueError):
+                confidence = 5
+            confidence = max(1, min(10, confidence))
+            normalised.append({
+                "topic": topic,
+                "why_it_matters": str(item.get("why_it_matters", "")).strip(),
+                "kind": kind,
+                "investigatable": bool(item.get("investigatable", True)),
+                "confidence": confidence,
+                "_source_shape": "structured",
+            })
+        # Anything else: skip silently
+    return normalised
 
 
 @dataclass
