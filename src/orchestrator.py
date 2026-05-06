@@ -795,6 +795,11 @@ class AutoResearcher:
         self.results = state.results
         self._candidate_assessments = state.candidate_assessments
         self._current_workflow_state = state.current_workflow_state
+        # Cache the latest score so the dashboard's
+        # ``latest_score_breakdown`` payload stays current.  The loop
+        # sets this on each successful ``_score()`` call.
+        if state.latest_score is not None:
+            self._latest_score = state.latest_score
 
     def _run_iteration(self) -> None:
         """Execute one full research iteration via the extracted loop module."""
@@ -852,17 +857,19 @@ class AutoResearcher:
         self._sync_from_loop_state(state)
 
     def _save_iteration(self, dimension: str, findings: str, score, kept: bool) -> None:
-        from .run_io import write_discovered_gaps_sidecar, write_iteration_markdown
+        # Note: this method is currently unused — the loop writes the
+        # iteration markdown directly via write_iteration_markdown(),
+        # and the sidecar JSON via write_discovered_gaps_sidecar() —
+        # both inside src/research_loop.py.  Kept here only as a hook
+        # for future flows that might invoke the orchestrator-level
+        # save path.
+        from .run_io import write_iteration_markdown
         write_iteration_markdown(
             iterations_dir=self.iterations_dir, iteration=self.iteration,
             dimension=dimension, findings=findings, score=score, kept=kept,
         )
         # Cache the latest score so the dashboard can surface its breakdown.
         self._latest_score = score
-        # Discovery plan Phase 2: persist the structured gap state so
-        # --resume can restore it without re-deriving from results.tsv.
-        if self.discovered_gaps:
-            write_discovered_gaps_sidecar(self.output_dir, self.discovered_gaps)
         self._collect_provenance(findings, scope=f"iteration-{self.iteration:03d}", dimension=dimension)
 
     def _log_result(self, dimension: str, score, hypothesis: str, *, status: str) -> None:

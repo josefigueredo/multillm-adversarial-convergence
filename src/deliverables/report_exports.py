@@ -21,6 +21,7 @@ def write_reporting_artifacts(researcher: Any) -> None:
         explored_dimensions=researcher.explored_dimensions,
         retry_summary=researcher._retry_summary,
         tool_loop_summary=researcher._tool_loop_summary,
+        latest_score_breakdown=researcher._latest_score_breakdown_payload(),
     )
     payload = tool_trace_payload(tool_trace=researcher._tool_trace)
     researcher.tool_trace_path.parent.mkdir(parents=True, exist_ok=True)

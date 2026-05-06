@@ -109,6 +109,10 @@ class LoopState:
     results_path: Path = field(default_factory=lambda: Path("results.tsv"))
     candidate_assessments: list[CandidateAssessment] = field(default_factory=list)
     current_workflow_state: ResearchState = ResearchState.IDLE
+    # Most recent IterationScore produced by ``_score()``.  Surfaced
+    # back to the orchestrator via ``_sync_from_loop_state`` so the
+    # dashboard's ``latest_score_breakdown`` payload can be populated.
+    latest_score: Any = None
 
     MAX_ATTEMPTS_PER_DIMENSION: int = 3
     KB_MAX_WORDS: int = 8000
@@ -165,6 +169,7 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
     emitter.transition(ResearchState.EXECUTE, iteration=state.iteration, dimension=dimension)
 
     score = _score(ctx, state, dimension, findings)
+    state.latest_score = score
     prev_best = state.best_scores.get(dimension, 0.0)
     breakdown = score.heuristic_breakdown
     log.info(
@@ -217,6 +222,15 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
             score=score,
             kept=kept,
         )
+    # Discovery plan Phase 2: persist the structured discovered_gaps
+    # state to the sidecar after each iteration so --resume can restore
+    # it without re-deriving from results.tsv.
+    if state.discovered_gaps:
+        try:
+            from .run_io import write_discovered_gaps_sidecar
+            write_discovered_gaps_sidecar(ctx.artifact_root, state.discovered_gaps)
+        except Exception:
+            log.debug("Failed to persist discovered_gaps sidecar", exc_info=True)
     ctx.collect_provenance(findings, scope=f"iteration-{state.iteration:03d}", dimension=dimension)
     _log_result(
         ctx, state, dimension, score, hypothesis.get("rationale", ""),
@@ -604,7 +618,8 @@ def _audit_gap_filter(
     try:
         emit = getattr(audit_trail, "emit", None)
         if callable(emit):
-            emit(f"gap_filtered_{reason}", payload)
+            # AuditTrailWriter.emit signature is emit(event, **fields).
+            emit(f"gap_filtered_{reason}", **payload)
         else:
             log.debug("audit emit unavailable; gap_filtered_%s skipped: %s", reason, payload)
     except Exception:
@@ -753,11 +768,15 @@ def _merge(ctx: LoopContext, state: LoopState, dimension: str, findings: str, sc
 
 def _emit_audit(audit_trail: Any, event_type: str, payload: dict[str, Any]) -> None:
     """Best-effort audit event emit; swallows errors so audit issues
-    never block the research loop."""
+    never block the research loop.
+
+    AuditTrailWriter.emit() takes the event type as a positional arg
+    and any structured fields as keyword args, so we splat the payload.
+    """
     try:
         emit = getattr(audit_trail, "emit", None)
         if callable(emit):
-            emit(event_type, payload)
+            emit(event_type, **payload)
     except Exception:
         log.debug("Failed to emit audit event %s", event_type, exc_info=True)
 
