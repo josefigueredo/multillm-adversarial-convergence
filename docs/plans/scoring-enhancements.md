@@ -1,5 +1,42 @@
 # Scoring Enhancements Plan
 
+> **Status: ✅ COMPLETED** (2026-05-06)
+>
+> All 8 proposals implemented and tested.  Per-proposal commits:
+>
+> - #1 target-dimension coverage → `dd843a9` (Phase 1)
+> - #2 novelty signal → `271a622` (Phase 2)
+> - #3 surface components → `dd843a9` (Phase 1)
+> - #4 multi-judge consensus → `db9c36f` (Phase 4)
+> - #5 per-dim evidence types → **OBSOLETED** by the universal-signal
+>   redesign in `f433cd6` (operators no longer need to author per-dim
+>   `expected_evidence` lists; universal signals work across all
+>   dimension types)
+> - #6 length curve → `dd843a9` (Phase 1)
+> - #7 cost-per-dollar dashboard view → `db9c36f` (Phase 4)
+> - #8 cross-iteration depth bonus → `c81eb18` (shipped with Discovery
+>   Phase 4)
+>
+> Configuration (all opt-in via YAML; defaults preserve legacy behavior):
+>
+> ```yaml
+> research:
+>   scoring:
+>     weights:
+>       novelty_weight: 0.25      # blends novelty into total
+>       depth_bonus: 0.15         # eases re-attempts past prev_best
+>   evaluation:
+>     judges:
+>       - adapter: gemini-cli
+>         weight: 1.0
+>       - adapter: codex-cli
+>         weight: 1.0
+> ```
+>
+> See `configs/research/_template.yaml` for the full annotated schema
+> and `AGENTS.md` for operator-facing summaries of new audit events
+> and dashboard fields.
+
 Concrete plan to fix bias in the research-mode scoring pipeline and add
 the observability needed to keep iterating on it. Grounded in evidence
 from the `localstack_alternatives_copilot_gemini` run on 2026-05-06.

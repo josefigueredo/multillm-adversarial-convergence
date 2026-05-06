@@ -32,11 +32,18 @@ uv run pytest tests/ -v
 - Three modes — **research**, **refine**, **plan** — share execution semantics but each owns its config schema and convergence loop. Each is a CLI subcommand of the same name (`src.cli research|refine|plan`).
 - Configs live in `configs/<mode>/`. Templates: `configs/research/_template.yaml`, `configs/refine/prd_template.yaml`, `configs/plan/plan_template.yaml`.
 - YAML root key per mode: research-mode → `research:`, refine-mode → `document:` (note: not `refine:`), plan-mode → `plan:`.
-- Run output layout (under `output/<run>/`): `run.log` (human), `audit_trail.jsonl` (structured append-only), `effective_config.json` (resolved snapshot), `tool_trace.json`, plus per-run mode-specific artifacts.
+- Run output layout (under `output/<run>/`): `run.log` (human), `audit_trail.jsonl` (structured append-only), `effective_config.json` (resolved snapshot), `tool_trace.json`, plus per-run mode-specific artifacts. **Research mode also writes `discovered_gaps.json`** — the structured `GapEntry` sidecar used as the authoritative store for cross-iteration gap state (Discovery plan Phase 2). On `--resume`, the sidecar takes priority over parsing the legacy `discovered_gaps` column in `results.tsv`.
 - Workspace boundary: `output/<run>/.workspace/` — owned by the run-scoped sandbox executor when `tool_execution_mode: sandboxed`.
 - Backend identifiers are transport-aware: `claude-cli`, `codex-cli`, `gemini-cli`, `copilot-cli` (CLI adapters); `claude-api`, `codex-api`, `gemini-api`, `litellm-api`, `copilot-api`, `bedrock-api` (API adapters).
 - Aggregator API adapters (`litellm-api`, `copilot-api`, `bedrock-api`) require explicit `execution.model` — no sensible default exists.
 - Research output style profiles: `default`, `paper`, `technical_doc`, `executive_brief`, `decision_memo`; refined by `reporting.style_overrides`.
+- **Research scoring is a hybrid**: a deterministic universal-signal heuristic (40% by default) + an LLM judge (60%). The heuristic measures `target_focus / citations / concrete_data / structure / length` — universal signals that work across topics, not per-config evidence types. Scores log per-component: `Scores — coverage: NN.N [target=X/40 evidence=X/35 questions=X/15 length=X/10] quality: NN.N [d=X a=X n=X act=X] novelty: NN.N total: NN.N`. `IterationScore` carries the full breakdown. See `src/scorer.py:heuristic_breakdown()` for the canonical implementation.
+- **Discovered gaps are structured**, not bare strings: `gaps_identified` in the judge schema is now an array of `{topic, why_it_matters, kind, investigatable, confidence}` objects. `kind` is one of `research_target` / `refinement` / `critique` (`src.scorer.GAP_KINDS`). Bare-string judge output is still parsed for transition compatibility via `parse_gaps_identified()`. Gaps are filtered through `process_discovered_gaps()` (length, language, dedupe) before entering `state.discovered_gaps`. Each filter rejection emits a `gap_filtered_<reason>` audit event.
+- **Audit event types** introduced by the scoring/discovery work (all in `audit_trail.jsonl`):
+  - `gap_promoted` — first-time canonical_topic creates a `GapEntry`
+  - `gap_seen_again` — existing canonical_topic re-encountered (cross-iteration convergence signal)
+  - `gap_filtered_too_short`, `gap_filtered_too_long`, `gap_filtered_non_english`, `gap_filtered_duplicate` — intake rejections
+- **Composite scoring weights are config-gated**. Defaults preserve the legacy `0.4 coverage + 0.6 quality` formula. Operators opt into the novelty-blended formula via `scoring.weights.novelty_weight > 0`, the cross-iteration depth bonus via `scoring.weights.depth_bonus > 0`, multi-judge consensus via `evaluation.judges`, and convergence-gated gap promotion via `discovery.promotion_enabled: true`. See `configs/research/_template.yaml` for the full annotated schema.
 
 ## DO
 

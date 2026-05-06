@@ -30,6 +30,22 @@ research:
     semantic_calibration: true # Generate semantic_calibration.json and include it in evaluation/reporting
     semantic_review: false     # Optional final judge pass over synthesis; writes semantic_review.json
 
+    # --- Multi-judge consensus (optional) -----------------------------
+    # When two or more judges are listed, each iteration's quality
+    # score is a weighted average across judges. Per-judge breakdowns
+    # appear in dashboard.json. Disagreements above
+    # ``judge_disagreement_threshold`` (1-10 axis points) emit an
+    # audit event. Default (no judges listed) preserves single-judge
+    # behavior using the strategy's primary judge backend.
+    # judges:
+    #   - adapter: gemini-cli
+    #     model: gemini-2.5-flash
+    #     weight: 1.0
+    #   - adapter: codex-cli
+    #     model: gpt-5.4
+    #     weight: 1.0
+    # judge_disagreement_threshold: 2
+
   reporting:
     export_html: true         # Generate report.html from final run artifacts
     export_pdf: false         # Generate report.pdf from final run artifacts
@@ -51,12 +67,60 @@ research:
   scoring:
     min_dimensions_per_iteration: 1
     target_dimensions_total: 10   # stop after this many dimensions have been explored
-    evidence_types:
-      - comparison_table
-      - pricing_data
-      - code_example
-      - architecture_diagram_description
+    evidence_types:               # DEPRECATED: kept for backward compat;
+      - comparison_table          # the universal-signal heuristic ignores
+      - pricing_data              # this list. Universal signals (citations,
+      - code_example              # concrete data, structure) work for any
+      - architecture_diagram_description # dimension type without per-dim config.
       - trade_off_analysis
+
+    # --- Composite scoring weights (optional) -------------------------
+    # Defaults preserve the legacy 0.4 coverage + 0.6 quality formula by
+    # setting ``novelty_weight: 0`` and ``depth_bonus: 0``. Operators
+    # opt into the novelty-blended formula and re-attempt depth bonus
+    # by setting these positive.
+    #
+    # When novelty_weight > 0:
+    #   quality_blend = (1 - judge_novelty_share) * quality
+    #                   + judge_novelty_share * (judge_novelty_axis * 10)
+    #   total = coverage_weight * coverage
+    #         + quality_weight * quality_blend
+    #         + novelty_weight * heuristic_novelty
+    #
+    # When depth_bonus > 0 and a dimension has been attempted >= 2 times:
+    #   prev_best is scaled DOWN by 1 + depth_bonus * min(attempts-1, 3)
+    #   so a focused refinement can clear the KEEP gate without having
+    #   to beat the original broad-pass score outright.
+    # weights:
+    #   coverage_weight: 0.4
+    #   quality_weight: 0.6
+    #   novelty_weight: 0.0       # Suggested calibrated value: 0.25
+    #   judge_novelty_share: 0.3
+    #   depth_bonus: 0.0          # Suggested calibrated value: 0.15
+
+  # --- Discovery: gap intake filtering + promotion (optional) ---------
+  # Defaults match pre-Phase-3 behavior: every gap that survives intake
+  # is auto-promoted on first sight. Operators opt into convergence-
+  # gated promotion via ``promotion_enabled: true``.
+  #
+  # Intake filters (always on):
+  # - language_filter: drops Spanish-style code-switch gaps
+  # - dedupe_threshold: Levenshtein-style similarity above which two
+  #   gap topics are considered duplicates
+  # - length: 30-200 chars enforced by JUDGE_SCHEMA
+  #
+  # Promotion (opt-in):
+  # - promotion_enabled: gate hypothesis-pool entry on convergence
+  # - promotion_min_occurrences: repeated sightings count as
+  #   convergence
+  # - promotion_high_confidence: single sighting promoted if mean
+  #   judge confidence >= this threshold (1-10)
+  # discovery:
+  #   language_filter: en           # en | none
+  #   dedupe_threshold: 0.85        # 0.0-1.0
+  #   promotion_enabled: false      # opt in once you have multi-iter runs
+  #   promotion_min_occurrences: 2
+  #   promotion_high_confidence: 8
 
   execution:
     max_iterations: 0       # 0 = no iteration cap; target_dimensions_total can still stop the run

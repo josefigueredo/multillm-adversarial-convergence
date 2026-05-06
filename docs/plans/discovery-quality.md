@@ -1,5 +1,36 @@
 # Discovery Quality Plan
 
+> **Status: ✅ COMPLETED** (2026-05-06)
+>
+> All 6 proposals implemented and tested.  Per-proposal commits:
+>
+> - #1 structured gap schema → `5568ce6` (Phase 1)
+> - #2 intake processing pipeline → `5568ce6` (Phase 1)
+> - #3 cross-iteration clustering with promotion → `7ebb4a9` (Phase 3)
+> - #4 kind-based dispatch → `c81eb18` (Phase 4)
+> - #5 confidence tiering → `7ebb4a9` (Phase 3, bundled with #3)
+> - #6 persistent gap state schema → `59de366` (Phase 2)
+>
+> Configuration (all opt-in via YAML; defaults preserve legacy
+> behavior except for the always-on intake filters):
+>
+> ```yaml
+> research:
+>   discovery:
+>     language_filter: en           # always on; "none" to disable
+>     dedupe_threshold: 0.85        # always on
+>     promotion_enabled: false      # opt in once you have multi-iter runs
+>     promotion_min_occurrences: 2
+>     promotion_high_confidence: 8
+> ```
+>
+> Phase 1 ships an upgraded `JUDGE_SCHEMA` with backward-compat for
+> bare-string responses; Phase 2 introduces the `discovered_gaps.json`
+> sidecar (authoritative) with TSV-column fallback for legacy resumes;
+> Phase 3 gates hypothesis-pool entry on convergence; Phase 4 dispatches
+> by `kind` (research_target / refinement / critique).  See
+> `AGENTS.md` for operator-facing audit event references.
+
 Concrete plan to fix the noise problem in the research-mode "new
 dimension discovered" channel and to turn discovery into a useful
 signal-extraction surface. Sibling to `docs/plans/scoring-enhancements.md`;

@@ -107,8 +107,16 @@ Real `run` executions now emit two runtime traces in the output directory:
   - `sandbox_policy_applied` — active runtime policy at setup (`tool_execution_mode`, `sandbox_active`, `filesystem_access`, `network_access`, `allow_host_bash`)
   - `policy_denied` — denial event recorded before exception propagates (`reason_code`, `policy_field`, `requested_action`, and optionally `requested_path`, `allowed_boundary`)
   - `dispatch_write_intent` — audit event emitted when a tool with `may_write=True` is dispatched while `sandbox_active=True`; **audit-only — not a deny gate**; write-boundary enforcement is still handled by `guard_path_write`
+- **gap discovery events** (Discovery plan Phases 1-2):
+  - `gap_promoted` — first-time canonical_topic creates a `GapEntry` (fields: `iteration`, `dimension`, `canonical_topic`, `display_topic`, `kind`, `confidence`)
+  - `gap_seen_again` — existing canonical_topic re-encountered across iterations; convergence signal (fields: `iteration`, `dimension`, `canonical_topic`, `occurrences`)
+  - `gap_filtered_too_short` / `gap_filtered_too_long` — intake length filter rejection (fields: `iteration`, `dimension`, `topic`, `kind`, `confidence`)
+  - `gap_filtered_non_english` — Spanish-stop-word heuristic rejection (when `discovery.language_filter: en`)
+  - `gap_filtered_duplicate` — Levenshtein-similarity dedupe rejection (fields include `matched_topic`)
 
-This is especially useful for debugging long iterations, because you can see which step was active before a stall and which artifacts were produced after each step.  Security events make it possible to audit exactly when and why a tool call or write was blocked.
+Plus the run-level **`discovered_gaps.json` sidecar** (Discovery plan Phase 2) — the authoritative persistent store for structured `GapEntry` metadata across iterations. Written at the end of each kept iteration; loaded preferentially over `results.tsv`'s legacy `discovered_gaps` column on `--resume`.
+
+This is especially useful for debugging long iterations, because you can see which step was active before a stall and which artifacts were produced after each step. Security events make it possible to audit exactly when and why a tool call or write was blocked. Gap discovery events let operators see exactly which gap topics were promoted, filtered, or re-encountered, with full provenance.
 
 ## Architecture
 
