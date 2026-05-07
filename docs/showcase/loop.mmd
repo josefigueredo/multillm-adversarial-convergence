@@ -1,12 +1,12 @@
 %%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 60, 'nodeSpacing': 30, 'curve': 'basis'}}}%%
 flowchart LR
-    A["**1 · Hypothesise**\nHighest knowledge gap"]
-    B["**2 · Execute**\nWeb · docs · code"]
-    C["**3 · Critique**\nDifferent backend\nerrors · gaps · weak claims"]
-    D["**4 · Score**\nHeuristic 40%\n+ LLM judge 60%"]
-    E{"**5 · Decide**\nImproved?"}
+    A["**1 · Hypothesise:** Highest knowledge gap"]
+    B["**2 · Execute:** Web · docs · code"]
+    C["**3 · Critique:** Different backend\nerrors · gaps · weak claims"]
+    D["**4 · Score:** Heuristic 40%\n+ LLM judge 60%"]
+    E{"**5 · Decide:** Improved?"}
     G["**✓ Grow corpus**"]
-    F["**6 · Compress**\nDistill · drop noise"]
+    F["**6 · Compress:** Distill · drop noise"]
     STOP(["Stop"])
 
     A --> B --> C --> D --> E
