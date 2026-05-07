@@ -118,7 +118,11 @@ research:
 
   execution:
     max_iterations: 25          # bounded but generous — was 10 in the localstack run
-    compress_every: 5           # corpus distillation every 5 iters
+    compress_every: 2           # compress every 2 iters keeps the prompt small enough that
+                                # claude-cli's Node heap (~1.5 GB) doesn't OOM on a 16 GB Mac.
+                                # Trade-off: ~2.5x more compress calls, but the corpus never
+                                # exceeds ~10-12k words at the trigger point (was 21k+ at
+                                # compress_every: 5 → SIGKILL'd twice during compression).
     allowed_tools: "WebSearch,WebFetch,Read,Bash,Glob,Grep"
     max_turns: 12               # more turns per call — let opus think
     timeout_seconds: 900        # 15 min per call — opus + deep dimensions need it
