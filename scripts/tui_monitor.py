@@ -33,9 +33,10 @@ import argparse
 import json
 import sys
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
+from typing import Deque, Iterable
 
 from rich.align import Align
 from rich.box import ROUNDED, SIMPLE
@@ -149,6 +150,12 @@ class RunState:
     # at startup.  Empty when results.tsv is missing — chart_points then
     # carry only the total_score from iteration_completed events.
     score_breakdowns: dict[int, tuple[float, float, float]] = field(default_factory=dict)
+    # Tail buffer of meaningful events for the live log panel.  Capped so
+    # long-running observers don't accumulate unbounded memory.  Each entry
+    # is ``(ts_str, kind, summary)`` where kind drives row colouring.
+    recent_events: Deque[tuple[str, str, str]] = field(
+        default_factory=lambda: deque(maxlen=12)
+    )
 
     def upsert_iter(self, n: int) -> IterRecord:
         if n not in self.iters:
@@ -175,6 +182,14 @@ class RunState:
         for iter_n, (cov, qual, total) in sorted(self.score_breakdowns.items()):
             self._upsert_chart_point((iter_n, cov, qual, total))
 
+    def _push_log(self, kind: str, summary: str, ts: str = "") -> None:
+        """Append one row to the event tail buffer.  ``kind`` drives colour."""
+        # Trim ts to HH:MM:SS for compactness; tolerate missing or odd shapes.
+        ts_short = ""
+        if ts and len(ts) >= 19 and ts[10] == "T":
+            ts_short = ts[11:19]
+        self.recent_events.append((ts_short, kind, summary))
+
     def apply_event(self, ev: dict) -> None:
         """Mutate state from one audit event.  Keeps logic in one place so
         live-tail and replay both go through the same code path."""
@@ -188,11 +203,13 @@ class RunState:
             self.strategy = ev.get("strategy", self.strategy)
             if not self.started_at:
                 self.started_at = time.time()
+            self._push_log("info", f"run started · strategy {self.strategy}", ts)
 
         elif evt == "iteration_started":
             self.current_iter = ev.get("iteration", self.current_iter)
             self.upsert_iter(self.current_iter)
             self.current_state = "(idle)"
+            self._push_log("iter", f"iter {self.current_iter} started", ts)
 
         elif evt == "step_started":
             step = ev.get("step", "")
@@ -212,6 +229,11 @@ class RunState:
                 # one backend invocation (replaces the earlier "~5 per iter"
                 # heuristic which was made up).
                 self.backend_calls += 1
+                self._push_log(
+                    "step",
+                    f"iter {self.current_iter} → {self.current_state.lower()} · {backend[:18]}",
+                    ts,
+                )
 
         elif evt == "step_completed":
             # Stay on the same state badge until the next step_started so the
@@ -245,11 +267,15 @@ class RunState:
                     self._upsert_chart_point((iter_n, float(total), float(total), float(total)))
             if rec.decision == "KEEP" and rec.dimension:
                 self.dimensions_covered.add(rec.dimension)
+            kind = "keep" if rec.decision == "KEEP" else "discard"
+            score_str = f"{rec.total:.1f}" if rec.total is not None else "?"
+            self._push_log(kind, f"iter {iter_n} {rec.decision.lower()} · score {score_str}", ts)
 
         elif evt == "iteration_aborted":
             iter_n = ev.get("iteration", self.current_iter)
             rec = self.upsert_iter(iter_n)
             rec.decision = "aborted"
+            self._push_log("warn", f"iter {iter_n} aborted · {ev.get('reason', '?')}", ts)
 
         elif evt == "compress_skipped_low_memory":
             free_gb = ev.get("free_gb", "?")
@@ -278,6 +304,7 @@ class RunState:
         elif evt == "run_completed":
             self.finished = True
             self.current_state = "DONE"
+            self._push_log("info", "run completed", ts)
 
 
 def _short_dim(dim: str) -> str:
@@ -577,6 +604,48 @@ def render_cost_block(state: RunState) -> Panel:
     )
 
 
+_LOG_KIND_COLOR = {
+    "info":    COLOR_MUTED,
+    "iter":    COLOR_PRIMARY,
+    "step":    COLOR_RESEARCH,
+    "keep":    COLOR_KEEP,
+    "discard": COLOR_DISCARD,
+    "warn":    COLOR_DECIDE,
+}
+
+
+def render_event_log(state: RunState) -> Panel:
+    """Live tail of the most-recent meaningful audit events.
+
+    Reads from ``state.recent_events`` (a bounded deque populated by
+    ``_push_log`` calls inside ``apply_event``).  Each row carries a
+    timestamp, a kind tag for colour, and a short summary.  Newest at
+    the bottom (so the cursor's natural reading order matches "what
+    just happened").
+    """
+    if not state.recent_events:
+        body: Group | Text = Text("(no events yet — waiting for audit trail)", style=COLOR_MUTED)
+    else:
+        rows: list[Text] = []
+        for ts_short, kind, summary in state.recent_events:
+            color = _LOG_KIND_COLOR.get(kind, COLOR_TEXT)
+            line = Text()
+            line.append(f"{ts_short or '--:--:--'}  ", style=COLOR_MUTED)
+            line.append(f"{kind:<7}", style=f"bold {color}")
+            line.append(f" {summary}", style=COLOR_TEXT)
+            rows.append(line)
+        body = Group(*rows)
+
+    return Panel(
+        body,
+        title="[bold]events · live tail[/bold]",
+        title_align="left",
+        border_style="grey39",
+        box=ROUNDED,
+        padding=(0, 1),
+    )
+
+
 def render_fallback_log(state: RunState) -> Panel | None:
     """Tail of OOM-defense fallback events, only shown when there are any."""
     if not state.fallback_events:
@@ -643,22 +712,33 @@ def build_layout(state: RunState, mode: str, source: Path | None, paused: bool,
         Layout(name="body", ratio=1),
         Layout(name="footer", size=3),
     )
-    # Left column is fixed-width to fit the state-machine boxes;
-    # right column takes the remaining width so the score chart and
-    # dim grid can breathe.
+    # Left column width must fit the widest state-machine line, which is
+    # the KEEP / DISCARD branch (~33 chars inside) plus panel padding +
+    # border (4 chars total).  ``_BOX_W + 16`` gives 40 char column,
+    # enough headroom for the branch and the COMPRESS / SYNTHESIZE row
+    # without wrap.  Empirically: was 32 (overlapping); 40 fits cleanly.
     layout["body"].split_row(
-        Layout(name="left", size=_BOX_W + 8),
+        Layout(name="left", size=_BOX_W + 16),
         Layout(name="right", ratio=1),
     )
-    right_components = [
+    # The right column splits into "data" (top) and "events log" (bottom).
+    # Data section stacks the existing score / dims / throughput cards;
+    # events section is a live tail of the audit trail, filling the space
+    # that was previously empty whitespace below the dims panel.
+    layout["right"].split_column(
+        Layout(name="right_top", ratio=2),
+        Layout(name="right_bottom", ratio=1, minimum_size=8),
+    )
+    top_components = [
         Layout(render_score_chart(state), name="chart", size=8),
         Layout(render_dim_grid(state, known_dims), name="dims", ratio=1),
         Layout(render_cost_block(state), name="cost", size=4),
     ]
     fallback = render_fallback_log(state)
     if fallback:
-        right_components.append(Layout(fallback, name="fallback", size=7))
-    layout["right"].split_column(*right_components)
+        top_components.append(Layout(fallback, name="fallback", size=7))
+    layout["right_top"].split_column(*top_components)
+    layout["right_bottom"].update(render_event_log(state))
     layout["left"].update(render_state_machine(state, tick=tick))
     layout["header"].update(render_header(state, mode))
     layout["footer"].update(render_footer(mode, source, paused))

@@ -364,6 +364,102 @@ def test_load_run_metadata_falls_back_to_dim_count_when_target_missing(tmp_path)
 
 
 # ---------------------------------------------------------------------------
+# Event log tail
+# ---------------------------------------------------------------------------
+
+def test_event_log_records_run_started():
+    s = RunState()
+    s.apply_event({"event": "run_started", "ts": "2026-05-07T08:05:15.000+00:00",
+                   "strategy": "adversarial", "run_id": "x"})
+    assert len(s.recent_events) == 1
+    ts, kind, summary = s.recent_events[0]
+    assert ts == "08:05:15"
+    assert kind == "info"
+    assert "adversarial" in summary
+
+
+def test_event_log_records_step_started_with_backend():
+    s = RunState()
+    s.apply_event({"event": "step_started", "step": "execute_research",
+                   "iteration": 3, "backend": "claude-cli sonnet",
+                   "ts": "2026-05-07T08:05:15.000+00:00"})
+    assert len(s.recent_events) == 1
+    _, kind, summary = s.recent_events[0]
+    assert kind == "step"
+    assert "iter 3" in summary
+    assert "execute" in summary
+    assert "claude-cli sonnet" in summary
+
+
+def test_event_log_records_iteration_completed_with_kind_and_score():
+    s = RunState()
+    s.apply_event({"event": "step_started", "step": "hypothesise",
+                   "iteration": 1, "dimension": "REST",
+                   "backend": "claude-cli opus"})
+    s.apply_event({"event": "iteration_completed", "iteration": 1,
+                   "dimension": "REST", "status": "keep", "total_score": 104.5,
+                   "ts": "2026-05-07T08:05:15.000+00:00"})
+    # First event is the step (with backend → logged), second is the completion
+    assert len(s.recent_events) == 2
+    _, kind, summary = s.recent_events[1]
+    assert kind == "keep"
+    assert "iter 1" in summary
+    assert "104.5" in summary
+
+
+def test_event_log_skips_step_started_without_backend():
+    """Steps that don't invoke a backend (persist, append, decide) shouldn't
+    crowd the event log — they're not informative for an operator."""
+    s = RunState()
+    s.apply_event({"event": "step_started", "step": "persist_iteration_markdown",
+                   "iteration": 1})
+    s.apply_event({"event": "step_started", "step": "append_results_row",
+                   "iteration": 1})
+    assert len(s.recent_events) == 0
+
+
+def test_event_log_records_discard_with_correct_kind():
+    s = RunState()
+    s.apply_event({"event": "iteration_completed", "iteration": 7,
+                   "dimension": "X", "status": "discard", "total_score": 40.0})
+    _, kind, _ = s.recent_events[-1]
+    assert kind == "discard"
+
+
+def test_event_log_buffer_capped_at_maxlen():
+    """Long-running observers don't accumulate unbounded memory — the deque
+    drops oldest entries after ``maxlen`` (12) events."""
+    s = RunState()
+    for i in range(50):
+        s.apply_event({"event": "iteration_started", "iteration": i})
+    assert len(s.recent_events) == 12
+    # Newest at the back: last entry should be iter 49
+    _, _, last_summary = s.recent_events[-1]
+    assert "iter 49" in last_summary
+    # First entry should be iter 38 (50 - 12)
+    _, _, first_summary = s.recent_events[0]
+    assert "iter 38" in first_summary
+
+
+def test_event_log_short_timestamp_for_malformed_ts():
+    """Audit events without a usable ts get an empty timestamp slot."""
+    s = RunState()
+    s.apply_event({"event": "iteration_started", "iteration": 1, "ts": "weird"})
+    ts, _, _ = s.recent_events[0]
+    assert ts == ""
+
+
+def test_event_log_records_iteration_aborted_as_warn():
+    s = RunState()
+    s.apply_event({"event": "iteration_aborted", "iteration": 4,
+                   "reason": "research_execution_empty"})
+    _, kind, summary = s.recent_events[-1]
+    assert kind == "warn"
+    assert "iter 4 aborted" in summary
+    assert "research_execution_empty" in summary
+
+
+# ---------------------------------------------------------------------------
 # Scripted events generator
 # ---------------------------------------------------------------------------
 
