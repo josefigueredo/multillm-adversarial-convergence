@@ -931,10 +931,124 @@ def _log_result(
         append_result_row(state.results_path, row)
 
 
+# Memory needed to safely invoke a CLI-backed compress: claude-cli's Node heap
+# baseline (~1.5 GB) plus python framework headroom plus a margin. Below this,
+# the kernel is likely to SIGKILL the python process during the subprocess
+# spawn. Tunable via env var for ops who want to override on bigger machines.
+_COMPRESS_MIN_FREE_GB = 2.0
+
+
+def _available_memory_gb() -> float | None:
+    """Return free system memory in GB, or None when detection fails.
+
+    Resilience layers, in order: (1) psutil if installed (cross-platform);
+    (2) ``vm_stat`` parsing on macOS; (3) ``/proc/meminfo`` on Linux.
+    Returning None means "unknown" — the caller treats it as "don't block
+    the operation on a measurement we can't make".
+    """
+    try:
+        import psutil  # declared in pyproject.toml; this guard is for stale venvs
+
+        return psutil.virtual_memory().available / (1024**3)
+    except ImportError:
+        pass
+
+    import sys
+
+    if sys.platform == "darwin":
+        try:
+            import subprocess
+
+            out = subprocess.check_output(["vm_stat"], text=True, timeout=2)
+            page_size = 16384  # macOS default on Apple Silicon; close enough on Intel
+            free_pages = 0
+            for line in out.splitlines():
+                if line.startswith(("Pages free:", "Pages inactive:", "Pages speculative:")):
+                    free_pages += int(line.rsplit(maxsplit=1)[-1].rstrip("."))
+            return (free_pages * page_size) / (1024**3)
+        except Exception:  # noqa: BLE001 — measurement, never raise
+            return None
+
+    if sys.platform.startswith("linux"):
+        try:
+            with open("/proc/meminfo", encoding="utf-8") as fh:
+                for line in fh:
+                    if line.startswith("MemAvailable:"):
+                        return int(line.split()[1]) / (1024**2)  # kB → GB
+        except Exception:  # noqa: BLE001
+            return None
+
+    return None
+
+
+def _truncate_knowledge_base(state: LoopState, reason: str) -> None:
+    """Lossy fallback: keep the head + tail, drop the middle.
+
+    Used when LLM-based compression cannot run (memory pressure) or fails
+    (backend error, empty response). Lossy but bounded — the run continues
+    instead of dying with a corpus that grows unbounded.
+    """
+    words = state.knowledge_base.split()
+    if len(words) <= state.KB_MAX_WORDS:
+        return
+
+    head_size = state.KB_MAX_WORDS // 2
+    tail_size = state.KB_MAX_WORDS - head_size
+    head = " ".join(words[:head_size])
+    tail = " ".join(words[-tail_size:])
+    omitted = len(words) - state.KB_MAX_WORDS
+
+    state.knowledge_base = (
+        f"{head}\n\n"
+        f"[... {omitted} words trimmed by lossy fallback ({reason}) ...]\n\n"
+        f"{tail}"
+    )
+    state.kb_path.write_text(state.knowledge_base, encoding="utf-8")
+    log.info(
+        "Knowledge base truncated to %d words (lossy fallback: %s).",
+        len(state.knowledge_base.split()),
+        reason,
+    )
+
+
 def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
-    """Distill the knowledge base if it exceeds the word limit."""
+    """Distill the knowledge base if it exceeds the word limit.
+
+    Two-layer defense against OOM:
+      1. PREVENT — pre-flight memory check refuses to invoke the compress
+         backend when free RAM is below ``_COMPRESS_MIN_FREE_GB``. The CLI
+         backends spawn a Node subprocess (~1.5 GB heap baseline); below
+         the threshold, the kernel is likely to SIGKILL python during
+         the spawn. Falls back to truncation.
+      2. GRACEFUL DEGRADE — wraps the backend call so any error (timeout,
+         empty response, exception) falls back to truncation rather than
+         leaving the corpus uncompressed (which would make the *next*
+         compress attempt even larger and more likely to OOM).
+
+    SIGKILL during the backend call cannot be caught — but layer 1 makes
+    that case rare, and on resume the run picks up at the post-truncation
+    state if the previous attempt fell through to layer 2.
+    """
     word_count = len(state.knowledge_base.split())
     if word_count <= state.KB_MAX_WORDS:
+        return
+
+    # Layer 1: pre-flight memory guard.
+    free_gb = _available_memory_gb()
+    if free_gb is not None and free_gb < _COMPRESS_MIN_FREE_GB:
+        log.warning(
+            "Skipping LLM compress at iter %d: only %.2f GB free (need %.1f GB). "
+            "Falling back to truncation.",
+            state.iteration, free_gb, _COMPRESS_MIN_FREE_GB,
+        )
+        ctx.audit_trail.emit(
+            "compress_skipped_low_memory",
+            iteration=state.iteration,
+            free_gb=round(free_gb, 2),
+            threshold_gb=_COMPRESS_MIN_FREE_GB,
+            corpus_words=word_count,
+        )
+        _truncate_knowledge_base(state, reason="low memory pre-flight")
         return
 
     log.info(
@@ -949,17 +1063,44 @@ def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
         f"{state.knowledge_base}"
     )
 
+    # Layer 2: try the LLM compress, fall through to truncation on any failure.
     compress_backend = ctx.strategy.get_compress_backend()
-    with ctx.audit_trail.step(
-        "compress_knowledge_base",
-        artifact_root=ctx.artifact_root,
-        iteration=state.iteration,
-        backend=compress_backend.name,
-    ):
-        resp = ctx.call_with(compress_backend, prompt, max_turns=3, timeout=120)
-    ctx.track_usage(resp, compress_backend.name)
+    try:
+        with ctx.audit_trail.step(
+            "compress_knowledge_base",
+            artifact_root=ctx.artifact_root,
+            iteration=state.iteration,
+            backend=compress_backend.name,
+        ):
+            resp = ctx.call_with(compress_backend, prompt, max_turns=3, timeout=120)
+        ctx.track_usage(resp, compress_backend.name)
+    except Exception as exc:  # noqa: BLE001 — never let compress kill the run
+        log.warning(
+            "Compress raised %s at iter %d; falling back to truncation.",
+            exc.__class__.__name__, state.iteration,
+        )
+        ctx.audit_trail.emit(
+            "compress_failed_fallback_truncate",
+            iteration=state.iteration,
+            error=f"{exc.__class__.__name__}: {exc}",
+            corpus_words=word_count,
+        )
+        _truncate_knowledge_base(state, reason=f"compress raised {exc.__class__.__name__}")
+        return
 
     if not resp.is_error and resp.text and len(resp.text) > 200:
         state.knowledge_base = resp.text
         state.kb_path.write_text(state.knowledge_base, encoding="utf-8")
         log.info("Knowledge base compressed to %d words.", len(resp.text.split()))
+    else:
+        log.warning(
+            "Compress returned empty/error at iter %d; falling back to truncation.",
+            state.iteration,
+        )
+        ctx.audit_trail.emit(
+            "compress_failed_fallback_truncate",
+            iteration=state.iteration,
+            error="empty_or_error_response",
+            corpus_words=word_count,
+        )
+        _truncate_knowledge_base(state, reason="compress returned empty/error")
