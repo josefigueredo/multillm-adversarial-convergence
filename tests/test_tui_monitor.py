@@ -197,6 +197,93 @@ def test_sparkline_truncates_long_input_to_window():
     assert len(spark) == 4
 
 
+def test_sparkline_auto_scales_above_100_for_novelty_blended_runs():
+    """Novelty-weighted total can exceed 100 (max 125).  Sparkline must
+    auto-scale so values above 100 don't all clamp to the top bar."""
+    from scripts.tui_monitor import SPARK_BARS
+    # Three values: 50 (mid), 100 (legacy max), 124 (novelty max)
+    spark = _sparkline([50.0, 100.0, 124.0], width=3)
+    assert len(spark) == 3
+    # The 124 value is the new vmax; it should be the top bar (█)
+    assert spark[-1] == SPARK_BARS[-1]
+    # The 50 value should NOT be the top bar (it's < vmax)
+    assert spark[0] != SPARK_BARS[-1]
+
+
+def test_sparkline_floor_at_100_for_low_score_runs():
+    """When all values are well under 100, vmax should still floor at 100
+    so a low-score run doesn't visually look like it's hit the ceiling."""
+    from scripts.tui_monitor import SPARK_BARS
+    # All values in 0-50; floor of 100 means they should all be in lower half
+    spark = _sparkline([10.0, 30.0, 50.0], width=3)
+    bar_indices = [SPARK_BARS.index(c) for c in spark]
+    # Top value (50) is half of the 100 floor, so should be in lower half of palette
+    assert bar_indices[-1] < len(SPARK_BARS) - 1
+
+
+# ---------------------------------------------------------------------------
+# results.tsv loader
+# ---------------------------------------------------------------------------
+
+def test_load_results_tsv_returns_breakdown_per_iteration(tmp_path):
+    from scripts.tui_monitor import load_results_tsv
+    p = tmp_path / "results.tsv"
+    p.write_text(
+        "iteration\tdimension\tcoverage_score\tquality_score\ttotal_score\textra\n"
+        "001\tDim A\t94.4\t65.0\t104.5\tjunk\n"
+        "002\tDim B\t90.0\t70.0\t108.0\tjunk\n",
+    )
+    out = load_results_tsv(p)
+    assert out[1] == (94.4, 65.0, 104.5)
+    assert out[2] == (90.0, 70.0, 108.0)
+
+
+def test_load_results_tsv_missing_file_returns_empty():
+    from scripts.tui_monitor import load_results_tsv
+    out = load_results_tsv(Path("/tmp/__nope__.tsv"))
+    assert out == {}
+
+
+def test_load_results_tsv_skips_unparseable_rows(tmp_path):
+    from scripts.tui_monitor import load_results_tsv
+    p = tmp_path / "results.tsv"
+    p.write_text(
+        "iteration\tcoverage_score\tquality_score\ttotal_score\n"
+        "001\t90.0\t60.0\t72.0\n"
+        "not_a_number\t0\t0\t0\n"
+        "002\t85.0\t70.0\t76.0\n",
+    )
+    out = load_results_tsv(p)
+    assert set(out.keys()) == {1, 2}
+
+
+# ---------------------------------------------------------------------------
+# RunState uses real breakdowns when score_breakdowns is populated
+# ---------------------------------------------------------------------------
+
+def test_iteration_completed_uses_score_breakdowns_when_available():
+    """When results.tsv was loaded into ``score_breakdowns``, the chart
+    point uses the real coverage/quality split, not the synthesized total."""
+    s = RunState()
+    s.score_breakdowns = {1: (94.4, 65.0, 104.5)}
+    s.apply_event({"event": "step_started", "step": "hypothesise",
+                   "iteration": 1, "dimension": "REST"})
+    s.apply_event({"event": "iteration_completed", "iteration": 1,
+                   "dimension": "REST", "status": "KEEP", "total_score": 104.5})
+    assert s.chart_points == [(1, 94.4, 65.0, 104.5)]
+
+
+def test_iteration_completed_falls_back_to_total_when_no_breakdown():
+    """Without results.tsv, the heuristic and quality lines fall back to
+    the total score (no synthesis), collapsing 3 lines into 1 visually
+    rather than fabricating numbers."""
+    s = RunState()
+    # score_breakdowns is empty (default)
+    s.apply_event({"event": "iteration_completed", "iteration": 1,
+                   "dimension": "REST", "status": "KEEP", "total_score": 76.0})
+    assert s.chart_points == [(1, 76.0, 76.0, 76.0)]
+
+
 # ---------------------------------------------------------------------------
 # Scripted events generator
 # ---------------------------------------------------------------------------

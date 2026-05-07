@@ -240,6 +240,8 @@ After synthesis, a **rubric** grades the output on citation coverage, evidence q
 
 When ensemble or parallel strategies produce multiple candidates for the same dimension, **inter-rater agreement** (Cohen's kappa) is computed across backends — quantifying whether independent review is adding real value or just cost.
 
+> **Score range note.** The default formula `0.4 * coverage + 0.6 * quality` is bounded `[0, 100]`. When `scoring.weights.novelty_weight > 0` is set in the config (opt-in), the formula becomes `0.4 * coverage + 0.6 * quality_blend + novelty_weight * heuristic_novelty`, where `quality_blend` mixes the judge's quality score with its novelty axis (`judge_novelty_share`). With `novelty_weight: 0.25`, the maximum total is `40 + 60 + 25 = 125`. Values above 100 in `results.tsv::total_score` and the dashboard chart are expected — not a bug. The dashboard and TUI auto-scale their score axes to handle this.
+
 ## Multi-Backend Strategies
 
 | Strategy | How It Works | Cost | Min Backends |

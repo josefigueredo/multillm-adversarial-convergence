@@ -377,11 +377,11 @@
         <!-- Axes -->
         <line class="chart-axis" x1="40" y1="20" x2="40" y2="200"/>
         <line class="chart-axis" x1="40" y1="200" x2="370" y2="200"/>
-        <!-- Y axis labels -->
-        <text class="chart-axis-label" x="32" y="28" text-anchor="end">100</text>
-        <text class="chart-axis-label" x="32" y="74" text-anchor="end">75</text>
-        <text class="chart-axis-label" x="32" y="120" text-anchor="end">50</text>
-        <text class="chart-axis-label" x="32" y="166" text-anchor="end">25</text>
+        <!-- Y axis labels — values updated by JS to match auto-scaled vmax -->
+        <text class="chart-axis-label" x="32" y="28"  text-anchor="end" id="y-label-100">100</text>
+        <text class="chart-axis-label" x="32" y="74"  text-anchor="end" id="y-label-75">75</text>
+        <text class="chart-axis-label" x="32" y="120" text-anchor="end" id="y-label-50">50</text>
+        <text class="chart-axis-label" x="32" y="166" text-anchor="end" id="y-label-25">25</text>
         <text class="chart-axis-label" x="32" y="208" text-anchor="end">0</text>
         <!-- X axis label -->
         <text class="chart-axis-label" x="205" y="225" text-anchor="middle">iteration</text>
@@ -509,8 +509,12 @@ function buildFrames(iterations) {
   let calls = 0, tokens = 0, dollars = 0;
   const covered = new Set();
 
-  for (const [iter, dimIdx, heur, qual, decision] of iterations) {
-    const total = +(0.4 * heur + 0.6 * qual).toFixed(1);
+  for (const tuple of iterations) {
+    const [iter, dimIdx, heur, qual, decision, realTotal] = tuple;
+    // Prefer the real total_score from results.tsv (handles novelty-blended
+    // formula where total can exceed 100); fall back to the legacy formula
+    // for scripted data where only heur/qual are known.
+    const total = realTotal != null ? realTotal : +(0.4 * heur + 0.6 * qual).toFixed(1);
     const dim = DIMENSIONS[dimIdx] || `dim ${dimIdx}`;
 
     // 5 frames per iteration: HYPO → EXEC → CRITIQUE → SCORE → DECIDE → branch
@@ -584,37 +588,75 @@ async function loadRealRun(url) {
   const lines = text.split('\n').filter(l => l.trim().length > 0);
   const events = lines.map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
 
-  // Group events by iteration. Audit events we care about:
-  //   { event: "iteration_started", iter: N, dimension: "..." }
-  //   { event: "score_computed", iter: N, heuristic: ..., quality: ..., total: ... }
-  //   { event: "iteration_decided", iter: N, decision: "KEEP" | "DISCARD" }
-  // The exact field names depend on src/audit_trail.py — adjust here once
-  // the real run is in hand. Fallback: if we can't parse, return null and
-  // the caller falls back to scripted data.
+  // Authoritative score breakdowns live in results.tsv (audit_trail's
+  // iteration_completed only carries total_score).  Fetch sibling file.
+  const breakdowns = await loadResultsTsv(url.replace(/audit_trail\.jsonl$/, 'results.tsv'));
+
+  // Group events by iteration.  Use audit for iteration_started (dimension)
+  // and iteration_completed (status), then merge in real scores from tsv.
   const byIter = new Map();
   for (const ev of events) {
     const iter = ev.iter ?? ev.iteration ?? null;
     if (iter == null) continue;
     if (!byIter.has(iter)) byIter.set(iter, { iter, dimIdx: 0, heur: 0, qual: 0, decision: "KEEP" });
     const slot = byIter.get(iter);
-    if (ev.event === "iteration_started" && ev.dimension) {
+    if ((ev.event === "iteration_started" || ev.event === "step_started") && ev.dimension) {
       const idx = DIMENSIONS.findIndex(d => ev.dimension.toLowerCase().includes(d.toLowerCase().split(' ')[0]));
       slot.dimIdx = idx >= 0 ? idx : ((iter - 1) % DIMENSIONS.length);
     }
-    if (ev.event === "score_computed") {
-      slot.heur = +(ev.heuristic ?? ev.coverage ?? 0).toFixed(1);
-      slot.qual = +(ev.quality ?? ev.judge_score ?? 0).toFixed(1);
+    if (ev.event === "iteration_completed") {
+      slot.decision = (ev.status || "KEEP").toUpperCase();
+      // Use total_score as fallback when results.tsv breakdown isn't available
+      const total = ev.total_score;
+      if (total != null && breakdowns[iter] === undefined) {
+        slot.heur = +total.toFixed(1);
+        slot.qual = +total.toFixed(1);
+      }
     }
-    if (ev.event === "iteration_decided") {
-      slot.decision = ev.decision || "KEEP";
-    }
+  }
+
+  // Override with results.tsv breakdowns when present — these are the truth.
+  for (const [iterStr, parts] of Object.entries(breakdowns)) {
+    const iter = +iterStr;
+    if (!byIter.has(iter)) byIter.set(iter, { iter, dimIdx: ((iter - 1) % DIMENSIONS.length), decision: "KEEP" });
+    const slot = byIter.get(iter);
+    slot.heur = +parts.coverage.toFixed(1);
+    slot.qual = +parts.quality.toFixed(1);
+    if (parts.total != null) slot.total = +parts.total.toFixed(1);
   }
 
   const iterations = [...byIter.values()]
     .sort((a, b) => a.iter - b.iter)
-    .map(s => [s.iter, s.dimIdx, s.heur, s.qual, s.decision]);
+    .map(s => [s.iter, s.dimIdx, s.heur, s.qual, s.decision, s.total]);
 
   return iterations.length > 0 ? iterations : null;
+}
+
+async function loadResultsTsv(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const text = await res.text();
+    const lines = text.split('\n').filter(Boolean);
+    if (lines.length < 2) return {};
+    const headers = lines[0].split('\t');
+    const idx = (name) => headers.indexOf(name);
+    const iIter = idx('iteration'), iCov = idx('coverage_score'),
+          iQual = idx('quality_score'), iTotal = idx('total_score');
+    if (iIter < 0 || iCov < 0 || iQual < 0) return {};
+    const out = {};
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split('\t');
+      const iter = +parts[iIter];
+      if (!Number.isFinite(iter)) continue;
+      out[iter] = {
+        coverage: +parts[iCov] || 0,
+        quality:  +parts[iQual] || 0,
+        total:    iTotal >= 0 ? (+parts[iTotal] || 0) : null,
+      };
+    }
+    return out;
+  } catch { return {}; }
 }
 
 // Extract recovery / fallback / rollback events from a parsed audit trail
@@ -731,11 +773,34 @@ function buildDimGrid() {
 }
 
 // Score chart: append data points iteration by iteration.
+// Y axis auto-scales so novelty-blended runs (max 125) and legacy
+// runs (max 100) both render across the full chart height.
 function updateChart(chartPoints) {
   const w = 330, h = 180, x0 = 40, y0 = 200;
   const maxIter = Math.max(DIMENSIONS.length, 12);
   const xScale = (i) => x0 + (i - 1) * (w / (maxIter - 1));
-  const yScale = (v) => y0 - (v / 100) * h;
+
+  // Floor at 100 so empty / low-score state doesn't squash to top of chart;
+  // otherwise track the actual peak so points never escape the plot area.
+  let vmax = 100;
+  for (const p of chartPoints) {
+    vmax = Math.max(vmax, p.heuristic || 0, p.quality || 0, p.total || 0);
+  }
+  // Round vmax up to next 25 for clean axis labels (100, 125, 150, ...)
+  vmax = Math.ceil(vmax / 25) * 25;
+  const yScale = (v) => y0 - (v / vmax) * h;
+
+  // Update Y axis labels to match the dynamic vmax
+  const labels = [
+    { id: 'y-label-100', value: vmax },
+    { id: 'y-label-75',  value: vmax * 0.75 },
+    { id: 'y-label-50',  value: vmax * 0.5 },
+    { id: 'y-label-25',  value: vmax * 0.25 },
+  ];
+  for (const { id, value } of labels) {
+    const el = $(id);
+    if (el) el.textContent = value.toFixed(0);
+  }
 
   const buildPath = (key) => chartPoints.length === 0
     ? ''

@@ -140,11 +140,35 @@ class RunState:
     fallback_events: list[str] = field(default_factory=list)
     finished: bool = False
     target_dimensions: int = 13  # updated from run_started if available
+    # Authoritative score breakdowns by iteration, loaded from results.tsv
+    # at startup.  Empty when results.tsv is missing — chart_points then
+    # carry only the total_score from iteration_completed events.
+    score_breakdowns: dict[int, tuple[float, float, float]] = field(default_factory=dict)
 
     def upsert_iter(self, n: int) -> IterRecord:
         if n not in self.iters:
             self.iters[n] = IterRecord(iter=n)
         return self.iters[n]
+
+    def _upsert_chart_point(self, point: tuple[int, float, float, float]) -> None:
+        """Replace an existing chart point for the same iteration, otherwise append.
+        Keeps the chart idempotent under replay (events seen multiple times) and
+        consistent with seeding from results.tsv."""
+        iter_n = point[0]
+        for i, existing in enumerate(self.chart_points):
+            if existing[0] == iter_n:
+                self.chart_points[i] = point
+                return
+        self.chart_points.append(point)
+        self.chart_points.sort(key=lambda p: p[0])
+
+    def seed_chart_from_breakdowns(self) -> None:
+        """Pre-populate chart_points from ``score_breakdowns`` so iterations
+        whose ``iteration_completed`` audit event was never emitted (e.g.,
+        SIGKILL during the post-iteration compress) still appear in the chart.
+        Safe to call multiple times — _upsert_chart_point dedupes."""
+        for iter_n, (cov, qual, total) in sorted(self.score_breakdowns.items()):
+            self._upsert_chart_point((iter_n, cov, qual, total))
 
     def apply_event(self, ev: dict) -> None:
         """Mutate state from one audit event.  Keeps logic in one place so
@@ -192,11 +216,21 @@ class RunState:
             total = ev.get("total_score")
             if total is not None:
                 rec.total = float(total)
-                # Best-effort: heuristic + quality split usually not in this event.
-                # For chart we'll synthesize from the total when partials missing.
-                heur = rec.heuristic if rec.heuristic is not None else float(total) * 0.95
-                qual = rec.quality if rec.quality is not None else float(total) * 1.05
-                self.chart_points.append((iter_n, heur, qual, float(total)))
+                # Prefer authoritative breakdown from results.tsv when available;
+                # fall back to total-only for both lines so we don't fabricate
+                # numbers.  ``audit_trail.jsonl::iteration_completed`` only carries
+                # ``total_score`` -- coverage / quality columns live in
+                # ``results.tsv``.  When the breakdown isn't loaded (e.g., live
+                # tail before the row is written), heuristic and quality both
+                # equal total — visually that collapses the three lines into one.
+                breakdown = self.score_breakdowns.get(iter_n)
+                if breakdown is not None:
+                    cov, qual, total_b = breakdown
+                    rec.heuristic = cov
+                    rec.quality = qual
+                    self._upsert_chart_point((iter_n, cov, qual, total_b))
+                else:
+                    self._upsert_chart_point((iter_n, float(total), float(total), float(total)))
             if rec.decision == "KEEP" and rec.dimension:
                 self.dimensions_covered.add(rec.dimension)
 
@@ -475,13 +509,19 @@ def render_footer(mode: str, source_path: Path | None, paused: bool) -> Panel:
 # Sparkline
 # ---------------------------------------------------------------------------
 
-def _sparkline(values: Iterable[float], width: int = 30, vmin: float = 0.0, vmax: float = 100.0) -> str:
-    """Unicode sparkline over a 0..100 range, padded/truncated to ``width``."""
+def _sparkline(values: Iterable[float], width: int = 30, vmin: float = 0.0, vmax: float | None = None) -> str:
+    """Unicode sparkline padded/truncated to ``width``.
+
+    When ``vmax`` is None, auto-scales to the data range with a floor of 100
+    so low-score runs still use the full 0-100 visual range AND novelty-blended
+    runs (max 125) don't clamp to ``█``.
+    """
     vals = list(values)
     if not vals:
         return ""
-    # Show the LAST `width` values
     vals = vals[-width:]
+    if vmax is None:
+        vmax = max(100.0, max(vals))
     out_chars = []
     span = max(0.0001, vmax - vmin)
     for v in vals:
@@ -525,6 +565,36 @@ def build_layout(state: RunState, mode: str, source: Path | None, paused: bool,
 # ---------------------------------------------------------------------------
 # Data sources: live tail + file replay + scripted
 # ---------------------------------------------------------------------------
+
+def load_results_tsv(path: Path) -> dict[int, tuple[float, float, float]]:
+    """Parse ``results.tsv`` for per-iteration score breakdowns.
+
+    Returns ``{iteration: (coverage_score, quality_score, total_score)}``.
+    The breakdown is the source of truth for the TUI score chart because
+    ``audit_trail.jsonl::iteration_completed`` only carries ``total_score``.
+    Returns ``{}`` when the file is missing or unparseable.
+    """
+    out: dict[int, tuple[float, float, float]] = {}
+    if not path.exists():
+        return out
+    try:
+        import csv
+
+        with path.open("r", encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(fh, delimiter="\t")
+            for row in reader:
+                try:
+                    iter_n = int(row.get("iteration", 0))
+                    cov = float(row.get("coverage_score", 0))
+                    qual = float(row.get("quality_score", 0))
+                    total = float(row.get("total_score", 0))
+                    out[iter_n] = (cov, qual, total)
+                except (ValueError, TypeError):
+                    continue
+    except OSError:
+        pass
+    return out
+
 
 def iter_audit_events(path: Path) -> Iterable[dict]:
     """Read every existing event from an audit file, yielding parsed dicts.
@@ -614,6 +684,11 @@ def run_live(audit_path: Path, console: Console) -> None:
     state = RunState()
     state.run_id = audit_path.parent.name
     state.started_at = time.time()
+    # Load authoritative score breakdowns from results.tsv (audit_trail's
+    # iteration_completed only carries total_score).  In live mode the file
+    # may grow during the run; this snapshot is fine for completed iterations.
+    state.score_breakdowns = load_results_tsv(audit_path.parent / "results.tsv")
+    state.seed_chart_from_breakdowns()
 
     layout = build_layout(state, "live", audit_path, paused=False)
     with Live(layout, console=console, refresh_per_second=REFRESH_HZ, screen=False) as live:
@@ -641,6 +716,9 @@ def run_replay(audit_path: Path | None, console: Console, frame_delay: float,
     state = RunState()
     state.run_id = run_label
     state.started_at = time.time()
+    if audit_path is not None:
+        state.score_breakdowns = load_results_tsv(audit_path.parent / "results.tsv")
+        state.seed_chart_from_breakdowns()
 
     layout = build_layout(state, "replay", source, paused=False)
     with Live(layout, console=console, refresh_per_second=REFRESH_HZ, screen=False) as live:
