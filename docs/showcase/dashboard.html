@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Adversarial Convergence — Live Replay</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #243144;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #3b82f6;
+    --primary: #1e3a5f;
+    --research: #0e7490;
+    --critique: #6d28d9;
+    --judge: #6d28d9;
+    --decide: #d97706;
+    --keep: #16a34a;
+    --discard: #dc2626;
+    --compress: #0e7490;
+    --synth: #2563eb;
+    --done: #475569;
+    --edge: #475569;
+    --edge-active: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+  body { display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; }
+
+  header {
+    padding: 12px 24px;
+    background: var(--panel);
+    border-bottom: 1px solid #334155;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+  }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; color: #f1f5f9; }
+  header h1 .topic { color: var(--accent); }
+  header .meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; display: flex; gap: 16px; }
+  header .meta span b { color: var(--text); font-weight: 600; margin-left: 4px; }
+
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
+    min-height: 0;
+  }
+  section.card {
+    background: var(--panel);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow: hidden;
+  }
+  section.card h2 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .flowchart svg { width: 100%; height: auto; max-height: calc(100vh - 200px); display: block; }
+
+  aside.panels { display: grid; grid-template-rows: minmax(0, 1.2fr) auto auto; gap: 12px; min-height: 0; }
+
+  .score-chart svg { width: 100%; height: auto; display: block; }
+
+  .dim-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .dim-cell {
+    background: var(--panel-2);
+    border-radius: 4px;
+    padding: 6px 4px;
+    font-size: 10px;
+    text-align: center;
+    color: var(--muted);
+    transition: background 300ms, color 300ms, transform 200ms;
+    line-height: 1.2;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dim-cell.covered { background: var(--keep); color: #052e16; font-weight: 600; }
+  .dim-cell.current { transform: scale(1.08); box-shadow: 0 0 0 2px var(--edge-active); color: var(--text); }
+
+  .cost-block {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .cost-cell {
+    background: var(--panel-2);
+    border-radius: 4px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+  .cost-cell .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .cost-cell .value { font-size: 22px; font-weight: 600; color: var(--text); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .cost-cell .unit { font-size: 11px; color: var(--muted); margin-left: 2px; }
+
+  footer {
+    padding: 10px 16px;
+    background: var(--panel);
+    border-top: 1px solid #334155;
+    display: grid;
+    grid-template-columns: auto auto auto 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+  }
+  footer button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid #334155;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+    min-width: 38px;
+  }
+  footer button:hover { background: #334155; border-color: #475569; }
+  footer button.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-width: 48px; }
+  footer button.primary:hover { background: #2563eb; }
+  footer input[type="range"] { width: 100%; accent-color: var(--accent); }
+  footer .frame-counter { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 100px; text-align: right; }
+  footer select {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid #334155; border-radius: 4px;
+    padding: 5px 8px; font-family: inherit; font-size: 12px;
+    cursor: pointer;
+  }
+
+  /* SVG flowchart styling */
+  .node rect, .node ellipse, .node polygon {
+    fill: var(--panel-2);
+    stroke: #475569;
+    stroke-width: 1.5;
+    transition: fill 300ms, stroke 300ms, filter 300ms;
+  }
+  .node text { fill: var(--text); font-size: 11px; font-weight: 500; pointer-events: none; }
+  .node text.sub { fill: var(--muted); font-size: 9px; }
+  .node.active rect, .node.active ellipse, .node.active polygon {
+    stroke: var(--edge-active);
+    stroke-width: 3;
+    filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.6));
+  }
+  .node.active.role-primary rect { fill: var(--primary); }
+  .node.active.role-research rect { fill: var(--research); }
+  .node.active.role-critique rect { fill: var(--critique); }
+  .node.active.role-judge rect { fill: var(--judge); }
+  .node.active.role-decide polygon { fill: var(--decide); }
+  .node.active.role-keep rect { fill: var(--keep); }
+  .node.active.role-discard rect { fill: var(--discard); }
+  .node.active.role-compress rect { fill: var(--compress); }
+  .node.active.role-synth rect { fill: var(--synth); }
+  .node.visited rect, .node.visited ellipse { stroke: #64748b; }
+
+  .edge { fill: none; stroke: var(--edge); stroke-width: 1.5; transition: stroke 300ms, stroke-width 300ms; }
+  .edge.active { stroke: var(--edge-active); stroke-width: 2.5; }
+  .edge-label { fill: var(--muted); font-size: 10px; font-style: italic; }
+
+  .pulse {
+    fill: var(--edge-active);
+    filter: drop-shadow(0 0 4px var(--edge-active));
+    opacity: 0;
+  }
+  .pulse.travelling { opacity: 1; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* Score chart elements */
+  .chart-axis { stroke: #334155; stroke-width: 1; }
+  .chart-axis-label { fill: var(--muted); font-size: 10px; }
+  .chart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .chart-line.heuristic { stroke: var(--research); }
+  .chart-line.quality { stroke: var(--critique); }
+  .chart-line.total { stroke: var(--edge-active); stroke-width: 2.5; }
+  .chart-dot { transition: r 200ms; }
+  .chart-dot.heuristic { fill: var(--research); }
+  .chart-dot.quality { fill: var(--critique); }
+  .chart-dot.total { fill: var(--edge-active); }
+
+  .source-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: var(--panel-2);
+    color: var(--muted);
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .source-badge.real { background: var(--keep); color: #052e16; }
+  .source-badge.scripted { background: var(--decide); color: #fff; }
+
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Adversarial Convergence — <span class="topic" id="topic-label">AWS API Gateway</span><span class="source-badge" id="source-badge">scripted</span></h1>
+  </div>
+  <div class="meta">
+    <span>iter <b id="meta-iter">0/0</b></span>
+    <span>state <b id="meta-state">—</b></span>
+    <span>backend <b id="meta-backend">—</b></span>
+    <span>dim <b id="meta-dim">—</b></span>
+  </div>
+</header>
+
+<main>
+  <section class="card flowchart">
+    <h2>State machine</h2>
+    <svg id="flow-svg" viewBox="0 0 720 720" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--edge)"/>
+        </marker>
+        <marker id="arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--edge-active)"/>
+        </marker>
+      </defs>
+
+      <!-- Edges first (so nodes draw on top) -->
+      <g id="edges">
+        <path class="edge" id="e-init-strategy"  d="M 360 70 L 360 110" marker-end="url(#arrow)"/>
+        <path class="edge" id="e-strategy-loop"  d="M 360 165 L 360 205" marker-end="url(#arrow)"/>
+        <path class="edge" id="e-loop-hypo"      d="M 360 250 L 360 280" marker-end="url(#arrow)"/>
+        <path class="edge" id="e-hypo-execute"   d="M 360 335 L 360 365" marker-end="url(#arrow)"/>
+        <path class="edge" id="e-execute-critique" d="M 360 420 L 360 450" marker-end="url(#arrow)"/>
+        <path class="edge" id="e-critique-score" d="M 360 505 L 360 535" marker-end="url(#arrow)"/>
+        <path class="edge" id="e-score-decide"   d="M 360 580 L 360 610" marker-end="url(#arrow)"/>
+        <!-- Decide branches: KEEP left, DISCARD right -->
+        <path class="edge" id="e-decide-keep"    d="M 330 645 Q 215 660 215 685" marker-end="url(#arrow)"/>
+        <path class="edge" id="e-decide-discard" d="M 390 645 Q 505 660 505 685" marker-end="url(#arrow)"/>
+        <!-- KEEP / DISCARD loop back up -->
+        <path class="edge" id="e-keep-loop"      d="M 165 690 Q 70 690 70 230 Q 70 220 310 220" marker-end="url(#arrow)"/>
+        <path class="edge" id="e-discard-loop"   d="M 555 690 Q 650 690 650 230 Q 650 220 410 220" marker-end="url(#arrow)"/>
+        <!-- Edge labels -->
+        <text class="edge-label" x="245" y="660">KEEP → merge</text>
+        <text class="edge-label" x="430" y="660">DISCARD → retry</text>
+      </g>
+
+      <!-- Nodes -->
+      <g id="nodes">
+        <g class="node" id="n-init">
+          <ellipse cx="360" cy="40" rx="110" ry="28"/>
+          <text x="360" y="38" text-anchor="middle">cli.py · load config</text>
+          <text x="360" y="52" text-anchor="middle" class="sub">backends · strategy · resume</text>
+        </g>
+
+        <g class="node" id="n-strategy" data-role="strategy">
+          <rect x="240" y="115" width="240" height="50" rx="8"/>
+          <text x="360" y="140" text-anchor="middle">build strategy: ADVERSARIAL</text>
+          <text x="360" y="155" text-anchor="middle" class="sub">primary · research[] · judge</text>
+        </g>
+
+        <g class="node" id="n-loop">
+          <rect x="290" y="210" width="140" height="42" rx="8"/>
+          <text x="360" y="232" text-anchor="middle">ITERATION LOOP</text>
+          <text x="360" y="246" text-anchor="middle" class="sub">infinite · until target/budget</text>
+        </g>
+
+        <g class="node" id="n-hypo" data-role="primary">
+          <rect x="245" y="285" width="230" height="50" rx="8"/>
+          <text x="360" y="308" text-anchor="middle">1 · HYPOTHESISE</text>
+          <text x="360" y="324" text-anchor="middle" class="sub">primary · pick next gap</text>
+        </g>
+
+        <g class="node" id="n-execute" data-role="research">
+          <rect x="245" y="370" width="230" height="50" rx="8"/>
+          <text x="360" y="393" text-anchor="middle">2 · EXECUTE</text>
+          <text x="360" y="409" text-anchor="middle" class="sub">research[] · web · docs · code</text>
+        </g>
+
+        <g class="node" id="n-critique" data-role="critique">
+          <rect x="245" y="455" width="230" height="50" rx="8"/>
+          <text x="360" y="478" text-anchor="middle">3 · CRITIQUE</text>
+          <text x="360" y="494" text-anchor="middle" class="sub">adversary · different family</text>
+        </g>
+
+        <g class="node" id="n-score" data-role="judge">
+          <rect x="245" y="540" width="230" height="50" rx="8"/>
+          <text x="360" y="563" text-anchor="middle">4 · SCORE</text>
+          <text x="360" y="579" text-anchor="middle" class="sub">heuristic 40% + judge 60%</text>
+        </g>
+
+        <g class="node" id="n-decide" data-role="decide">
+          <polygon points="360,610 410,640 360,670 310,640"/>
+          <text x="360" y="644" text-anchor="middle" font-size="10">total &gt; best?</text>
+        </g>
+
+        <g class="node" id="n-keep" data-role="keep">
+          <rect x="115" y="685" width="100" height="34" rx="8"/>
+          <text x="165" y="706" text-anchor="middle">KEEP · merge</text>
+        </g>
+
+        <g class="node" id="n-discard" data-role="discard">
+          <rect x="505" y="685" width="100" height="34" rx="8"/>
+          <text x="555" y="706" text-anchor="middle">DISCARD · save</text>
+        </g>
+      </g>
+
+      <!-- Travelling pulse -->
+      <circle id="pulse" class="pulse" r="5"/>
+
+      <!-- Side card: COMPRESS (decoupled — fired every N iters) -->
+      <g class="node" id="n-compress" data-role="compress" transform="translate(0,0)">
+        <rect x="35" y="100" width="120" height="46" rx="8"/>
+        <text x="95" y="122" text-anchor="middle">⚙ COMPRESS</text>
+        <text x="95" y="136" text-anchor="middle" class="sub">every 5 · distill</text>
+      </g>
+
+      <!-- Side card: SYNTHESIZE (terminal) -->
+      <g class="node" id="n-synth" data-role="synth">
+        <rect x="565" y="100" width="120" height="46" rx="8"/>
+        <text x="625" y="122" text-anchor="middle">SYNTHESIZE</text>
+        <text x="625" y="136" text-anchor="middle" class="sub">final report</text>
+      </g>
+    </svg>
+
+    <div class="legend">
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--primary)"></span>primary</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--research)"></span>research</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--critique)"></span>critique</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--judge)"></span>judge</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--decide)"></span>decide</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--keep)"></span>keep</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--discard)"></span>discard</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--compress)"></span>compress</div>
+    </div>
+  </section>
+
+  <aside class="panels">
+    <section class="card score-chart">
+      <h2>Score progression</h2>
+      <svg id="chart-svg" viewBox="0 0 380 240" preserveAspectRatio="xMidYMid meet">
+        <!-- Axes -->
+        <line class="chart-axis" x1="40" y1="20" x2="40" y2="200"/>
+        <line class="chart-axis" x1="40" y1="200" x2="370" y2="200"/>
+        <!-- Y axis labels -->
+        <text class="chart-axis-label" x="32" y="28" text-anchor="end">100</text>
+        <text class="chart-axis-label" x="32" y="74" text-anchor="end">75</text>
+        <text class="chart-axis-label" x="32" y="120" text-anchor="end">50</text>
+        <text class="chart-axis-label" x="32" y="166" text-anchor="end">25</text>
+        <text class="chart-axis-label" x="32" y="208" text-anchor="end">0</text>
+        <!-- X axis label -->
+        <text class="chart-axis-label" x="205" y="225" text-anchor="middle">iteration</text>
+        <!-- Lines + dots populated by JS -->
+        <path class="chart-line heuristic" id="line-heuristic" d=""/>
+        <path class="chart-line quality"   id="line-quality"   d=""/>
+        <path class="chart-line total"     id="line-total"     d=""/>
+        <g id="chart-dots"></g>
+        <!-- Legend -->
+        <g transform="translate(50, 18)">
+          <rect width="10" height="2" y="4" fill="var(--research)"/>
+          <text x="14" y="9" class="chart-axis-label">heuristic</text>
+          <rect width="10" height="2" y="4" x="76" fill="var(--critique)"/>
+          <text x="90" y="9" class="chart-axis-label">judge</text>
+          <rect width="10" height="2.5" y="4" x="138" fill="var(--edge-active)"/>
+          <text x="152" y="9" class="chart-axis-label">total</text>
+        </g>
+      </svg>
+    </section>
+
+    <section class="card">
+      <h2>Dimensions covered (<span id="dim-count">0</span>/<span id="dim-total">13</span>)</h2>
+      <div class="dim-grid" id="dim-grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Cost & calls</h2>
+      <div class="cost-block">
+        <div class="cost-cell"><div class="label">calls</div><div class="value" id="cost-calls">0</div></div>
+        <div class="cost-cell"><div class="label">tokens</div><div class="value" id="cost-tokens">0<span class="unit">k</span></div></div>
+        <div class="cost-cell"><div class="label">spend</div><div class="value">$<span id="cost-dollars">0.00</span></div></div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<footer>
+  <button id="btn-restart" title="restart (r)">⏮</button>
+  <button id="btn-prev"    title="step back (←)">◀</button>
+  <button id="btn-play"    class="primary" title="play / pause (space)">▶</button>
+  <input type="range" id="scrubber" min="0" max="0" value="0">
+  <button id="btn-next"    title="step forward (→)">▶</button>
+  <span class="frame-counter" id="frame-counter">frame 0 / 0</span>
+  <select id="speed-select" title="playback speed">
+    <option value="0.5">0.5×</option>
+    <option value="1" selected>1×</option>
+    <option value="2">2×</option>
+    <option value="4">4×</option>
+  </select>
+</footer>
+
+<script>
+'use strict';
+
+// ============================================================================
+// Configuration & data
+// ============================================================================
+
+const TOPIC_LABEL = "AWS API Gateway";
+const DIMENSIONS = [
+  "REST vs HTTP",
+  "WebSocket",
+  "AuthN/AuthZ",
+  "Rate limiting",
+  "Integrations",
+  "VTL mapping",
+  "CORS",
+  "Observability",
+  "Cost model",
+  "Deployment",
+  "Custom domains",
+  "Hard limits",
+  "REST→HTTP migration",
+];
+
+// Backend role → state-machine node id
+const STATE_NODES = ["n-strategy","n-loop","n-hypo","n-execute","n-critique","n-score","n-decide","n-keep","n-discard","n-compress","n-synth","n-init"];
+
+// Edges, in the order the iteration walks them. Each entry maps a transition
+// to (from-node, to-node, edge-id). The pulse animates along the edge's path.
+const ITERATION_EDGES = {
+  "loop-hypo":       { from: "n-loop",     to: "n-hypo",     edge: "e-loop-hypo" },
+  "hypo-execute":    { from: "n-hypo",     to: "n-execute",  edge: "e-hypo-execute" },
+  "execute-critique":{ from: "n-execute",  to: "n-critique", edge: "e-execute-critique" },
+  "critique-score":  { from: "n-critique", to: "n-score",    edge: "e-critique-score" },
+  "score-decide":    { from: "n-score",    to: "n-decide",   edge: "e-score-decide" },
+  "decide-keep":     { from: "n-decide",   to: "n-keep",     edge: "e-decide-keep" },
+  "decide-discard":  { from: "n-decide",   to: "n-discard",  edge: "e-decide-discard" },
+  "keep-loop":       { from: "n-keep",     to: "n-loop",     edge: "e-keep-loop" },
+  "discard-loop":    { from: "n-discard",  to: "n-loop",     edge: "e-discard-loop" },
+};
+
+// Scripted demo data — 12 iterations with believable convergence curve and a
+// dip at iter 7 (so the demo can call it out as "the critic forced a deeper
+// pass"). Real data, when loaded, replaces this entirely.
+const SCRIPTED_DATA = [
+  // [iter, dim_idx, heuristic, quality, decision]
+  [ 1,  0, 42, 58, "KEEP"],
+  [ 2,  1, 48, 62, "KEEP"],
+  [ 3,  2, 55, 65, "KEEP"],
+  [ 4,  3, 58, 68, "KEEP"],   // compress here (compress_every: 5 → after iter 4 done)
+  [ 5,  4, 62, 70, "KEEP"],
+  [ 6,  5, 66, 72, "KEEP"],
+  [ 7,  6, 64, 70, "DISCARD"],// the dip — critic flags weak citation
+  [ 8,  6, 70, 75, "KEEP"],   // retry of dim 6 succeeds
+  [ 9,  7, 73, 78, "KEEP"],
+  [10,  8, 75, 81, "KEEP"],
+  [11,  9, 78, 83, "KEEP"],
+  [12, 10, 82, 87, "KEEP"],
+];
+
+// ============================================================================
+// Frame generator: turn iteration data into a flat sequence of frames.
+// Each frame is a single state-machine step (HYPO, EXECUTE, ...). The player
+// advances frame-by-frame; iterations are reconstructed from the frames.
+// ============================================================================
+
+function buildFrames(iterations) {
+  const frames = [];
+  let calls = 0, tokens = 0, dollars = 0;
+  const covered = new Set();
+
+  for (const [iter, dimIdx, heur, qual, decision] of iterations) {
+    const total = +(0.4 * heur + 0.6 * qual).toFixed(1);
+    const dim = DIMENSIONS[dimIdx] || `dim ${dimIdx}`;
+
+    // 5 frames per iteration: HYPO → EXEC → CRITIQUE → SCORE → DECIDE → branch
+    const seq = [
+      { state: "HYPOTHESISE",  node: "n-hypo",     edge: "loop-hypo",       backend: "claude-cli opus",   dim },
+      { state: "EXECUTE",      node: "n-execute",  edge: "hypo-execute",    backend: "claude-cli sonnet", dim },
+      { state: "CRITIQUE",     node: "n-critique", edge: "execute-critique",backend: "codex-cli gpt-5.4", dim },
+      { state: "SCORE",        node: "n-score",    edge: "critique-score",  backend: "codex-cli gpt-5.4", dim },
+      { state: "DECIDE",       node: "n-decide",   edge: "score-decide",    backend: "—",                 dim },
+      decision === "KEEP"
+        ? { state: "KEEP",     node: "n-keep",     edge: "decide-keep",     backend: "—",                 dim }
+        : { state: "DISCARD",  node: "n-discard",  edge: "decide-discard",  backend: "—",                 dim },
+      { state: "LOOP",         node: "n-loop",     edge: decision === "KEEP" ? "keep-loop" : "discard-loop", backend: "—", dim },
+    ];
+
+    seq.forEach((f, i) => {
+      // Cost accumulators only tick on backend calls (HYPO/EXEC/CRITIQUE/SCORE)
+      if (i < 4) { calls += 1; tokens += 8 + Math.round(Math.random() * 6); dollars += 0; }
+      frames.push({
+        ...f,
+        iter, total, heuristic: heur, quality: qual, decision,
+        dimIdx, dimsCoveredCount: covered.size + (decision === "KEEP" ? 1 : 0),
+        calls, tokens, dollars,
+        // chart point lands on the SCORE frame
+        chartPoint: f.state === "SCORE" ? { iter, heuristic: heur, quality: qual, total } : null,
+      });
+    });
+
+    if (decision === "KEEP") covered.add(dimIdx);
+
+    // Compress every 5 iterations (after iter 5, 10, ...)
+    if (iter % 5 === 0) {
+      frames.push({
+        state: "COMPRESS", node: "n-compress", edge: null,
+        backend: "claude-cli sonnet (utility)", dim,
+        iter, total, heuristic: heur, quality: qual, decision,
+        dimIdx, dimsCoveredCount: covered.size,
+        calls: ++calls, tokens: tokens + 12, dollars,
+        chartPoint: null,
+      });
+    }
+  }
+
+  // Final synthesis frame
+  const last = iterations[iterations.length - 1];
+  if (last) {
+    const [iter, , heur, qual] = last;
+    const total = +(0.4 * heur + 0.6 * qual).toFixed(1);
+    frames.push({
+      state: "SYNTHESIZE", node: "n-synth", edge: null,
+      backend: "claude-cli opus (synthesis)",
+      dim: "all dimensions",
+      iter, total, heuristic: heur, quality: qual, decision: "DONE",
+      dimIdx: -1, dimsCoveredCount: covered.size,
+      calls: calls + 1, tokens: tokens + 50, dollars,
+      chartPoint: null,
+    });
+  }
+
+  return frames;
+}
+
+// ============================================================================
+// audit_trail.jsonl loader (real-data path)
+// ============================================================================
+
+async function loadRealRun(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} loading ${url}`);
+  const text = await res.text();
+  const lines = text.split('\n').filter(l => l.trim().length > 0);
+  const events = lines.map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
+
+  // Group events by iteration. Audit events we care about:
+  //   { event: "iteration_started", iter: N, dimension: "..." }
+  //   { event: "score_computed", iter: N, heuristic: ..., quality: ..., total: ... }
+  //   { event: "iteration_decided", iter: N, decision: "KEEP" | "DISCARD" }
+  // The exact field names depend on src/audit_trail.py — adjust here once
+  // the real run is in hand. Fallback: if we can't parse, return null and
+  // the caller falls back to scripted data.
+  const byIter = new Map();
+  for (const ev of events) {
+    const iter = ev.iter ?? ev.iteration ?? null;
+    if (iter == null) continue;
+    if (!byIter.has(iter)) byIter.set(iter, { iter, dimIdx: 0, heur: 0, qual: 0, decision: "KEEP" });
+    const slot = byIter.get(iter);
+    if (ev.event === "iteration_started" && ev.dimension) {
+      const idx = DIMENSIONS.findIndex(d => ev.dimension.toLowerCase().includes(d.toLowerCase().split(' ')[0]));
+      slot.dimIdx = idx >= 0 ? idx : ((iter - 1) % DIMENSIONS.length);
+    }
+    if (ev.event === "score_computed") {
+      slot.heur = +(ev.heuristic ?? ev.coverage ?? 0).toFixed(1);
+      slot.qual = +(ev.quality ?? ev.judge_score ?? 0).toFixed(1);
+    }
+    if (ev.event === "iteration_decided") {
+      slot.decision = ev.decision || "KEEP";
+    }
+  }
+
+  const iterations = [...byIter.values()]
+    .sort((a, b) => a.iter - b.iter)
+    .map(s => [s.iter, s.dimIdx, s.heur, s.qual, s.decision]);
+
+  return iterations.length > 0 ? iterations : null;
+}
+
+// ============================================================================
+// Renderer
+// ============================================================================
+
+const $ = (id) => document.getElementById(id);
+
+function clearActive() {
+  document.querySelectorAll('.node.active').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.edge.active').forEach(e => e.classList.remove('active'));
+}
+
+function applyRoleClass(nodeEl) {
+  // Roles inferred from data-role attribute; we already set base in HTML
+  const role = nodeEl.dataset.role;
+  if (role) nodeEl.classList.add(`role-${role}`);
+}
+
+function setActiveNode(nodeId) {
+  clearActive();
+  const n = $(nodeId);
+  if (n) {
+    applyRoleClass(n);
+    n.classList.add('active');
+  }
+}
+
+function setActiveEdge(edgeId) {
+  if (!edgeId) return;
+  const ed = $(edgeId);
+  if (ed) ed.classList.add('active');
+}
+
+// SVG path → animate a circle along it using getPointAtLength.
+// Browser-native, no library required.
+function pulseAlongEdge(edgeId, durationMs) {
+  const path = $(edgeId);
+  const pulse = $('pulse');
+  if (!path || !pulse) return;
+  const len = path.getTotalLength();
+  const start = performance.now();
+  pulse.classList.add('travelling');
+
+  function frame(t) {
+    const p = Math.min(1, (t - start) / durationMs);
+    const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    const pt = path.getPointAtLength(eased * len);
+    pulse.setAttribute('cx', pt.x);
+    pulse.setAttribute('cy', pt.y);
+    if (p < 1) requestAnimationFrame(frame);
+    else pulse.classList.remove('travelling');
+  }
+  requestAnimationFrame(frame);
+}
+
+function buildDimGrid() {
+  const grid = $('dim-grid');
+  grid.innerHTML = '';
+  DIMENSIONS.forEach((dim, idx) => {
+    const cell = document.createElement('div');
+    cell.className = 'dim-cell';
+    cell.id = `dim-${idx}`;
+    cell.textContent = dim;
+    grid.appendChild(cell);
+  });
+  $('dim-total').textContent = DIMENSIONS.length;
+}
+
+// Score chart: append data points iteration by iteration.
+function updateChart(chartPoints) {
+  const w = 330, h = 180, x0 = 40, y0 = 200;
+  const maxIter = Math.max(DIMENSIONS.length, 12);
+  const xScale = (i) => x0 + (i - 1) * (w / (maxIter - 1));
+  const yScale = (v) => y0 - (v / 100) * h;
+
+  const buildPath = (key) => chartPoints.length === 0
+    ? ''
+    : chartPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.iter).toFixed(1)} ${yScale(p[key]).toFixed(1)}`).join(' ');
+
+  $('line-heuristic').setAttribute('d', buildPath('heuristic'));
+  $('line-quality').setAttribute('d',   buildPath('quality'));
+  $('line-total').setAttribute('d',     buildPath('total'));
+
+  const dotsGroup = $('chart-dots');
+  dotsGroup.innerHTML = '';
+  chartPoints.forEach((p) => {
+    for (const k of ['heuristic', 'quality', 'total']) {
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', xScale(p.iter));
+      c.setAttribute('cy', yScale(p[k]));
+      c.setAttribute('r', k === 'total' ? 3.5 : 2.5);
+      c.setAttribute('class', `chart-dot ${k}`);
+      dotsGroup.appendChild(c);
+    }
+  });
+}
+
+function updateDimGrid(coveredCount, currentDimIdx, decision) {
+  document.querySelectorAll('.dim-cell').forEach(c => c.classList.remove('current'));
+  if (currentDimIdx >= 0 && $(`dim-${currentDimIdx}`)) {
+    $(`dim-${currentDimIdx}`).classList.add('current');
+    if (decision === "KEEP") $(`dim-${currentDimIdx}`).classList.add('covered');
+  }
+  $('dim-count').textContent = coveredCount;
+}
+
+function updateMeta(frame) {
+  $('meta-iter').textContent = `${frame.iter}/${SCRIPTED_DATA.length}`;
+  $('meta-state').textContent = frame.state;
+  $('meta-backend').textContent = frame.backend;
+  $('meta-dim').textContent = frame.dim;
+}
+
+function updateCost(frame) {
+  $('cost-calls').textContent = frame.calls;
+  $('cost-tokens').textContent = (frame.tokens / 1).toFixed(0);
+  // CLI subscriptions = $0.00 flat-rate; scripted keeps it honest
+  $('cost-dollars').textContent = frame.dollars.toFixed(2);
+}
+
+// ============================================================================
+// Player / state
+// ============================================================================
+
+const Player = {
+  frames: [],
+  index: 0,
+  playing: false,
+  speed: 1,
+  baseFrameMs: 1100,   // base advance interval at 1× speed
+  pulseMs: 800,
+  timer: null,
+  chartPoints: [],
+
+  setFrames(frames) {
+    this.frames = frames;
+    this.chartPoints = [];
+    this.index = 0;
+    $('scrubber').max = frames.length - 1;
+    $('scrubber').value = 0;
+    this.renderFrame(0);
+  },
+
+  renderFrame(index, animateEdge = false) {
+    if (index < 0 || index >= this.frames.length) return;
+    const f = this.frames[index];
+
+    // Rebuild chart points up to this index
+    this.chartPoints = [];
+    for (let i = 0; i <= index; i++) {
+      if (this.frames[i].chartPoint) this.chartPoints.push(this.frames[i].chartPoint);
+    }
+    updateChart(this.chartPoints);
+
+    // Visited markers — every node we've passed gets the muted-stroke style
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('visited'));
+    const visited = new Set();
+    for (let i = 0; i <= index; i++) visited.add(this.frames[i].node);
+    visited.forEach(nid => $(nid)?.classList.add('visited'));
+
+    setActiveNode(f.node);
+    if (animateEdge && f.edge && ITERATION_EDGES[f.edge]) {
+      const e = ITERATION_EDGES[f.edge].edge;
+      setActiveEdge(e);
+      pulseAlongEdge(e, this.pulseMs / this.speed);
+    }
+    updateMeta(f);
+    updateDimGrid(f.dimsCoveredCount, f.dimIdx, f.decision);
+    updateCost(f);
+    $('scrubber').value = index;
+    $('frame-counter').textContent = `frame ${index + 1} / ${this.frames.length}`;
+  },
+
+  next() {
+    if (this.index < this.frames.length - 1) {
+      this.index += 1;
+      this.renderFrame(this.index, true);
+    } else {
+      this.pause();
+    }
+  },
+
+  prev() {
+    if (this.index > 0) {
+      this.index -= 1;
+      this.renderFrame(this.index, false);
+    }
+  },
+
+  scrubTo(i) {
+    this.pause();
+    this.index = i;
+    this.renderFrame(i, false);
+  },
+
+  play() {
+    if (this.playing) return;
+    this.playing = true;
+    $('btn-play').textContent = '⏸';
+    this.tick();
+  },
+
+  pause() {
+    this.playing = false;
+    $('btn-play').textContent = '▶';
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+  },
+
+  tick() {
+    if (!this.playing) return;
+    this.next();
+    if (this.index < this.frames.length - 1) {
+      this.timer = setTimeout(() => this.tick(), this.baseFrameMs / this.speed);
+    } else {
+      this.pause();
+    }
+  },
+
+  restart() {
+    this.pause();
+    this.index = 0;
+    this.chartPoints = [];
+    this.renderFrame(0, false);
+  },
+};
+
+// ============================================================================
+// Wire up controls
+// ============================================================================
+
+function wireControls() {
+  $('btn-play').addEventListener('click', () => Player.playing ? Player.pause() : Player.play());
+  $('btn-next').addEventListener('click', () => { Player.pause(); Player.next(); });
+  $('btn-prev').addEventListener('click', () => { Player.pause(); Player.prev(); });
+  $('btn-restart').addEventListener('click', () => Player.restart());
+  $('scrubber').addEventListener('input', (e) => Player.scrubTo(+e.target.value));
+  $('speed-select').addEventListener('change', (e) => { Player.speed = +e.target.value; });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key === ' ') { e.preventDefault(); Player.playing ? Player.pause() : Player.play(); }
+    if (e.key === 'ArrowRight') { Player.pause(); Player.next(); }
+    if (e.key === 'ArrowLeft')  { Player.pause(); Player.prev(); }
+    if (e.key === 'r' || e.key === 'R') Player.restart();
+  });
+}
+
+// ============================================================================
+// Bootstrap
+// ============================================================================
+
+async function main() {
+  $('topic-label').textContent = TOPIC_LABEL;
+  buildDimGrid();
+  wireControls();
+
+  const params = new URLSearchParams(location.search);
+  const runUrl = params.get('run');
+
+  let iterations = SCRIPTED_DATA;
+  let badge = 'scripted';
+
+  if (runUrl) {
+    try {
+      const real = await loadRealRun(runUrl);
+      if (real && real.length > 0) {
+        iterations = real;
+        badge = 'real';
+        console.log(`Loaded ${real.length} iterations from ${runUrl}`);
+      } else {
+        console.warn(`No iterations parsed from ${runUrl} — falling back to scripted data`);
+      }
+    } catch (err) {
+      console.error(`Failed to load ${runUrl}:`, err);
+      console.warn('Falling back to scripted data');
+    }
+  }
+
+  $('source-badge').textContent = badge;
+  $('source-badge').className = `source-badge ${badge}`;
+
+  Player.setFrames(buildFrames(iterations));
+}
+
+main();
+</script>
+
+</body>
+</html>
