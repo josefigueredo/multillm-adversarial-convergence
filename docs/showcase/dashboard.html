@@ -687,13 +687,14 @@ function updateChart(chartPoints) {
   });
 }
 
-function updateDimGrid(coveredCount, currentDimIdx, decision) {
-  document.querySelectorAll('.dim-cell').forEach(c => c.classList.remove('current'));
+function updateDimGrid(coveredDimSet, currentDimIdx) {
+  // Rebuild from scratch so backward scrubbing un-greens cells correctly.
+  document.querySelectorAll('.dim-cell').forEach(c => c.classList.remove('current', 'covered'));
+  coveredDimSet.forEach(idx => $(`dim-${idx}`)?.classList.add('covered'));
   if (currentDimIdx >= 0 && $(`dim-${currentDimIdx}`)) {
     $(`dim-${currentDimIdx}`).classList.add('current');
-    if (decision === "KEEP") $(`dim-${currentDimIdx}`).classList.add('covered');
   }
-  $('dim-count').textContent = coveredCount;
+  $('dim-count').textContent = coveredDimSet.size;
 }
 
 function updateMeta(frame) {
@@ -757,7 +758,14 @@ const Player = {
       pulseAlongEdge(e, this.pulseMs / this.speed);
     }
     updateMeta(f);
-    updateDimGrid(f.dimsCoveredCount, f.dimIdx, f.decision);
+    // Recompute covered dimensions from frames 0..index so backward scrubbing
+    // un-greens cells correctly (the frame's cumulative count would over-mark).
+    const coveredDimSet = new Set();
+    for (let i = 0; i <= index; i++) {
+      const fi = this.frames[i];
+      if (fi.state === "KEEP" && fi.dimIdx >= 0) coveredDimSet.add(fi.dimIdx);
+    }
+    updateDimGrid(coveredDimSet, f.dimIdx);
     updateCost(f);
     $('scrubber').value = index;
     $('frame-counter').textContent = `frame ${index + 1} / ${this.frames.length}`;
