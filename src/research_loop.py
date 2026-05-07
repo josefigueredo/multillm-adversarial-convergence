@@ -778,6 +778,19 @@ def _merge(ctx: LoopContext, state: LoopState, dimension: str, findings: str, sc
         state.discovered_dimensions = merged["discovered_dimensions"]
         state.kb_path.write_text(state.knowledge_base, encoding="utf-8")
 
+        if merged.get("skipped_duplicate_merge"):
+            log.warning(
+                "Dimension '%s' already present in knowledge base — skipped merge "
+                "to avoid double-append.  Likely cause: a prior crash between the "
+                "KB write and the iter-md / results.tsv writes for this iteration.",
+                dimension,
+            )
+            ctx.audit_trail.emit(
+                "merge_skipped_duplicate_recovered",
+                iteration=state.iteration,
+                dimension=dimension,
+            )
+
         # Discovery plan Phase 2: persist structured gap metadata
         # alongside the bare-string view.  Each surviving record from
         # intake either creates a new GapEntry (gap_promoted audit

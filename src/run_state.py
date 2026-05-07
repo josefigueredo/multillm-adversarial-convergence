@@ -443,7 +443,24 @@ def merge_findings(
     if dimension not in explored_dimensions:
         explored_dimensions.append(dimension)
 
-    knowledge_base += f"\n\n## {dimension}\n\n" + findings
+    # Idempotency guard: if a prior partial run already appended this
+    # dimension's section to the KB on disk and then crashed between the
+    # ``kb_path.write_text`` call and the ``write_iteration_markdown`` /
+    # ``append_results_row`` calls, the resume path will rerun this
+    # iteration with the same dimension (because ``explored_dimensions``
+    # was rebuilt from ``results.tsv``, which never got the row).  Without
+    # this check, the LLM-produced findings would be appended a second
+    # time, doubling the dimension's content in the knowledge base.
+    #
+    # Prepend a newline before the search so first-line section headers
+    # also match the marker pattern (matters when KB has been compressed
+    # down to a single section that starts at position 0).
+    dim_section_marker = f"\n## {dimension}\n"
+    skipped_duplicate_merge = dim_section_marker in ("\n" + knowledge_base)
+
+    if not skipped_duplicate_merge:
+        knowledge_base += f"\n\n## {dimension}\n\n" + findings
+
     for gap in gaps:
         if (
             gap not in explored_dimensions
@@ -456,6 +473,7 @@ def merge_findings(
         "knowledge_base": knowledge_base,
         "explored_dimensions": explored_dimensions,
         "discovered_dimensions": discovered_dimensions,
+        "skipped_duplicate_merge": skipped_duplicate_merge,
     }
 
 
