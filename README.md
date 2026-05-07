@@ -26,6 +26,12 @@ uv run python -m src.cli research --config configs/research/aws_api_gateway.yaml
 
 Same shape for `refine` and `plan` — point `--config` at a YAML, optionally append `--dry-run`.
 
+For long or overnight runs, wrap the call in `scripts/research_with_retry.sh` — it auto-resumes on OOM kills, supervisor signals, or quota exhaustion, logs every attempt to `logs/`, and respects `Ctrl+C` cleanly:
+
+```bash
+./scripts/research_with_retry.sh configs/research/aws_api_gateway.yaml
+```
+
 To start your own, copy a template:
 
 - Research → `configs/research/_template.yaml` (annotated)

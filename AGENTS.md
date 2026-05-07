@@ -23,9 +23,35 @@ uv run python -m src.cli explain resume --output <run_dir>
 uv run python -m src.cli doctor config --config <path>
 uv run python -m src.cli doctor output --output <run_dir>
 
+# Long / overnight runs — auto-retry + auto-resume on hard kills
+./scripts/research_with_retry.sh configs/research/<topic>.yaml
+./scripts/research_with_retry.sh configs/research/<topic>.yaml --max-attempts 5
+./scripts/research_with_retry.sh configs/research/<topic>.yaml --backoff 120
+
 # Tests
 uv run pytest tests/ -v
 ```
+
+### `scripts/research_with_retry.sh` — retry/resume wrapper
+
+For long runs vulnerable to hard process kills (OOM at exit 137, SIGSEGV at 139, supervisor SIGTERM at 143) or to quota exhaustion that survives the framework's internal rate-limit backoff. The wrapper:
+
+- runs the first attempt fresh; subsequent attempts append `--resume` so the orchestrator picks up from the last completed iteration rather than starting over;
+- treats exit `0` as success, exit `130` (Ctrl+C) as user-requested stop (no retry), exit `2` as a config error (no retry — fix the config first), and any other non-zero exit as a transient failure to retry;
+- backs off exponentially between attempts: 60s → 120s → 240s → 480s → 960s, capped at 1800s (30 min);
+- caps attempts at 10 by default (`--max-attempts N` overrides);
+- writes both wrapper status and framework stdout/stderr to `logs/<config-name>-<timestamp>.log` for postmortem;
+- forwards interactive `Ctrl+C` (SIGINT/SIGTERM) cleanly without a retry — kill it with `kill -INT <pid>` from another shell when running detached.
+
+Recommended overnight invocation:
+
+```bash
+nohup ./scripts/research_with_retry.sh configs/research/<topic>.yaml > /dev/null 2>&1 &
+echo $! > .run.pid
+tail -f logs/<topic>-*.log    # in another shell
+```
+
+The wrapper is the OUTER retry loop. The framework's INNER backoff handles in-band rate limits at iteration boundaries (see Architecture diagram in `docs/research.md`).
 
 ## Conventions
 
@@ -100,6 +126,12 @@ uv run pytest tests/ -v
 - `input/` — operator-provided source materials (e.g., `input/iris/` for plan refinement)
 - `output/` — live run artifacts (ephemeral, generated)
 - `docs/showcase/` — durable example outputs persisted as documentation
+
+### Scripts
+
+- `scripts/calibrate_scoring.py` — replay-based scorer calibration helper
+- `scripts/mock_demo.py` — generates a mock localstack-alternatives showcase run from fixtures
+- `scripts/research_with_retry.sh` — shell wrapper that runs a research config with auto-retry-and-resume on hard kills (OOM, SIGSEGV, supervisor SIGTERM) or quota exhaustion. Logs to `logs/<config-name>-<timestamp>.log`. See the Commands section for usage.
 
 ### Documentation
 
