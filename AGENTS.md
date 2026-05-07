@@ -36,7 +36,7 @@ uv run pytest tests/ -v
 
 For long runs vulnerable to hard process kills (OOM at exit 137, SIGSEGV at 139, supervisor SIGTERM at 143) or to quota exhaustion that survives the framework's internal rate-limit backoff. The wrapper:
 
-- runs the first attempt fresh; subsequent attempts append `--resume` so the orchestrator picks up from the last completed iteration rather than starting over;
+- auto-detects existing output at `output/<config-basename>/`: if `audit_trail.jsonl` is present, the **first attempt** starts with `--resume` (so re-running the wrapper after a stop continues where it left off rather than starting over). If no output exists, the first attempt starts fresh. All subsequent retries within the run always use `--resume`;
 - treats exit `0` as success, exit `130` (Ctrl+C) as user-requested stop (no retry), exit `2` as a config error (no retry — fix the config first), and any other non-zero exit as a transient failure to retry;
 - backs off exponentially between attempts: 60s → 120s → 240s → 480s → 960s, capped at 1800s (30 min);
 - caps attempts at 10 by default (`--max-attempts N` overrides);

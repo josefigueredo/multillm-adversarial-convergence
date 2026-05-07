@@ -73,10 +73,23 @@ extra_flags=""
 
 trap 'log "interrupted by user — exiting"; exit 130' INT TERM
 
+# Auto-resume: if output already exists for this run, the first attempt uses
+# --resume.  Otherwise it starts fresh.  Detection is based on the framework's
+# convention that output/<config-basename>/ holds the run state.
+output_dir="output/${RUN_NAME}"
+if [ -d "$output_dir" ] && [ -f "$output_dir/audit_trail.jsonl" ]; then
+  iter_count=$(ls "$output_dir/iterations/" 2>/dev/null | wc -l | tr -d ' ')
+  extra_flags="--resume"
+  RESUME_NOTE="resuming from existing output ($iter_count iterations on disk)"
+else
+  RESUME_NOTE="starting fresh (no existing output)"
+fi
+
 log "config:        $CONFIG"
 log "log file:      $LOG_FILE"
 log "max attempts:  $MAX_ATTEMPTS"
 log "initial backoff: ${BACKOFF}s (cap ${BACKOFF_CAP}s, doubled per failure)"
+log "first attempt: $RESUME_NOTE"
 log ""
 
 while true; do
