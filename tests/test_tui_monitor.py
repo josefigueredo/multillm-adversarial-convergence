@@ -285,6 +285,85 @@ def test_iteration_completed_falls_back_to_total_when_no_breakdown():
 
 
 # ---------------------------------------------------------------------------
+# De-faking: real call counter + lowercase-status normalisation
+# ---------------------------------------------------------------------------
+
+def test_step_started_with_backend_increments_real_call_counter():
+    """Each step_started carrying a backend field is one backend invocation.
+    Replaces the earlier '~5 per iter' heuristic which was made up."""
+    s = RunState()
+    assert s.backend_calls == 0
+    s.apply_event({"event": "step_started", "step": "hypothesise",
+                   "iteration": 1, "backend": "claude-cli opus"})
+    s.apply_event({"event": "step_started", "step": "execute_research",
+                   "iteration": 1, "backend": "claude-cli sonnet"})
+    s.apply_event({"event": "step_started", "step": "score_iteration",
+                   "iteration": 1, "backend": "codex-cli gpt-5.4"})
+    assert s.backend_calls == 3
+
+
+def test_step_started_without_backend_does_not_count():
+    """Persist / log steps don't invoke a backend — they shouldn't bump calls."""
+    s = RunState()
+    s.apply_event({"event": "step_started", "step": "persist_iteration_markdown",
+                   "iteration": 1})
+    s.apply_event({"event": "step_started", "step": "append_results_row",
+                   "iteration": 1})
+    assert s.backend_calls == 0
+
+
+def test_iteration_completed_lowercase_status_normalised_to_keep():
+    """Audit emits ``status: keep`` (lowercase); compare uppercase elsewhere."""
+    s = RunState()
+    s.apply_event({"event": "step_started", "step": "hypothesise",
+                   "iteration": 1, "dimension": "REST"})
+    s.apply_event({"event": "iteration_completed", "iteration": 1,
+                   "dimension": "REST", "status": "keep", "total_score": 76.0})
+    assert s.iters[1].decision == "KEEP"
+    assert "REST" in s.dimensions_covered  # would be empty if .upper() wasn't applied
+
+
+# ---------------------------------------------------------------------------
+# Run metadata loader
+# ---------------------------------------------------------------------------
+
+def test_load_run_metadata_returns_topic_and_dimensions(tmp_path):
+    from scripts.tui_monitor import load_run_metadata
+    cfg = tmp_path / "effective_config.json"
+    cfg.write_text("""{
+        "topic": "Compare AWS API Gateway options",
+        "dimensions": ["REST vs HTTP", "WebSocket"],
+        "scoring": {"target_dimensions_total": 5},
+        "execution": {"strategy": "adversarial", "compress_every": 2}
+    }""", encoding="utf-8")
+    meta = load_run_metadata(tmp_path)
+    assert meta["topic"] == "Compare AWS API Gateway options"
+    assert meta["dimensions"] == ["REST vs HTTP", "WebSocket"]
+    assert meta["target_dimensions_total"] == 5
+    assert meta["strategy"] == "adversarial"
+    assert meta["compress_every"] == 2
+
+
+def test_load_run_metadata_missing_file_returns_empty(tmp_path):
+    from scripts.tui_monitor import load_run_metadata
+    assert load_run_metadata(tmp_path) == {}
+
+
+def test_load_run_metadata_falls_back_to_dim_count_when_target_missing(tmp_path):
+    """When ``scoring.target_dimensions_total`` isn't in the config (legacy),
+    derive it from the configured dimensions count."""
+    from scripts.tui_monitor import load_run_metadata
+    cfg = tmp_path / "effective_config.json"
+    cfg.write_text("""{
+        "topic": "X",
+        "dimensions": ["A", "B", "C"],
+        "scoring": {}
+    }""", encoding="utf-8")
+    meta = load_run_metadata(tmp_path)
+    assert meta["target_dimensions_total"] == 3
+
+
+# ---------------------------------------------------------------------------
 # Scripted events generator
 # ---------------------------------------------------------------------------
 

@@ -139,7 +139,12 @@ class RunState:
     dimensions_covered: set[str] = field(default_factory=set)
     fallback_events: list[str] = field(default_factory=list)
     finished: bool = False
-    target_dimensions: int = 13  # updated from run_started if available
+    # Loaded from effective_config.json at startup (with safe defaults).
+    target_dimensions: int = 0
+    configured_dimensions: list[str] = field(default_factory=list)
+    # Real call counter: incremented per ``step_started`` event whose
+    # ``backend`` field is set (one event per backend invocation).
+    backend_calls: int = 0
     # Authoritative score breakdowns by iteration, loaded from results.tsv
     # at startup.  Empty when results.tsv is missing — chart_points then
     # carry only the total_score from iteration_completed events.
@@ -203,6 +208,10 @@ class RunState:
             backend = ev.get("backend")
             if backend:
                 self.current_backend = backend
+                # Real call counter: each step_started with a backend field is
+                # one backend invocation (replaces the earlier "~5 per iter"
+                # heuristic which was made up).
+                self.backend_calls += 1
 
         elif evt == "step_completed":
             # Stay on the same state badge until the next step_started so the
@@ -212,7 +221,10 @@ class RunState:
         elif evt == "iteration_completed":
             iter_n = ev.get("iteration", self.current_iter)
             rec = self.upsert_iter(iter_n)
-            rec.decision = ev.get("status", "")
+            # Audit trail emits lowercase ``status`` ("keep"/"discard"); the
+            # rest of the TUI compares against uppercase tokens.  Normalise
+            # at the boundary so downstream code stays simple.
+            rec.decision = (ev.get("status", "") or "").upper()
             total = ev.get("total_score")
             if total is not None:
                 rec.total = float(total)
@@ -311,49 +323,122 @@ def render_header(state: RunState, mode: str) -> Panel:
     )
 
 
-def render_state_machine(state: RunState) -> Panel:
-    """Vertical state machine — current state highlighted with an arrow + glow."""
-    lines: list[Text] = []
-    for st in STATE_FLOW:
-        is_active = state.current_state == st
-        prefix = "  ▶ " if is_active else "    "
-        color = STATE_COLOR.get(st, COLOR_TEXT)
-        line = Text()
-        line.append(prefix, style=COLOR_ACCENT if is_active else COLOR_MUTED)
-        line.append(f"[{st}]", style=f"bold {color}" if is_active else COLOR_MUTED)
-        lines.append(line)
-        if st != STATE_FLOW[-1]:
-            arrow = Text()
-            arrow.append("     │", style=COLOR_MUTED)
-            lines.append(arrow)
+# Animation: rich.Live re-renders at REFRESH_HZ.  This counter advances
+# once per render and drives subtle motion on the active state (pulsing
+# brightness, spinner char, edge glow) without being epileptic.
+ANIM_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+ANIM_BRIGHTNESS = ["bright_yellow", "yellow1", "yellow2", "yellow1"]
 
-    # Branch from DECIDE
-    branch = Text()
-    branch.append("    ", style=COLOR_MUTED)
+
+def _spinner_char(tick: int) -> str:
+    return ANIM_FRAMES[tick % len(ANIM_FRAMES)]
+
+
+def _pulse_color(tick: int) -> str:
+    return ANIM_BRIGHTNESS[(tick // 2) % len(ANIM_BRIGHTNESS)]
+
+
+# State-machine layout: list of (label, role-color).  Box-drawn with proper
+# horizontal centering so the chart looks like a real flowchart, not a list.
+_BOX_W = 24  # node box width
+
+
+def _box(label: str, *, active: bool, color: str, tick: int) -> list[Text]:
+    """Return three Text lines forming a box around `label`.
+
+    Active boxes pulse: spinner char on the left, brightness-cycling border.
+    """
+    pad = max(0, _BOX_W - 2 - len(label))
+    left_pad = pad // 2
+    right_pad = pad - left_pad
+    if active:
+        border_color = _pulse_color(tick)
+        body_color = f"bold {color}"
+        # Spinner replaces the inactive 2-space left margin; same width,
+        # so the box right border stays aligned with the top/bottom corners.
+        left_marker = _spinner_char(tick) + " "
+    else:
+        border_color = COLOR_MUTED
+        body_color = COLOR_MUTED
+        left_marker = "  "
+    top = Text()
+    top.append("  ┌" + "─" * (_BOX_W - 2) + "┐", style=border_color)
+    mid = Text()
+    mid.append(left_marker, style=COLOR_ACCENT if active else COLOR_MUTED)
+    mid.append("│", style=border_color)
+    mid.append(" " * left_pad + label + " " * right_pad, style=body_color)
+    mid.append("│", style=border_color)
+    bot = Text()
+    bot.append("  └" + "─" * (_BOX_W - 2) + "┘", style=border_color)
+    return [top, mid, bot]
+
+
+def _connector(active: bool, tick: int) -> Text:
+    """Vertical arrow between boxes; pulses when the next box is active."""
+    color = _pulse_color(tick) if active else COLOR_MUTED
+    line = Text()
+    line.append(" " * (_BOX_W // 2 + 2), style=color)
+    line.append("│" if not active else "▼", style=color)
+    return line
+
+
+def render_state_machine(state: RunState, tick: int = 0) -> Panel:
+    """Vertical box-drawn state machine with per-tick animation on the active node."""
+    lines: list[Text] = []
+    for i, st in enumerate(STATE_FLOW):
+        is_active = state.current_state == st
+        # If THIS state is active, the connector ABOVE it pulses too
+        if i > 0:
+            prev_was_active = state.current_state == STATE_FLOW[i - 1]
+            lines.append(_connector(active=is_active or prev_was_active, tick=tick))
+        color = STATE_COLOR.get(st, COLOR_TEXT)
+        lines.extend(_box(st, active=is_active, color=color, tick=tick))
+
+    # DECIDE branches into KEEP / DISCARD horizontally
     keep_active = state.current_state == "KEEP"
     discard_active = state.current_state == "DISCARD"
-    branch.append("↙ KEEP", style=f"bold {COLOR_KEEP}" if keep_active else COLOR_MUTED)
-    branch.append("    ", style=COLOR_MUTED)
-    branch.append("DISCARD ↘", style=f"bold {COLOR_DISCARD}" if discard_active else COLOR_MUTED)
+    decide_just_resolved = keep_active or discard_active
+    lines.append(_connector(active=decide_just_resolved, tick=tick))
+    branch = Text()
+    branch.append(" " * 2, style=COLOR_MUTED)
+    branch.append("┌─ KEEP ", style=_pulse_color(tick) if keep_active else COLOR_MUTED)
+    branch.append(" " * (_BOX_W - 12), style=COLOR_MUTED)
+    branch.append(" DISCARD ─┐", style=_pulse_color(tick) if discard_active else COLOR_MUTED)
     lines.append(branch)
+    branch_box = Text()
+    branch_box.append("  │ ", style=_pulse_color(tick) if keep_active else COLOR_MUTED)
+    branch_box.append(f"{_spinner_char(tick) if keep_active else ' '} merge ",
+                      style=f"bold {COLOR_KEEP}" if keep_active else COLOR_MUTED)
+    branch_box.append(" " * (_BOX_W - 16), style=COLOR_MUTED)
+    branch_box.append(f" save {_spinner_char(tick) if discard_active else ' '} ",
+                      style=f"bold {COLOR_DISCARD}" if discard_active else COLOR_MUTED)
+    branch_box.append("│", style=_pulse_color(tick) if discard_active else COLOR_MUTED)
+    lines.append(branch_box)
 
     # Side-cars
     lines.append(Text(""))
     side = Text()
     compress_active = state.current_state == "COMPRESS"
     synth_active = state.current_state in ("SYNTHESIZE", "DONE")
-    side.append("    ⚙ COMPRESS    ", style=f"bold {COLOR_COMPRESS}" if compress_active else COLOR_MUTED)
-    side.append("📄 SYNTHESIZE", style=f"bold {COLOR_SYNTH}" if synth_active else COLOR_MUTED)
+    side.append("  ", style=COLOR_MUTED)
+    if compress_active:
+        side.append(f"{_spinner_char(tick)} ⚙ COMPRESS ", style=f"bold {COLOR_COMPRESS}")
+    else:
+        side.append("  ⚙ COMPRESS ", style=COLOR_MUTED)
+    side.append("   ", style=COLOR_MUTED)
+    if synth_active:
+        side.append(f"{_spinner_char(tick)} 📄 SYNTHESIZE", style=f"bold {COLOR_SYNTH}")
+    else:
+        side.append("  📄 SYNTHESIZE", style=COLOR_MUTED)
     lines.append(side)
 
-    body = Group(*lines)
     return Panel(
-        body,
+        Group(*lines),
         title="[bold]state machine[/bold]",
         title_align="left",
         border_style="grey39",
         box=ROUNDED,
-        padding=(1, 2),
+        padding=(0, 1),
     )
 
 
@@ -394,16 +479,24 @@ def render_score_chart(state: RunState) -> Panel:
 
 
 def render_dim_grid(state: RunState, all_dimensions: list[str] | None = None) -> Panel:
-    """Grid of dimension tiles — covered cells in green, current in yellow."""
-    target = state.target_dimensions
+    """Grid of dimension tiles — covered cells in green, current in yellow.
+
+    Source of truth for the full dimension list: ``state.configured_dimensions``
+    (loaded from ``effective_config.json``).  Falls back to dimensions seen in
+    the run's iterations when no config is available (scripted demo).
+    """
+    target = state.target_dimensions or len(state.configured_dimensions) or len(state.iters) or 1
     covered_set = state.dimensions_covered
     current_dim = state.current_dim if state.current_state not in ("(idle)", "DONE") else ""
 
-    # Use known dimensions if provided (replay/scripted), else accumulate from run.
-    seen = list(all_dimensions) if all_dimensions else []
-    for rec in state.iters.values():
-        if rec.dimension and rec.dimension not in seen:
-            seen.append(rec.dimension)
+    # Configured dimensions are the truth; fall back to discovered-from-run.
+    seen: list[str] = list(state.configured_dimensions) if state.configured_dimensions else (
+        list(all_dimensions) if all_dimensions else []
+    )
+    if not state.configured_dimensions:
+        for rec in state.iters.values():
+            if rec.dimension and rec.dimension not in seen:
+                seen.append(rec.dimension)
     if current_dim and current_dim not in seen:
         seen.append(current_dim)
 
@@ -437,22 +530,29 @@ def render_dim_grid(state: RunState, all_dimensions: list[str] | None = None) ->
 
 
 def render_cost_block(state: RunState) -> Panel:
-    """Calls / tokens / spend / elapsed."""
+    """Iters / backend calls / elapsed.
+
+    All four cells show real numbers from the audit trail.  Spend is
+    intentionally omitted: the framework doesn't surface it in
+    audit_trail.jsonl today, and showing a hardcoded "$0.00" is
+    misleading for API-backend runs.  Re-add when run_manifest grows
+    a cost_estimate field.
+    """
     iter_count = len(state.iters)
-    # Approximate calls: ~5 per iteration (HYPO/EXEC/CRITIQUE/SCORE/COMPRESS-on-trigger)
-    calls = sum(5 for r in state.iters.values()) + sum(1 for r in state.iters.values() if r.iter % 2 == 0)
-    elapsed = ""
+    calls_str = str(state.backend_calls) if state.backend_calls else "—"
+    kept = sum(1 for r in state.iters.values() if r.decision.upper() == "KEEP")
+    discarded = sum(1 for r in state.iters.values() if r.decision.upper() == "DISCARD")
+
+    elapsed = "—"
     if state.started_at:
         secs = int(time.time() - state.started_at)
         h, rem = divmod(secs, 3600)
         m, s = divmod(rem, 60)
-        elapsed = f"{h}h {m:02d}m {s:02d}s" if h else f"{m}m {s:02d}s"
+        elapsed = f"{h}h{m:02d}m{s:02d}s" if h else f"{m}m{s:02d}s"
 
     cells = Table.grid(expand=True, padding=(0, 1))
-    cells.add_column(justify="center", ratio=1)
-    cells.add_column(justify="center", ratio=1)
-    cells.add_column(justify="center", ratio=1)
-    cells.add_column(justify="center", ratio=1)
+    for _ in range(4):
+        cells.add_column(justify="center", ratio=1)
 
     def cell(label: str, value: str, color: str = COLOR_TEXT) -> Group:
         return Group(
@@ -462,14 +562,14 @@ def render_cost_block(state: RunState) -> Panel:
 
     cells.add_row(
         cell("iters", str(iter_count), COLOR_TEXT),
-        cell("calls", f"~{calls}", COLOR_TEXT),
-        cell("spend", "$0.00", COLOR_KEEP),  # CLI flat-rate
-        cell("elapsed", elapsed or "—", COLOR_TEXT),
+        cell("calls", calls_str, COLOR_TEXT),
+        cell("kept/disc", f"{kept}/{discarded}", COLOR_KEEP if kept >= discarded else COLOR_DECIDE),
+        cell("elapsed", elapsed, COLOR_TEXT),
     )
 
     return Panel(
         cells,
-        title="[bold]cost & calls[/bold]",
+        title="[bold]throughput[/bold]",
         title_align="left",
         border_style="grey39",
         box=ROUNDED,
@@ -536,27 +636,30 @@ def _sparkline(values: Iterable[float], width: int = 30, vmin: float = 0.0, vmax
 # ---------------------------------------------------------------------------
 
 def build_layout(state: RunState, mode: str, source: Path | None, paused: bool,
-                 known_dims: list[str] | None = None) -> Layout:
+                 known_dims: list[str] | None = None, tick: int = 0) -> Layout:
     layout = Layout()
     layout.split_column(
         Layout(name="header", size=4),
         Layout(name="body", ratio=1),
         Layout(name="footer", size=3),
     )
+    # Left column is fixed-width to fit the state-machine boxes;
+    # right column takes the remaining width so the score chart and
+    # dim grid can breathe.
     layout["body"].split_row(
-        Layout(name="left", ratio=1),
+        Layout(name="left", size=_BOX_W + 8),
         Layout(name="right", ratio=1),
     )
     right_components = [
         Layout(render_score_chart(state), name="chart", size=8),
         Layout(render_dim_grid(state, known_dims), name="dims", ratio=1),
-        Layout(render_cost_block(state), name="cost", size=5),
+        Layout(render_cost_block(state), name="cost", size=4),
     ]
     fallback = render_fallback_log(state)
     if fallback:
         right_components.append(Layout(fallback, name="fallback", size=7))
     layout["right"].split_column(*right_components)
-    layout["left"].update(render_state_machine(state))
+    layout["left"].update(render_state_machine(state, tick=tick))
     layout["header"].update(render_header(state, mode))
     layout["footer"].update(render_footer(mode, source, paused))
     return layout
@@ -565,6 +668,33 @@ def build_layout(state: RunState, mode: str, source: Path | None, paused: bool,
 # ---------------------------------------------------------------------------
 # Data sources: live tail + file replay + scripted
 # ---------------------------------------------------------------------------
+
+def load_run_metadata(output_dir: Path) -> dict:
+    """Read topic / dimensions / target_dimensions_total from the run's
+    ``effective_config.json``.  Returns ``{}`` when missing or unparseable.
+
+    The framework writes this snapshot at run start; it is the canonical
+    source for static run metadata that doesn't change during the run.
+    """
+    path = output_dir / "effective_config.json"
+    if not path.exists():
+        return {}
+    try:
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return {
+        "topic": cfg.get("topic", "") or "",
+        "dimensions": list(cfg.get("dimensions", []) or []),
+        "target_dimensions_total": int(
+            (cfg.get("scoring") or {}).get("target_dimensions_total")
+            or len(cfg.get("dimensions", []) or [])
+            or 0
+        ),
+        "strategy": (cfg.get("execution") or {}).get("strategy", ""),
+        "compress_every": (cfg.get("execution") or {}).get("compress_every", 0),
+    }
+
 
 def load_results_tsv(path: Path) -> dict[int, tuple[float, float, float]]:
     """Parse ``results.tsv`` for per-iteration score breakdowns.
@@ -676,7 +806,22 @@ def _backend_for_step(step: str) -> str:
 # Modes
 # ---------------------------------------------------------------------------
 
-REFRESH_HZ = 4   # rich Live refresh rate
+REFRESH_HZ = 8   # rich Live refresh rate — fast enough for smooth pulse animation
+
+
+def _apply_metadata(state: RunState, meta: dict) -> None:
+    """Populate static run metadata on the RunState from effective_config.json.
+    No-op when the dict is empty (file missing / unreadable)."""
+    if not meta:
+        return
+    if meta.get("topic"):
+        state.topic = meta["topic"]
+    if meta.get("strategy"):
+        state.strategy = meta["strategy"]
+    if meta.get("dimensions"):
+        state.configured_dimensions = [_short_dim(d) for d in meta["dimensions"]]
+    if meta.get("target_dimensions_total"):
+        state.target_dimensions = int(meta["target_dimensions_total"])
 
 
 def run_live(audit_path: Path, console: Console) -> None:
@@ -689,13 +834,17 @@ def run_live(audit_path: Path, console: Console) -> None:
     # may grow during the run; this snapshot is fine for completed iterations.
     state.score_breakdowns = load_results_tsv(audit_path.parent / "results.tsv")
     state.seed_chart_from_breakdowns()
+    _apply_metadata(state, load_run_metadata(audit_path.parent))
 
-    layout = build_layout(state, "live", audit_path, paused=False)
+    layout = build_layout(state, "live", audit_path, paused=False, tick=0)
+    tick = 0
     with Live(layout, console=console, refresh_per_second=REFRESH_HZ, screen=False) as live:
         try:
-            for ev in follow_audit_events(audit_path):
+            poll = 1.0 / REFRESH_HZ
+            for ev in follow_audit_events(audit_path, poll_interval=poll):
                 state.apply_event(ev)
-                live.update(build_layout(state, "live", audit_path, paused=False))
+                tick += 1
+                live.update(build_layout(state, "live", audit_path, paused=False, tick=tick))
         except KeyboardInterrupt:
             pass
 
@@ -719,17 +868,28 @@ def run_replay(audit_path: Path | None, console: Console, frame_delay: float,
     if audit_path is not None:
         state.score_breakdowns = load_results_tsv(audit_path.parent / "results.tsv")
         state.seed_chart_from_breakdowns()
+        _apply_metadata(state, load_run_metadata(audit_path.parent))
 
-    layout = build_layout(state, "replay", source, paused=False)
+    layout = build_layout(state, "replay", source, paused=False, tick=0)
+    tick = 0
     with Live(layout, console=console, refresh_per_second=REFRESH_HZ, screen=False) as live:
         try:
             for ev in events:
                 state.apply_event(ev)
-                live.update(build_layout(state, "replay", source, paused=False))
-                time.sleep(frame_delay)
-            # Hold the final state on screen until user quits
+                # Subdivide the frame_delay into smaller animation ticks so
+                # the active state pulses smoothly even when an event takes
+                # a few seconds (frame_delay > 1).
+                anim_ticks = max(1, int(frame_delay * REFRESH_HZ))
+                for _ in range(anim_ticks):
+                    tick += 1
+                    live.update(build_layout(state, "replay", source, paused=False, tick=tick))
+                    time.sleep(frame_delay / anim_ticks)
+            # Hold the final state on screen until user quits — keep the
+            # pulse animation alive so the user knows the page isn't frozen.
             while True:
-                time.sleep(0.5)
+                tick += 1
+                live.update(build_layout(state, "replay", source, paused=False, tick=tick))
+                time.sleep(1.0 / REFRESH_HZ)
         except KeyboardInterrupt:
             pass
 

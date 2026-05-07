@@ -445,8 +445,11 @@
 // Configuration & data
 // ============================================================================
 
-const TOPIC_LABEL = "AWS API Gateway";
-const DIMENSIONS = [
+// Defaults used for the scripted demo and as fallback when no real run is
+// loaded.  When ?run= is provided, ``loadRunMetadata`` overrides both with
+// the actual values from ``effective_config.json``.
+let TOPIC_LABEL = "AWS API Gateway";
+let DIMENSIONS = [
   "REST vs HTTP",
   "WebSocket",
   "AuthN/AuthZ",
@@ -461,6 +464,27 @@ const DIMENSIONS = [
   "Hard limits",
   "REST→HTTP migration",
 ];
+
+function _shortDim(dim) {
+  // Mirror the TUI's _short_dim: take up to first colon, max 34 chars.
+  if (dim.includes(":")) dim = dim.split(":", 1)[0];
+  return dim.slice(0, 34).trim();
+}
+
+async function loadRunMetadata(auditUrl) {
+  // ``effective_config.json`` lives next to the audit trail.
+  const url = auditUrl.replace(/audit_trail\.jsonl$/, 'effective_config.json');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const cfg = await res.json();
+    return {
+      topic: cfg.topic || "",
+      dimensions: (cfg.dimensions || []).map(_shortDim),
+      target: cfg.scoring?.target_dimensions_total || (cfg.dimensions || []).length || 0,
+    };
+  } catch { return null; }
+}
 
 // Backend role → state-machine node id
 const STATE_NODES = ["n-strategy","n-loop","n-hypo","n-execute","n-critique","n-score","n-decide","n-keep","n-discard","n-compress","n-synth","n-init"];
@@ -1013,8 +1037,8 @@ function wireControls() {
 // ============================================================================
 
 async function main() {
-  $('topic-label').textContent = TOPIC_LABEL;
-  buildDimGrid();
+  // Topic + dim grid are written AFTER metadata load (later in this function)
+  // so real-run values land in the DOM instead of the hardcoded defaults.
   wireControls();
 
   const params = new URLSearchParams(location.search);
@@ -1025,6 +1049,16 @@ async function main() {
 
   if (runUrl) {
     try {
+      // Load real metadata (topic + configured dimensions) BEFORE iteration
+      // parsing so the dim-grid renders against the real dim list, not the
+      // hardcoded AWS array.
+      const meta = await loadRunMetadata(runUrl);
+      if (meta) {
+        if (meta.topic)     TOPIC_LABEL = meta.topic;
+        if (meta.dimensions && meta.dimensions.length) DIMENSIONS = meta.dimensions;
+        if (meta.target)    $('dim-total').textContent = meta.target;
+        console.log(`Loaded run metadata: topic=${meta.topic.slice(0, 40)} dims=${meta.dimensions.length}`);
+      }
       const real = await loadRealRun(runUrl);
       if (real && real.length > 0) {
         iterations = real;
@@ -1047,9 +1081,12 @@ async function main() {
     }
   }
 
+  $('topic-label').textContent = TOPIC_LABEL;
   $('source-badge').textContent = badge;
   $('source-badge').className = `source-badge ${badge}`;
 
+  // Rebuild the dim grid in case loadRunMetadata changed the DIMENSIONS array
+  buildDimGrid();
   Player.setFrames(buildFrames(iterations));
 }
 
