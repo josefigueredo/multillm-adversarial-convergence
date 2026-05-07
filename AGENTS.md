@@ -28,6 +28,13 @@ uv run python -m src.cli doctor output --output <run_dir>
 ./scripts/research_with_retry.sh configs/research/<topic>.yaml --max-attempts 5
 ./scripts/research_with_retry.sh configs/research/<topic>.yaml --backoff 120
 
+# Live / replay TUI monitor (rich-based terminal dashboard)
+uv run python scripts/tui_monitor.py output/<run>/             # auto-detect (live or replay)
+uv run python scripts/tui_monitor.py output/<run>/ --live      # force live tail
+uv run python scripts/tui_monitor.py output/<run>/ --replay    # force replay
+uv run python scripts/tui_monitor.py --scripted                # demo with synthetic data
+uv run python scripts/tui_monitor.py output/<run>/ --replay --replay-speed 0.1   # fast replay
+
 # Tests
 uv run pytest tests/ -v
 ```
@@ -132,6 +139,7 @@ The wrapper is the OUTER retry loop. The framework's INNER backoff handles in-ba
 - `scripts/calibrate_scoring.py` — replay-based scorer calibration helper
 - `scripts/mock_demo.py` — generates a mock localstack-alternatives showcase run from fixtures
 - `scripts/research_with_retry.sh` — shell wrapper that runs a research config with auto-retry-and-resume on hard kills (OOM, SIGSEGV, supervisor SIGTERM) or quota exhaustion. Logs to `logs/<config-name>-<timestamp>.log`. See the Commands section for usage.
+- `scripts/tui_monitor.py` — terminal monitor that visualises a running or completed research run by reading `audit_trail.jsonl`. Live-tail mode auto-refreshes as the orchestrator emits events; replay mode auto-advances frame-by-frame. Mirrors the in-browser `docs/showcase/dashboard.html` layout (state machine, score sparklines, dimension grid, cost block) in `rich`. Auto-detects mode by `audit_trail.jsonl` mtime (< 60s = live). See the Commands section.
 
 ### Documentation
 

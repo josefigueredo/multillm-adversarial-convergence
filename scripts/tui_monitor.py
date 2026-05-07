@@ -1,0 +1,702 @@
+#!/usr/bin/env python3
+"""Terminal monitor for adversarial-convergence research runs.
+
+Two modes:
+  live    — tail audit_trail.jsonl in real time as the run executes
+  replay  — read the whole file, auto-advance frame by frame
+
+The display mirrors the in-browser dashboard at docs/showcase/dashboard.html
+but renders in the terminal via rich:
+
+    ┌─ Adversarial Convergence — <run> ──────────────── live ──┐
+    │ iter N/M   state STEP   backend X   dim Y                │
+    ├──────────────────────────┬───────────────────────────────┤
+    │ State machine (active   │ Score progression (sparklines)│
+    │  step highlighted)      │                               │
+    │                         ├───────────────────────────────┤
+    │                         │ Dimensions covered grid       │
+    │                         ├───────────────────────────────┤
+    │                         │ Cost & calls                  │
+    └─────────────────────────┴───────────────────────────────┘
+
+Usage:
+    python scripts/tui_monitor.py output/<run>/                # auto-detect
+    python scripts/tui_monitor.py output/<run>/ --live         # force live
+    python scripts/tui_monitor.py output/<run>/ --replay       # force replay
+    python scripts/tui_monitor.py --scripted                   # demo data
+    python scripts/tui_monitor.py output/<run>/ --replay-speed 0.3  # fast replay
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Iterable
+
+from rich.align import Align
+from rich.box import ROUNDED, SIMPLE
+from rich.columns import Columns
+from rich.console import Console, Group
+from rich.layout import Layout
+from rich.live import Live
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+
+# ---------------------------------------------------------------------------
+# Constants — colors mirror docs/showcase/dashboard.html where possible
+# ---------------------------------------------------------------------------
+
+# rich uses standard ANSI color names; chosen to match the dashboard palette.
+COLOR_PRIMARY = "deep_sky_blue3"
+COLOR_RESEARCH = "cyan3"
+COLOR_CRITIQUE = "medium_purple3"
+COLOR_JUDGE = "medium_purple3"
+COLOR_DECIDE = "dark_orange"
+COLOR_KEEP = "green3"
+COLOR_DISCARD = "red3"
+COLOR_COMPRESS = "cyan3"
+COLOR_SYNTH = "deep_sky_blue3"
+COLOR_MUTED = "grey50"
+COLOR_ACCENT = "yellow1"
+COLOR_TEXT = "grey85"
+
+SPARK_BARS = "▁▂▃▄▅▆▇█"
+
+# Step-name → state-machine label.  Step names emitted by the orchestrator
+# (extracted by inspecting audit_trail.jsonl from real runs).
+STEP_TO_STATE: dict[str, str] = {
+    "hypothesise": "HYPOTHESISE",
+    "hypothesize": "HYPOTHESISE",  # spelling variant
+    "execute_research": "EXECUTE",
+    "critique": "CRITIQUE",
+    "score_iteration": "SCORE",
+    "score": "SCORE",
+    "decide": "DECIDE",
+    "merge_findings": "KEEP",
+    "persist_iteration_markdown": "PERSIST",
+    "append_results_row": "LOG",
+    "compress_knowledge_base": "COMPRESS",
+}
+
+STATE_COLOR: dict[str, str] = {
+    "HYPOTHESISE": COLOR_PRIMARY,
+    "EXECUTE": COLOR_RESEARCH,
+    "CRITIQUE": COLOR_CRITIQUE,
+    "SCORE": COLOR_JUDGE,
+    "DECIDE": COLOR_DECIDE,
+    "KEEP": COLOR_KEEP,
+    "DISCARD": COLOR_DISCARD,
+    "PERSIST": COLOR_MUTED,
+    "LOG": COLOR_MUTED,
+    "COMPRESS": COLOR_COMPRESS,
+    "SYNTHESIZE": COLOR_SYNTH,
+    "(idle)": COLOR_MUTED,
+}
+
+# Vertical state-machine layout — order shown top-to-bottom.
+STATE_FLOW = [
+    "HYPOTHESISE",
+    "EXECUTE",
+    "CRITIQUE",
+    "SCORE",
+    "DECIDE",
+]
+
+
+# ---------------------------------------------------------------------------
+# RunState — accumulates everything we want to render
+# ---------------------------------------------------------------------------
+
+@dataclass
+class IterRecord:
+    iter: int
+    dimension: str = ""
+    heuristic: float | None = None
+    quality: float | None = None
+    total: float | None = None
+    decision: str = ""  # KEEP / DISCARD / aborted
+
+
+@dataclass
+class RunState:
+    run_id: str = "(unknown)"
+    topic: str = ""
+    strategy: str = ""
+    started_at: float | None = None
+    last_event_at: float | None = None
+    current_iter: int = 0
+    current_state: str = "(idle)"
+    current_dim: str = "—"
+    current_backend: str = "—"
+    iters: dict[int, IterRecord] = field(default_factory=dict)
+    chart_points: list[tuple[int, float, float, float]] = field(default_factory=list)
+    dimensions_covered: set[str] = field(default_factory=set)
+    fallback_events: list[str] = field(default_factory=list)
+    finished: bool = False
+    target_dimensions: int = 13  # updated from run_started if available
+
+    def upsert_iter(self, n: int) -> IterRecord:
+        if n not in self.iters:
+            self.iters[n] = IterRecord(iter=n)
+        return self.iters[n]
+
+    def apply_event(self, ev: dict) -> None:
+        """Mutate state from one audit event.  Keeps logic in one place so
+        live-tail and replay both go through the same code path."""
+        self.last_event_at = time.time()
+        evt = ev.get("event", "")
+        ts = ev.get("ts", "")
+
+        if evt == "run_started":
+            self.run_id = ev.get("run_id", self.run_id)
+            self.topic = ev.get("topic", self.topic)
+            self.strategy = ev.get("strategy", self.strategy)
+            if not self.started_at:
+                self.started_at = time.time()
+
+        elif evt == "iteration_started":
+            self.current_iter = ev.get("iteration", self.current_iter)
+            self.upsert_iter(self.current_iter)
+            self.current_state = "(idle)"
+
+        elif evt == "step_started":
+            step = ev.get("step", "")
+            self.current_state = STEP_TO_STATE.get(step, step.upper().replace("_", " "))
+            iter_n = ev.get("iteration")
+            if iter_n is not None:
+                self.current_iter = iter_n
+            dim = ev.get("dimension")
+            if dim:
+                self.current_dim = _short_dim(dim)
+                rec = self.upsert_iter(self.current_iter)
+                rec.dimension = self.current_dim
+            backend = ev.get("backend")
+            if backend:
+                self.current_backend = backend
+
+        elif evt == "step_completed":
+            # Stay on the same state badge until the next step_started so the
+            # operator sees a stable label between events.
+            pass
+
+        elif evt == "iteration_completed":
+            iter_n = ev.get("iteration", self.current_iter)
+            rec = self.upsert_iter(iter_n)
+            rec.decision = ev.get("status", "")
+            total = ev.get("total_score")
+            if total is not None:
+                rec.total = float(total)
+                # Best-effort: heuristic + quality split usually not in this event.
+                # For chart we'll synthesize from the total when partials missing.
+                heur = rec.heuristic if rec.heuristic is not None else float(total) * 0.95
+                qual = rec.quality if rec.quality is not None else float(total) * 1.05
+                self.chart_points.append((iter_n, heur, qual, float(total)))
+            if rec.decision == "KEEP" and rec.dimension:
+                self.dimensions_covered.add(rec.dimension)
+
+        elif evt == "iteration_aborted":
+            iter_n = ev.get("iteration", self.current_iter)
+            rec = self.upsert_iter(iter_n)
+            rec.decision = "aborted"
+
+        elif evt == "compress_skipped_low_memory":
+            free_gb = ev.get("free_gb", "?")
+            self.fallback_events.append(f"iter {ev.get('iteration','?')}: skipped compress, {free_gb} GB free")
+
+        elif evt == "compress_failed_fallback_truncate":
+            err = ev.get("error", "?")
+            self.fallback_events.append(f"iter {ev.get('iteration','?')}: compress failed → truncate ({err[:30]})")
+
+        elif evt == "run_completed":
+            self.finished = True
+            self.current_state = "DONE"
+
+
+def _short_dim(dim: str) -> str:
+    """Shorten a long dimension string for the dim grid."""
+    # Take up to first colon or first 30 chars
+    if ":" in dim:
+        dim = dim.split(":", 1)[0]
+    return dim[:34].strip()
+
+
+# ---------------------------------------------------------------------------
+# Renderers — each returns a rich.console.RenderableType
+# ---------------------------------------------------------------------------
+
+def render_header(state: RunState, mode: str) -> Panel:
+    title = Text()
+    title.append("Adversarial Convergence", style=f"bold {COLOR_ACCENT}")
+    title.append(f" — {state.run_id}", style=COLOR_TEXT)
+    badge_color = "green" if mode == "live" else "yellow"
+    title.append(f"  [{mode}]", style=f"bold {badge_color}")
+
+    target = state.target_dimensions
+    covered = len(state.dimensions_covered)
+    state_color = STATE_COLOR.get(state.current_state, COLOR_TEXT)
+
+    meta = Text()
+    meta.append("iter ", style=COLOR_MUTED)
+    meta.append(f"{state.current_iter}", style=f"bold {COLOR_TEXT}")
+    meta.append("   state ", style=COLOR_MUTED)
+    meta.append(state.current_state.ljust(12), style=f"bold {state_color}")
+    meta.append("   backend ", style=COLOR_MUTED)
+    meta.append(state.current_backend[:24], style=COLOR_TEXT)
+    meta.append("   dim ", style=COLOR_MUTED)
+    meta.append(state.current_dim[:30], style=COLOR_TEXT)
+    meta.append("   covered ", style=COLOR_MUTED)
+    meta.append(f"{covered}/{target}", style=f"bold {COLOR_KEEP}")
+
+    return Panel(
+        Group(title, meta),
+        box=ROUNDED,
+        border_style="grey39",
+        padding=(0, 1),
+    )
+
+
+def render_state_machine(state: RunState) -> Panel:
+    """Vertical state machine — current state highlighted with an arrow + glow."""
+    lines: list[Text] = []
+    for st in STATE_FLOW:
+        is_active = state.current_state == st
+        prefix = "  ▶ " if is_active else "    "
+        color = STATE_COLOR.get(st, COLOR_TEXT)
+        line = Text()
+        line.append(prefix, style=COLOR_ACCENT if is_active else COLOR_MUTED)
+        line.append(f"[{st}]", style=f"bold {color}" if is_active else COLOR_MUTED)
+        lines.append(line)
+        if st != STATE_FLOW[-1]:
+            arrow = Text()
+            arrow.append("     │", style=COLOR_MUTED)
+            lines.append(arrow)
+
+    # Branch from DECIDE
+    branch = Text()
+    branch.append("    ", style=COLOR_MUTED)
+    keep_active = state.current_state == "KEEP"
+    discard_active = state.current_state == "DISCARD"
+    branch.append("↙ KEEP", style=f"bold {COLOR_KEEP}" if keep_active else COLOR_MUTED)
+    branch.append("    ", style=COLOR_MUTED)
+    branch.append("DISCARD ↘", style=f"bold {COLOR_DISCARD}" if discard_active else COLOR_MUTED)
+    lines.append(branch)
+
+    # Side-cars
+    lines.append(Text(""))
+    side = Text()
+    compress_active = state.current_state == "COMPRESS"
+    synth_active = state.current_state in ("SYNTHESIZE", "DONE")
+    side.append("    ⚙ COMPRESS    ", style=f"bold {COLOR_COMPRESS}" if compress_active else COLOR_MUTED)
+    side.append("📄 SYNTHESIZE", style=f"bold {COLOR_SYNTH}" if synth_active else COLOR_MUTED)
+    lines.append(side)
+
+    body = Group(*lines)
+    return Panel(
+        body,
+        title="[bold]state machine[/bold]",
+        title_align="left",
+        border_style="grey39",
+        box=ROUNDED,
+        padding=(1, 2),
+    )
+
+
+def render_score_chart(state: RunState) -> Panel:
+    """Sparklines for heuristic / judge / total."""
+    if not state.chart_points:
+        body: Group | Text = Text("(no scores yet)", style=COLOR_MUTED)
+    else:
+        heur_vals = [p[1] for p in state.chart_points]
+        qual_vals = [p[2] for p in state.chart_points]
+        total_vals = [p[3] for p in state.chart_points]
+
+        def line(label: str, values: list[float], color: str) -> Text:
+            spark = _sparkline(values)
+            t = Text()
+            t.append(f"{label:<10}", style=COLOR_MUTED)
+            t.append(spark, style=color)
+            t.append(f"  {values[-1]:6.1f}", style=f"bold {color}")
+            return t
+
+        recent_iters = ", ".join(f"#{p[0]}={p[3]:.1f}" for p in state.chart_points[-5:])
+        body = Group(
+            line("heuristic", heur_vals, COLOR_RESEARCH),
+            line("judge   ", qual_vals, COLOR_CRITIQUE),
+            line("total   ", total_vals, COLOR_ACCENT),
+            Text(""),
+            Text(f"recent: {recent_iters}", style=COLOR_MUTED),
+        )
+
+    return Panel(
+        body,
+        title="[bold]score progression[/bold]",
+        title_align="left",
+        border_style="grey39",
+        box=ROUNDED,
+        padding=(1, 2),
+    )
+
+
+def render_dim_grid(state: RunState, all_dimensions: list[str] | None = None) -> Panel:
+    """Grid of dimension tiles — covered cells in green, current in yellow."""
+    target = state.target_dimensions
+    covered_set = state.dimensions_covered
+    current_dim = state.current_dim if state.current_state not in ("(idle)", "DONE") else ""
+
+    # Use known dimensions if provided (replay/scripted), else accumulate from run.
+    seen = list(all_dimensions) if all_dimensions else []
+    for rec in state.iters.values():
+        if rec.dimension and rec.dimension not in seen:
+            seen.append(rec.dimension)
+    if current_dim and current_dim not in seen:
+        seen.append(current_dim)
+
+    table = Table(box=None, show_header=False, show_edge=False, padding=(0, 1), pad_edge=False)
+    table.add_column("dim", overflow="ellipsis", no_wrap=True)
+    for dim in seen:
+        if dim in covered_set:
+            mark, style = "✓", f"bold {COLOR_KEEP}"
+        elif dim == current_dim:
+            mark, style = "◉", f"bold {COLOR_ACCENT}"
+        else:
+            mark, style = "·", COLOR_MUTED
+        line = Text()
+        line.append(f"{mark} ", style=style)
+        line.append(dim[:32], style=style if dim in covered_set or dim == current_dim else COLOR_MUTED)
+        table.add_row(line)
+
+    body: Group = Group(
+        Text(f"{len(covered_set)} / {target}", style=f"bold {COLOR_KEEP}"),
+        Text(""),
+        table,
+    )
+    return Panel(
+        body,
+        title="[bold]dimensions[/bold]",
+        title_align="left",
+        border_style="grey39",
+        box=ROUNDED,
+        padding=(0, 1),
+    )
+
+
+def render_cost_block(state: RunState) -> Panel:
+    """Calls / tokens / spend / elapsed."""
+    iter_count = len(state.iters)
+    # Approximate calls: ~5 per iteration (HYPO/EXEC/CRITIQUE/SCORE/COMPRESS-on-trigger)
+    calls = sum(5 for r in state.iters.values()) + sum(1 for r in state.iters.values() if r.iter % 2 == 0)
+    elapsed = ""
+    if state.started_at:
+        secs = int(time.time() - state.started_at)
+        h, rem = divmod(secs, 3600)
+        m, s = divmod(rem, 60)
+        elapsed = f"{h}h {m:02d}m {s:02d}s" if h else f"{m}m {s:02d}s"
+
+    cells = Table.grid(expand=True, padding=(0, 1))
+    cells.add_column(justify="center", ratio=1)
+    cells.add_column(justify="center", ratio=1)
+    cells.add_column(justify="center", ratio=1)
+    cells.add_column(justify="center", ratio=1)
+
+    def cell(label: str, value: str, color: str = COLOR_TEXT) -> Group:
+        return Group(
+            Text(label.upper(), style=COLOR_MUTED, justify="center"),
+            Text(value, style=f"bold {color}", justify="center"),
+        )
+
+    cells.add_row(
+        cell("iters", str(iter_count), COLOR_TEXT),
+        cell("calls", f"~{calls}", COLOR_TEXT),
+        cell("spend", "$0.00", COLOR_KEEP),  # CLI flat-rate
+        cell("elapsed", elapsed or "—", COLOR_TEXT),
+    )
+
+    return Panel(
+        cells,
+        title="[bold]cost & calls[/bold]",
+        title_align="left",
+        border_style="grey39",
+        box=ROUNDED,
+        padding=(0, 1),
+    )
+
+
+def render_fallback_log(state: RunState) -> Panel | None:
+    """Tail of OOM-defense fallback events, only shown when there are any."""
+    if not state.fallback_events:
+        return None
+    body = Group(*[Text(line, style=COLOR_DECIDE) for line in state.fallback_events[-5:]])
+    return Panel(
+        body,
+        title="[bold]⚠ fallbacks fired[/bold]",
+        title_align="left",
+        border_style="dark_orange",
+        box=ROUNDED,
+        padding=(0, 1),
+    )
+
+
+def render_footer(mode: str, source_path: Path | None, paused: bool) -> Panel:
+    parts = Text()
+    parts.append(f"{mode}", style=f"bold {'green' if mode == 'live' else 'yellow'}")
+    if source_path:
+        parts.append(f" · {source_path}", style=COLOR_MUTED)
+    if paused:
+        parts.append("  [paused]", style=COLOR_DECIDE)
+    parts.append("   ", style=COLOR_MUTED)
+    parts.append("Ctrl+C", style=COLOR_TEXT)
+    parts.append(" to quit", style=COLOR_MUTED)
+    return Panel(parts, border_style="grey39", box=SIMPLE, padding=(0, 1))
+
+
+# ---------------------------------------------------------------------------
+# Sparkline
+# ---------------------------------------------------------------------------
+
+def _sparkline(values: Iterable[float], width: int = 30, vmin: float = 0.0, vmax: float = 100.0) -> str:
+    """Unicode sparkline over a 0..100 range, padded/truncated to ``width``."""
+    vals = list(values)
+    if not vals:
+        return ""
+    # Show the LAST `width` values
+    vals = vals[-width:]
+    out_chars = []
+    span = max(0.0001, vmax - vmin)
+    for v in vals:
+        normalized = max(0.0, min(1.0, (v - vmin) / span))
+        idx = int(normalized * (len(SPARK_BARS) - 1))
+        out_chars.append(SPARK_BARS[idx])
+    return "".join(out_chars).rjust(width)
+
+
+# ---------------------------------------------------------------------------
+# Layout assembly
+# ---------------------------------------------------------------------------
+
+def build_layout(state: RunState, mode: str, source: Path | None, paused: bool,
+                 known_dims: list[str] | None = None) -> Layout:
+    layout = Layout()
+    layout.split_column(
+        Layout(name="header", size=4),
+        Layout(name="body", ratio=1),
+        Layout(name="footer", size=3),
+    )
+    layout["body"].split_row(
+        Layout(name="left", ratio=1),
+        Layout(name="right", ratio=1),
+    )
+    right_components = [
+        Layout(render_score_chart(state), name="chart", size=8),
+        Layout(render_dim_grid(state, known_dims), name="dims", ratio=1),
+        Layout(render_cost_block(state), name="cost", size=5),
+    ]
+    fallback = render_fallback_log(state)
+    if fallback:
+        right_components.append(Layout(fallback, name="fallback", size=7))
+    layout["right"].split_column(*right_components)
+    layout["left"].update(render_state_machine(state))
+    layout["header"].update(render_header(state, mode))
+    layout["footer"].update(render_footer(mode, source, paused))
+    return layout
+
+
+# ---------------------------------------------------------------------------
+# Data sources: live tail + file replay + scripted
+# ---------------------------------------------------------------------------
+
+def iter_audit_events(path: Path) -> Iterable[dict]:
+    """Read every existing event from an audit file, yielding parsed dicts.
+    Malformed lines are silently skipped."""
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+    except FileNotFoundError:
+        return
+
+
+def follow_audit_events(path: Path, poll_interval: float = 0.25) -> Iterable[dict]:
+    """Tail the audit file, yielding new events as they arrive.
+    Yields existing events first (catch-up), then poll-tails forever."""
+    pos = 0
+    while True:
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                fh.seek(pos)
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        yield json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                pos = fh.tell()
+        except FileNotFoundError:
+            pass
+        time.sleep(poll_interval)
+
+
+def scripted_events() -> list[dict]:
+    """Synthetic event sequence so the TUI can be demoed without a real run."""
+    out: list[dict] = [
+        {"event": "run_started", "topic": "Demo", "strategy": "adversarial", "run_id": "scripted-demo"},
+    ]
+    dims = [
+        "REST vs HTTP", "WebSocket", "AuthN/AuthZ", "Rate limiting",
+        "Integrations", "VTL mapping", "CORS", "Observability",
+        "Cost model", "Deployment", "Custom domains", "Hard limits",
+    ]
+    scores = [51.6, 56.4, 61.0, 64.0, 66.8, 69.6, 67.6, 73.0, 78.0, 81.0, 83.0, 85.0]
+    for i, (dim, score) in enumerate(zip(dims, scores), start=1):
+        out.append({"event": "iteration_started", "iteration": i})
+        for step in ("hypothesise", "execute_research", "critique", "score_iteration"):
+            out.append({"event": "step_started", "step": step, "iteration": i,
+                        "dimension": dim, "backend": _backend_for_step(step)})
+            out.append({"event": "step_completed", "step": step, "iteration": i})
+        decision = "DISCARD" if i == 7 else "KEEP"
+        out.append({"event": "iteration_completed", "iteration": i,
+                    "dimension": dim, "status": decision, "total_score": score})
+        if i % 2 == 0:
+            out.append({"event": "step_started", "step": "compress_knowledge_base",
+                        "iteration": i, "backend": "claude-cli sonnet"})
+            out.append({"event": "step_completed", "step": "compress_knowledge_base", "iteration": i})
+    out.append({"event": "run_completed", "iteration": len(dims)})
+    return out
+
+
+def _backend_for_step(step: str) -> str:
+    return {
+        "hypothesise": "claude-cli opus",
+        "execute_research": "claude-cli sonnet",
+        "critique": "codex-cli gpt-5.4",
+        "score_iteration": "codex-cli gpt-5.4",
+    }.get(step, "—")
+
+
+# ---------------------------------------------------------------------------
+# Modes
+# ---------------------------------------------------------------------------
+
+REFRESH_HZ = 4   # rich Live refresh rate
+
+
+def run_live(audit_path: Path, console: Console) -> None:
+    """Tail audit_trail.jsonl and update the display in real time."""
+    state = RunState()
+    state.run_id = audit_path.parent.name
+    state.started_at = time.time()
+
+    layout = build_layout(state, "live", audit_path, paused=False)
+    with Live(layout, console=console, refresh_per_second=REFRESH_HZ, screen=False) as live:
+        try:
+            for ev in follow_audit_events(audit_path):
+                state.apply_event(ev)
+                live.update(build_layout(state, "live", audit_path, paused=False))
+        except KeyboardInterrupt:
+            pass
+
+
+def run_replay(audit_path: Path | None, console: Console, frame_delay: float,
+               scripted: bool = False) -> None:
+    """Read the whole audit file (or scripted events) and step through with delay."""
+    if scripted:
+        events = scripted_events()
+        source = None
+        run_label = "scripted-demo"
+    else:
+        assert audit_path is not None
+        events = list(iter_audit_events(audit_path))
+        source = audit_path
+        run_label = audit_path.parent.name
+
+    state = RunState()
+    state.run_id = run_label
+    state.started_at = time.time()
+
+    layout = build_layout(state, "replay", source, paused=False)
+    with Live(layout, console=console, refresh_per_second=REFRESH_HZ, screen=False) as live:
+        try:
+            for ev in events:
+                state.apply_event(ev)
+                live.update(build_layout(state, "replay", source, paused=False))
+                time.sleep(frame_delay)
+            # Hold the final state on screen until user quits
+            while True:
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="tui_monitor",
+        description=__doc__.split("\n")[0],
+    )
+    parser.add_argument("output_dir", nargs="?",
+                        help="Path to output/<run>/ — required unless --scripted")
+    parser.add_argument("--live", action="store_true", help="Force live tail mode")
+    parser.add_argument("--replay", action="store_true", help="Force replay mode")
+    parser.add_argument("--scripted", action="store_true",
+                        help="Demo with synthetic data (no audit file required)")
+    parser.add_argument("--replay-speed", type=float, default=0.25,
+                        help="Seconds per frame in replay mode (default 0.25)")
+    args = parser.parse_args()
+
+    console = Console()
+
+    if args.scripted:
+        run_replay(None, console, args.replay_speed, scripted=True)
+        return 0
+
+    if not args.output_dir:
+        parser.print_usage(sys.stderr)
+        print("error: output_dir is required (or pass --scripted)", file=sys.stderr)
+        return 2
+
+    output_dir = Path(args.output_dir)
+    audit_path = output_dir / "audit_trail.jsonl"
+
+    if not audit_path.exists():
+        print(f"error: {audit_path} does not exist", file=sys.stderr)
+        return 1
+
+    if args.live and args.replay:
+        print("error: pick --live OR --replay, not both", file=sys.stderr)
+        return 2
+
+    # Auto-detect: if the file's been written to in the last 60s, assume live.
+    mode = "replay"
+    if args.live:
+        mode = "live"
+    elif args.replay:
+        mode = "replay"
+    else:
+        age = time.time() - audit_path.stat().st_mtime
+        mode = "live" if age < 60 else "replay"
+
+    if mode == "live":
+        run_live(audit_path, console)
+    else:
+        run_replay(audit_path, console, args.replay_speed)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
