@@ -1,0 +1,146 @@
+# AWS API Gateway research with claude-cli Opus as primary reasoner,
+# claude-cli Sonnet as research-breadth backend, and codex-cli as the
+# critic + judge.  The codex backend is a *different model family* from
+# the two Claude backends — that family separation is what makes the
+# adversarial loop productive (different RLHF → different blind spots).
+#
+# Demo positioning: this config is meant to actually *converge* on a
+# conclusive recommendation.  The localstack-alternatives run was less
+# decisive because (a) two of its three backends are weaker on
+# structured reasoning and (b) it had only 10 iterations of headroom.
+# This config doubles iteration budget, raises per-call turn limit and
+# timeout, expands the dimension list to 13 of the real architectural
+# pain points, and opts into the novelty-blended scoring formula plus
+# convergence-gated gap promotion so the dashboard shows the full
+# scoring story.
+
+research:
+  topic: "Compare AWS API Gateway options for enterprise REST and WebSocket APIs"
+  goal: >
+    Produce a comprehensive, architect-level comparison of AWS API Gateway
+    variants (REST API, HTTP API, WebSocket API) with a clear,
+    decision-ready recommendation per use-case bucket
+    (greenfield REST, REST migration, real-time WebSocket, multi-tenant SaaS).
+    Include pricing models, hard limits, integration patterns, and
+    trade-offs at the level a staff engineer would need to defend the
+    choice in an architecture review.
+
+  dimensions:
+    - "REST API vs HTTP API: feature matrix, pricing, performance, and what HTTP API still cannot do"
+    - "WebSocket API: capabilities, connection limits, scaling patterns, and the $connect/$disconnect lifecycle"
+    - "Authentication and authorization: IAM, Cognito, Lambda authorizers, JWT — including authorizer caching strategies"
+    - "Rate limiting, throttling, and usage plans for multi-tenant SaaS (per-tenant key isolation)"
+    - "Integration patterns: Lambda proxy, VPC link, HTTP proxy, AWS service integrations, and direct DynamoDB"
+    - "Request/response transformation: VTL mapping templates (REST), parameter mapping (HTTP API), payload format v1 vs v2"
+    - "CORS handling and pre-flight optimization across REST API vs HTTP API"
+    - "Observability: CloudWatch metrics, X-Ray tracing, access logging, structured logging, and CloudTrail audit"
+    - "Cost modeling: per-request pricing, data transfer, caching, free tier, and the cost crossover REST↔HTTP"
+    - "Deployment: stages, canary releases, versioning, OpenAPI export/import, CDK vs SAM vs Terraform"
+    - "Custom domains, TLS certificates, ACM regions, and edge-optimized vs regional vs private endpoints"
+    - "Hard limits and quotas that constrain architecture decisions (per-account, per-API, per-stage)"
+    - "Migration path REST API → HTTP API: feature gap, breaking changes, and when NOT to migrate"
+
+  methodology:
+    question: "Given the variants, which API Gateway type fits each enterprise use-case bucket — and why?"
+    scope: >
+      Audience: staff engineers and platform architects making a binding choice
+      that will be in production for 3+ years.  In-scope: official AWS
+      documentation, AWS re:Invent talks (2023+), well-regarded engineering
+      blogs (AWS Architecture Center, Serverless Land, official AWS Solutions
+      Architect blogs).  Out-of-scope: marketing posts, vendor-neutral
+      gateway-vs-gateway comparisons (Kong, Tyk, Apigee — different category).
+    inclusion_criteria:
+      - "Official AWS documentation (docs.aws.amazon.com)"
+      - "AWS re:Invent / re:Inforce talk transcripts and slides"
+      - "AWS Architecture Center reference architectures"
+      - "Engineering blog posts dated 2024 or later"
+      - "GitHub examples from awslabs / aws-samples organisations"
+    exclusion_criteria:
+      - "Marketing landing pages without technical depth"
+      - "Comparisons against non-AWS API gateways (out of scope)"
+      - "Posts older than 2022 unless still listed as canonical reference by AWS"
+    preferred_source_types:
+      - "AWS official documentation"
+      - "AWS Architecture Center"
+      - "AWS re:Invent talks"
+      - "awslabs / aws-samples GitHub repositories"
+      - "AWS engineering blog"
+    recency_days: 365
+
+  evaluation:
+    semantic_calibration: true
+    semantic_review: true       # final judge pass over the synthesis — demo-worthy
+
+  reporting:
+    export_html: true
+    report_title: "AWS API Gateway — Architect-Level Comparison"
+    output_style: technical_doc
+    style_overrides:
+      include_executive_summary: true
+      include_comparison_table: true
+      include_methodology: true
+      include_limitations: true
+      include_next_actions: true
+      section_order: recommendation_first
+      recommendation_mode: ranked
+      citation_mode: references_section
+
+  scoring:
+    min_dimensions_per_iteration: 1
+    target_dimensions_total: 13
+    evidence_types:
+      - comparison_table
+      - pricing_data
+      - code_example
+      - architecture_diagram_description
+      - trade_off_analysis
+
+    # Opt into the novelty-blended formula and depth bonus so the
+    # framework's full scoring surface is visible in the demo.  Defaults
+    # would have used the legacy 0.4-coverage + 0.6-quality formula.
+    weights:
+      coverage_weight: 0.4
+      quality_weight: 0.6
+      novelty_weight: 0.25
+      judge_novelty_share: 0.3
+      depth_bonus: 0.15
+
+  # Convergence-gated gap promotion.  Without this, every survived gap
+  # promotes on first sight; with this, promotion needs either repeated
+  # sightings (>= 2) or single high-confidence (>= 8/10) — produces a
+  # cleaner discovered_gaps.json for the demo to walk through.
+  discovery:
+    language_filter: en
+    dedupe_threshold: 0.85
+    promotion_enabled: true
+    promotion_min_occurrences: 2
+    promotion_high_confidence: 8
+
+  execution:
+    max_iterations: 25          # bounded but generous — was 10 in the localstack run
+    compress_every: 5           # corpus distillation every 5 iters
+    allowed_tools: "WebSearch,WebFetch,Read,Bash,Glob,Grep"
+    max_turns: 12               # more turns per call — let opus think
+    timeout_seconds: 900        # 15 min per call — opus + deep dimensions need it
+    max_budget_per_call: 3.00   # bound per-call spend (opus is pricier than sonnet)
+
+    strategy: adversarial
+    providers:
+      claude_opus:
+        adapter: claude-cli
+        model: opus             # deepest reasoning — synthesis + final calls
+      claude_sonnet:
+        adapter: claude-cli
+        model: sonnet           # fast breadth — research-pass workhorse
+      codex_critic:
+        adapter: codex-cli
+        model: gpt-5.4          # different family — adversary + judge
+    backends:
+      primary: claude_opus
+      research:
+        - claude_sonnet
+        - codex_critic          # codex contributes its own research perspective too
+      judge: codex_critic       # cross-family judge (Anthropic researcher → OpenAI judge)
+      utility: claude_sonnet    # fast utility for cheap classification calls
+    strategy_config:
+      critique_depth: thorough  # let the critic dig — light/standard/thorough
