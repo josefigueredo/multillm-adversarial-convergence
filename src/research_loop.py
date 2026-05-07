@@ -226,6 +226,22 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         state.best_scores[dimension] = score.total
         if score.total > state.best_score:
             state.best_score = score.total
+        # Atomicity: write the sentinel BEFORE any of the four risky disk
+        # writes (KB merge, iter_md, sidecar, results.tsv).  A crash anywhere
+        # in this block leaves the sentinel on disk; resume_state's call to
+        # rollback_partial_iterations undoes the partial side effects before
+        # the iteration counter is rebuilt.  See docs/plans/iteration-atomicity.md.
+        from .run_state import write_iteration_sentinel
+        write_iteration_sentinel(
+            iterations_dir=state.iterations_dir,
+            iteration=state.iteration,
+            dimension=dimension,
+        )
+        ctx.audit_trail.emit(
+            "iteration_sentinel_written",
+            iteration=state.iteration,
+            dimension=dimension,
+        )
         _merge(ctx, state, dimension, findings, score)
         log.info("KEEP — merged into knowledge base.")
         emitter.transition(ResearchState.MERGE, iteration=state.iteration, dimension=dimension)
@@ -264,6 +280,21 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         ctx, state, dimension, score, hypothesis.get("rationale", ""),
         status=_decision,
     )
+
+    # Atomicity: all four risky writes (KB merge, iter_md, sidecar, results.tsv)
+    # have completed.  Clear the sentinel BEFORE compress fires so a compress
+    # crash does not trigger a needless rollback on resume.
+    if kept:
+        from .run_state import clear_iteration_sentinel
+        clear_iteration_sentinel(
+            iterations_dir=state.iterations_dir,
+            iteration=state.iteration,
+        )
+        ctx.audit_trail.emit(
+            "iteration_sentinel_cleared",
+            iteration=state.iteration,
+            dimension=dimension,
+        )
 
     if state.iteration % ctx.config.execution.compress_every == 0:
         _compress_knowledge_base(ctx, state)

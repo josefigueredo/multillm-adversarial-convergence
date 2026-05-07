@@ -718,6 +718,21 @@ class AutoResearcher:
             max_attempts_per_dimension=self.MAX_ATTEMPTS_PER_DIMENSION,
             discovered_gaps_sidecar=self.output_dir / "discovered_gaps.json",
         )
+
+        # Atomicity: surface any partial-iteration rollbacks that resume_state
+        # performed so they show up in the audit trail and downstream UIs.
+        for entry in state.get("rollbacks", []):
+            log.warning(
+                "Rolled back partial iteration %d (dim=%r) — undone: %s",
+                entry["iteration"], entry["dimension"], entry.get("undone", []),
+            )
+            self._record_event(
+                "iteration_rolled_back",
+                iteration=entry["iteration"],
+                dimension=entry["dimension"],
+                undone=entry.get("undone", []),
+            )
+
         if not state["iteration"]:
             return
 

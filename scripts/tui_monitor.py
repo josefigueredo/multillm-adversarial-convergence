@@ -213,6 +213,22 @@ class RunState:
             err = ev.get("error", "?")
             self.fallback_events.append(f"iter {ev.get('iteration','?')}: compress failed → truncate ({err[:30]})")
 
+        elif evt == "iteration_rolled_back":
+            undone = ev.get("undone", []) or []
+            undone_str = ", ".join(undone) if undone else "(no side effects)"
+            dim = (ev.get("dimension", "") or "")[:30]
+            self.fallback_events.append(
+                f"iter {ev.get('iteration','?')}: rolled back partial iteration "
+                f"(dim={dim or '?'}, undone: {undone_str})"
+            )
+
+        elif evt == "merge_skipped_duplicate_recovered":
+            dim = (ev.get("dimension", "") or "")[:30]
+            self.fallback_events.append(
+                f"iter {ev.get('iteration','?')}: defensive merge guard fired "
+                f"(dim={dim or '?'} — investigate; rollback may have failed)"
+            )
+
         elif evt == "run_completed":
             self.finished = True
             self.current_state = "DONE"

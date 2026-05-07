@@ -108,6 +108,43 @@ def test_compress_failed_fallback_truncate_appended_to_fallback_log():
     assert any("RuntimeError" in line for line in s.fallback_events)
 
 
+def test_iteration_rolled_back_appended_to_fallback_log():
+    s = RunState()
+    s.apply_event({
+        "event": "iteration_rolled_back",
+        "iteration": 4,
+        "dimension": "REST API vs HTTP API",
+        "undone": ["iter_md", "tsv_row", "kb_section"],
+    })
+    assert any("iter 4" in line for line in s.fallback_events)
+    assert any("rolled back" in line for line in s.fallback_events)
+    assert any("kb_section" in line for line in s.fallback_events)
+
+
+def test_iteration_rolled_back_with_empty_undone_still_logs():
+    """Sentinel-only crash: nothing else on disk, undone is []."""
+    s = RunState()
+    s.apply_event({
+        "event": "iteration_rolled_back",
+        "iteration": 7,
+        "dimension": "X",
+        "undone": [],
+    })
+    assert any("iter 7" in line for line in s.fallback_events)
+    assert any("(no side effects)" in line for line in s.fallback_events)
+
+
+def test_merge_skipped_duplicate_recovered_appended_to_fallback_log():
+    s = RunState()
+    s.apply_event({
+        "event": "merge_skipped_duplicate_recovered",
+        "iteration": 5,
+        "dimension": "Auth flow",
+    })
+    assert any("iter 5" in line for line in s.fallback_events)
+    assert any("defensive merge guard" in line for line in s.fallback_events)
+
+
 def test_run_completed_marks_finished():
     s = RunState()
     s.apply_event({"event": "run_completed"})

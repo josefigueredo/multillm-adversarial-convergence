@@ -279,6 +279,148 @@ def track_candidate_usage(usage: UsageTotals, candidate: ResearchCandidate) -> N
     )
 
 
+# ---------------------------------------------------------------------------
+# Iteration atomicity — sentinel files mark in-progress iterations so a
+# resume after a crash can roll back partial side effects (KB section,
+# iter_NNN.md, last results.tsv row) before counting iterations.
+# Contract documented in docs/plans/iteration-atomicity.md.
+# ---------------------------------------------------------------------------
+
+SENTINEL_PREFIX = ".iter_"
+SENTINEL_SUFFIX = "_in_progress.json"
+
+
+def write_iteration_sentinel(
+    *,
+    iterations_dir: Path,
+    iteration: int,
+    dimension: str,
+    started_at: str = "",
+) -> Path:
+    """Mark an iteration as in-progress.
+
+    Written before the first risky disk write of the KEEP path; deleted
+    after all four (KB, iter_md, sidecar, results.tsv) complete.
+    """
+    iterations_dir.mkdir(parents=True, exist_ok=True)
+    sentinel = iterations_dir / f"{SENTINEL_PREFIX}{iteration:03d}{SENTINEL_SUFFIX}"
+    payload = {
+        "iteration": iteration,
+        "dimension": dimension,
+        "started_at": started_at,
+        "kb_section_marker": f"\n## {dimension}\n",
+    }
+    sentinel.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return sentinel
+
+
+def clear_iteration_sentinel(*, iterations_dir: Path, iteration: int) -> None:
+    """Remove the in-progress marker after the iteration's writes succeed."""
+    sentinel = iterations_dir / f"{SENTINEL_PREFIX}{iteration:03d}{SENTINEL_SUFFIX}"
+    if sentinel.exists():
+        sentinel.unlink()
+
+
+def _drop_kb_section(knowledge_base: str, marker: str) -> tuple[str, bool]:
+    """Remove the section starting at ``marker`` up to the next ``\\n## `` heading.
+
+    Returns ``(new_kb, removed)``.  Idempotent: ``(kb, False)`` when the marker
+    isn't present.  Normalised so first-line section headers also match.
+    """
+    normalised = "\n" + knowledge_base
+    idx = normalised.find(marker)
+    if idx < 0:
+        return knowledge_base, False
+    section_start = max(0, idx - 1)
+    after_marker = normalised.find("\n## ", idx + len(marker))
+    section_end_norm = after_marker if after_marker >= 0 else len(normalised)
+    section_end = max(0, section_end_norm - 1)
+    new_kb = knowledge_base[:section_start] + knowledge_base[section_end:]
+    while "\n\n\n" in new_kb:
+        new_kb = new_kb.replace("\n\n\n", "\n\n")
+    return new_kb, True
+
+
+def _drop_last_tsv_row_if_iteration(results_path: Path, iteration: int) -> bool:
+    """If the last data row of ``results.tsv`` is for ``iteration``, remove it.
+
+    Returns True when a row was removed.  No-op when the file is missing,
+    only the header is present, or the last row belongs to a different
+    iteration.
+    """
+    if not results_path.exists():
+        return False
+    with results_path.open("r", encoding="utf-8", newline="") as fh:
+        lines = fh.readlines()
+    if len(lines) < 2:
+        return False
+    last = lines[-1].rstrip("\n")
+    first_field = last.split("\t", 1)[0]
+    try:
+        last_iter = int(first_field)
+    except ValueError:
+        return False
+    if last_iter != iteration:
+        return False
+    results_path.write_text("".join(lines[:-1]), encoding="utf-8")
+    return True
+
+
+def rollback_partial_iterations(
+    *,
+    iterations_dir: Path,
+    results_path: Path,
+    knowledge_base_path: Path,
+) -> list[dict[str, Any]]:
+    """Find and undo any iterations that crashed mid-write.
+
+    Returns a list of rollback descriptors (one per sentinel found),
+    each shaped ``{iteration, dimension, undone: list[str]}`` where
+    ``undone`` is a subset of ``{"iter_md", "tsv_row", "kb_section"}``.
+    Caller may emit each as an ``iteration_rolled_back`` audit event.
+    """
+    if not iterations_dir.exists():
+        return []
+
+    rollbacks: list[dict[str, Any]] = []
+    sentinels = sorted(iterations_dir.glob(f"{SENTINEL_PREFIX}*{SENTINEL_SUFFIX}"))
+    for sentinel in sentinels:
+        try:
+            payload = json.loads(sentinel.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            sentinel.unlink(missing_ok=True)
+            continue
+
+        iteration = int(payload.get("iteration", 0) or 0)
+        dimension = payload.get("dimension", "") or ""
+        marker = payload.get("kb_section_marker") or (f"\n## {dimension}\n" if dimension else "")
+        undone: list[str] = []
+
+        iter_md = iterations_dir / f"iter_{iteration:03d}.md"
+        if iter_md.exists():
+            iter_md.unlink()
+            undone.append("iter_md")
+
+        if _drop_last_tsv_row_if_iteration(results_path, iteration):
+            undone.append("tsv_row")
+
+        if knowledge_base_path.exists() and marker:
+            kb = knowledge_base_path.read_text(encoding="utf-8")
+            new_kb, removed = _drop_kb_section(kb, marker)
+            if removed:
+                knowledge_base_path.write_text(new_kb, encoding="utf-8")
+                undone.append("kb_section")
+
+        sentinel.unlink(missing_ok=True)
+        rollbacks.append({
+            "iteration": iteration,
+            "dimension": dimension,
+            "undone": undone,
+        })
+
+    return rollbacks
+
+
 def resume_state(
     *,
     iterations_dir: Path,
@@ -296,7 +438,19 @@ def resume_state(
     ``results.tsv`` and synthesises ``GapEntry`` records with
     conservative defaults — preserving ``--resume`` from runs that
     pre-date the schema upgrade.
+
+    Atomicity: any iteration sentinel found on disk indicates a previous
+    crash mid-write.  Each is rolled back BEFORE counting iterations so
+    the rest of the resume logic operates on consistent state.  The
+    returned dict's ``rollbacks`` key carries the descriptors so the
+    caller can emit ``iteration_rolled_back`` audit events.
     """
+    rollbacks = rollback_partial_iterations(
+        iterations_dir=iterations_dir,
+        results_path=results_path,
+        knowledge_base_path=knowledge_base_path,
+    )
+
     existing = sorted(iterations_dir.glob("iter_*.md"))
     if not existing:
         return {
@@ -308,6 +462,7 @@ def resume_state(
             "discovered_dimensions": [],
             "discovered_gaps": {},
             "dimension_attempts": {},
+            "rollbacks": rollbacks,
             "knowledge_base": knowledge_base_path.read_text(encoding="utf-8") if knowledge_base_path.exists() else "",
         }
 
@@ -415,6 +570,7 @@ def resume_state(
         "discovered_dimensions": discovered_dimensions,
         "discovered_gaps": discovered_gaps,
         "dimension_attempts": dimension_attempts,
+        "rollbacks": rollbacks,
         "knowledge_base": knowledge_base,
     }
 

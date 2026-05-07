@@ -170,6 +170,9 @@ flowchart TD
     LOOP -.->|Ctrl+C or stop criteria| SYNTH[Generate synthesis.md<br>primary backend]
     SYNTH --> DONE([Print summary + rubric grade + exit])
 
+    CHECK -->|--resume + crashed sentinel| ROLLBACK[Rollback partial iteration<br>delete iter_md / tsv row / KB section<br>see Atomicity & resume]
+    ROLLBACK --> RESUME
+
     style LOOP fill:#f59e0b,color:#000
     style MERGE fill:#22c55e,color:#000
     style SAVE fill:#94a3b8,color:#000
@@ -178,7 +181,38 @@ flowchart TD
     style WAIT_LONG fill:#f97316,color:#000
     style STRAT fill:#8b5cf6,color:#fff
     style CRITIQUE fill:#f59e0b,color:#000
+    style ROLLBACK fill:#dc2626,color:#fff
 ```
+
+## Atomicity & resume
+
+Each KEEP iteration performs four risky disk writes in sequence:
+
+1. `state.kb_path.write_text(...)` — appends `## DIM\n\n<findings>` to the knowledge base
+2. `write_iteration_markdown(...)` — creates `iterations/iter_NNN.md`
+3. `write_discovered_gaps_sidecar(...)` — overwrites `discovered_gaps.json`
+4. `_log_result(...)` → `append_results_row(...)` — appends a row to `results.tsv`
+
+A SIGKILL (OOM, supervisor signal, kernel jetsam) anywhere in this block leaves disk in a partial state. Without protection, `--resume` would either re-run the iteration with the same dimension and double the KB section, or count an orphaned `iter_NNN.md` as a completed iteration when its `results.tsv` row never landed.
+
+**The contract:** a sentinel file `iterations/.iter_<NNN>_in_progress.json` marks the iteration as in-flight. Lifecycle:
+
+- Written **before** step 1.
+- Removed **after** step 4, before any compress fires.
+
+On `--resume`, `rollback_partial_iterations` runs **before** the iteration counter is rebuilt. For each sentinel found:
+
+- If `iter_NNN.md` exists → delete it.
+- If the trailing row of `results.tsv` is for `iteration` → drop it.
+- If the KB contains the dimension's `\n## DIM\n` section → excise it (everything from the marker to the next `\n## ` heading or end of file).
+- Delete the sentinel.
+- Emit `iteration_rolled_back` with the iteration, dimension, and which side effects were undone.
+
+The iteration then re-runs from a clean slate — no doubling, no orphans. Compress, which runs **after** the sentinel is cleared, is not in the protected window: a crash mid-compress leaves the pre-compress KB intact (correct, just larger) and is handled separately by the two-layer compress defense (`compress_skipped_low_memory` / `compress_failed_fallback_truncate`).
+
+A defensive idempotency guard remains in `merge_findings` as a safety net: if the rollback ever fails to remove the KB section, the next merge attempt detects the duplicate and emits `merge_skipped_duplicate_recovered`. In a working system this event should never fire — its presence indicates a rollback bug.
+
+Full design rationale and crash-window matrix: [`docs/plans/iteration-atomicity.md`](plans/iteration-atomicity.md).
 
 ## Scoring
 

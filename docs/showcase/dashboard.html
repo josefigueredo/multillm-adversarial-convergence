@@ -207,6 +207,27 @@
   .source-badge.real { background: var(--keep); color: #052e16; }
   .source-badge.scripted { background: var(--decide); color: #fff; }
 
+  /* Recovery events panel — populated when iteration_rolled_back,
+     compress_skipped_low_memory, or compress_failed_fallback_truncate
+     events appear in the audit trail. */
+  section.card.recovery { border: 1px solid var(--decide); }
+  section.card.recovery h2 { color: var(--decide); }
+  .recovery-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text);
+    max-height: 140px;
+    overflow-y: auto;
+  }
+  .recovery-list li { padding: 4px 0; border-bottom: 1px solid var(--panel-2); }
+  .recovery-list li:last-child { border-bottom: none; }
+  .recovery-list .ev-iter { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .recovery-list .ev-type { color: var(--decide); font-weight: 600; margin-right: 6px; }
+  .recovery-list .ev-detail { color: var(--muted); }
+
   @media (max-width: 1100px) {
     main { grid-template-columns: 1fr; }
   }
@@ -393,6 +414,11 @@
         <div class="cost-cell"><div class="label">tokens</div><div class="value" id="cost-tokens">0<span class="unit">k</span></div></div>
         <div class="cost-cell"><div class="label">spend</div><div class="value">$<span id="cost-dollars">0.00</span></div></div>
       </div>
+    </section>
+
+    <section class="card recovery" id="recovery-card" style="display:none;">
+      <h2>⚠ Recovery events</h2>
+      <ul class="recovery-list" id="recovery-list"></ul>
     </section>
   </aside>
 </main>
@@ -591,6 +617,52 @@ async function loadRealRun(url) {
   return iterations.length > 0 ? iterations : null;
 }
 
+// Extract recovery / fallback / rollback events from a parsed audit trail
+// so the dashboard can surface them in the Recovery Events panel.  These
+// are independent of the iteration playback frames; they show on screen
+// as soon as their iteration is reached.
+const RECOVERY_EVENT_TYPES = {
+  iteration_rolled_back: "ROLLBACK",
+  merge_skipped_duplicate_recovered: "DUP-MERGE GUARD",
+  compress_skipped_low_memory: "COMPRESS SKIP (RAM)",
+  compress_failed_fallback_truncate: "COMPRESS → TRUNCATE",
+};
+
+async function loadRecoveryEvents(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const text = await res.text();
+    const events = text.split('\n').filter(Boolean).map(l => {
+      try { return JSON.parse(l); } catch { return null; }
+    }).filter(Boolean);
+    return events
+      .filter(ev => ev.event in RECOVERY_EVENT_TYPES)
+      .map(ev => ({
+        iter: ev.iter ?? ev.iteration ?? 0,
+        type: RECOVERY_EVENT_TYPES[ev.event],
+        detail: _summariseRecovery(ev),
+      }));
+  } catch { return []; }
+}
+
+function _summariseRecovery(ev) {
+  if (ev.event === "iteration_rolled_back") {
+    const undone = (ev.undone || []).join(", ") || "(nothing on disk)";
+    return `dim=${(ev.dimension || "?").slice(0, 30)} undone: ${undone}`;
+  }
+  if (ev.event === "compress_skipped_low_memory") {
+    return `${(ev.free_gb ?? "?").toString().slice(0, 4)} GB free (need ${ev.threshold_gb ?? "?"})`;
+  }
+  if (ev.event === "compress_failed_fallback_truncate") {
+    return `error: ${(ev.error || "?").toString().slice(0, 40)}`;
+  }
+  if (ev.event === "merge_skipped_duplicate_recovered") {
+    return `dim=${(ev.dimension || "?").slice(0, 30)} (defensive guard fired — investigate)`;
+  }
+  return "";
+}
+
 // ============================================================================
 // Renderer
 // ============================================================================
@@ -724,6 +796,7 @@ const Player = {
   pulseMs: 800,
   timer: null,
   chartPoints: [],
+  recoveryEvents: [],   // [{iter, type, detail}, ...] populated from audit trail
 
   setFrames(frames) {
     this.frames = frames;
@@ -732,6 +805,30 @@ const Player = {
     $('scrubber').max = frames.length - 1;
     $('scrubber').value = 0;
     this.renderFrame(0);
+  },
+
+  setRecoveryEvents(events) {
+    this.recoveryEvents = events || [];
+  },
+
+  renderRecoveryList(currentIter) {
+    const visible = this.recoveryEvents.filter(e => e.iter <= currentIter);
+    const card = $('recovery-card');
+    const list = $('recovery-list');
+    if (visible.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = '';
+    list.innerHTML = '';
+    visible.forEach(ev => {
+      const li = document.createElement('li');
+      li.innerHTML =
+        `<span class="ev-iter">iter ${String(ev.iter).padStart(2, '0')}</span>` +
+        `<span class="ev-type">${ev.type}</span>` +
+        `<span class="ev-detail">${ev.detail}</span>`;
+      list.appendChild(li);
+    });
   },
 
   renderFrame(index, animateEdge = false) {
@@ -767,6 +864,7 @@ const Player = {
     }
     updateDimGrid(coveredDimSet, f.dimIdx);
     updateCost(f);
+    this.renderRecoveryList(f.iter);
     $('scrubber').value = index;
     $('frame-counter').textContent = `frame ${index + 1} / ${this.frames.length}`;
   },
@@ -869,6 +967,14 @@ async function main() {
         console.log(`Loaded ${real.length} iterations from ${runUrl}`);
       } else {
         console.warn(`No iterations parsed from ${runUrl} — falling back to scripted data`);
+      }
+      // Recovery events are independent of the iteration playback — load even
+      // if iterations parsing returned partial results, so the operator sees
+      // the rollback / fallback story regardless.
+      const recovery = await loadRecoveryEvents(runUrl);
+      Player.setRecoveryEvents(recovery);
+      if (recovery.length > 0) {
+        console.log(`Loaded ${recovery.length} recovery events from ${runUrl}`);
       }
     } catch (err) {
       console.error(`Failed to load ${runUrl}:`, err);

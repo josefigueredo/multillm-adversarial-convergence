@@ -76,6 +76,11 @@ The wrapper is the OUTER retry loop. The framework's INNER backoff handles in-ba
   - `gap_promoted` — first-time canonical_topic creates a `GapEntry`
   - `gap_seen_again` — existing canonical_topic re-encountered (cross-iteration convergence signal)
   - `gap_filtered_too_short`, `gap_filtered_too_long`, `gap_filtered_non_english`, `gap_filtered_duplicate` — intake rejections
+- **Iteration atomicity** (added 2026-05-07; see [`docs/plans/iteration-atomicity.md`](docs/plans/iteration-atomicity.md) and the *Atomicity & resume* section of [`docs/research.md`](docs/research.md)): each KEEP iteration writes a sentinel `iterations/.iter_<NNN>_in_progress.json` before its 4-step disk write block (KB merge / iter_md / sidecar / results.tsv) and clears it after. On `--resume`, `rollback_partial_iterations` undoes any side effects whose sentinel survived a crash. Audit events:
+  - `iteration_sentinel_written` / `iteration_sentinel_cleared` — normal lifecycle
+  - `iteration_rolled_back` — resume detected a crashed iteration; surfaces `undone: ["iter_md"|"tsv_row"|"kb_section"]`
+  - `merge_skipped_duplicate_recovered` — defensive guard fired (should never happen in healthy runs; presence indicates a rollback bug)
+  - `compress_skipped_low_memory` / `compress_failed_fallback_truncate` — OOM defense in `_compress_knowledge_base`
 - **Composite scoring weights are config-gated**. Defaults preserve the legacy `0.4 coverage + 0.6 quality` formula. Operators opt into the novelty-blended formula via `scoring.weights.novelty_weight > 0`, the cross-iteration depth bonus via `scoring.weights.depth_bonus > 0`, multi-judge consensus via `evaluation.judges`, and convergence-gated gap promotion via `discovery.promotion_enabled: true`. See `configs/research/_template.yaml` for the full annotated schema.
 
 ## DO
