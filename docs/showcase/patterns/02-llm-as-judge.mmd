@@ -1,11 +1,11 @@
 %%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 60, 'nodeSpacing': 30, 'curve': 'basis'}}}%%
 flowchart LR
-    P["**Producer**\nclaude-cli"]
-    C["**Candidate**\noutput + claims"]
-    J["**Judge**\ncodex-cli\n*(different family)*"]
-    H["**Heuristic 40%**\ntarget · citations · structure"]
-    L["**LLM-as-Judge 60%**\ndepth · accuracy · novelty"]
-    S["**Composite Score**\nrationale + dim breakdown"]
+    P["**Producer**: claude-cli"]
+    C["**Candidate**: output + claims"]
+    J["**Judge**: codex-cli\n*(different family)*"]
+    H["**Heuristic 40%**: target · citations · structure"]
+    L["**LLM-as-Judge 60%**: depth · accuracy · novelty"]
+    S["**Composite Score**: rationale + dim breakdown"]
 
     P --> C --> J
     C --> H

@@ -10,3 +10,5 @@ build/
 .history/
 .DS_Store
 .remember/
+.logs/
+.playwright-mcp/

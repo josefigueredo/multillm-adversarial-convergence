@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presenter View · Multi-LLM Adversarial Convergence</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg-deep:        #0a0c10;
+      --bg-panel:       rgba(13, 17, 23, 0.78);
+      --ink:            #e6edf3;
+      --ink-soft:       #b1bac4;
+      --ink-mute:       #7d8590;
+      --hairline:       rgba(230, 237, 243, 0.10);
+      --hairline-2:     rgba(230, 237, 243, 0.22);
+      --phosphor:       #f5a524;
+      --phosphor-cool:  #22d3ee;
+      --phosphor-green: #7ee787;
+      --phosphor-warn:  #ff7b72;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: var(--bg-deep);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+        radial-gradient(circle at 100% 0%, rgba(245,165,36,0.06), transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(34,211,238,0.04), transparent 50%);
+      background-attachment: fixed;
+      color: var(--ink);
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .frame {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 40px 60px;
+      display: grid;
+      gap: 20px;
+    }
+
+    /* HEADER */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .brand::before { content: '◉ '; color: var(--phosphor); }
+    .brand strong { color: var(--phosphor); font-weight: 500; margin-left: 4px; }
+    .deck-link {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--phosphor-cool);
+      text-decoration: none;
+      border: 1px solid var(--hairline-2);
+      padding: 7px 14px;
+      border-radius: 99px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .deck-link:hover { border-color: var(--phosphor-cool); color: var(--ink); }
+
+    /* SLIDE CARD */
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--hairline-2);
+      border-radius: 8px;
+      padding: 28px 32px 32px;
+      backdrop-filter: blur(20px) saturate(1.3);
+      -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    }
+    .card-head {
+      display: flex; align-items: baseline; gap: 18px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .index {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; letter-spacing: 0.20em; text-transform: uppercase;
+      color: var(--phosphor);
+      flex: 0 0 auto;
+    }
+    .title {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -0.018em;
+      color: var(--ink);
+      line-height: 1.2;
+      flex: 1 1 auto;
+    }
+    .timing {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.10em;
+      color: var(--ink-mute);
+      flex: 0 0 100%;
+      padding-top: 4px;
+    }
+    .timing::before { content: '⏱  '; }
+    .notes {
+      white-space: pre-wrap;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--ink-soft);
+    }
+    .notes em, .notes i { color: var(--phosphor); font-style: normal; }
+    .empty {
+      color: var(--ink-mute);
+      font-style: italic;
+      font-size: 14px;
+    }
+
+    /* CONTROL BAR */
+    .controls {
+      display: flex; align-items: center; gap: 14px;
+      justify-content: center;
+      padding: 18px 0 8px;
+    }
+    .controls button {
+      background: transparent;
+      border: 1px solid var(--hairline-2);
+      color: var(--ink);
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .controls button:hover:not(:disabled) {
+      border-color: var(--phosphor);
+      color: var(--phosphor);
+    }
+    .controls button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .indicator {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      color: var(--ink-soft);
+      min-width: 90px;
+      text-align: center;
+    }
+    .indicator strong { color: var(--phosphor); font-weight: 600; }
+
+    /* JUMP STRIP */
+    .jump {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      justify-content: center;
+      padding: 12px 4px 0;
+      max-width: 100%;
+    }
+    .jump button {
+      width: 26px; height: 26px;
+      padding: 0;
+      background: transparent;
+      border: 1px solid var(--hairline);
+      color: var(--ink-mute);
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .jump button:hover {
+      border-color: var(--phosphor);
+      color: var(--phosphor);
+    }
+    .jump button.active {
+      border-color: var(--phosphor);
+      background: rgba(245, 165, 36, 0.10);
+      color: var(--phosphor);
+    }
+
+    /* HINT FOOTER */
+    .hint {
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--ink-mute);
+      opacity: 0.6;
+      margin-top: 22px;
+    }
+    .hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 3px;
+      margin: 0 2px;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="topbar">
+      <div class="brand">PRESENTER VIEW · <strong>Multi-LLM Adversarial Convergence</strong></div>
+      <a class="deck-link" id="open-deck" href="clean.html" target="deck-window">↗ OPEN DECK</a>
+    </header>
+
+    <main class="card">
+      <div class="card-head">
+        <span class="index" id="slide-index">SLIDE · 01 / 33</span>
+        <h1 class="title" id="slide-title">—</h1>
+        <div class="timing" id="slide-timing"></div>
+      </div>
+      <div class="notes" id="slide-notes"></div>
+    </main>
+
+    <nav class="controls">
+      <button id="btn-prev">← PREV</button>
+      <span class="indicator"><strong id="cur">1</strong> / <span id="total">33</span></span>
+      <button id="btn-next">NEXT →</button>
+    </nav>
+
+    <div class="jump" id="jump"></div>
+
+    <div class="hint">
+      <kbd>←</kbd><kbd>→</kbd> navigate · <kbd>Home</kbd>/<kbd>End</kbd> jump · <kbd>O</kbd> open deck · navigation syncs across tabs
+    </div>
+  </div>
+
+  <script id="notes-data" type="application/json">[
+  {
+    "n": 1,
+    "title": "Multi-LLM Adversarial Convergence Framework",
+    "timing": "",
+    "notes": "Antes de arrancar: dejá claro que esto es un demo grabado que se reproduce a\nvelocidad. No estamos esperando que un modelo piense en vivo — eso sería\nimposible de presentar bien en 30 minutos. Pero todos los artefactos que vas\na ver salieron de una corrida real: mismo config, mismos backends, mismo\naudit trail. Nada está mockeado. Nada está editado a mano para que quede\nlindo.\n\nLa idea central — \"que los LLMs discutan hasta converger\" — la van a ver\nmaterializada en cada slide. No es una metáfora; es literalmente lo que\nhace el sistema: un backend propone, otro distinto critica, un tercero\narbitra, y el ciclo se repite hasta que el score deja de mejorar.\n\nSi la audiencia es técnica, hacé énfasis en el \"different model families\".\nSi es producto/management, hacé énfasis en el \"audit every claim\"."
+  },
+  {
+    "n": 2,
+    "title": "The problem",
+    "timing": "1 min — el problema en una sola oración antes de cualquier historia de origen",
+    "notes": "Acá tenés que plantar bandera: el problema NO es \"los LLMs alucinan a veces\".\nEl problema es estructural — un solo modelo no te da forma de saber qué le\nfaltó ver, qué inventó con confianza, ni si otro modelo distinto habría\nllegado a la misma conclusión. Es un punto ciego de epistemología, no de\nprompt engineering.\n\nLa frase clave para repetir: \"non-deterministic and unverifiable\". Esas son\ndos palabras distintas — no determinístico (la salida varía entre corridas)\ny no verificable (no podés auditar el razonamiento). Las dos son problemas\nseparados y este framework ataca a las dos.\n\nCuando llegues a \"make them score, critique, and argue with each other\",\nhacé una pausa. Es la idea central de todo el sistema. Lo que sigue son\ndetalles de implementación."
+  },
+  {
+    "n": 3,
+    "title": "Origin: Karpathy's autoresearch",
+    "timing": "2 min — historia de origen, ahora que ya saben qué están viendo",
+    "notes": "Importante reconocer que el loop no lo inventamos nosotros. Karpathy lo\npublicó como `autoresearch` para entrenamiento de redes neuronales. La\nmecánica es simple: modificás código, entrenás 5 minutos en GPU, medís\nla loss, y decidís keep-or-revert. Si mejoró, lo guardás; si no, lo\ndescartás. Iterás.\n\nEl insight transferible — y este es el punto que tenés que machacar — es\nque esta forma del loop no es exclusiva del entrenamiento. Aplica a CUALQUIER\ncosa que puedas puntuar. Investigación con LLMs es una de esas cosas.\n\nCuando recorras la tabla, andá despacio. Cada fila es una analogía 1-a-1.\nGPU run → llamada a backend. Loss → score híbrido (heurística + judge).\nPesos de la red → corpus de conocimiento. Es la misma máquina con otro\nsustrato: el sustrato son weights en Karpathy, knowledge acá.\n\nSi te preguntan \"¿por qué heurística 40 / judge 60?\" — respondé: el judge\nsolo puede ser gameado (un modelo aprende a escribir para el judge). La\nheurística es determinística y model-agnostic. Combinadas, son más difíciles\nde explotar. Vamos a profundizar en LLM-as-Judge en el slide 8."
+  },
+  {
+    "n": 4,
+    "title": "The loop",
+    "timing": "2 min — diagrama del loop. Bajá la velocidad acá. Es el modelo mental para todo lo que sigue.",
+    "notes": "Este es EL slide más importante de toda la primera parte. Es el modelo\nmental que vas a referenciar implícitamente en cada explicación que sigue.\nNo tengas apuro acá. Mostrá el diagrama, dejá que lo lean, y después\nrecorré los tres elementos coloreados.\n\nCritique (violeta): el crítico SIEMPRE es un backend distinto al que\nprodujo. No es self-evaluation. Diferentes priors → diferentes blind spots.\nSi Claude tiene un sesgo, GPT no lo comparte (y al revés). Esa diferencia\nes exactamente lo que querés capturar.\n\nDecide (ámbar): KEEP hace crecer el corpus, DISCARD hace que el sistema\nreintente la misma dimensión con una hipótesis distinta. No es \"fallaste,\nseguís\" — es \"no convergió, probá otro ángulo\".\n\nCompress (turquesa): cada N iteraciones (default: 4) el agente reescribe\nsu propio corpus, podando lo que ya no aporta. Sin esto, los runs explotan\nen costo de tokens y el modelo pierde foco. Es rank-and-prune forzado.\n\nStopping criteria: tres opciones. Ctrl+C (intervención manual), max\niterations (presupuesto), o target dimensions cubiertas (objetivo). Lo que\nocurra primero."
+  },
+  {
+    "n": 5,
+    "title": "I · PATTERNS",
+    "timing": "transición, 10 seg",
+    "notes": "Transición rápida. Acá empieza la parte densa: los 11 patrones. Avisá que\nse van a mostrar uno por slide, agrupados en tres capas (Engine, Topology,\nGuardrails). Cada uno tiene una cita canónica.\n\nSi la audiencia es senior técnica, decí: \"vamos a ver una taxonomía\nejecutable, no una lista de buzzwords\".\nSi es mixta, decí: \"cada cosa que parece un truco tiene un nombre y un\npaper detrás\"."
+  },
+  {
+    "n": 6,
+    "title": "Why these patterns matter",
+    "timing": "2 min — preámbulo antes del desfile de patrones. ¿Por qué nombrarlos?",
+    "notes": "El framing acá es importante. La razón por la que cada componente del\nsistema mapea a un patrón con nombre y referencia bibliográfica NO es por\nacademicismo — es por tres beneficios concretos en la operación del código.\n\nReplaceability — cuando algo tiene nombre, intercambiarlo es mecánico. Si\nmañana querés cambiar el judge de codex-cli a gemini-api, no rediseñás\nnada: cambiás el binding del role en el config. El patrón \"Multi-Agent\nRole Topology\" te da exactamente esa indirección.\n\nDefensibility — en code review, en vez de discutir \"¿esto está bien?\"\ndiscutís \"¿esto es Evaluator-Optimizer o es Reflection?\". Conversación más\ncorta, más precisa, menos sujeta a opinión personal.\n\nOnboarding — alguien que llega nuevo al repo reconoce las formas. No tiene\nque ingeniería-inversa cada decisión. Si vio Evaluator-Optimizer en otro\nproyecto, lo reconoce acá y arranca productivo más rápido.\n\nLos 11 patrones no son toda la teoría agéntica que existe — son el\nsubconjunto que ESTE framework efectivamente compone. Engine son los 3\nque hacen que una iteración tenga sentido. Topology son los 5 que dicen\ncómo se conectan los backends. Guardrails son los 3 que evitan que el\nsistema haga lo que no debería."
+  },
+  {
+    "n": 7,
+    "title": "1 · Evaluator-Optimizer",
+    "timing": "1 min — Patrón 1: el outer loop",
+    "notes": "EL PATRÓN — Es el outer loop más simple que existe en sistemas agénticos.\nUn generador produce candidatos. Un evaluador los puntúa contra un\nobjetivo. El sistema se queda con los que tienen score alto y descarta\n(o reescribe) los demás. El loop corre hasta que el score se aplana o\nhasta que se agota un presupuesto (iteraciones, tiempo, costo).\n\nLa pieza que muchos pasan por alto: el evaluador y el generador NO tienen\nque ser el mismo modelo. De hecho, idealmente NO lo son — pero ese tema\nlo desarrollamos en el patrón siguiente (LLM-as-Judge).\n\nEn este repo: research_loop.py es el dueño del ciclo. scorer.py implementa\nel score híbrido (40% heurística determinística + 60% judge LLM, valores\nconfigurables). Cada decisión KEEP o DISCARD queda registrada en\naudit_trail.jsonl como evento estructurado — eso te permite reconstruir\nexactamente qué decidió el sistema y por qué.\n\nReferencia canónica: el paper de Anthropic \"Building Effective Agents\".\nEs la base teórica más citada para este patrón."
+  },
+  {
+    "n": 8,
+    "title": "2 · LLM-as-Judge",
+    "timing": "1.5 min — Patrón 2: el corazón del modelo de confianza. Demorá un beat en independencia.",
+    "notes": "EL PATRÓN — Acá hay un principio que parece obvio pero que se viola\nconstantemente: el modelo que PRODUCE una salida no puede puntuarla bien.\nSelf-evaluation tiene sesgo conocido hacia la verbosidad y la confianza.\nEl modelo se cree sus propias respuestas.\n\nLa solución: un modelo separado, idealmente de otra familia, evalúa la\nsalida contra un rubric. Su score es UNA de las entradas a la decisión\nkeep/discard — no es la única, hay también una heurística determinística.\n\nPor qué híbrido (40 heurística / 60 judge): un judge LLM puro se puede\ngamear. Si el productor aprende a \"escribir para el judge\", el sistema\ncolapsa. La heurística es determinística (chequea cobertura, densidad de\ncitas, completitud por dimensión) — no se gamea. Las dos juntas son más\nduras de explotar que cualquiera por separado.\n\nModo multi-judge: si configurás varios judges, el sistema detecta\ndesacuerdo entre ellos. Eso es señal de que la dimensión es ambigua o\nque un judge tiene sesgo — útil para flagging temprano.\n\nReferencias: agentic-design.ai tiene la mejor explicación práctica;\narXiv 2410.10934 es el paper de fondo sobre judge bias."
+  },
+  {
+    "n": 9,
+    "title": "3 · Reflection / Self-Compression",
+    "timing": "1 min — Patrón 3: por qué importa acotar el contexto. Rank-and-prune forzado.",
+    "notes": "EL PATRÓN — La iteración naive crece el contexto monotónicamente. Cada\nclaim que sobrevive el KEEP se agrega a la memoria de trabajo. Sin\ncompresión, los runs explotan: el costo de tokens se va al carajo, el\nmodelo pierde foco, y la relación señal/ruido cae.\n\nLa compresión es un paso forzado de \"rank-and-prune\": el agente vuelve a\nleer su propio corpus y lo reescribe, quedándose solo con lo que él\njuzga load-bearing. No es resumir — es priorizar. Lo que se cae, se cae\ncon registro de auditoría.\n\nEsto NO es opcional para runs largos. Sin compression_interval, una\ninvestigación de 20 iteraciones puede llegar a usar 10x los tokens que\nuna bien comprimida, y la calidad del último claim se degrada porque el\nmodelo está sumergido en ruido.\n\nEn este repo: el flag es compression_interval (default 4). El audit\nevent corpus_compressed registra los token counts antes y después,\nasí podés ver cuánto se podó.\n\nReferencia: el batch de Andrew Ng sobre agentic patterns. La sección\nde Reflection es la canonical."
+  },
+  {
+    "n": 10,
+    "title": "4 · Orchestrator / Subagents",
+    "timing": "1 min — Patrón 4: quién es dueño del lifecycle. Workers que no llaman workers.",
+    "notes": "EL PATRÓN — Centralizá el control flow en un solo componente. Los backends\nson trabajadores con contrato angosto: reciben una tarea, devuelven un\nresultado, y NO tienen awareness del lifecycle más amplio. No saben en\nqué iteración están, no saben qué backend corre antes o después, no\nsaben si esto va a un judge.\n\nEsa restricción los hace reemplazables, testeables, y sobre todo evita\nque el estado cross-cutting se filtre dentro de los adaptadores de\ntransporte. Si copilot-cli cambia su API mañana, lo único que tocás es\nel adapter — la lógica del loop no se entera.\n\nRegla dura: los backends NUNCA se llaman entre sí. Solo retornan al\norchestrator. Si necesitás encadenar dos backends, eso es lógica del\norchestrator, no del backend.\n\norchestrator.py es el ÚNICO dueño de las transiciones de fase, los\nchequeos de convergencia, y los triggers de compresión. Si ves\ncontrol flow en otra parte, es un bug arquitectural.\n\nReferencia: Anthropic \"Building Effective Agents\" tiene la formulación\ncanónica de orchestrator-workers."
+  },
+  {
+    "n": 11,
+    "title": "5 · Multi-Agent Role Topology",
+    "timing": "1 min — Patrón 5: roles vs modelos. La superficie de swap.",
+    "notes": "EL PATRÓN — Los nombres `primary`, `judge`, `utility`, `research[]` son\nabstracciones que el código razona. Cada uno se bindea a un backend\nconcreto en config time. El mismo código del orchestrator funciona si\nhoy `judge` es codex-cli y mañana es gemini-api. Esa indirección ES la\nsuperficie de swap.\n\nSin este patrón, cambiar el judge significa modificar el código del\norchestrator. Con este patrón, es cambiar una línea de YAML. La diferencia\nes enorme cuando estás iterando experimentalmente con qué modelo es mejor\nen qué rol.\n\nDetalle de implementación: BackendsConfig valida que TODOS los roles\nnecesarios estén bindeados antes de arrancar. Si te falta el role `judge`\ny la estrategia lo necesita, fallás temprano con error claro — no en\nmedio del run cuando ya gastaste tokens.\n\nLos nombres de role aparecen en cada evento de audit. role=judge\nbackend=codex-cli — eso te permite filtrar logs por rol semántico, no\nsolo por backend técnico. Útil cuando querés ver \"todo lo que hizo el\ncritic\" sin importar qué modelo lo cumplió en esta corrida.\n\nReferencia: arXiv 2405.10467 es la formalización académica del patrón."
+  },
+  {
+    "n": 12,
+    "title": "6 · Routing / Specialist Dispatch",
+    "timing": "1 min — Patrón 6: dispatch por persona.",
+    "notes": "EL PATRÓN — Trabajo distinto necesita priors distintos. Una pregunta de\nbreadth (\"¿cuáles son las alternativas a X?\") se beneficia de un modelo\ncon recall amplio. Una pregunta de precisión-crítica (\"¿esta cita\nrealmente sostiene este claim?\") se beneficia de un modelo entrenado\nadversarial.\n\nEl router mira la persona declarada por la dimensión y dispatcha al\nbackend correspondiente. Si una dimensión no tiene specialist matchable,\ncae al primary — fail-safe en vez de fail-stop.\n\nCaso de uso típico: en una investigación de 8 dimensiones, podés tener\n2 que pidan \"broad-recall\", 4 que pidan \"precision-analyst\", y 2 que\npidan \"code-reviewer\". Cada una se asigna al backend que la maneje\nmejor. No estás obligado a usar un solo modelo para todo.\n\nCuándo NO usar specialist: cuando la audiencia te pidió una sola\n\"voz\" coherente en el output final. En ese caso, mejor ensemble o serial\ncon un único primary.\n\nReferencia: Anthropic \"Building Effective Agents\" — sección sobre\nrouting, que es el patrón general del cual specialist dispatch es una\nespecialización."
+  },
+  {
+    "n": 13,
+    "title": "7 · Parallelization (Ensemble)",
+    "timing": "1 min — Patrón 7: reducción de varianza vía redundancia.",
+    "notes": "EL PATRÓN — Reducción de varianza por redundancia. Corrés la MISMA tarea\nen N backends simultáneamente. Las respuestas van a divergir en formas\ninteresantes — y esa divergencia ES la información que querés.\n\nDespués un judge elige la más fuerte, o un paso de vote/merge las combina.\nCuál estrategia depende de la tarea: para investigación abierta, merge\nsuele ganar (combinás coverage). Para preguntas con respuesta única,\nvote/judge suele ganar (filtrás errores).\n\nCuándo conviene ensemble: cuando el costo de una respuesta equivocada es\nalto Y el presupuesto te permite la redundancia. Si estás escribiendo un\nADR que va a guiar 6 meses de trabajo, gastar 3x los tokens para tener\nvarianza más baja es una compra fácil. Si estás explorando una idea\ncasual, no.\n\nDetalle de impl: usamos ThreadPoolExecutor con paralelismo acotado.\nNo queremos que un ensemble de 4 backends mate al rate limit de uno y\nfalle todo el run.\n\nReferencia: Anthropic — sección de parallelization patterns."
+  },
+  {
+    "n": 14,
+    "title": "8 · Prompt Chaining (Serial)",
+    "timing": "1 min — Patrón 8: especialización por etapa.",
+    "notes": "EL PATRÓN — Especialización por ETAPA, no por tarea. Un backend investiga,\nel próximo critica, el próximo refina. Cada etapa opera sobre el output\nde la anterior, así que la cadena acumula contexto. Más barato que\nensemble (no son llamadas paralelas, no hay redundancia) pero más lento\nend-to-end (las etapas son secuenciales, no se solapan).\n\nCuándo usar serial sobre ensemble: cuando las etapas tienen\nespecializaciones asimétricas. Investigar y criticar son habilidades\ndistintas — querés que el research-stage NO esté pensando en críticas, y\nel critique-stage NO esté pensando en producir contenido nuevo. La\nseparación de responsabilidades es la ventaja.\n\nCuándo NO usar serial: cuando la audiencia espera una respuesta rápida.\nCada etapa adiciona latencia, y un chain de 4 etapas con 30 segundos\ncada una son 2 minutos largos.\n\nEn el repo, la etapa N+1 recibe el output COMPLETO de la N como contexto\nen el prompt. Eso hace que la cadena sea coherente, pero también hace\nque el costo crezca con cada etapa. Por eso el patrón de Reflection /\nCompression aplica con fuerza acá si la cadena es larga.\n\nReferencia: Anthropic — el patrón de chaining es uno de los más antiguos\ny mejor documentados."
+  },
+  {
+    "n": 15,
+    "title": "9 · Adversarial Critique",
+    "timing": "1.5 min — Patrón 9: la estrategia del demo. Distinto RLHF = distintos blind spots.",
+    "notes": "EL PATRÓN — Variante en forma de debate del serial chaining. El researcher\npropone claims; el critic — DELIBERADAMENTE de otra familia de modelos —\nbusca errores, citas débiles, gaps lógicos; el arbitrator (otra familia\ndistinta de nuevo) emite un veredicto.\n\nLa pieza clave: \"different RLHF training produces different blind spots\".\nCada modelo fue entrenado por humanos distintos con feedback distinto, así\nque internalizó sesgos distintos. Las debilidades de Claude son visibles\npara GPT, y al revés. Si los tres backends fueran del mismo proveedor,\neste patrón sería inútil — estarías triangulando con tres versiones del\nmismo blind spot.\n\nEsta es LA estrategia que usa el demo run que vamos a ver. Tres roles,\ntres familias: claude-cli investiga, codex-cli critica, codex-cli\narbitra. Y vas a ver concretamente qué encontró el critic — errores\nfactuales reales, no comentarios de estilo.\n\nEl audit log registra cada flag del critic y cada decisión del\narbitrator. Esa traza es lo que te permite reconstruir POR QUÉ una\nhipótesis sobrevivió o fue descartada.\n\nReferencia: arXiv 2305.19118 — el paper de Multi-Agent Debate. Es la\nformalización académica del approach."
+  },
+  {
+    "n": 16,
+    "title": "10 · Tool Use + Sandboxed Execution",
+    "timing": "1.5 min — Patrón 10: sandbox como IAM. Anclá a preocupaciones empresariales.",
+    "notes": ""
+  },
+  {
+    "n": 17,
+    "title": "11 · Human-in-the-Loop (HITL)",
+    "timing": "1 min — Patrón 11: gates de fase. Las dos decisiones quedan registradas.",
+    "notes": "EL PATRÓN — Algunas acciones son demasiado consecuentes para confiárselas\na un agente plenamente autónomo: deploys, escrituras irreversibles,\ngastos grandes. HITL inserta una pausa explícita en los bordes de fase;\nel operador revisa los artefactos, los plan diffs, las estimaciones de\ncosto, y aprueba o aborta.\n\nPunto clave: las DOS decisiones (approve y abort) se registran. No es solo\n\"tuvo permiso para seguir\" — es \"Juan aprobó esto a las 14:32 con esta\nplan diff visible\". Eso le da auditoría completa.\n\nCaso de uso típico: en una investigación que termina escribiendo un ADR,\nquerés HITL en el borde research → synthesis. El operador chequea que\nlas dimensiones cubiertas tienen sentido, que el corpus se ve sano, y\nrecién ahí autoriza la generación del documento final.\n\nNO es un patrón para producción autónoma 24/7 — es para flows donde\nquerés delegate-but-verify. Tiene latencia humana (puede pasar una hora\ndesde que el agente termina la fase research hasta que el operador\naprueba), así que diseñar el flow para que la pausa esté OK es parte del\ncosto.\n\nReferencia: LangGraph tiene la documentación más práctica sobre HITL."
+  },
+  {
+    "n": 18,
+    "title": "How they compose — the strategy lattice",
+    "timing": "3 min — composición. El demo run es una tupla sobre las capas.",
+    "notes": "Acá unificás las 11 cajitas anteriores en una vista de capas. Los patrones\nno son ortogonales — se layerean. Engine es lo que hace que una iteración\ntenga sentido. Topology es cómo se conectan los backends. Guardrails es\nqué evita que el sistema haga macanas.\n\nLa frase clave: \"a configured strategy is a tuple over the layers\". Cada\nconfiguración real del sistema es UNA elección por capa. No hay \"modo\nadversarial\" como botón único — adversarial es una elección de guardrail\nque se compone con elecciones de topology y engine.\n\nEl demo que vamos a ver es: Adversarial Critique (guardrail) sobre Serial\nChaining (topology) usando Evaluator-Optimizer + LLM-as-Judge (engine),\ncon Sandbox siempre prendido. Esa tupla específica.\n\nSi te preguntan \"¿puedo combinar X con Y?\" — generalmente sí. Las capas\nson mix-and-match. Las únicas combinaciones imposibles son las que el\nschema de config las rechaza explícitamente (por ejemplo, no tiene sentido\nensemble + serial al mismo tiempo).\n\nEl insight pedagógico: cuando alguien venga con un caso nuevo, el\nejercicio NO es \"¿qué framework de AI uso?\" — es \"¿qué tupla de capas\ncompongo?\". Eso es un cambio de framing importante."
+  },
+  {
+    "n": 19,
+    "title": "II · DEMO",
+    "timing": "transición, 10 seg",
+    "notes": "Transición. Se acaba la parte teórica, arranca el demo. Avisá que vamos a\nver una pregunta concreta — la migración de LocalStack — corrida con los\npatrones que acabamos de explicar.\n\nSi la audiencia tiene gente que conoce LocalStack, hacé énfasis en la\nparte de \"moving to a fully paid model\" — la decisión es real, no\ninventada para el demo. Si no conocen, contextualizá: LocalStack emula\nservicios de AWS localmente, hace falta para CI/CD, y acaba de pasar\na modelo pago."
+  },
+  {
+    "n": 20,
+    "title": "The config — three backends, adversarial strategy",
+    "timing": "2 min — mostrá el config en la terminal. Cosas que tenés que señalar:\n  - strategy: adversarial\n  - tres backends: claude-cli (primary), copilot-cli (researcher), codex-cli (adversary+judge)\n  - 8 dimensiones, max 10 iteraciones\n  - allowed_tools: tools web reales, no mockeados",
+    "notes": "Mostrá esto en la terminal real (con bat o tu editor) además del slide\nsi tenés tiempo. Las piezas a remarcar:\n\n1. strategy: adversarial → la elección de guardrail que vimos en la\n   strategy lattice.\n2. Tres backends bindeados a roles. NO son tres instancias del mismo\n   modelo — son tres familias distintas. Esa es la pieza que hace que\n   adversarial funcione (recordá: distinto RLHF = distintos blind spots).\n3. claude-cli como primary_reasoner (Claude Code, calidad alta de\n   reasoning estructurado).\n4. copilot-cli como research_coder (GitHub Copilot — calidad alta de\n   research técnico con tools).\n5. codex-cli como adversary_reasoner — y fijate que CUMPLE DOS roles\n   (judge + utility). Eso es válido y económico — un mismo backend puede\n   cubrir varios roles si las cargas no chocan.\n6. max_iterations: 10 — presupuesto duro. Si no convergió a 10, se\n   detiene.\n7. allowed_tools: tools reales, no mockeados. WebSearch, WebFetch, Read,\n   Bash, Glob, Grep — el agente realmente busca en la web y lee archivos\n   locales.\n\nLa frase de cierre — \"Critic and judge are deliberately different from\nthe researcher\" — repetila lentamente. Es el corazón del approach\nadversarial."
+  },
+  {
+    "n": 21,
+    "title": "Dry-run first — validate without spending tokens",
+    "timing": "1 min — slide de dry-run, después 2 min de demo en terminal",
+    "notes": "PRESENTADOR: cambiá a la terminal y mostrá el playback grabado del run.\nMientras carga, comentá las líneas del log de iteración — hipótesis,\nscore, decisiones KEEP/DISCARD apareciendo en tiempo real.\n\nPor qué dry-run importa: sin él, un error de config (un backend no\ndisponible, un role no bindeado, un tool no clasificado) te lo enterás a\nmitad de la corrida cuando ya gastaste tokens. El dry-run valida TODO el\nwiring sin hacer una sola llamada a backend. Es 5 segundos de chequeo\npara evitar 5 minutos de pérdida.\n\nLo que el dry-run confirma:\n- Los adapters de backend resuelven y son alcanzables (provider health).\n- La strategy es válida para la topología de roles declarada.\n- El capability registry de tools está satisfecho (no hay tool no clasificado).\n- La política del sandbox es coherente (no hay write boundaries que choquen).\n\nSi el dry-run pasa, podés correr con --no-dry-run con confianza. Si falla,\nel error te dice exactamente qué arreglar."
+  },
+  {
+    "n": 22,
+    "title": "III · ADVERSARIAL",
+    "timing": "transición, 10 seg",
+    "notes": "Transición corta. Avisá que lo que viene son citas LITERALES del judge en\nuna corrida real. No editadas, no parafraseadas. Si la audiencia tiene\nescépticos, este es el momento donde tenés evidencia concreta de que\nadversarial encuentra cosas reales."
+  },
+  {
+    "n": 23,
+    "title": "The critic finds real errors",
+    "timing": "3 min — el slide más importante. Mostrá la crítica encontrando un error real, después mostrá que se arregló.",
+    "notes": "Este es el slide más importante de toda la sección de demo. Si la\naudiencia se va a casa con UNA cosa, que sea esto: el adversarial\ncritique no es teatro — encuentra errores factuales.\n\nIteración 001: Copilot (researcher) entregó findings sobre cobertura de\nAWS services en alternativas a LocalStack. Score 62. La calidad parecía\nrazonable a primera vista — pero un judge de otra familia (GPT-5.4) la\nmiró y encontró tres problemas duros.\n\nRepasá las tres citas DESPACIO. Son literales del audit log.\n\n1. \"MiniStack section appears materially stale\" — el critic identifica que\n   los claims sobre API Gateway v1, Cognito, y KMS no tienen evidencia\n   primaria actual. NO está diciendo \"no me gusta cómo está escrito\" —\n   está diciendo \"estos tres claims específicos no tienen fuente actual\".\n\n2. \"Moto capabilities are mischaracterized\" — el critic dice que el\n   modo de ejecución de Lambda y el matiz de enforcement de IAM están\n   FÁCTICAMENTE MAL. Factualmente. Chequeable.\n\n3. \"Overconfident relative to the cited evidence\" — el critic señala que\n   muchos claims fine-grained son más fuertes de lo que la evidencia\n   sostiene. Es un problema de calibración.\n\nEl punto que tenés que martillar: estos NO son comentarios de estilo. NO\nson \"fixame el wording\". Son desafíos factuales — modelo distinto, datos\nde entrenamiento distintos, captura errores distintos.\n\nEl loop fuerza a la siguiente iteración a resolver estos gaps o a\ndescartar el claim. No hay \"ignorá el feedback del critic\". Es estructural."
+  },
+  {
+    "n": 24,
+    "title": "Score progression — convergence is measurable",
+    "timing": "2 min — mostrá la tabla de score, llamá la atención al dip en iter 007 (una dimensión más dura) y al salto a 76.3 en 009.",
+    "notes": "La forma de la curva importa más que los números. No es lineal — sube,\nbaja en iter 007, después salta. Esa NO-linealidad es la firma de\nconvergencia adversarial real, no de un modelo \"haciendo lo que se le\npide\".\n\nIter 001 a 006: subida progresiva. El sistema agrega dimensiones, el\nscore promedio crece.\n\nIter 007: dip a 63.5. Acá es donde tenés que detenerte. ¿Por qué bajó?\nPorque el critic flagged \"migration estimates under-validated\" — los\nnúmeros de esfuerzo de migración no estaban sosteniendos por evidencia\nsuficiente. El loop NO escondió eso para mantener una curva linda. Lo\nregistró y forzó la próxima iteración a ir más profundo.\n\nIter 009: salto a 76.3. Esa iteración resolvió el problema — +12.8\npuntos sobre la dimensión específica que estaba mal sostenida. Eso es\nconvergencia real: bajaste cuando descubriste un problema, subiste cuando\nlo resolviste.\n\nSi la curva fuera monótona-creciente sin nunca bajar, eso sería SOSPECHOSO\n— el modelo estaría escribiéndole al judge en vez de investigando. La\nforma \"subida, dip, salto\" es saludable.\n\nScore = 40% heurística + 60% judge. Repetí esa fórmula si te preguntan\nqué significa el número."
+  },
+  {
+    "n": 25,
+    "title": "From one corpus — three artifacts",
+    "timing": "1 min — transición a mostrar los outputs",
+    "notes": "La separación clave: el LOOP DE INVESTIGACIÓN corre una vez. Lo que\ncambia entre artifactos es el RENDERING, no el research. Misma data,\nmismas citas, distinto formato de salida.\n\nEso te permite re-renderizar runs viejos a nuevos formatos sin volver a\ngastar en backend calls. El flag --synthesize saltea el loop completo y\nsolo re-emite el reporte. Si descubriste hace un mes algo importante y\nahora necesitás presentarlo en formato paper para stakeholders, son 5\nsegundos, no 5 minutos de re-investigación.\n\nLos cinco styles disponibles: default, paper, technical_doc,\nexecutive_brief, decision_memo. Vamos a ver tres en detalle (default,\npaper, technical_doc). Los otros dos son variantes — executive_brief es\nversión corta de decision_memo orientada a C-level."
+  },
+  {
+    "n": 26,
+    "title": "Output: default — for internal exploration",
+    "timing": "1.5 min — mostrá el reporte raw en el browser",
+    "notes": "Este es el formato más liviano. Síntesis narrativa, secciones por\ndimensión, tablas comparativas embebidas. Lo más cercano que vas a tener\na una \"página de Notion bien laburada\".\n\nCuándo usarlo: exploración interna, compartir findings dentro del equipo,\niteración rápida antes de decidir el formato final. Es el default por una\nrazón — es el menos opinado, no asume audiencia.\n\nNO usarlo para: stakeholders externos, decisiones formales, documentos\nque se van a citar después.\n\nMostrá el browser tab si lo tenés abierto. Pasá rápido, no es el money\nslide — los siguientes dos sí."
+  },
+  {
+    "n": 27,
+    "title": "Output: paper — for stakeholders and external review",
+    "timing": "1.5 min — mostrá el reporte paper en el browser",
+    "notes": "Acá el formato cambia drásticamente. Estructura tipo paper académico:\nabstract arriba, sección de methodology que documenta cómo se llegó a las\nconclusiones, claims con evidencia explícita, y al final una sección\nReferences generada DETERMINÍSTICAMENTE desde citations.json.\n\n\"Determinísticamente\" es la palabra clave. La bibliografía no es una\nsugerencia del LLM — es construida a partir del archivo estructurado de\ncitas que el sistema mantuvo durante todo el run. Si una cita no está\nen citations.json, no puede aparecer en el output. Eso te da garantías\nsobre provenance que un LLM solo no puede dar.\n\nCuándo usarlo: stakeholders externos, reportes donde el provenance\nimporta más que la prosa, cualquier cosa que vaya a ser citada por otros\ndocumentos downstream. Audiencias técnicas-formales lo prefieren porque\nsaben dónde buscar la evidencia.\n\nMostrá la página References en el browser. Es la prueba visible de la\nestructura."
+  },
+  {
+    "n": 28,
+    "title": "Output: technical_doc — for engineering decisions",
+    "timing": "1.5 min — mostrá el reporte technical en el browser. Este es el money slide para audiencias de ingeniería.",
+    "notes": "Este es EL money slide para audiencias de ingeniería. Tablas\ncomparativas, matriz de decisión, recomendación arriba (no enterrada al\nfinal), pros/cons estructurados por alternativa.\n\nLa estructura es la de un ADR (Architecture Decision Record) o un RFC\ncon veredicto. Empieza por la conclusión — \"recomendamos X porque Y\" —\ny después justifica. Es la forma que tu equipo de ingeniería ya conoce.\n\nCuándo usarlo: ADRs, evaluación de vendors o tools, decision memos para\nequipos técnicos. Cualquier momento donde el reader quiere saber qué\nhacer ANTES de saber por qué.\n\nMostrá la decision matrix en el browser. Si tenés tiempo, hacé scroll a\nla sección de pros/cons — es la parte donde el formato se gana el sueldo.\n\nSi la audiencia es técnica, este es el formato que más les va a interesar."
+  },
+  {
+    "n": 29,
+    "title": "Every run is fully replayable",
+    "timing": "1.5 min — mostrá el directorio de output en la terminal. Apuntá a rerun.sh.",
+    "notes": "Recorré el árbol de archivos despacio. Cada uno tiene un propósito\nauditable:\n\n- run.log: log operacional human-readable. Para mirar rápido qué pasó.\n- audit_trail.jsonl: trail estructurado append-only. Cada paso, cada\n  tool call, cada denial, cada decisión de policy. ESTE es el archivo\n  forense. Si querés saber qué decidió el sistema y por qué, lo abrís\n  con jq.\n- effective_config.json: snapshot completo del config NORMALIZADO al\n  arrancar el run. No es el YAML original — es el YAML después de\n  resolver defaults, expandir referencias, validar schema. Eso te\n  permite reproducir aunque cambien los defaults del código mañana.\n- tool_trace.json: argumentos de cada tool call y output truncado. Para\n  debugear qué buscó el agente y qué encontró.\n- prompt_snapshot.json: los prompts EXACTOS enviados al arranque. Si el\n  sistema cambia los prompts por defecto en una versión futura, este\n  archivo te permite reconstruir con los originales.\n- rerun.sh: NO es documentación — es ejecutable. Lo corrés y reconstruye\n  el run idéntico. No hay \"funcionaba en mi máquina\".\n- iterations/: una carpeta por iteración con hipótesis, findings,\n  crítica y score. Si querés ver cómo evolucionó el pensamiento del\n  sistema, lo lees iteración por iteración.\n- report.html: el output renderizado en el style elegido.\n\nLa parte que más impresiona a auditores: rerun.sh ejecutable. Ningún\nsistema de research convencional te garantiza eso."
+  },
+  {
+    "n": 30,
+    "title": "Trust + certainty — every claim is classified",
+    "timing": "1 min — terminal del audit trail: cat ... | python3 -m json.tool | head -40",
+    "notes": "Cada claim que el sistema emite carga una clasificación de trust. Es la\nforma de ser explícitos sobre cuán fuerte es cada conclusión. Hay tres\nclases:\n\n1. untrusted_web_content: cita de URL que viene de búsqueda web en vivo.\n   Tratar como externa y no verificada hasta que un humano la valide.\n   Default conservative — el sistema NO confía en una URL solo porque\n   apareció en results.\n\n2. user_provided_source_material: archivos de input que el operador\n   subió. El sistema confía en estos al nivel del operador. Si vos le\n   subiste el doc, el sistema asume que vos lo verificaste.\n\n3. inferred_claim: claim sintetizado por el LLM sin cita directa. Esto\n   está EXPLÍCITAMENTE flagged. NO se esconde como \"afirmación general\".\n   Si el sistema infiere algo sin fuente, te lo dice.\n\nMás arriba todavía: hay logs estilo PRISMA (la metodología de revisiones\nsistemáticas de medicina, adaptada acá).\n\n- search_log: qué buscó, cuándo, desde qué backend.\n- screening_log: qué se incluyó o se excluyó del corpus, y POR QUÉ.\n- certainty_tables: score de certeza first-pass por claim.\n\nPunto pedagógico: el sistema NO te dice \"esto es verdad\". Te dice \"esto\nes lo que encontré, esta es la fuerza de la evidencia, este es el path\nde auditoría\". El reader sabe qué tan fuerte es cada conclusión ANTES\nde actuar sobre ella. Eso es honestidad estructural."
+  },
+  {
+    "n": 31,
+    "title": "This run",
+    "timing": "30 seg — costo. Cortito. Números del run real.",
+    "notes": "Métricas del run real. Pasalo rápido (es solo medio minuto), pero\nremarcá dos cosas:\n\n1. Cost: $0.00. Eso NO es magia — es la elección de adapters CLI sobre\n   adapters API. Los CLI adapters reusan tus suscripciones Claude Pro /\n   Copilot / Codex que ya pagás como flat rate. Costo marginal por run:\n   cero. Si tu equipo ya tiene esas suscripciones, podés correr esto\n   ilimitado sin preocuparte por costos por token.\n\n2. La caveat importante: para CI/CD o runs unattended, los CLI adapters\n   no sirven (necesitan login interactivo). Para esos casos, usás los\n   API adapters y se cobra por token. La elección depende del contexto\n   — interactivo y exploratorio: CLI. Automated y producción: API.\n\n8 de 8 dimensiones cubiertas, 9 iteraciones (+ 1 compresión en iter 4),\nscore final 76.3 sobre 100. Tres formatos de output generados. Eso es\nlo que viste durante todo el demo, condensado en una tabla."
+  },
+  {
+    "n": 32,
+    "title": "What you just saw",
+    "timing": "1 min — takeaways como conclusiones",
+    "notes": "Los 6 puntos son los takeaways operacionales. Repasalos en orden, sin\nagregar contenido nuevo — son recordatorios de lo que la audiencia\nacaba de ver.\n\nPero el blockquote del final es donde tenés que aterrizar el avión. La\nanalogía con code review es DELIBERADA: el adversarial loop NO es un\ntruco clever de AI, es el mismo principio de ingeniería que code review.\nUn segundo par de ojos con priors distintos atrapa bugs distintos.\n\nEsa analogía hace que la audiencia \"se lleve\" el concepto sin\nnecesidad de recordar los 11 patrones por nombre. Si entienden code\nreview, entienden por qué adversarial funciona. Esa es la victoria\npedagógica del slide.\n\nSi te queda tiempo, podés ofrecer la última observación: \"los humanos\nque hacen code review hace décadas — esto solo aplica el mismo principio\na la generación de research, en vez de aplicarlo a código\"."
+  },
+  {
+    "n": 33,
+    "title": "Multi-LLM Adversarial Convergence Framework",
+    "timing": "",
+    "notes": "Cierre. Tres comandos para que la audiencia arranque por su cuenta:\nuv sync, dry-run con su propio config, y run real.\n\nEl template _template.yaml está pensado para que copien y modifiquen —\nno necesitan empezar de cero. Cualquier topic que se les ocurra (su\npropia decisión técnica, su propia evaluación de tools, su propia\ninvestigación) entra ahí.\n\nSi tu charla tuvo Q&A, este es el momento para abrir preguntas. Las\nreferencias en el footer del slide te dan tres lugares donde mandar a\nquien quiera profundizar:\n\n- docs/research.md: cómo se usa el sistema en detalle.\n- docs/design/agentic-design-patterns.md: el reference doc del repo\n  con los 11 patrones mapeados a archivos del código.\n- AGENTS.md: las convenciones para que un agente trabaje en este repo.\n\nSi alguien te pregunta \"¿lo puedo usar para X?\" — la respuesta default\nes \"probablemente sí, copiá el template y abrí un issue si te trabás\".\nLa barrera de entrada está baja a propósito."
+  }
+]</script>
+  <script>
+    (() => {
+      const slides = JSON.parse(document.getElementById('notes-data').textContent);
+      const total = slides.length;
+      const els = {
+        idx: document.getElementById('slide-index'),
+        title: document.getElementById('slide-title'),
+        timing: document.getElementById('slide-timing'),
+        notes: document.getElementById('slide-notes'),
+        cur: document.getElementById('cur'),
+        total: document.getElementById('total'),
+        prev: document.getElementById('btn-prev'),
+        next: document.getElementById('btn-next'),
+        jump: document.getElementById('jump'),
+        deck: document.getElementById('open-deck'),
+      };
+      els.total.textContent = total;
+      let current = 1;
+
+      // Build jump strip
+      for (let i = 1; i <= total; i++) {
+        const b = document.createElement('button');
+        b.textContent = i;
+        b.dataset.slide = i;
+        b.addEventListener('click', () => go(i));
+        els.jump.appendChild(b);
+      }
+
+      function pad(n) { return String(n).padStart(2, '0'); }
+
+      function render(n) {
+        const s = slides[n - 1];
+        els.idx.textContent = `SLIDE · ${pad(n)} / ${pad(total)}`;
+        els.title.textContent = s.title || '—';
+        els.timing.textContent = s.timing || '';
+        els.timing.style.display = s.timing ? 'block' : 'none';
+        if (s.notes && s.notes.trim().length) {
+          els.notes.textContent = s.notes;
+          els.notes.classList.remove('empty');
+        } else {
+          els.notes.textContent = '(no speaker notes for this slide)';
+          els.notes.classList.add('empty');
+        }
+        els.cur.textContent = n;
+        document.querySelectorAll('.jump button').forEach(b => {
+          b.classList.toggle('active', parseInt(b.dataset.slide) === n);
+        });
+        els.prev.disabled = n <= 1;
+        els.next.disabled = n >= total;
+        // scroll jump strip so the active chip is visible
+        const active = els.jump.querySelector('.active');
+        if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+
+      function go(n, broadcast = true) {
+        n = Math.max(1, Math.min(total, n));
+        if (n === current) return;
+        current = n;
+        render(n);
+        history.replaceState(null, '', '#' + n);
+        if (broadcast) {
+          try { localStorage.setItem('deckCurrentSlide', String(n)); } catch (e) {}
+        }
+      }
+      function next() { go(current + 1); }
+      function prev() { go(current - 1); }
+
+      els.prev.addEventListener('click', prev);
+      els.next.addEventListener('click', next);
+
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        switch (e.key) {
+          case 'ArrowRight': case 'PageDown': case ' ': e.preventDefault(); next(); break;
+          case 'ArrowLeft':  case 'PageUp':            e.preventDefault(); prev(); break;
+          case 'Home':                                  e.preventDefault(); go(1); break;
+          case 'End':                                   e.preventDefault(); go(total); break;
+          case 'o': case 'O':
+            window.open('clean.html', 'deck-window');
+            break;
+        }
+      });
+
+      // ── Cross-tab sync (other window writes deckCurrentSlide) ──
+      window.addEventListener('storage', (e) => {
+        if (e.key !== 'deckCurrentSlide' || e.newValue == null) return;
+        const n = parseInt(e.newValue, 10);
+        if (!isNaN(n) && n !== current) go(n, false);
+      });
+
+      // initial slide from hash, or last value in storage
+      function startSlide() {
+        const m = location.hash.match(/^#(\d+)$/);
+        if (m) return parseInt(m[1], 10);
+        const stored = localStorage.getItem('deckCurrentSlide');
+        if (stored) return parseInt(stored, 10);
+        return 1;
+      }
+      go(startSlide(), false);
+      window.addEventListener('hashchange', () => {
+        const m = location.hash.match(/^#(\d+)$/);
+        if (m) go(parseInt(m[1], 10));
+      });
+    })();
+  </script>
+</body>
+</html>

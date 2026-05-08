@@ -228,12 +228,113 @@
   .recovery-list .ev-type { color: var(--decide); font-weight: 600; margin-right: 6px; }
   .recovery-list .ev-detail { color: var(--muted); }
 
+  /* Model-provider badges attached to step nodes. Populated by JS from each
+     frame's `backend` string (e.g. "claude-cli opus" → Anthropic). One badge
+     per provider per node; the badge corresponding to the currently-executing
+     model glows during playback. The white logo glyph sits on top of the
+     branded circle. */
+  .model-badge { pointer-events: auto; }
+  .model-badge circle {
+    stroke: rgba(15, 23, 42, 0.85);
+    stroke-width: 1.2;
+    transition: filter 200ms, stroke 200ms, stroke-width 200ms;
+  }
+  .model-badge .logo {
+    color: #ffffff;            /* drives currentColor in the symbol path */
+    pointer-events: none;
+  }
+  .model-badge.active circle {
+    stroke: var(--edge-active);
+    stroke-width: 2;
+    filter: drop-shadow(0 0 6px var(--edge-active));
+  }
+  .model-badge.idle circle { opacity: 0.55; }
+  .model-badge.idle .logo  { opacity: 0.85; }
+
+  /* Per-provider circle colours. The logo glyph itself is always white
+     (set via the .logo class above) regardless of provider. */
+  .provider-anthropic circle { fill: #ea580c; }
+  .provider-openai    circle { fill: #10a37f; }
+  .provider-github    circle { fill: #a371f7; }
+  .provider-google    circle { fill: #4285f4; }
+
+  .model-legend {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #334155;
+  }
+  .model-legend .legend-swatch.model {
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    line-height: 1;
+  }
+  .model-legend .legend-swatch.model svg {
+    width: 11px;
+    height: 11px;
+    color: inherit;
+  }
+
   @media (max-width: 1100px) {
     main { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
+
+<!-- ============================================================================
+     Provider logo sprite — inline SVG <symbol> definitions reused by both the
+     SVG flowchart badges and the HTML legend via <use href="#logo-X">.
+     Each symbol paints with fill="currentColor" so the same path can be tinted
+     white on the badges and dark on print-friendly legend variants.
+     ============================================================================ -->
+<svg id="provider-logos" width="0" height="0" style="position:absolute;left:-9999px" aria-hidden="true">
+  <defs>
+    <!-- Anthropic Claude — 8 elongated petals at 45° intervals, the
+         "Klaus" asterisk that's the company's primary mark. -->
+    <symbol id="logo-anthropic" viewBox="-50 -50 100 100">
+      <g fill="currentColor">
+        <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z"/>
+        <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(45)"/>
+        <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(90)"/>
+        <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(135)"/>
+        <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(180)"/>
+        <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(225)"/>
+        <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(270)"/>
+        <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(315)"/>
+      </g>
+    </symbol>
+
+    <!-- OpenAI — simplified 6-fold star (the iconic hexagonal mark, rendered
+         as 3 crossing strokes at 60° offsets — a widely-used simplification
+         of the official knot when icon size is small). -->
+    <symbol id="logo-openai" viewBox="-50 -50 100 100">
+      <g fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round">
+        <line x1="0" y1="-38" x2="0" y2="38"/>
+        <line x1="-33" y1="-19" x2="33" y2="19"/>
+        <line x1="-33" y1="19" x2="33" y2="-19"/>
+      </g>
+    </symbol>
+
+    <!-- GitHub Copilot — Octocat silhouette (Copilot is a GitHub product;
+         the Octocat is the universally-recognized GitHub mark and is the
+         official identification used in product attribution). -->
+    <symbol id="logo-github" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.4 3-.405 1.02.005 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+    </symbol>
+
+    <!-- Google Gemini — 4-point sparkle / twinkle (the iconic mark used
+         throughout Gemini product surfaces; two perpendicular crossing
+         concave diamonds). -->
+    <symbol id="logo-google" viewBox="-50 -50 100 100">
+      <path fill="currentColor" d="M 0,-42 C 3,-18 3,-3 38,0 C 3,3 3,18 0,42 C -3,18 -3,3 -38,0 C -3,-3 -3,-18 0,-42 Z"/>
+    </symbol>
+  </defs>
+</svg>
 
 <header>
   <div>
@@ -368,6 +469,9 @@
       <div class="legend-item"><span class="legend-swatch" style="background:var(--discard)"></span>discard</div>
       <div class="legend-item"><span class="legend-swatch" style="background:var(--compress)"></span>compress</div>
     </div>
+
+    <!-- Populated by renderModelLegend() once frames have been built -->
+    <div class="legend model-legend" id="model-legend"></div>
   </section>
 
   <aside class="panels">
@@ -502,6 +606,48 @@ const ITERATION_EDGES = {
   "keep-loop":       { from: "n-keep",     to: "n-loop",     edge: "e-keep-loop" },
   "discard-loop":    { from: "n-discard",  to: "n-loop",     edge: "e-discard-loop" },
 };
+
+// Model providers we know how to recognise from a backend string. The
+// `label` is the 2-letter monogram drawn on the badge circle; the `name`
+// is shown in the tooltip and the model legend.
+const MODEL_PROVIDERS = {
+  anthropic: { id: 'anthropic', label: 'Cl', name: 'Anthropic Claude',     color: '#ea580c' },
+  openai:    { id: 'openai',    label: 'Cx', name: 'OpenAI Codex / GPT',   color: '#10a37f' },
+  github:    { id: 'github',    label: 'Cp', name: 'GitHub Copilot',       color: '#a371f7' },
+  google:    { id: 'google',    label: 'Gm', name: 'Google Gemini',        color: '#4285f4' },
+};
+
+// Map a backend string from a frame (e.g. "claude-cli opus", "codex-cli
+// gpt-5.4 (judge)", "copilot-cli sonnet") to its provider, or null if the
+// string is "—" / empty / unrecognised. Order matters: we check `claude`
+// before `codex` so the "anthropic" variant takes precedence when a string
+// contains both (rare, but possible in audit-trail merge events).
+function detectProvider(backend) {
+  if (!backend || typeof backend !== 'string') return null;
+  const s = backend.toLowerCase().trim();
+  if (s === '' || s === '—' || s === '-') return null;
+  if (s.includes('claude') || s.includes('anthropic')) return MODEL_PROVIDERS.anthropic;
+  if (s.includes('codex')  || s.includes('gpt')  || s.includes('openai')) return MODEL_PROVIDERS.openai;
+  if (s.includes('copilot')) return MODEL_PROVIDERS.github;
+  if (s.includes('gemini') || s.includes('google')) return MODEL_PROVIDERS.google;
+  return null;
+}
+
+// Anchor coordinates (in SVG units) for the FIRST badge on each step node.
+// Additional badges stack along `dir`: 'left' or 'right'. The four wide
+// reasoning-step nodes get their badges in the empty margin LEFT of the
+// rect; n-compress (near the left viewBox edge) gets them on the right;
+// n-synth (near the right viewBox edge) gets them on the left.
+const NODE_BADGE_ANCHOR = {
+  'n-hypo':     { x: 232, y: 310, dir: 'left'  },
+  'n-execute':  { x: 232, y: 395, dir: 'left'  },
+  'n-critique': { x: 232, y: 480, dir: 'left'  },
+  'n-score':    { x: 232, y: 565, dir: 'left'  },
+  'n-compress': { x: 175, y: 123, dir: 'right' },
+  'n-synth':    { x: 547, y: 123, dir: 'left'  },
+};
+const BADGE_RADIUS = 11;
+const BADGE_SPACING = 24;
 
 // Scripted demo data — 12 iterations with believable convergence curve and a
 // dip at iter 7 (so the demo can call it out as "the critic forced a deeper
@@ -873,6 +1019,123 @@ function updateCost(frame) {
 }
 
 // ============================================================================
+// Model badges — visual cue showing WHICH model executed WHICH step
+// ============================================================================
+
+// Walk every frame and build a map: nodeId → ordered list of providers
+// observed for that node. We preserve insertion order (Map iteration order)
+// so the badge for the FIRST observed provider gets the primary anchor
+// position; later providers stack along NODE_BADGE_ANCHOR[node].dir.
+function buildNodeModelMap(frames) {
+  const map = new Map();
+  for (const f of frames) {
+    if (!NODE_BADGE_ANCHOR[f.node]) continue;
+    const provider = detectProvider(f.backend);
+    if (!provider) continue;
+    if (!map.has(f.node)) map.set(f.node, new Map());
+    const slot = map.get(f.node);
+    if (!slot.has(provider.id)) slot.set(provider.id, provider);
+  }
+  return map;
+}
+
+function renderModelBadges(nodeModelMap) {
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  // Re-render safe: drop any badges from a previous build (e.g. on resize
+  // or if frames are rebuilt).
+  document.querySelectorAll('.model-badge').forEach(el => el.remove());
+
+  for (const [nodeId, providers] of nodeModelMap.entries()) {
+    const nodeEl = $(nodeId);
+    const anchor = NODE_BADGE_ANCHOR[nodeId];
+    if (!nodeEl || !anchor) continue;
+
+    let i = 0;
+    for (const provider of providers.values()) {
+      const dx = anchor.dir === 'left' ? -i * BADGE_SPACING : i * BADGE_SPACING;
+      const cx = anchor.x + dx;
+      const cy = anchor.y;
+
+      const badge = document.createElementNS(SVG_NS, 'g');
+      badge.setAttribute('class', `model-badge provider-${provider.id} idle`);
+      badge.setAttribute('data-node', nodeId);
+      badge.setAttribute('data-provider', provider.id);
+
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('cx', cx);
+      circle.setAttribute('cy', cy);
+      circle.setAttribute('r', BADGE_RADIUS);
+
+      // Embedded official-style logo via <use href="#logo-X">. The logo
+      // glyph is sized to ~70% of the badge diameter so the colored ring
+      // stays visible. White color comes from the .logo CSS rule.
+      const logoSize = BADGE_RADIUS * 1.4;
+      const use = document.createElementNS(SVG_NS, 'use');
+      use.setAttribute('href', `#logo-${provider.id}`);
+      use.setAttribute('x', cx - logoSize / 2);
+      use.setAttribute('y', cy - logoSize / 2);
+      use.setAttribute('width', logoSize);
+      use.setAttribute('height', logoSize);
+      use.setAttribute('class', 'logo');
+
+      const title = document.createElementNS(SVG_NS, 'title');
+      title.textContent = `${provider.name} executes this step`;
+
+      badge.appendChild(circle);
+      badge.appendChild(use);
+      badge.appendChild(title);
+      nodeEl.appendChild(badge);
+      i++;
+    }
+  }
+}
+
+function renderModelLegend(nodeModelMap) {
+  const seen = new Set();
+  for (const providers of nodeModelMap.values()) {
+    for (const id of providers.keys()) seen.add(id);
+  }
+  const legend = $('model-legend');
+  if (!legend) return;
+  legend.innerHTML = '';
+  if (seen.size === 0) return;
+
+  for (const id of seen) {
+    const p = MODEL_PROVIDERS[id];
+    if (!p) continue;
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    // Embed the same <symbol> reference used by the SVG flowchart badges
+    // — single source of truth for each provider's logo.
+    item.innerHTML =
+      `<span class="legend-swatch model" style="background:${p.color}">` +
+        `<svg aria-hidden="true"><use href="#logo-${p.id}"/></svg>` +
+      `</span>` +
+      `${p.name}`;
+    legend.appendChild(item);
+  }
+}
+
+// Apply the active glow to the badge corresponding to the currently-playing
+// frame. Idempotent — clears all previous active states first. Safe to call
+// when the frame's node has no badge (e.g. n-decide, n-loop) — does nothing.
+function setActiveModelBadge(frame) {
+  document.querySelectorAll('.model-badge.active').forEach(b => {
+    b.classList.remove('active');
+    b.classList.add('idle');
+  });
+  if (!frame || !NODE_BADGE_ANCHOR[frame.node]) return;
+  const provider = detectProvider(frame.backend);
+  if (!provider) return;
+  const sel = `.model-badge[data-node="${frame.node}"][data-provider="${provider.id}"]`;
+  const badge = document.querySelector(sel);
+  if (badge) {
+    badge.classList.remove('idle');
+    badge.classList.add('active');
+  }
+}
+
+// ============================================================================
 // Player / state
 // ============================================================================
 
@@ -938,6 +1201,7 @@ const Player = {
     visited.forEach(nid => $(nid)?.classList.add('visited'));
 
     setActiveNode(f.node);
+    setActiveModelBadge(f);
     if (animateEdge && f.edge && ITERATION_EDGES[f.edge]) {
       const e = ITERATION_EDGES[f.edge].edge;
       setActiveEdge(e);
@@ -1087,7 +1351,16 @@ async function main() {
 
   // Rebuild the dim grid in case loadRunMetadata changed the DIMENSIONS array
   buildDimGrid();
-  Player.setFrames(buildFrames(iterations));
+
+  // Build frames first, then derive the model-per-step map from them so the
+  // badges always reflect what's actually in the playback (including any
+  // future override that swaps the hardcoded backend strings in buildFrames).
+  const frames = buildFrames(iterations);
+  const nodeModelMap = buildNodeModelMap(frames);
+  renderModelBadges(nodeModelMap);
+  renderModelLegend(nodeModelMap);
+
+  Player.setFrames(frames);
 }
 
 main();

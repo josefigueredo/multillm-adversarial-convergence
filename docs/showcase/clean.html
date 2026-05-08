@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Multi-LLM Adversarial Convergence Framework</title>
+  <link rel="stylesheet" href="clean.css">
+</head>
+<body>
+  <video class="persistent-bg" src="animation-veryslow.mp4" autoplay muted loop playsinline></video>
+
+  <main class="deck">
+    <section class="slide lead video-bg" data-slide="1">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h1 id="multi-llm-adversarial-convergence-framework">Multi-LLM Adversarial Convergence Framework</h1>
+<h3 id="make-competing-llms-argue-until-they-converge-on-the-best-answer">Make competing LLMs argue until they converge on the best answer</h3>
+<br />
+<blockquote>
+<p><strong>Staged demo</strong> — this is a real run played back at speed.<br />
+All artifacts shown are live outputs from the actual execution.</p>
+</blockquote>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide" data-slide="2">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="the-problem">The problem</h2>
+<p>Single-model research is <strong>non-deterministic and unverifiable</strong>.<br />
+One LLM, one pass, one perspective.</p>
+<blockquote>
+<p>You can't know what it missed, what it fabricated with confidence, or whether a different model would have reached the same conclusion.</p>
+</blockquote>
+<p><strong>This framework's answer:</strong></p>
+<ul>
+<li>Run multiple backends on the same topic</li>
+<li>Make them <strong>score, critique, and argue with each other</strong></li>
+<li>Keep only what survives adversarial review</li>
+<li>Emit a full evidence trail so you can audit every claim</li>
+</ul>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide" data-slide="3">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="origin-karpathys-autoresearch">Origin: Karpathy's <code>autoresearch</code></h2>
+<p>The loop isn't original. <a href="https://github.com/karpathy/autoresearch">Andrej Karpathy's <code>autoresearch</code></a> runs:</p>
+<blockquote>
+<p><em>modify code → train 5 min on GPU → measure loss → keep or revert</em></p>
+</blockquote>
+<p>The insight: <strong>this shape applies to anything you can score</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Karpathy's <code>autoresearch</code></th>
+<th>This framework</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPU training run</td>
+<td>LLM backend call</td>
+</tr>
+<tr>
+<td>Loss function</td>
+<td>Heuristic 40% + LLM judge 60%</td>
+</tr>
+<tr>
+<td>Neural network weights</td>
+<td>Knowledge corpus</td>
+</tr>
+<tr>
+<td>~5 min per iteration</td>
+<td>One backend call per iteration</td>
+</tr>
+<tr>
+<td>Stops when loss plateaus</td>
+<td>Stops on <code>max_iterations</code> or <code>target_dimensions_total</code></td>
+</tr>
+</tbody>
+</table>
+<p>Same loop. Different substrate: <strong>knowledge instead of weights</strong>.</p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide" data-slide="4">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="the-loop">The loop</h2>
+<p><img src="loop.svg" alt="" /></p>
+<!-- Legend + stopping criteria deliberately removed — the diagram's
+     own eyebrows / stroke colors / invariant footer already convey:
+       · Critique (cyan)  — different backend = different blind spots
+       · Decide  (amber)  — KEEP grows corpus · DISCARD retries
+       · Compress (cyan)  — distill · drop noise · bound context
+     and the SVG footer carries: STOPPING — Ctrl+C · max_iterations ·
+     target_dimensions_total · whichever fires first. Speaker notes for
+     this slide live in control.html. -->
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide divider video-bg" data-slide="5">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="i--patterns">I · PATTERNS</h2>
+<h1 id="agentic-design-patterns">Agentic Design Patterns</h1>
+<h3 id="engine--topology--guardrails">Engine · Topology · Guardrails</h3>
+<p><em>11 named patterns from the research literature — each cited, each replaceable.</em></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide tight" data-slide="6">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="why-these-patterns-matter">Why these patterns matter</h2>
+<p>This codebase is <strong>not a collection of hacks</strong>.</p>
+<ol>
+<li><strong>Replaceability</strong> — when a pattern is named, swapping the implementation is mechanical</li>
+<li><strong>Defensibility</strong> — code review can ask <em>&quot;is this Evaluator-Optimizer or Reflection?&quot;</em> instead of <em>&quot;is this fine?&quot;</em></li>
+<li><strong>Onboarding</strong> — new contributors recognise shapes; they don't have to reverse-engineer intent</li>
+</ol>
+<blockquote>
+<p>11 patterns: <strong>engine</strong> (3) + <strong>topology</strong> (5) + <strong>guardrails</strong> (3).</p>
+</blockquote>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="7">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="1--evaluator-optimizer">1 · Evaluator-Optimizer</h2>
+<blockquote>
+<p><em>The outer loop. Propose, score, keep or discard, repeat.</em></p>
+</blockquote>
+<p><img src="patterns/01-evaluator-optimizer.svg" alt="" style="width:880px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/research_loop.py</code> — owns the iteration cycle</li>
+<li><code>src/scorer.py</code> — composite score (heuristic 40% + judge 60%); see <code>IterationScore</code></li>
+<li><code>KEEP</code> vs <code>DISCARD</code> decision recorded per iteration in <code>audit_trail.jsonl</code></li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="8">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="2--llm-as-judge">2 · LLM-as-Judge</h2>
+<blockquote>
+<p><em>A different model scores the candidate. No self-grading.</em></p>
+</blockquote>
+<p><img src="patterns/02-llm-as-judge.svg" alt="" style="width:920px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/scorer.py</code> — <code>judge_response()</code> calls a non-producer backend</li>
+<li>Hybrid: 40% deterministic heuristic + 60% LLM judge (configurable via <code>scoring.weights</code>)</li>
+<li>Multi-judge mode: <code>evaluation.judges = [...]</code> enables consensus + disagreement detection (<code>detect_judge_disagreement()</code>)</li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://agentic-design.ai/patterns/reflection/llm-as-judge">agentic-design.ai — LLM-as-Judge</a> · <a href="https://arxiv.org/abs/2410.10934">arXiv 2410.10934</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="9">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="3--reflection--self-compression">3 · Reflection / Self-Compression</h2>
+<blockquote>
+<p><em>Every N iterations: distill the corpus, drop noise.</em></p>
+</blockquote>
+<p><img src="patterns/03-reflection-compression.svg" alt="" style="width:1080px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>compression_interval</code> config flag (default: every 4 iterations)</li>
+<li>The agent re-reads its own corpus and emits a distilled version</li>
+<li>Audit event: <code>corpus_compressed</code> with before/after token counts</li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://www.deeplearning.ai/the-batch/how-agents-can-improve-llm-performance/">Andrew Ng — Agentic Patterns</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="10">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="4--orchestrator--subagents">4 · Orchestrator / Subagents</h2>
+<blockquote>
+<p><em>One owner of lifecycle. Many narrow-contract workers.</em></p>
+</blockquote>
+<p><img src="patterns/04-orchestrator-subagents.svg" alt="" style="width:780px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/orchestrator.py</code> — the only owner of phase transitions, convergence checks, compression triggers</li>
+<li><code>src/backends/</code> — adapters with a single contract: <code>run(prompt) → response</code></li>
+<li>Backends never call each other; they only return to the orchestrator</li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="11">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="5--multi-agent-role-topology">5 · Multi-Agent Role Topology</h2>
+<blockquote>
+<p><em>Configure roles, not models. Swap backends without changing logic.</em></p>
+</blockquote>
+<p><img src="patterns/05-role-topology.svg" alt="" style="width:900px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>configs/research/&lt;topic&gt;.yaml</code> — <code>execution.backends</code> map roles to backend IDs</li>
+<li><code>src/config.py</code> — <code>BackendsConfig</code> schema; validates role completeness</li>
+<li>Role names appear in audit events: <code>role=judge backend=codex-cli</code></li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://arxiv.org/abs/2405.10467">arXiv 2405.10467 — Multi-Agent Role Topology</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="12">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="6--routing--specialist-dispatch">6 · Routing / Specialist Dispatch</h2>
+<blockquote>
+<p><em>Each dimension goes to the backend best suited for it.</em></p>
+</blockquote>
+<p><img src="patterns/06-routing-specialist.svg" alt="" style="width:920px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/strategy.py</code> — <code>specialist</code> strategy</li>
+<li>Each dimension declares a persona in config; persona → backend lookup at dispatch time</li>
+<li>Falls back to <code>primary</code> if no specialist matches</li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="13">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="7--parallelization-ensemble">7 · Parallelization (Ensemble)</h2>
+<blockquote>
+<p><em>Fan out to all backends in parallel. Merge via judge.</em></p>
+</blockquote>
+<p><img src="patterns/07-parallel-ensemble.svg" alt="" style="width:880px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/strategy.py</code> — <code>ensemble</code> and <code>parallel</code> strategies</li>
+<li><code>concurrent.futures.ThreadPoolExecutor</code> — bounded parallelism</li>
+<li>Judge selects best response or synthesises an ensemble answer</li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="14">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="8--prompt-chaining-serial">8 · Prompt Chaining (Serial)</h2>
+<blockquote>
+<p><em>Backends take turns. Each stage receives the previous stage's output.</em></p>
+</blockquote>
+<p><img src="patterns/08-prompt-chaining-serial.svg" alt="" style="width:960px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/strategy.py</code> — <code>serial</code> strategy</li>
+<li>Stage N+1's prompt includes stage N's full output as context</li>
+<li>Used when stages have asymmetric specialisations (research → critique → synthesis)</li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="15">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="9--adversarial-critique">9 · Adversarial Critique</h2>
+<blockquote>
+<p><em>Researcher · Critic · Arbitrator — across different model families.</em></p>
+</blockquote>
+<p><img src="patterns/09-adversarial-critique.svg" alt="" style="width:880px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/strategy.py</code> — <code>adversarial</code> strategy (used in the demo run)</li>
+<li>Three roles: <code>researcher</code>, <code>critic</code>, <code>arbitrator</code> — each a different backend family</li>
+<li>Audit log records every critique flag and arbitrator decision</li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://arxiv.org/abs/2305.19118">arXiv 2305.19118 — Multi-Agent Debate</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="16">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="10--tool-use--sandboxed-execution">10 · Tool Use + Sandboxed Execution</h2>
+<blockquote>
+<p><em>The capability registry is the agentic equivalent of an IAM policy.</em></p>
+</blockquote>
+<p><img src="patterns/10-tool-use-sandbox.svg" alt="" style="width:920px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/policy/</code> — capability registry, sandbox executor, audit hooks</li>
+<li>Write boundary: <code>output/&lt;run&gt;/.workspace/</code> — outside is read-only</li>
+<li>Network policy: <code>web_only</code> (allowlisted endpoints) or <code>none</code></li>
+<li>Audit events: <code>tool_denied</code>, <code>write_intent</code>, <code>network_intent</code></li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/engineering/writing-tools-for-agents">Anthropic — Writing Tools for Agents</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide pattern" data-slide="17">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="11--human-in-the-loop-hitl">11 · Human-in-the-Loop (HITL)</h2>
+<blockquote>
+<p><em>Phase-transition gates. Operator approves before irreversible actions.</em></p>
+</blockquote>
+<p><img src="patterns/11-human-in-the-loop.svg" alt="" style="width:920px;" /></p>
+<p><strong>In this codebase</strong></p>
+<ul>
+<li><code>src/policy/hitl.py</code> — phase-transition gate</li>
+<li>Configurable per-phase: <code>hitl.gates = [research_to_synthesis, plan_approve, ...]</code></li>
+<li>Audit events: <code>hitl_approved</code>, <code>hitl_aborted</code> — both with operator identity</li>
+</ul>
+<p><span class="ref"><strong>Reference:</strong> <a href="https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/">LangGraph — Human-in-the-Loop</a></span></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide tight" data-slide="18">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="how-they-compose--the-strategy-lattice">How they compose — the strategy lattice</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Patterns</th>
+<th>Concern</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Engine</strong></td>
+<td>Evaluator-Optimizer · LLM-as-Judge · Reflection</td>
+<td>What makes a single iteration meaningful</td>
+</tr>
+<tr>
+<td><strong>Topology</strong></td>
+<td>Orchestrator · Role Topology · Routing · Parallel · Serial</td>
+<td>How backends are wired and dispatched</td>
+</tr>
+<tr>
+<td><strong>Guardrails</strong></td>
+<td>Adversarial Critique · Sandbox · HITL</td>
+<td>What prevents the agent from doing the wrong thing</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>A configured strategy is a tuple over the layers.</strong> Demo run = <code>Adversarial Critique</code> (guardrail) over <code>Serial Chaining</code> (topology) using <code>Evaluator-Optimizer + LLM-as-Judge</code> (engine), with <code>Sandbox</code> always on.</p>
+</blockquote>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide divider video-bg" data-slide="19">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="ii--demo">II · DEMO</h2>
+<h1 id="demo">Demo</h1>
+<h3 id="localstack-alternatives--a-real-research-question">LocalStack alternatives — a real research question</h3>
+<p><em>&quot;LocalStack went fully paid. Should our team pay Pro or migrate to an open-source alternative?&quot;</em></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide tighter" data-slide="20">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="the-config--three-backends-adversarial-strategy">The config — three backends, adversarial strategy</h2>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-yaml"><span class="hljs-comment"># configs/research/localstack_alternatives_copilot_codex.yaml</span>
+<span class="hljs-attr">research:</span>
+  <span class="hljs-attr">topic:</span> <span class="hljs-string">&gt;
+    Compare alternatives to LocalStack for local AWS service emulation.
+    LocalStack is moving to a fully paid model. Evaluate MiniStack, Floci,
+    and other viable open-source alternatives.
+</span>  <span class="hljs-attr">goal:</span> <span class="hljs-string">&gt;
+    A decision-ready comparison for a team evaluating LocalStack Pro vs
+    open-source migration. Include migration effort, service coverage gaps,
+    and a clear recommendation.
+</span>  <span class="hljs-attr">execution:</span>
+    <span class="hljs-attr">strategy:</span> <span class="hljs-string">adversarial</span>
+    <span class="hljs-attr">backends:</span>
+      <span class="hljs-attr">primary:</span>   <span class="hljs-string">primary_reasoner</span>    <span class="hljs-comment"># claude-cli (Claude Code)</span>
+      <span class="hljs-attr">research:</span>  [<span class="hljs-string">research_coder</span>]    <span class="hljs-comment"># copilot-cli (GitHub Copilot)</span>
+      <span class="hljs-attr">judge:</span>     <span class="hljs-string">adversary_reasoner</span>  <span class="hljs-comment"># codex-cli   (GPT-5.4) ← critic + judge</span>
+      <span class="hljs-attr">utility:</span>   <span class="hljs-string">adversary_reasoner</span>
+    <span class="hljs-attr">max_iterations:</span> <span class="hljs-number">10</span>
+    <span class="hljs-attr">allowed_tools:</span> <span class="hljs-string">&quot;WebSearch,WebFetch,Read,Bash,Glob,Grep&quot;</span>
+</code></pre>
+<p>Three different model families. Critic and judge are <strong>deliberately different</strong> from the researcher.</p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide" data-slide="21">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="dry-run-first--validate-without-spending-tokens">Dry-run first — validate without spending tokens</h2>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-bash"><span class="hljs-comment"># Validate config wiring, provider health, and tool capabilities — no backend calls</span>
+uv run python -m src.cli research \
+  --config configs/research/localstack_alternatives_copilot_codex.yaml \
+  --dry-run
+</code></pre>
+<p>Output confirms:</p>
+<ul>
+<li>All backend adapters resolve and are reachable</li>
+<li>Strategy is valid for the declared role topology</li>
+<li>Tool capability registry is satisfied</li>
+<li>Sandbox policy is coherent</li>
+</ul>
+<p>Then run for real (this is the staged playback):</p>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-bash">uv run python -m src.cli research \
+  --config configs/research/localstack_alternatives_copilot_codex.yaml
+</code></pre>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide divider video-bg" data-slide="22">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="iii--adversarial">III · ADVERSARIAL</h2>
+<h1 id="adversarial-critique-in-action">Adversarial critique in action</h1>
+<h3 id="what-the-critic-actually-said--from-the-real-run">What the critic actually said — from the real run</h3>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide" data-slide="23">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="the-critic-finds-real-errors">The critic finds real errors</h2>
+<p><strong>Iteration 001</strong> — Researcher (Copilot) delivers AWS service coverage findings. Score: <strong>62.0</strong></p>
+<p>The judge backend (GPT-5.4) reviews and raises:</p>
+<blockquote>
+<p><em>&quot;MiniStack section appears materially stale — API Gateway v1, Cognito, and KMS coverage are asserted without current primary source evidence.&quot;</em></p>
+</blockquote>
+<blockquote>
+<p><em>&quot;Moto capabilities are mischaracterized — Lambda execution mode and IAM enforcement nuance are factually wrong.&quot;</em></p>
+</blockquote>
+<blockquote>
+<p><em>&quot;Many fine-grained feature claims are overconfident relative to the cited evidence.&quot;</em></p>
+</blockquote>
+<p><strong>These are not style comments. They are factual challenges</strong> — a different model, different training data, catching different errors.</p>
+<p>The loop forces the next iteration to resolve these gaps or be discarded.</p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide tight" data-slide="24">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="score-progression--convergence-is-measurable">Score progression — convergence is measurable</h2>
+<p>Each bar is one iteration. Score = heuristic (40%) + LLM judge (60%).</p>
+<table>
+<thead>
+<tr>
+<th>Iteration</th>
+<th>Dimension</th>
+<th>Score</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>001</td>
+<td>AWS service coverage</td>
+<td><strong>62.0</strong></td>
+<td>KEEP</td>
+</tr>
+<tr>
+<td>002</td>
+<td>Community activity &amp; bus factor</td>
+<td>63.0</td>
+<td>KEEP</td>
+</tr>
+<tr>
+<td>003</td>
+<td>Migration effort</td>
+<td>63.5</td>
+<td>KEEP</td>
+</tr>
+<tr>
+<td>004</td>
+<td>CI/CD integration</td>
+<td>63.5</td>
+<td>KEEP</td>
+</tr>
+<tr>
+<td>005</td>
+<td>IaC toolchain (Terraform/CDK/SAM)</td>
+<td><strong>69.5</strong></td>
+<td>KEEP</td>
+</tr>
+<tr>
+<td>006</td>
+<td>CloudFormation source verification</td>
+<td>68.0</td>
+<td>KEEP</td>
+</tr>
+<tr>
+<td>007</td>
+<td>Migration effort by team profile</td>
+<td>63.5</td>
+<td>KEEP <em>(harder dimension)</em></td>
+</tr>
+<tr>
+<td>008</td>
+<td>API behavioral fidelity</td>
+<td>66.0</td>
+<td>KEEP</td>
+</tr>
+<tr>
+<td><strong>009</strong></td>
+<td>Migration effort (final)</td>
+<td><strong>76.3</strong></td>
+<td>KEEP</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Iter 007 dipped because the critic flagged under-validated migration estimates.<br />
+The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12.8 points</strong> on the final dimension.</p>
+</blockquote>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide" data-slide="25">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="from-one-corpus--three-artifacts">From one corpus — three artifacts</h2>
+<p>The research loop runs <strong>once</strong>. The output style is a rendering decision, not a research decision.</p>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-yaml"><span class="hljs-attr">reporting:</span>
+  <span class="hljs-attr">output_style:</span> <span class="hljs-string">technical_doc</span>   <span class="hljs-comment"># default | paper | technical_doc | executive_brief | decision_memo</span>
+</code></pre>
+<p>Re-render any past run without re-running research:</p>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-bash">uv run python -m src.cli research \
+  --config configs/research/localstack_alternatives_copilot_codex_paper.yaml \
+  --synthesize   <span class="hljs-comment"># skips research loop, only re-renders</span>
+</code></pre>
+<p><strong>Same data. Same citations. Different artifact.</strong></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide split-right" data-slide="26">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="output-default--for-internal-exploration">Output: <code>default</code> — for internal exploration</h2>
+
+<p>Quick narrative synthesis, sectioned by dimension, embedded comparison tables.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>Exploring a topic</li>
+<li>Sharing internal findings</li>
+<li>Fast iteration before committing to a format</li>
+</ul>
+<p><strong>Closest analog:</strong> a thorough Notion research page</p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+      <figure class="bg-right" style="background-image: url('localstack-alternatives/images/raw.png');"></figure>
+    </section>
+
+    <section class="slide split-right" data-slide="27">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="output-paper--for-stakeholders-and-external-review">Output: <code>paper</code> — for stakeholders and external review</h2>
+
+<p>Abstract, methodology section, evidence-backed claims, deterministic <code>## References</code> built from <code>citations.json</code>.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>Writing for external review</li>
+<li>Stakeholder reports where evidence provenance matters</li>
+<li>Anything that will be cited downstream</li>
+</ul>
+<p><strong>Closest analog:</strong> a literature review or RFC with bibliography</p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+      <figure class="bg-right" style="background-image: url('localstack-alternatives/images/paper.png');"></figure>
+    </section>
+
+    <section class="slide split-right" data-slide="28">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="output-technical_doc--for-engineering-decisions">Output: <code>technical_doc</code> — for engineering decisions</h2>
+
+<p>Comparison tables, decision matrix, recommendation upfront, structured pros/cons per alternative.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>Architecture Decision Records (ADRs)</li>
+<li>Vendor / tool evaluation</li>
+<li>Decision memos for engineering teams</li>
+</ul>
+<p><strong>Closest analog:</strong> an RFC or ADR with a verdict</p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+      <figure class="bg-right" style="background-image: url('localstack-alternatives/images/technical.png');"></figure>
+    </section>
+
+    <section class="slide tight" data-slide="29">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="every-run-is-fully-replayable">Every run is fully replayable</h2>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code>output/localstack_alternatives_copilot_codex/
+├── run.log                  ← human-readable operational log
+├── audit_trail.jsonl        ← append-only structured trail: steps, tool calls, denials, policy events
+├── effective_config.json    ← full normalized config snapshot at run time
+├── tool_trace.json          ← per-tool args + truncated outputs
+├── prompt_snapshot.json     ← exact prompts sent at run start
+├── rerun.sh                 ← runnable exact-replay script
+├── iterations/
+│   ├── iter_001.md          ← hypothesis + findings + critique + score
+│   └── iter_009.md
+└── report.html              ← rendered output
+</code></pre>
+<p><code>rerun.sh</code> is not documentation — it's an executable that reconstructs the exact run.<br />
+No &quot;it worked on my machine.&quot;</p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide tight" data-slide="30">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="trust--certainty--every-claim-is-classified">Trust + certainty — every claim is classified</h2>
+<p>Every entry in <code>citations.json</code> and <code>claims.json</code> carries a <code>trust_class</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>untrusted_web_content</code></td>
+<td>URL citation from live web search — treat as external, unverified</td>
+</tr>
+<tr>
+<td><code>user_provided_source_material</code></td>
+<td>Operator-provided input files — trusted by the operator</td>
+</tr>
+<tr>
+<td><code>inferred_claim</code></td>
+<td>LLM-synthesised without a direct citation — explicitly flagged</td>
+</tr>
+</tbody>
+</table>
+<p>Plus PRISMA-style evidence logs:</p>
+<ul>
+<li><code>search_log.json</code> — what was searched, when, from which backend</li>
+<li><code>screening_log.json</code> — what was included or excluded, and why</li>
+<li><code>certainty_tables.json</code> — first-pass certainty score per claim</li>
+</ul>
+<blockquote>
+<p>Readers know <strong>exactly how strong each conclusion is</strong> before acting on it.</p>
+</blockquote>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide tight" data-slide="31">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="this-run">This run</h2>
+<p>Real execution data from the <code>localstack_alternatives_copilot_codex</code> run:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backends</td>
+<td><code>claude-cli</code> (Claude Sonnet) · <code>copilot-cli</code> (Claude Sonnet 4.6) · <code>codex-cli</code> (GPT-5.4)</td>
+</tr>
+<tr>
+<td>Strategy</td>
+<td><code>adversarial</code> — researcher + critic + arbitrator</td>
+</tr>
+<tr>
+<td>Dimensions covered</td>
+<td><strong>8 of 8</strong></td>
+</tr>
+<tr>
+<td>Iterations</td>
+<td><strong>9</strong> (+ compression at iter 4)</td>
+</tr>
+<tr>
+<td>Best score reached</td>
+<td><strong>76.3 / 100</strong></td>
+</tr>
+<tr>
+<td>Output formats generated</td>
+<td>3 (<code>default</code>, <code>paper</code>, <code>technical_doc</code>)</td>
+</tr>
+<tr>
+<td>Execution cost</td>
+<td><strong>$0.00</strong> — all CLI adapters, flat-rate subscriptions</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>CLI adapters reuse existing Claude Pro / Copilot / Codex subscriptions — <strong>flat cost, not per-token</strong>.<br />
+API adapters (for CI/unattended runs) bill per-token. Choose based on context.</p>
+</blockquote>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide" data-slide="32">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="what-you-just-saw">What you just saw</h2>
+<ol>
+<li>Two different model families <strong>argued about LocalStack alternatives</strong> for 9 iterations</li>
+<li>The critic (GPT-5.4) caught real factual errors in the researcher's (Copilot) output</li>
+<li>The loop forced resolution — the final score improved <strong>+14.3 points</strong> from iteration 1 to 9</li>
+<li>Three publication-ready artifacts were produced from <strong>one research corpus</strong></li>
+<li>Every claim carries a <code>trust_class</code> — the system is honest about what it doesn't know</li>
+<li>The full run is <strong>exactly reproducible</strong> via <code>rerun.sh</code></li>
+</ol>
+<blockquote>
+<p><strong>The adversarial loop isn't about being clever. It's about the same engineering principle<br />
+as code review: a second set of eyes with different priors catches different bugs.</strong></p>
+</blockquote>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <section class="slide tighter spec video-bg" data-slide="33">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="multi-llm-adversarial-convergence-framework-1">Multi-LLM Adversarial Convergence Framework</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Version</strong></td>
+<td><code>0.x</code> — research preview</td>
+</tr>
+<tr>
+<td><strong>Repo</strong></td>
+<td><code>github.com/josefigueredo/multillm-adversarial-convergence</code></td>
+</tr>
+<tr>
+<td><strong>License</strong></td>
+<td>See repository</td>
+</tr>
+<tr>
+<td><strong>Patterns</strong></td>
+<td>11 — Engine (3) · Topology (5) · Guardrails (3)</td>
+</tr>
+<tr>
+<td><strong>Backends</strong></td>
+<td>Claude · Copilot · Codex · Gemini · API + CLI adapters</td>
+</tr>
+<tr>
+<td><strong>Outputs</strong></td>
+<td><code>default</code> · <code>paper</code> · <code>technical_doc</code> · <code>executive_brief</code> · <code>decision_memo</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="try-it">Try it</h3>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-bash">uv <span class="hljs-built_in">sync</span>
+CONFIG=configs/research/localstack_alternatives_copilot_codex.yaml
+uv run python -m src.cli research --config <span class="hljs-string">&quot;<span class="hljs-variable">$CONFIG</span>&quot;</span> --dry-run    <span class="hljs-comment"># validate</span>
+uv run python -m src.cli research --config <span class="hljs-string">&quot;<span class="hljs-variable">$CONFIG</span>&quot;</span>              <span class="hljs-comment"># run</span>
+</code></pre>
+<p>Copy a template for your own topic: <code>configs/research/_template.yaml</code> · Read on: <a href="../research.md"><code>docs/research.md</code></a> · <a href="../design/agentic-design-patterns.md"><code>docs/design/agentic-design-patterns.md</code></a> · <a href="../../AGENTS.md"><code>AGENTS.md</code></a></p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+  </main>
+
+  <nav class="deck-controls" aria-label="Slide navigation">
+    <button id="btn-prev" aria-label="Previous slide">‹</button>
+    <span id="page-indicator">1 / 33</span>
+    <button id="btn-next" aria-label="Next slide">›</button>
+  </nav>
+
+  <script src="clean.js"></script>
+</body>
+</html>

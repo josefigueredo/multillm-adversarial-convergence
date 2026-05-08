@@ -1,9 +1,9 @@
 %%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 60, 'nodeSpacing': 30, 'curve': 'basis'}}}%%
 flowchart LR
-    R["**Researcher**\ncopilot-cli\nfamily: GPT"]
-    C["**Critic**\ncodex-cli\nfamily: GPT*"]
-    A["**Arbitrator**\nclaude-cli\nfamily: Claude"]
-    OK["**Verdict**\nkeep / revise / reject"]
+    R["**Researcher**: copilot-cli\nfamily: GPT"]
+    C["**Critic**: codex-cli\nfamily: GPT*"]
+    A["**Arbitrator**: claude-cli\nfamily: Claude"]
+    OK["**Verdict**: keep / revise / reject"]
 
     R -- 'claim' --> C
     C -- 'flagged: weak citation' --> A

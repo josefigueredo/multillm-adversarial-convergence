@@ -1,9 +1,9 @@
 %%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'lineColor': '#64748b'}, 'flowchart': {'rankSpacing': 55, 'nodeSpacing': 25, 'curve': 'basis'}}}%%
 flowchart LR
-    AG["**Agent**\nclaude-cli"]
-    REQ["**Tool call**\nWebFetch · Bash · Write"]
-    REG{"**Capability\nregistry**\nallowlist"}
-    SBX["**Sandbox**\n.workspace/ only\nweb_only · none"]
+    AG["**Agent**: claude-cli"]
+    REQ["**Tool call**: WebFetch · Bash · Write"]
+    REG{"**Capability\nregistry**: allowlist"}
+    SBX["**Sandbox**: .workspace/ only\nweb_only · none"]
     OK["**Execute**"]
     DENY["**Denied**"]
     AUD["audit_trail.jsonl"]
