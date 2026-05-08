@@ -395,11 +395,10 @@ body {
   margin-right: 6px;
 }
 
-/* ── LOOP DIAGRAM (slide 4) ─────────────────────────────────────── */
+/* ── RESEARCH LOOP DIAGRAM (slide 4 · patterns/00-research-loop.svg) ─ */
 /* Hand-crafted in deck palette — no re-tinting filter, just lift it.
-   Cap height so the legend table + stopping-criteria copy fit below
-   without spilling outside the slide frame. */
-.slide img[src$="loop.svg"] {
+   Cap height so the slide doesn't get dominated by the diagram. */
+.slide img[src$="00-research-loop.svg"] {
   display: block;
   margin: 8px auto 14px;
   max-width: 100%;
