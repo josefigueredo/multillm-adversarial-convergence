@@ -130,9 +130,19 @@ body {
   font-size: 40px; font-weight: 600; letter-spacing: -0.022em;
   color: var(--ink); margin: 0 0 18px; line-height: 1.08;
 }
+/* h2 = standardized slide title for every content slide.
+   The amber left-rule is the deck's "this is the title" signal —
+   pattern slides already used it; now every plain content slide
+   inherits the same dignified treatment. Lead/divider/spec override. */
 .slide h2 {
-  font-size: 22px; font-weight: 500; letter-spacing: -0.008em;
-  color: var(--ink-soft); margin: 0 0 16px; line-height: 1.3;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  color: var(--ink);
+  margin: 0 0 18px;
+  line-height: 1.15;
+  border-left: 2px solid var(--phosphor);
+  padding-left: 18px;
 }
 .slide h3 {
   font-size: 18px; font-weight: 500; color: var(--ink);
@@ -291,12 +301,17 @@ body {
   padding: 80px 96px;
 }
 .slide.divider h2 {
+  /* On dividers the h2 is a small mono-caps eyebrow above the
+     big h1 — explicitly reset the title styling inherited from
+     `.slide h2` (no left-rule, no padding). */
   color: var(--phosphor);
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px; letter-spacing: 0.32em;
   text-transform: uppercase;
   font-weight: 500;
   margin-bottom: 18px;
+  border-left: none;
+  padding-left: 0;
 }
 .slide.divider h2::before {
   content: '╱╱  ';
@@ -329,7 +344,9 @@ body {
 /* ── TIGHT / TIGHTER ────────────────────────────────────────────── */
 .slide.tight  { font-size: 21px; padding: 48px 64px; }
 .slide.tight h1 { font-size: 32px; margin-bottom: 12px; }
-.slide.tight h2 { font-size: 18px; margin-bottom: 10px; }
+/* Title size stays at the standardized 30px — `.tight` only compresses
+   body content, not signposting. Drop only the margin slightly. */
+.slide.tight h2 { margin-bottom: 14px; }
 .slide.tight pre { font-size: 14px; line-height: 1.5; padding: 16px 18px; }
 .slide.tight table { font-size: 16px; }
 .slide.tight th { padding: 10px 12px 7px; }
@@ -337,9 +354,21 @@ body {
 .slide.tight blockquote { padding: 10px 18px; margin: 12px 0; font-size: 0.92em; }
 .slide.tight p, .slide.tight li { margin: 0.30em 0; }
 
+/* Slide 18 — strategy lattice. The single 3×3 table is the slide,
+   so it gets explicit breathing room above (below the title) and below
+   (before the closing blockquote). */
+.slide[data-slide="18"] table {
+  margin: 36px 0 28px;
+}
+.slide[data-slide="18"] td {
+  padding: 14px 16px;
+  line-height: 1.6;
+}
+
 .slide.tighter { font-size: 19px; padding: 40px 56px; }
 .slide.tighter h1 { font-size: 28px; margin-bottom: 10px; }
-.slide.tighter h2 { font-size: 16px; margin-bottom: 8px; }
+/* Same logic as .tight — title size constant, only the body shrinks. */
+.slide.tighter h2 { margin-bottom: 12px; }
 .slide.tighter pre { font-size: 13px; line-height: 1.45; padding: 12px 16px; }
 .slide.tighter table { font-size: 15px; }
 .slide.tighter blockquote { padding: 8px 16px; margin: 8px 0; font-size: 0.9em; }
@@ -347,12 +376,9 @@ body {
 
 /* ── PATTERN SLIDE ──────────────────────────────────────────────── */
 .slide.pattern { font-size: 21px; padding: 48px 64px 56px; }
-.slide.pattern h1, .slide.pattern h2 {
-  font-size: 30px; font-weight: 600; color: var(--ink);
-  border-left: 2px solid var(--phosphor);
-  padding-left: 18px;
-  margin-bottom: 14px;
-}
+/* Pattern h2 inherits the standardized .slide h2 treatment now —
+   rule kept only to tighten margin slightly so the diagram has room. */
+.slide.pattern h2 { margin-bottom: 14px; }
 .slide.pattern blockquote {
   background: transparent;
   border-left: 2px solid var(--ink-mute);
@@ -367,6 +393,10 @@ body {
   margin: 10px auto 14px;
   max-height: 260px;
 }
+/* `.focus` modifier — pattern slides that drop the "In this codebase" body
+   so the diagram can take the freed vertical space. Add `focus` to the
+   class list and the diagram caps at ~460px instead of 260px. */
+.slide.pattern.focus img { max-height: 460px; }
 /* New pro-themed SVGs already render in deck palette — no CSS filter
    re-tinting needed. Just give them a soft drop shadow to lift them
    off the glass panel. */
@@ -396,13 +426,13 @@ body {
 }
 
 /* ── RESEARCH LOOP DIAGRAM (slide 4 · patterns/00-research-loop.svg) ─ */
-/* Hand-crafted in deck palette — no re-tinting filter, just lift it.
-   Cap height so the slide doesn't get dominated by the diagram. */
+/* Slide 4 has just title + diagram (no legend/body copy), so the
+   diagram gets the full remaining vertical real estate. */
 .slide img[src$="00-research-loop.svg"] {
   display: block;
   margin: 8px auto 14px;
   max-width: 100%;
-  max-height: 340px;
+  max-height: 520px;
   filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.5));
 }
 
@@ -432,13 +462,10 @@ body {
 .slide.spec {
   background-color: var(--bg-panel-vbg);
 }
-.slide.spec h1 {
-  font-size: 30px;
-  font-family: 'Geist', sans-serif;
-  border-bottom: 1px solid var(--hairline-2);
-  padding-bottom: 12px;
-  margin-bottom: 16px;
-}
+/* Spec card title — inherits the standardized .slide h2 treatment
+   (30px ink with amber left-rule). Just tighten margin slightly so
+   the metadata table sits right under it. */
+.slide.spec h2 { margin-bottom: 16px; }
 .slide.spec h3 {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
@@ -478,11 +505,114 @@ body {
 }
 .slide.spec pre::before { content: 'BIBTEX'; }
 
+/* ── DASHBOARD CTA (link out to live replay) ────────────────────── */
+.slide .dashboard-cta {
+  display: inline-flex; align-items: center; gap: 14px;
+  padding: 12px 22px;
+  border: 1px solid var(--phosphor-cool);
+  border-radius: 99px;
+  background: rgba(34, 211, 238, 0.06);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background 0.15s, transform 0.12s;
+  font-family: 'Geist', sans-serif;
+}
+.slide .dashboard-cta:hover {
+  background: rgba(34, 211, 238, 0.15);
+  transform: translateY(-1px);
+}
+.slide .dashboard-cta .cta-icon {
+  color: var(--phosphor-cool);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 600;
+}
+.slide .dashboard-cta .cta-label {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.slide .dashboard-cta .cta-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  color: var(--ink-mute);
+}
+
+/* ── SCRIPTED TERMINAL ──────────────────────────────────────────── */
+/* A `.terminal` element on any slide becomes a step-able shell demo.
+   Drive with ↑/↓ (step), P (autoplay), R (reset), End (jump-end). */
+.slide .terminal {
+  --term-bg: #0b0e13;
+  --term-titlebar: #161b22;
+  background: var(--term-bg);
+  border-radius: 8px;
+  box-shadow: 0 16px 50px rgba(0,0,0,0.55), 0 0 0 1px var(--hairline-2), inset 0 0 60px rgba(0,0,0,0.4);
+  overflow: hidden;
+  position: relative;
+  margin: 14px 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.slide .terminal::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+  pointer-events: none; z-index: 2;
+}
+.slide .terminal-titlebar {
+  background: var(--term-titlebar);
+  padding: 9px 12px 7px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.4);
+}
+.slide .terminal .window-controls { display: flex; gap: 7px; }
+.slide .terminal .window-controls .dot {
+  width: 11px; height: 11px; border-radius: 50%; display: inline-block;
+}
+.slide .terminal .dot-close { background: #ff5f56; }
+.slide .terminal .dot-min   { background: #ffbd2e; }
+.slide .terminal .dot-max   { background: #27c93f; }
+.slide .terminal-title {
+  flex: 1; text-align: center;
+  font-size: 11px; letter-spacing: 0.06em;
+  color: var(--ink-mute);
+}
+.slide .terminal-step {
+  font-size: 9px; letter-spacing: 0.16em; color: var(--ink-mute); opacity: 0.6;
+}
+.slide .terminal-step strong { color: var(--phosphor); font-weight: 500; }
+
+.slide .terminal-body {
+  padding: 16px 18px 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  max-height: 460px;
+  overflow-y: auto;
+}
+.slide.tight .terminal-body, .slide.tighter .terminal-body { max-height: 380px; font-size: 13px; }
+.slide .terminal-body::-webkit-scrollbar { width: 6px; }
+.slide .terminal-body::-webkit-scrollbar-thumb { background: var(--hairline-2); border-radius: 3px; }
+
+.slide .terminal .line { white-space: pre-wrap; word-break: break-word; }
+.slide .terminal .prompt-line .prompt-text { color: var(--phosphor-cool); font-weight: 500; }
+.slide .terminal .prompt-line .typed-text  { color: var(--ink); }
+.slide .terminal .prompt-line             { color: var(--phosphor-cool); }
+.slide .terminal .output-line  { color: var(--ink-soft); }
+.slide .terminal .success-line { color: var(--phosphor-green); }
+.slide .terminal .error-line   { color: var(--phosphor-warn); }
+.slide .terminal .comment-line { color: var(--ink-mute); font-style: italic; }
+.slide .terminal .heading-line { color: var(--phosphor); font-weight: 600; letter-spacing: 0.02em; margin-top: 4px; }
+
+/* override base `code` styling inside the terminal so chip-look doesn't bleed */
+.slide .terminal code {
+  background: none; border: none; color: inherit; padding: 0; font-size: inherit;
+}
+
 /* ── DECK CONTROLS (nav bar) ────────────────────────────────────── */
 .deck-controls {
   position: fixed;
   bottom: 16px;
-  left: 50%;
+  left: 75%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;

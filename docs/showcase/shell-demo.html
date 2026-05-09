@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scripted Terminal · prototype</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg-deep:        #0a0c10;
+      --bg-panel:       rgba(13, 17, 23, 0.78);
+      --ink:            #e6edf3;
+      --ink-soft:       #b1bac4;
+      --ink-mute:       #7d8590;
+      --hairline:       rgba(230, 237, 243, 0.10);
+      --hairline-2:     rgba(230, 237, 243, 0.22);
+      --phosphor:       #f5a524;
+      --phosphor-cool:  #22d3ee;
+      --phosphor-green: #7ee787;
+      --phosphor-warn:  #ff7b72;
+
+      --term-bg:        #0b0e13;
+      --term-titlebar:  #161b22;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: var(--bg-deep);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+        radial-gradient(circle at 100% 0%, rgba(245,165,36,0.06), transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(34,211,238,0.04), transparent 50%);
+      color: var(--ink);
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .frame {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 32px;
+      display: grid;
+      gap: 24px;
+    }
+
+    /* TOPBAR */
+    .topbar {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: 24px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .brand::before { content: '◉ '; color: var(--phosphor); }
+    .brand strong { color: var(--phosphor); font-weight: 500; margin-left: 4px; }
+    .controls-hint {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.12em;
+      color: var(--ink-mute);
+    }
+    .controls-hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 3px;
+      margin: 0 2px;
+      font-size: 10px;
+      color: var(--ink);
+      background: rgba(13,17,23,0.5);
+    }
+
+    /* TERMINAL */
+    .terminal {
+      background: var(--term-bg);
+      border-radius: 10px;
+      box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.55),
+        0 0 0 1px var(--hairline-2),
+        inset 0 0 80px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+      position: relative;
+    }
+    .terminal::after {
+      /* CRT scanline overlay */
+      content: '';
+      position: absolute; inset: 0;
+      background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 3px);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .terminal-titlebar {
+      background: var(--term-titlebar);
+      padding: 11px 14px 9px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid rgba(0,0,0,0.4);
+    }
+    .window-controls { display: flex; gap: 8px; }
+    .window-controls .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot-close { background: #ff5f56; }
+    .dot-min   { background: #ffbd2e; }
+    .dot-max   { background: #27c93f; }
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--ink-mute);
+    }
+    .terminal-step {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: var(--ink-mute);
+      opacity: 0.6;
+    }
+    .terminal-step strong { color: var(--phosphor); font-weight: 500; }
+
+    .terminal-body {
+      padding: 22px 24px 28px;
+      min-height: 460px;
+      max-height: 70vh;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+    .terminal-body::-webkit-scrollbar { width: 6px; }
+    .terminal-body::-webkit-scrollbar-thumb { background: var(--hairline-2); border-radius: 3px; }
+
+    /* Output line styles by type */
+    .line { white-space: pre-wrap; word-break: break-word; }
+    .line.prompt-line {
+      color: var(--phosphor-cool);
+    }
+    .line.prompt-line .prompt-text { color: var(--phosphor-cool); font-weight: 500; }
+    .line.prompt-line .typed-text  { color: var(--ink); }
+    .line.output-line  { color: var(--ink-soft); }
+    .line.success-line { color: var(--phosphor-green); }
+    .line.error-line   { color: var(--phosphor-warn); }
+    .line.comment-line { color: var(--ink-mute); font-style: italic; }
+    .line.heading-line {
+      color: var(--phosphor);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-top: 6px;
+    }
+
+    /* Blinking cursor */
+    .cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 1em;
+      background: var(--phosphor);
+      vertical-align: text-bottom;
+      animation: blink 1.05s steps(2) infinite;
+      margin-left: 2px;
+      transform: translateY(2px);
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* TIMELINE / PROGRESS BAR */
+    .timeline {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      padding: 0 4px;
+    }
+    .timeline-cell {
+      flex: 1 1 18px; min-width: 14px; max-width: 28px;
+      height: 8px; border-radius: 2px;
+      background: var(--hairline);
+      border: 1px solid var(--hairline-2);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .timeline-cell.done {
+      background: rgba(245,165,36,0.4);
+      border-color: var(--phosphor);
+    }
+    .timeline-cell.current {
+      background: var(--phosphor);
+      box-shadow: 0 0 8px rgba(245,165,36,0.55);
+    }
+
+    /* Footer status */
+    .status {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-mute);
+      letter-spacing: 0.10em;
+      padding: 0 4px;
+    }
+    .status .pos { color: var(--ink); }
+    .status .pos strong { color: var(--phosphor); font-weight: 600; }
+    .status .mode {
+      padding: 3px 9px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .status .mode.playing { color: var(--phosphor-green); border-color: var(--phosphor-green); }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="topbar">
+      <div class="brand">SCRIPTED TERMINAL · <strong>prototype</strong></div>
+      <div class="controls-hint">
+        <kbd>↓</kbd>/<kbd>→</kbd> next  ·  <kbd>↑</kbd>/<kbd>←</kbd> back  ·  <kbd>P</kbd> play  ·  <kbd>R</kbd> reset  ·  <kbd>End</kbd> jump-end
+      </div>
+    </header>
+
+    <section class="terminal" aria-label="Demo terminal">
+      <header class="terminal-titlebar">
+        <div class="window-controls">
+          <span class="dot dot-close"></span>
+          <span class="dot dot-min"></span>
+          <span class="dot dot-max"></span>
+        </div>
+        <div class="terminal-title" id="term-title">~/dev/np-skill-demo — bash</div>
+        <div class="terminal-step"><strong id="step-cur">0</strong> / <span id="step-total">—</span></div>
+      </header>
+      <div class="terminal-body" id="term-body"></div>
+    </section>
+
+    <div class="timeline" id="timeline" aria-hidden="true"></div>
+
+    <footer class="status">
+      <span class="pos">step <strong id="status-cur">0</strong> / <span id="status-total">—</span></span>
+      <span class="mode" id="mode">manual</span>
+    </footer>
+  </div>
+
+  <!-- ─── DEMO SCRIPT ───
+       Each step: { type, text, delay?, prompt? }
+       type:
+         prompt   — append prompt prefix (e.g. '~ $ ') in cyan; if `text` is also given it's the typed command
+         typed    — animate char-by-char (does NOT add a prompt; usually you use type:'prompt' with text)
+         output   — instant, muted color
+         success  — instant, phosphor-green
+         error    — instant, phosphor-warn
+         comment  — instant, gray italic (annotations like # this does X)
+         heading  — instant, phosphor amber, bolder (visual section break)
+         clear    — wipes the body
+       delay (ms): used by auto-play between THIS step finishing and the next starting.
+                   Defaults: typed lines = 600ms, output = 350ms, etc.
+       prompt: when type='prompt', this is the prompt prefix (default '~ $ '). -->
+  <script id="script-data" type="application/json">
+[
+  { "type": "comment", "text": "# Live demo — install + use the np-skill suite in a fresh container", "delay": 600 },
+  { "type": "comment", "text": "# Up/Down to step · P to autoplay", "delay": 600 },
+
+  { "type": "prompt", "prompt": "host:~ $ ", "text": "./scripts/demo.sh", "delay": 900 },
+  { "type": "output", "text": "[INFO] Building np-skill-demo image…", "delay": 250 },
+  { "type": "output", "text": "[INFO] Pulling base image debian:trixie-slim", "delay": 350 },
+  { "type": "output", "text": "[INFO] Removing old container if any", "delay": 200 },
+  { "type": "output", "text": "[INFO] Starting np-skill-demo (detached)", "delay": 250 },
+  { "type": "success", "text": "✓ container running on host network", "delay": 700 },
+
+  { "type": "prompt", "prompt": "host:~ $ ", "text": "docker logs -f np-skill-demo", "delay": 900 },
+  { "type": "output", "text": "→ installing @github/copilot",  "delay": 200 },
+  { "type": "output", "text": "→ installing platform skills",  "delay": 200 },
+  { "type": "output", "text": "  · np-cli-assistant",  "delay": 120 },
+  { "type": "output", "text": "  · np-api",  "delay": 120 },
+  { "type": "output", "text": "  · np-investigation",  "delay": 120 },
+  { "type": "output", "text": "  · np-developer-actions",  "delay": 120 },
+  { "type": "success", "text": "✓ /tmp/demo-ready written — container ready", "delay": 700 },
+
+  { "type": "prompt", "prompt": "host:~ $ ", "text": "docker exec -it np-skill-demo bash", "delay": 900 },
+
+  { "type": "heading", "text": "── inside the container ──────────────────────────────", "delay": 400 },
+
+  { "type": "prompt", "prompt": "container:/work $ ", "text": "copilot", "delay": 900 },
+  { "type": "output", "text": "GitHub Copilot CLI · interactive session", "delay": 250 },
+  { "type": "comment", "text": "# 4 platform skills loaded", "delay": 500 },
+
+  { "type": "prompt", "prompt": "copilot> ", "text": "list my apps in production", "delay": 1100 },
+  { "type": "output", "text": "I'll use np-cli-assistant to list applications.", "delay": 350 },
+  { "type": "output", "text": "$ np application list --namespace prod", "delay": 250 },
+  { "type": "output", "text": "┌──────┬──────────────────┬───────────┐", "delay": 80 },
+  { "type": "output", "text": "│ ID   │ Name             │ Status    │", "delay": 80 },
+  { "type": "output", "text": "├──────┼──────────────────┼───────────┤", "delay": 80 },
+  { "type": "output", "text": "│ 1234 │ web-app          │ running   │", "delay": 100 },
+  { "type": "output", "text": "│ 5678 │ api-gateway      │ running   │", "delay": 100 },
+  { "type": "output", "text": "│ 9012 │ worker           │ stopped   │", "delay": 100 },
+  { "type": "output", "text": "└──────┴──────────────────┴───────────┘", "delay": 600 },
+
+  { "type": "prompt", "prompt": "copilot> ", "text": "create a staging scope for app 1234", "delay": 1300 },
+  { "type": "output", "text": "Switching to np-developer-actions (mutation request)", "delay": 350 },
+  { "type": "output", "text": "Plan:", "delay": 200 },
+  { "type": "output", "text": "  POST /apps/1234/scopes", "delay": 150 },
+  { "type": "output", "text": "  body: { \"name\": \"staging\", \"slug\": \"staging\" }", "delay": 150 },
+  { "type": "output", "text": "Type literal `yes` to confirm:", "delay": 600 },
+
+  { "type": "prompt", "prompt": "› ", "text": "y", "delay": 900 },
+  { "type": "error", "text": "✗ aborted — only literal `yes` advances.", "delay": 700 },
+
+  { "type": "prompt", "prompt": "› ", "text": "yes", "delay": 1100 },
+  { "type": "success", "text": "✓ scope `staging` created (id 33221)", "delay": 250 },
+  { "type": "output", "text": "  audit: ~/.platform/np-developer-actions.log", "delay": 800 }
+]
+  </script>
+
+  <script>
+    (() => {
+      const script = JSON.parse(document.getElementById('script-data').textContent);
+      const els = {
+        body:    document.getElementById('term-body'),
+        cur:     document.getElementById('step-cur'),
+        total:   document.getElementById('step-total'),
+        sCur:    document.getElementById('status-cur'),
+        sTotal:  document.getElementById('status-total'),
+        mode:    document.getElementById('mode'),
+        timeline:document.getElementById('timeline'),
+      };
+
+      const TYPING_MS_PER_CHAR = 28;
+      const SNAP_THRESHOLD_MS  = 60; // if last typing started <N ms ago and user re-presses, snap immediately
+
+      let position = 0;          // index of the NEXT step to render (0..script.length)
+      let lines = [];            // DOM <div class="line"> nodes corresponding to rendered steps
+      let isAnimating = false;   // currently typing
+      let snapNow = null;        // function to snap current animation to complete
+      let isPlaying = false;
+      let playTimer = null;
+
+      els.total.textContent = script.length;
+      els.sTotal.textContent = script.length;
+
+      // build timeline cells
+      script.forEach((_, i) => {
+        const c = document.createElement('span');
+        c.className = 'timeline-cell';
+        c.dataset.idx = i;
+        c.addEventListener('click', () => {
+          if (isPlaying) stopPlay();
+          jumpTo(i + 1);
+        });
+        els.timeline.appendChild(c);
+      });
+
+      function refreshIndicators() {
+        els.cur.textContent  = position;
+        els.sCur.textContent = position;
+        // timeline state
+        Array.from(els.timeline.children).forEach((c, i) => {
+          c.classList.toggle('done', i < position - 1);
+          c.classList.toggle('current', i === position - 1);
+        });
+        // mode label
+        els.mode.textContent = isPlaying ? 'playing' : 'manual';
+        els.mode.classList.toggle('playing', isPlaying);
+      }
+
+      function clearAll() {
+        els.body.innerHTML = '';
+        lines = [];
+        position = 0;
+      }
+
+      function appendLine(stepIndex) {
+        const step = script[stepIndex];
+        if (!step) return Promise.resolve();
+        if (step.type === 'clear') {
+          clearAll();
+          return Promise.resolve();
+        }
+        const div = document.createElement('div');
+        const cls = {
+          prompt:  'prompt-line',
+          typed:   'prompt-line',
+          output:  'output-line',
+          success: 'success-line',
+          error:   'error-line',
+          comment: 'comment-line',
+          heading: 'heading-line',
+        }[step.type] || 'output-line';
+        div.className = 'line ' + cls;
+
+        // For prompt type with text: render prompt then animate typing
+        if (step.type === 'prompt' && step.text != null) {
+          const pSpan = document.createElement('span');
+          pSpan.className = 'prompt-text';
+          pSpan.textContent = step.prompt || '~ $ ';
+          const tSpan = document.createElement('span');
+          tSpan.className = 'typed-text';
+          div.appendChild(pSpan);
+          div.appendChild(tSpan);
+          els.body.appendChild(div);
+          lines.push(div);
+          els.body.scrollTop = els.body.scrollHeight;
+          return animateTyping(tSpan, step.text);
+        }
+        if (step.type === 'typed') {
+          els.body.appendChild(div);
+          lines.push(div);
+          els.body.scrollTop = els.body.scrollHeight;
+          return animateTyping(div, step.text);
+        }
+        // prompt-only (no command) or any other instant type
+        if (step.type === 'prompt') {
+          const pSpan = document.createElement('span');
+          pSpan.className = 'prompt-text';
+          pSpan.textContent = step.prompt || '~ $ ';
+          div.appendChild(pSpan);
+        } else {
+          div.textContent = step.text ?? '';
+        }
+        els.body.appendChild(div);
+        lines.push(div);
+        els.body.scrollTop = els.body.scrollHeight;
+        return Promise.resolve();
+      }
+
+      function animateTyping(target, text) {
+        return new Promise((resolve) => {
+          isAnimating = true;
+          let i = 0;
+          let timer = null;
+          let resolved = false;
+          function tick() {
+            if (i < text.length) {
+              target.textContent += text.charAt(i++);
+              els.body.scrollTop = els.body.scrollHeight;
+              timer = setTimeout(tick, TYPING_MS_PER_CHAR);
+            } else {
+              done();
+            }
+          }
+          function done() {
+            if (resolved) return;
+            resolved = true;
+            clearTimeout(timer);
+            isAnimating = false;
+            snapNow = null;
+            resolve();
+          }
+          // expose snap function
+          snapNow = () => {
+            target.textContent = text;
+            els.body.scrollTop = els.body.scrollHeight;
+            done();
+          };
+          tick();
+        });
+      }
+
+      async function stepForward() {
+        if (isAnimating && snapNow) { snapNow(); return; }
+        if (position >= script.length) return;
+        await appendLine(position);
+        position++;
+        refreshIndicators();
+      }
+
+      function stepBackward() {
+        if (isPlaying) stopPlay();
+        if (isAnimating && snapNow) snapNow();
+        if (position <= 0) return;
+        // remove the last DOM line that wasn't a 'clear'
+        position--;
+        const lastDiv = lines.pop();
+        if (lastDiv && lastDiv.parentNode) lastDiv.parentNode.removeChild(lastDiv);
+        refreshIndicators();
+      }
+
+      async function jumpTo(target) {
+        if (isAnimating && snapNow) snapNow();
+        if (target < 0) target = 0;
+        if (target > script.length) target = script.length;
+        if (target === position) return;
+        if (target < position) {
+          // step back to target
+          while (position > target) stepBackward();
+        } else {
+          while (position < target) {
+            await appendLine(position);
+            position++;
+          }
+          refreshIndicators();
+        }
+      }
+
+      async function play() {
+        if (isPlaying) return;
+        isPlaying = true;
+        refreshIndicators();
+        while (isPlaying && position < script.length) {
+          const stepIdx = position;
+          await appendLine(stepIdx);
+          position++;
+          refreshIndicators();
+          const delay = script[stepIdx].delay ?? 350;
+          if (!isPlaying) break;
+          await new Promise((r) => { playTimer = setTimeout(r, delay); });
+        }
+        isPlaying = false;
+        refreshIndicators();
+      }
+
+      function stopPlay() {
+        isPlaying = false;
+        clearTimeout(playTimer);
+        if (isAnimating && snapNow) snapNow();
+        refreshIndicators();
+      }
+
+      function reset() {
+        stopPlay();
+        clearAll();
+        refreshIndicators();
+      }
+
+      // ── Keyboard ──────────────────────────────────────────────────
+      document.addEventListener('keydown', (e) => {
+        if (e.target.matches('input, textarea, [contenteditable]')) return;
+        switch (e.key) {
+          case 'ArrowDown': case 'ArrowRight': case ' ': case 'Enter':
+            e.preventDefault();
+            if (isPlaying) stopPlay();
+            stepForward();
+            break;
+          case 'ArrowUp': case 'ArrowLeft':
+            e.preventDefault();
+            stepBackward();
+            break;
+          case 'p': case 'P':
+            e.preventDefault();
+            if (isPlaying) stopPlay();
+            else play();
+            break;
+          case 'r': case 'R':
+            e.preventDefault();
+            reset();
+            break;
+          case 'Home':
+            e.preventDefault();
+            reset();
+            break;
+          case 'End':
+            e.preventDefault();
+            jumpTo(script.length);
+            break;
+        }
+      });
+
+      refreshIndicators();
+    })();
+  </script>
+</body>
+</html>

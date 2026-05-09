@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Replay · Adversarial Convergence Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg-deep:        #0a0c10;
+      --bg-panel:       rgba(13, 17, 23, 0.78);
+      --bg-card:        rgba(13, 17, 23, 0.62);
+      --ink:            #e6edf3;
+      --ink-soft:       #b1bac4;
+      --ink-mute:       #7d8590;
+      --hairline:       rgba(230, 237, 243, 0.10);
+      --hairline-2:     rgba(230, 237, 243, 0.22);
+      --phosphor:       #f5a524;
+      --phosphor-cool:  #22d3ee;
+      --phosphor-green: #7ee787;
+      --phosphor-warn:  #ff7b72;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: var(--bg-deep);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+        radial-gradient(circle at 100% 0%, rgba(245,165,36,0.06), transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(34,211,238,0.04), transparent 50%);
+      background-attachment: fixed;
+      color: var(--ink);
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .frame {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 16px 20px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+      overflow: hidden;
+    }
+    /* Bottom rail mirrors the main grid: legend in col 1 (under state machine),
+       player in col 2 (under event log) so widths align column-to-column. */
+    .bottom-rail {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
+      gap: 14px;  /* matches main's gap so both rails align edge-to-edge */
+      align-items: center;
+      padding-top: 6px;
+      border-top: 1px solid var(--hairline);
+    }
+    .bottom-rail .hint     { padding-top: 0; text-align: left; }
+    .bottom-rail .controls { width: 100%; justify-content: space-between; }
+
+    /* HEADER — mirrors main grid so chips align with the right column */
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
+      gap: 14px;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .brand::before { content: '◉ '; color: var(--phosphor); }
+    .brand strong { color: var(--phosphor); font-weight: 500; margin-left: 4px; }
+
+    /* Meta chips: 4 fixed-width columns — uniform size regardless of content */
+    .topbar .meta-chips {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--ink-soft);
+      padding: 5px 8px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 6px;
+      background: rgba(13,17,23,0.5);
+      min-height: 38px;
+      overflow: hidden;
+    }
+    .chip-label {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--ink-mute);
+      line-height: 1.1;
+    }
+    .chip-value {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink);
+      letter-spacing: 0.04em;
+      margin-top: 2px;
+      width: 100%;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+    .chip-value strong { font-weight: 600; }
+    .chip.iter  .chip-value strong { color: var(--phosphor); }
+    .chip.state .chip-value         { color: var(--phosphor-cool); }
+
+    /* MAIN GRID — favor the state machine column for legibility */
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
+      gap: 14px;
+      align-items: stretch;
+      min-height: 0; /* allow children to shrink within the grid track */
+    }
+    main > .card.flow {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    main > .card-stack {
+      min-height: 0;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--hairline);
+      border-radius: 8px;
+      padding: 12px 16px 14px;
+      backdrop-filter: blur(20px) saturate(1.3);
+      -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    }
+    .card .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--phosphor); margin: 0 0 8px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card .eyebrow .sub {
+      color: var(--ink-mute); font-weight: 400; letter-spacing: 0.1em;
+    }
+    .card-stack {
+      display: grid;
+      gap: 10px;
+      grid-template-rows: 2fr 1fr 1fr 2fr;  /* score · dims · cost · events */
+      min-height: 0;
+    }
+    .card-stack > .card {
+      display: flex; flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    /* let each card's main content fill the remaining height after the eyebrow */
+    .card-stack > .card > .chart-wrap,
+    .card-stack > .card > .dim-grid,
+    .card-stack > .card > .cost,
+    .card-stack > .card > .events {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    /* SVG inside chart-wrap should also fill */
+    .card-stack > .card > .chart-wrap svg {
+      flex: 1 1 auto; min-height: 0; height: 100%;
+    }
+    .card-stack > .card > .chart-wrap {
+      display: flex; flex-direction: column;
+    }
+
+    /* STATE MACHINE SVG — fills its column, both axes */
+    .flow svg {
+      width: 100%;
+      height: 100%;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: block;
+    }
+    .flow .node rect, .flow .node polygon {
+      fill: #0d1117; stroke: #7d8590; stroke-width: 1.5;
+      transition: stroke 0.2s, filter 0.2s;
+    }
+    .flow .node text.eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.16em;
+      fill: #7d8590;
+      text-transform: uppercase;
+    }
+    .flow .node text.title {
+      font-family: 'Geist', sans-serif;
+      font-size: 14px; font-weight: 600; fill: var(--ink);
+    }
+    .flow .node text.sub {
+      font-family: 'Geist', sans-serif;
+      font-size: 10px; fill: var(--ink-soft);
+    }
+    .flow .edge {
+      fill: none; stroke: #7d8590; stroke-width: 1.2;
+      transition: stroke 0.3s, stroke-width 0.3s;
+    }
+    .flow .edge-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.10em;
+      fill: var(--ink-mute);
+    }
+
+    /* node role colors (default → role-stroke when matched) */
+    .flow .node[data-role="config"]   rect { stroke: var(--phosphor-cool); }
+    .flow .node[data-role="config"]   text.eyebrow { fill: var(--phosphor-cool); }
+    .flow .node[data-role="primary"]  rect { stroke: #7d8590; }
+    .flow .node[data-role="research"] rect { stroke: var(--phosphor-cool); }
+    .flow .node[data-role="research"] text.eyebrow { fill: var(--phosphor-cool); }
+    .flow .node[data-role="critique"] rect { stroke: var(--phosphor-warn); }
+    .flow .node[data-role="critique"] text.eyebrow { fill: var(--phosphor-warn); }
+    .flow .node[data-role="score"]    polygon { stroke: var(--phosphor); }
+    .flow .node[data-role="score"]    text.eyebrow { fill: var(--phosphor); }
+    .flow .node[data-role="decide"]   polygon { stroke: var(--phosphor); }
+    .flow .node[data-role="decide"]   text.eyebrow { fill: var(--phosphor); }
+    .flow .node[data-role="keep"]     rect { stroke: var(--phosphor-green); }
+    .flow .node[data-role="keep"]     text.eyebrow { fill: var(--phosphor-green); }
+    .flow .node[data-role="discard"]  rect { stroke: var(--phosphor-warn); }
+    .flow .node[data-role="discard"]  text.eyebrow { fill: var(--phosphor-warn); }
+    .flow .node[data-role="compress"] rect { stroke: var(--phosphor-cool); }
+    .flow .node[data-role="compress"] text.eyebrow { fill: var(--phosphor-cool); }
+    .flow .node[data-role="synth"]    rect { stroke: var(--phosphor-green); }
+    .flow .node[data-role="synth"]    text.eyebrow { fill: var(--phosphor-green); }
+
+    /* active state */
+    .flow .node.active rect, .flow .node.active polygon {
+      stroke-width: 2.4;
+      filter: drop-shadow(0 0 12px var(--active-glow, rgba(245,165,36,0.55)));
+    }
+    /* "Marching ants" — illusion of flow along the active edge */
+    @keyframes flow-dash {
+      to { stroke-dashoffset: -20; }
+    }
+    .flow .edge.active {
+      stroke: var(--phosphor); stroke-width: 2;
+      stroke-dasharray: 6 4;
+      animation: flow-dash 0.55s linear infinite;
+      filter: drop-shadow(0 0 4px rgba(245,165,36,0.5));
+    }
+
+    /* MODEL BADGES — pinned to the right inside each backend-running node.
+       Colors per provider; goes bright + glow when its node is active. */
+    .flow .model-badge { transition: opacity 0.25s; pointer-events: none; }
+    .flow .model-badge circle {
+      stroke: rgba(13, 17, 23, 0.9);
+      stroke-width: 1.2;
+      transition: stroke 0.2s, filter 0.2s;
+    }
+    .flow .model-badge .logo { fill: #fff; }
+    .flow .node:not(.active) .model-badge circle { opacity: 0.55; }
+    .flow .node:not(.active) .model-badge .logo  { opacity: 0.8; }
+    .flow .node.active .model-badge circle {
+      stroke: var(--phosphor);
+      stroke-width: 2;
+      filter: drop-shadow(0 0 8px rgba(245,165,36,0.85));
+    }
+    .flow .provider-anthropic circle { fill: #d97706; }
+    .flow .provider-openai    circle { fill: #10a37f; }
+    .flow .provider-github    circle { fill: #a371f7; }
+    .flow .provider-google    circle { fill: #4285f4; }
+    .flow .model-badge text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5px; letter-spacing: 0.04em;
+      fill: var(--ink-soft); text-anchor: end;
+    }
+    /* Backend label sitting next to the badge inside the node body */
+    .flow .node text.model-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.04em;
+      fill: var(--ink-mute);
+      text-anchor: end;
+      transition: fill 0.2s;
+    }
+    .flow .node.active text.model-name { fill: var(--phosphor); }
+
+    /* SCORE CHART */
+    .chart-wrap { padding: 6px 4px 4px; }
+    .chart-wrap svg { width: 100%; height: auto; display: block; }
+    .chart-wrap .grid line { stroke: var(--hairline); stroke-width: 0.5; }
+    .chart-wrap .axis-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.12em;
+      fill: var(--ink-mute);
+    }
+    .chart-wrap .line-total { fill: none; stroke: var(--phosphor); stroke-width: 1.6; }
+    .chart-wrap .line-heur  { fill: none; stroke: var(--phosphor-cool); stroke-width: 1.2; stroke-dasharray: 3 3; }
+    .chart-wrap .line-qual  { fill: none; stroke: var(--phosphor-green); stroke-width: 1.2; stroke-dasharray: 3 3; }
+    .chart-wrap .pt-total { fill: var(--phosphor); }
+    .chart-wrap .pt-current { fill: var(--phosphor); stroke: var(--ink); stroke-width: 1.5; }
+    .chart-wrap .legend {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.10em;
+      color: var(--ink-mute);
+      margin-top: 6px;
+    }
+    .chart-wrap .legend .swatch {
+      display: inline-block; width: 14px; height: 2px; vertical-align: middle;
+      margin-right: 6px;
+    }
+    .chart-wrap .legend .swatch.total { background: var(--phosphor); }
+    .chart-wrap .legend .swatch.heur  { background: var(--phosphor-cool); }
+    .chart-wrap .legend .swatch.qual  { background: var(--phosphor-green); }
+
+    /* DIM GRID */
+    .dim-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+    }
+    .dim-cell {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.06em;
+      color: var(--ink-mute);
+      background: rgba(13,17,23,0.6);
+      border: 1px solid var(--hairline);
+      border-radius: 4px;
+      padding: 6px 4px;
+      text-align: center;
+      min-height: 38px;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.35s ease, background 0.25s, color 0.25s, transform 0.2s, border-color 0.25s, box-shadow 0.25s;
+      line-height: 1.25;
+      /* Hidden until the iteration first hypothesises this dim */
+      opacity: 0;
+      transform: scale(0.92);
+      pointer-events: none;
+    }
+    .dim-cell.discovered {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+    .dim-cell.covered {
+      background: rgba(126, 231, 135, 0.10);
+      border-color: var(--phosphor-green);
+      color: var(--phosphor-green);
+      font-weight: 500;
+    }
+    .dim-cell.current {
+      transform: scale(1.06);
+      border-color: var(--phosphor);
+      color: var(--phosphor);
+      box-shadow: 0 0 0 1px var(--phosphor);
+    }
+
+    /* COST BLOCK */
+    .cost {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .cost .cell {
+      background: rgba(13,17,23,0.6);
+      border: 1px solid var(--hairline);
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+    .cost .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute); margin-bottom: 6px;
+    }
+    .cost .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 22px; font-weight: 600;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .cost .value .unit {
+      font-size: 11px; color: var(--ink-mute); font-weight: 400; margin-left: 4px;
+    }
+
+    /* EVENT LOG (height controlled by .card-stack grid track) */
+    .events {
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; line-height: 1.6;
+      padding: 4px 0;
+    }
+    .events::-webkit-scrollbar { width: 6px; }
+    .events::-webkit-scrollbar-thumb { background: var(--hairline-2); border-radius: 3px; }
+    .events .ev { display: flex; gap: 10px; padding: 1px 4px; }
+    .events .ev-iter { color: var(--phosphor); font-weight: 500; min-width: 36px; }
+    .events .ev-state { color: var(--ink-soft); min-width: 80px; }
+    .events .ev-state.keep { color: var(--phosphor-green); }
+    .events .ev-state.discard { color: var(--phosphor-warn); }
+    .events .ev-state.compress { color: var(--phosphor-cool); }
+    .events .ev-state.synth { color: var(--phosphor-green); }
+    .events .ev-detail { color: var(--ink-mute); flex: 1; }
+
+    /* PLAYER controls (in-flow, sits on the bottom rail) */
+    footer.controls {
+      position: relative;
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 14px;
+      border-radius: 99px;
+      background: rgba(13, 17, 23, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--hairline-2);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink-soft);
+      z-index: 50;
+    }
+    footer.controls button {
+      background: transparent;
+      border: 1px solid var(--hairline);
+      color: var(--ink);
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      display: grid; place-items: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    footer.controls button:hover { border-color: var(--phosphor); color: var(--phosphor); }
+    footer.controls .scrub {
+      flex: 1 1 auto; min-width: 120px;
+      accent-color: var(--phosphor);
+    }
+    footer.controls .pos {
+      letter-spacing: 0.18em;
+      min-width: 90px; text-align: center;
+    }
+    footer.controls .pos strong { color: var(--phosphor); font-weight: 600; }
+    footer.controls select {
+      background: transparent;
+      border: 1px solid var(--hairline-2);
+      color: var(--ink);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .hint {
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.14em;
+      color: var(--ink-mute); opacity: 0.5;
+      padding-top: 4px;
+    }
+    .hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 3px;
+      margin: 0 2px;
+      font-size: 9px;
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="topbar">
+      <div class="brand">LIVE REPLAY · <strong id="topic">AWS API Gateway</strong></div>
+      <div class="meta-chips">
+        <div class="chip iter">
+          <span class="chip-label">ITER</span>
+          <span class="chip-value"><strong id="chip-iter">0</strong> / <span id="chip-iter-total">12</span></span>
+        </div>
+        <div class="chip">
+          <span class="chip-label">FRAME</span>
+          <span class="chip-value"><strong id="chip-frame">0</strong> / <span id="chip-frame-total">—</span></span>
+        </div>
+        <div class="chip state">
+          <span class="chip-label">STATE</span>
+          <span class="chip-value" id="chip-state">—</span>
+        </div>
+        <div class="chip">
+          <span class="chip-label">SCORE</span>
+          <span class="chip-value" id="chip-score">—</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- LEFT: state machine -->
+      <section class="card flow">
+        <div class="eyebrow">▸ STATE MACHINE <span class="sub">12 iterations · adversarial · serial chain</span></div>
+        <svg viewBox="0 0 960 760" preserveAspectRatio="xMidYMid meet" aria-label="State machine">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/>
+            </marker>
+            <marker id="ah-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/>
+            </marker>
+
+            <!-- ── Provider logos (Klaus / 6-fold star / Octocat / Gemini sparkle) ── -->
+            <symbol id="logo-anthropic" viewBox="-50 -50 100 100">
+              <g class="logo">
+                <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z"/>
+                <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(45)"/>
+                <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(90)"/>
+                <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(135)"/>
+                <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(180)"/>
+                <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(225)"/>
+                <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(270)"/>
+                <path d="M 0,-38 Q 4,-22 5,-10 Q 3,-2 0,-2 Q -3,-2 -5,-10 Q -4,-22 0,-38 Z" transform="rotate(315)"/>
+              </g>
+            </symbol>
+            <symbol id="logo-openai" viewBox="-50 -50 100 100">
+              <g class="logo" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round">
+                <line x1="0" y1="-38" x2="0" y2="38"/>
+                <line x1="-33" y1="-19" x2="33" y2="19"/>
+                <line x1="-33" y1="19"  x2="33" y2="-19"/>
+              </g>
+            </symbol>
+            <symbol id="logo-github" viewBox="0 0 24 24">
+              <path class="logo" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.4 3-.405 1.02.005 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+            </symbol>
+            <symbol id="logo-google" viewBox="-50 -50 100 100">
+              <path class="logo" d="M 0,-42 C 3,-18 3,-3 38,0 C 3,3 3,18 0,42 C -3,18 -3,3 -38,0 C -3,-3 -3,-18 0,-42 Z"/>
+            </symbol>
+          </defs>
+
+          <!-- nodes — main column widened (x=200, w=320) so the model
+               name + provider badge have a comfortable inner-right shelf -->
+          <g class="node" id="n-init" data-role="config">
+            <rect x="200" y="20" width="320" height="60" rx="6"/>
+            <text class="eyebrow"  x="212" y="38">INIT · CONFIG</text>
+            <text class="title"   x="212" y="58">Boot</text>
+            <text class="sub"     x="212" y="74">backends · strategy · resume</text>
+          </g>
+          <g class="node" id="n-strategy" data-role="config">
+            <rect x="200" y="100" width="320" height="60" rx="6"/>
+            <text class="eyebrow" x="212" y="118">STRATEGY</text>
+            <text class="title"  x="212" y="138">Wire roles</text>
+            <text class="sub"    x="212" y="154">primary · research[] · judge</text>
+          </g>
+          <g class="node" id="n-loop" data-role="primary">
+            <rect x="200" y="180" width="320" height="60" rx="6"/>
+            <text class="eyebrow" x="212" y="198">LOOP</text>
+            <text class="title"  x="212" y="218">Iterate</text>
+            <text class="sub"    x="212" y="234">until target / budget</text>
+          </g>
+          <g class="node" id="n-hypo" data-role="primary">
+            <rect x="200" y="270" width="320" height="60" rx="6"/>
+            <text class="eyebrow" x="212" y="288">HYPOTHESISE</text>
+            <text class="title"  x="212" y="308">Pick next gap</text>
+            <text class="sub"    x="212" y="324">primary · highest knowledge gap</text>
+            <g class="model-badge provider-anthropic" transform="translate(498 290)">
+              <circle r="13"/>
+              <use class="logo" href="#logo-anthropic" width="20" height="20" x="-10" y="-10"/>
+            </g>
+            <text class="model-name" x="511" y="324">claude-cli</text>
+          </g>
+          <g class="node" id="n-execute" data-role="research">
+            <rect x="200" y="360" width="320" height="60" rx="6"/>
+            <text class="eyebrow" x="212" y="378">EXECUTE</text>
+            <text class="title"  x="212" y="398">Research</text>
+            <text class="sub"    x="212" y="414">research[] · web · docs · code</text>
+            <g class="model-badge provider-github" transform="translate(498 380)">
+              <circle r="13"/>
+              <use class="logo" href="#logo-github" width="18" height="18" x="-9" y="-9"/>
+            </g>
+            <text class="model-name" x="511" y="414">copilot-cli</text>
+          </g>
+          <g class="node" id="n-critique" data-role="critique">
+            <rect x="200" y="450" width="320" height="60" rx="6"/>
+            <text class="eyebrow" x="212" y="468">CRITIQUE</text>
+            <text class="title"  x="212" y="488">Adversary review</text>
+            <text class="sub"    x="212" y="504">different family · different blind spots</text>
+            <g class="model-badge provider-openai" transform="translate(498 470)">
+              <circle r="13"/>
+              <use class="logo" href="#logo-openai" width="18" height="18" x="-9" y="-9"/>
+            </g>
+            <text class="model-name" x="511" y="504">codex-cli</text>
+          </g>
+          <g class="node" id="n-score" data-role="score">
+            <rect x="200" y="540" width="320" height="60" rx="6"/>
+            <text class="eyebrow" x="212" y="558">SCORE</text>
+            <text class="title"  x="212" y="578">Composite</text>
+            <text class="sub"    x="212" y="594">heuristic 40 % + judge 60 %</text>
+            <g class="model-badge provider-openai" transform="translate(498 560)">
+              <circle r="13"/>
+              <use class="logo" href="#logo-openai" width="18" height="18" x="-9" y="-9"/>
+            </g>
+            <text class="model-name" x="511" y="594">codex-cli</text>
+          </g>
+
+          <!-- decide diamond -->
+          <g class="node" id="n-decide" data-role="decide">
+            <polygon points="360,630 500,680 360,730 220,680"/>
+            <text class="eyebrow" x="360" y="666" text-anchor="middle">DECIDE</text>
+            <text class="title"  x="360" y="685" text-anchor="middle">Improved?</text>
+            <text class="sub"    x="360" y="703" text-anchor="middle">vs previous best</text>
+          </g>
+
+          <!-- branches -->
+          <g class="node" id="n-keep" data-role="keep">
+            <rect x="20" y="660" width="180" height="48" rx="6"/>
+            <text class="eyebrow" x="32" y="678">✓ KEEP</text>
+            <text class="title"  x="32" y="698">grow corpus</text>
+          </g>
+          <g class="node" id="n-discard" data-role="discard">
+            <rect x="520" y="660" width="180" height="48" rx="6"/>
+            <text class="eyebrow" x="532" y="678">✗ DISCARD</text>
+            <text class="title"  x="532" y="698">retry dim</text>
+          </g>
+
+          <!-- side branches: compress + synth (shifted far right so the
+               discard-loop return path can run cleanly between them and
+               the main column without piercing them) -->
+          <g class="node" id="n-compress" data-role="compress">
+            <rect x="720" y="180" width="220" height="60" rx="6"/>
+            <text class="eyebrow" x="732" y="198">⚙ COMPRESS</text>
+            <text class="title"  x="732" y="218">Distill</text>
+            <text class="sub"    x="732" y="234">every 5 iter</text>
+            <g class="model-badge provider-anthropic" transform="translate(920 200)">
+              <circle r="12"/>
+              <use class="logo" href="#logo-anthropic" width="18" height="18" x="-9" y="-9"/>
+            </g>
+            <text class="model-name" x="932" y="234">claude-cli</text>
+          </g>
+          <g class="node" id="n-synth" data-role="synth">
+            <rect x="720" y="270" width="220" height="60" rx="6"/>
+            <text class="eyebrow" x="732" y="288">SYNTHESISE</text>
+            <text class="title"  x="732" y="308">Final report</text>
+            <text class="sub"    x="732" y="324">targets met</text>
+            <g class="model-badge provider-anthropic" transform="translate(920 290)">
+              <circle r="12"/>
+              <use class="logo" href="#logo-anthropic" width="18" height="18" x="-9" y="-9"/>
+            </g>
+            <text class="model-name" x="932" y="324">claude-cli</text>
+          </g>
+
+          <!-- edges (vertical chain) -->
+          <path class="edge" id="e-init-strategy"      d="M 360 80 L 360 100"  marker-end="url(#ah)"/>
+          <path class="edge" id="e-strategy-loop"      d="M 360 160 L 360 180" marker-end="url(#ah)"/>
+          <path class="edge" id="e-loop-hypo"          d="M 360 240 L 360 270" marker-end="url(#ah)"/>
+          <path class="edge" id="e-hypo-execute"       d="M 360 330 L 360 360" marker-end="url(#ah)"/>
+          <path class="edge" id="e-execute-critique"   d="M 360 420 L 360 450" marker-end="url(#ah)"/>
+          <path class="edge" id="e-critique-score"     d="M 360 510 L 360 540" marker-end="url(#ah)"/>
+          <path class="edge" id="e-score-decide"       d="M 360 600 L 360 630" marker-end="url(#ah)"/>
+          <path class="edge" id="e-decide-keep"        d="M 270 700 Q 200 700 200 684" marker-end="url(#ah)"/>
+          <path class="edge" id="e-decide-discard"     d="M 450 700 Q 520 700 520 684" marker-end="url(#ah)"/>
+          <path class="edge" id="e-keep-loop"          d="M 110 660 Q 110 380 110 200 Q 110 190 200 210" marker-end="url(#ah)"/>
+          <path class="edge" id="e-discard-loop"       d="M 610 660 Q 610 380 610 200 Q 610 190 520 210" marker-end="url(#ah)" stroke-dasharray="4 4"/>
+          <!-- side branches reach far right; arrows pass over the
+               discard-loop riser at x=610 — line crossing OK, body crossing not. -->
+          <path class="edge" id="e-loop-compress"      d="M 520 210 L 720 210" marker-end="url(#ah)" stroke-dasharray="3 3"/>
+          <path class="edge" id="e-hypo-synth"         d="M 520 300 L 720 300" marker-end="url(#ah)" stroke-dasharray="3 3"/>
+
+          <!-- edge labels -->
+          <text class="edge-label" x="155" y="635" text-anchor="middle">YES</text>
+          <text class="edge-label" x="565" y="635" text-anchor="middle">NO</text>
+          <text class="edge-label" x="715" y="200" text-anchor="end">every 5</text>
+          <text class="edge-label" x="715" y="290" text-anchor="end">on stop</text>
+        </svg>
+      </section>
+
+      <!-- RIGHT: chart + dims + cost + events -->
+      <aside class="card-stack">
+        <section class="card">
+          <div class="eyebrow">▸ SCORE PROGRESSION <span class="sub" id="best-score">best —</span></div>
+          <div class="chart-wrap">
+            <svg viewBox="0 0 800 200" preserveAspectRatio="none">
+              <g class="grid" id="chart-grid"></g>
+              <g id="chart-axis"></g>
+              <path id="chart-heur" class="line-heur" vector-effect="non-scaling-stroke"/>
+              <path id="chart-qual" class="line-qual" vector-effect="non-scaling-stroke"/>
+              <path id="chart-total" class="line-total" vector-effect="non-scaling-stroke"/>
+              <g id="chart-points"></g>
+            </svg>
+            <div class="legend">
+              <span><span class="swatch total"></span> total</span>
+              <span><span class="swatch heur"></span> heuristic 40%</span>
+              <span><span class="swatch qual"></span> judge 60%</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="eyebrow">▸ DIMENSIONS <span class="sub"><span id="dim-covered">0</span> / <span id="dim-total">13</span> covered</span></div>
+          <div class="dim-grid" id="dim-grid"></div>
+        </section>
+
+        <section class="card">
+          <div class="eyebrow">▸ COST <span class="sub">running totals</span></div>
+          <div class="cost">
+            <div class="cell"><div class="label">calls</div><div class="value" id="c-calls">0</div></div>
+            <div class="cell"><div class="label">tokens</div><div class="value" id="c-tokens">0<span class="unit">k</span></div></div>
+            <div class="cell"><div class="label">spend</div><div class="value">$<span id="c-spend">0.00</span></div></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="eyebrow">▸ EVENT LOG <span class="sub">decisions · compressions · synth</span></div>
+          <div class="events" id="events"></div>
+        </section>
+      </aside>
+    </main>
+
+    <div class="bottom-rail">
+      <div class="hint">
+        <kbd>↓</kbd>/<kbd>→</kbd>/<kbd>Space</kbd> next  ·  <kbd>↑</kbd>/<kbd>←</kbd> prev  ·  <kbd>P</kbd> play  ·  <kbd>R</kbd> reset  ·  <kbd>Home</kbd>/<kbd>End</kbd> jump  ·  <kbd>1</kbd>–<kbd>4</kbd> speed
+      </div>
+      <footer class="controls">
+        <button id="btn-prev"  title="prev frame">‹</button>
+        <button id="btn-play"  title="play / pause">▶</button>
+        <button id="btn-next"  title="next frame">›</button>
+        <input type="range" class="scrub" id="scrub" min="0" value="0" />
+        <span class="pos">frame <strong id="pos-cur">0</strong> / <span id="pos-total">—</span></span>
+        <select id="speed-sel" title="playback speed">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+        </select>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ── Data ────────────────────────────────────────────────────────
+    // 13 dimensions, 12 iterations: [iter, dim_idx, heuristic, quality, decision]
+    const DIMENSIONS = [
+      'REST vs HTTP', 'WebSocket', 'AuthN/AuthZ', 'Rate limiting',
+      'Integrations', 'VTL mapping', 'CORS', 'Observability',
+      'Cost model', 'Deployment', 'Custom domains', 'Hard limits',
+      'REST→HTTP migration',
+    ];
+    const ITERATIONS = [
+      [ 1,  0, 42, 58, 'KEEP'],
+      [ 2,  1, 48, 62, 'KEEP'],
+      [ 3,  2, 55, 65, 'KEEP'],
+      [ 4,  3, 58, 68, 'KEEP'],
+      [ 5,  4, 62, 70, 'KEEP'],   // compress after iter 5
+      [ 6,  5, 66, 72, 'KEEP'],
+      [ 7,  6, 64, 70, 'DISCARD'],// the dip — critic flags weak citation
+      [ 8,  6, 70, 75, 'KEEP'],   // retry of dim 6 succeeds
+      [ 9,  7, 73, 78, 'KEEP'],
+      [10,  8, 75, 81, 'KEEP'],   // compress after iter 10
+      [11,  9, 78, 83, 'KEEP'],
+      [12, 10, 82, 87, 'KEEP'],
+    ];
+
+    // STATES per iteration: 7 frames + optional COMPRESS = 8
+    const STATE_SEQ = [
+      { state: 'HYPOTHESISE',  node: 'n-hypo',     edge: 'e-loop-hypo' },
+      { state: 'EXECUTE',      node: 'n-execute',  edge: 'e-hypo-execute' },
+      { state: 'CRITIQUE',     node: 'n-critique', edge: 'e-execute-critique' },
+      { state: 'SCORE',        node: 'n-score',    edge: 'e-critique-score' },
+      { state: 'DECIDE',       node: 'n-decide',   edge: 'e-score-decide' },
+    ];
+
+    // ── Build frames ────────────────────────────────────────────────
+    function buildFrames() {
+      const frames = [];
+      const covered = new Set();
+      let calls = 0, tokens = 0, dollars = 0;
+      // bootstrap frames (init / strategy / loop) — show once
+      frames.push({ state: 'INIT',     node: 'n-init',     edge: null,                 iter: 0, total: 0, dim: '', dimIdx: -1, decision: null, calls, tokens, dollars, covered: 0, chartPoint: null });
+      frames.push({ state: 'STRATEGY', node: 'n-strategy', edge: 'e-init-strategy',    iter: 0, total: 0, dim: '', dimIdx: -1, decision: null, calls, tokens, dollars, covered: 0, chartPoint: null });
+      frames.push({ state: 'LOOP',     node: 'n-loop',     edge: 'e-strategy-loop',    iter: 0, total: 0, dim: '', dimIdx: -1, decision: null, calls, tokens, dollars, covered: 0, chartPoint: null });
+
+      for (const [iter, dimIdx, heur, qual, decision] of ITERATIONS) {
+        const total = +(0.4 * heur + 0.6 * qual).toFixed(1);
+        const dim = DIMENSIONS[dimIdx] || `dim ${dimIdx}`;
+        STATE_SEQ.forEach((step, i) => {
+          if (i < 4) { calls += 1; tokens += 8 + ((i*7 + iter) % 7); }
+          frames.push({
+            ...step, iter, total, heuristic: heur, quality: qual, dim, dimIdx, decision,
+            calls, tokens, dollars,
+            covered: covered.size + (decision === 'KEEP' ? 1 : 0) - (decision === 'KEEP' ? 1 : 0),
+            chartPoint: step.state === 'SCORE' ? { iter, heuristic: heur, quality: qual, total } : null,
+          });
+        });
+        // KEEP / DISCARD frame
+        const isKeep = decision === 'KEEP';
+        frames.push({
+          state: isKeep ? 'KEEP' : 'DISCARD',
+          node: isKeep ? 'n-keep' : 'n-discard',
+          edge: isKeep ? 'e-decide-keep' : 'e-decide-discard',
+          iter, total, heuristic: heur, quality: qual, dim, dimIdx, decision,
+          calls, tokens, dollars,
+          covered: covered.size + (isKeep ? 1 : 0),
+          chartPoint: null,
+        });
+        // LOOP-back
+        frames.push({
+          state: 'LOOP',
+          node: 'n-loop',
+          edge: isKeep ? 'e-keep-loop' : 'e-discard-loop',
+          iter, total, heuristic: heur, quality: qual, dim, dimIdx, decision,
+          calls, tokens, dollars,
+          covered: covered.size + (isKeep ? 1 : 0),
+          chartPoint: null,
+        });
+        if (isKeep) covered.add(dimIdx);
+        // Compress every 5 iterations
+        if (iter % 5 === 0) {
+          calls += 1; tokens += 14;
+          frames.push({
+            state: 'COMPRESS', node: 'n-compress', edge: 'e-loop-compress',
+            iter, total, heuristic: heur, quality: qual, dim, dimIdx, decision,
+            calls, tokens, dollars,
+            covered: covered.size,
+            chartPoint: null,
+          });
+        }
+      }
+      // synth final
+      const last = ITERATIONS[ITERATIONS.length - 1];
+      frames.push({
+        state: 'SYNTHESISE', node: 'n-synth', edge: 'e-hypo-synth',
+        iter: last[0], total: +(0.4*last[2] + 0.6*last[3]).toFixed(1),
+        heuristic: last[2], quality: last[3], dim: '', dimIdx: -1,
+        decision: 'SYNTHESISED',
+        calls, tokens, dollars, covered: covered.size,
+        chartPoint: null,
+      });
+      return frames;
+    }
+
+    const FRAMES = buildFrames();
+
+    // ── DOM helpers ─────────────────────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+
+    // build dim grid
+    (() => {
+      const grid = $('dim-grid');
+      DIMENSIONS.forEach((d, i) => {
+        const el = document.createElement('div');
+        el.className = 'dim-cell';
+        el.dataset.idx = i;
+        el.textContent = d;
+        grid.appendChild(el);
+      });
+      $('dim-total').textContent = DIMENSIONS.length;
+      $('chip-iter-total').textContent = ITERATIONS.length;
+      $('chip-frame-total').textContent = FRAMES.length;
+      $('pos-total').textContent = FRAMES.length;
+      $('scrub').max = FRAMES.length - 1;
+    })();
+
+    // chart geometry (matches viewBox 0 0 800 200)
+    const CHART_X_MIN = 40, CHART_X_MAX = 790;
+    const CHART_Y_MIN = 20, CHART_Y_MAX = 180;
+    // chart axis (build once)
+    (() => {
+      const grid = $('chart-grid');
+      // horizontal grid lines 0/25/50/75/100
+      [0, 25, 50, 75, 100].forEach(v => {
+        const y = CHART_Y_MAX - (v / 100) * (CHART_Y_MAX - CHART_Y_MIN);
+        const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        ln.setAttribute('x1', CHART_X_MIN); ln.setAttribute('x2', CHART_X_MAX);
+        ln.setAttribute('y1', y);            ln.setAttribute('y2', y);
+        grid.appendChild(ln);
+        const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        lbl.setAttribute('class', 'axis-label');
+        lbl.setAttribute('x', 6); lbl.setAttribute('y', y + 3);
+        lbl.textContent = v;
+        grid.appendChild(lbl);
+      });
+    })();
+
+    // ── Render frame ────────────────────────────────────────────────
+    let chartPoints = [];
+    let eventLog = [];
+    let currentFrame = -1;
+
+    function renderFrame(idx) {
+      if (idx < 0 || idx >= FRAMES.length) return;
+      const f = FRAMES[idx];
+      currentFrame = idx;
+
+      // chips
+      $('chip-iter').textContent  = f.iter || 0;
+      $('chip-frame').textContent = idx + 1;
+      $('chip-state').textContent = f.state;
+      $('chip-score').textContent = f.total ? f.total.toFixed(1) : '—';
+      $('pos-cur').textContent = idx + 1;
+      $('scrub').value = idx;
+
+      // active node
+      document.querySelectorAll('.flow .node').forEach(n => n.classList.remove('active'));
+      if (f.node) {
+        const n = $(f.node);
+        if (n) n.classList.add('active');
+      }
+      // active edge
+      document.querySelectorAll('.flow .edge').forEach(e => e.classList.remove('active'));
+      if (f.edge) {
+        const e = $(f.edge);
+        if (e) e.classList.add('active');
+      }
+
+      // cost
+      $('c-calls').textContent  = f.calls;
+      $('c-tokens').innerHTML   = `${(f.tokens / 1000).toFixed(1)}<span class="unit">k</span>`;
+      $('c-spend').textContent  = '0.00';
+
+      // dim grid: rebuild discovered + covered + current
+      // - discovered: any frame so far has touched this dim. SYNTHESISE
+      //   "discovers" all remaining dims so the final view shows every
+      //   declared dim — covered ones in green, uncovered ones in gray.
+      // - covered:    the agent KEPT this dim
+      // - current:    the active frame is operating on this dim
+      const cells = document.querySelectorAll('.dim-cell');
+      const discoveredSet = new Set();
+      const coveredSet = new Set();
+      let synthSeen = false;
+      for (let i = 0; i <= idx; i++) {
+        const ff = FRAMES[i];
+        if (ff.dimIdx != null && ff.dimIdx >= 0) discoveredSet.add(ff.dimIdx);
+        if (ff.state === 'KEEP') coveredSet.add(ff.dimIdx);
+        if (ff.state === 'SYNTHESISE') synthSeen = true;
+      }
+      if (synthSeen) {
+        for (let i = 0; i < DIMENSIONS.length; i++) discoveredSet.add(i);
+      }
+      cells.forEach((c, i) => {
+        c.classList.toggle('discovered', discoveredSet.has(i));
+        c.classList.toggle('covered', coveredSet.has(i));
+        c.classList.toggle('current', i === f.dimIdx && f.dimIdx >= 0);
+      });
+      $('dim-covered').textContent = coveredSet.size;
+
+      // chart: aggregate score points up to current frame
+      chartPoints = [];
+      for (let i = 0; i <= idx; i++) {
+        if (FRAMES[i].chartPoint) chartPoints.push(FRAMES[i].chartPoint);
+      }
+      drawChart(chartPoints);
+
+      const best = chartPoints.reduce((m, p) => Math.max(m, p.total), 0);
+      $('best-score').textContent = `best ${best ? best.toFixed(1) : '—'}`;
+
+      // event log: collect milestones up to current
+      eventLog = [];
+      for (let i = 0; i <= idx; i++) {
+        const ff = FRAMES[i];
+        if (ff.state === 'KEEP' || ff.state === 'DISCARD') {
+          eventLog.push({ iter: ff.iter, type: ff.state.toLowerCase(), detail: `${ff.dim} → ${ff.total.toFixed(1)}` });
+        } else if (ff.state === 'COMPRESS') {
+          eventLog.push({ iter: ff.iter, type: 'compress', detail: 'distill · drop noise' });
+        } else if (ff.state === 'SYNTHESISE') {
+          eventLog.push({ iter: ff.iter, type: 'synth', detail: 'final report ready' });
+        }
+      }
+      drawEvents();
+    }
+
+    function drawChart(points) {
+      const xMax = ITERATIONS.length;
+      const X = (i) => CHART_X_MIN + (i / xMax) * (CHART_X_MAX - CHART_X_MIN);
+      const Y = (v) => CHART_Y_MAX - (v / 100) * (CHART_Y_MAX - CHART_Y_MIN);
+      const totalPath = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.iter)} ${Y(p.total)}`).join(' ');
+      const heurPath  = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.iter)} ${Y(p.heuristic)}`).join(' ');
+      const qualPath  = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.iter)} ${Y(p.quality)}`).join(' ');
+      $('chart-total').setAttribute('d', totalPath);
+      $('chart-heur').setAttribute('d', heurPath);
+      $('chart-qual').setAttribute('d', qualPath);
+      const pts = $('chart-points');
+      pts.innerHTML = '';
+      points.forEach((p, i) => {
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', X(p.iter));
+        c.setAttribute('cy', Y(p.total));
+        c.setAttribute('r', i === points.length - 1 ? 3.5 : 2.2);
+        c.setAttribute('class', i === points.length - 1 ? 'pt-current' : 'pt-total');
+        pts.appendChild(c);
+      });
+    }
+
+    function drawEvents() {
+      const list = $('events');
+      list.innerHTML = '';
+      eventLog.slice(-12).reverse().forEach(ev => {
+        const div = document.createElement('div');
+        div.className = 'ev';
+        div.innerHTML =
+          `<span class="ev-iter">i${String(ev.iter).padStart(2, '0')}</span>` +
+          `<span class="ev-state ${ev.type}">${ev.type.toUpperCase()}</span>` +
+          `<span class="ev-detail">${ev.detail}</span>`;
+        list.appendChild(div);
+      });
+    }
+
+    // ── Player ─────────────────────────────────────────────────────
+    let position = 0;
+    let isPlaying = false;
+    let playTimer = null;
+    let speed = 1;
+    const BASE_FRAME_MS = 720; // 1× speed
+
+    function go(idx) {
+      idx = Math.max(0, Math.min(FRAMES.length - 1, idx));
+      position = idx;
+      renderFrame(idx);
+    }
+    function next() { if (position < FRAMES.length - 1) go(position + 1); }
+    function prev() { if (position > 0) go(position - 1); }
+    function play() {
+      if (isPlaying) return;
+      isPlaying = true;
+      $('btn-play').textContent = '⏸';
+      const tick = () => {
+        if (!isPlaying) return;
+        if (position >= FRAMES.length - 1) { stop(); return; }
+        next();
+        playTimer = setTimeout(tick, BASE_FRAME_MS / speed);
+      };
+      tick();
+    }
+    function stop() {
+      isPlaying = false;
+      $('btn-play').textContent = '▶';
+      clearTimeout(playTimer);
+    }
+    function reset() { stop(); go(0); }
+
+    // controls
+    $('btn-prev').addEventListener('click', () => { stop(); prev(); });
+    $('btn-next').addEventListener('click', () => { stop(); next(); });
+    $('btn-play').addEventListener('click', () => { isPlaying ? stop() : play(); });
+    $('scrub').addEventListener('input', (e) => { stop(); go(parseInt(e.target.value, 10)); });
+    $('speed-sel').addEventListener('change', (e) => { speed = parseFloat(e.target.value); });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea, select')) return;
+      switch (e.key) {
+        case 'ArrowDown': case 'ArrowRight': case ' ':
+          e.preventDefault(); stop(); next(); break;
+        case 'ArrowUp': case 'ArrowLeft':
+          e.preventDefault(); stop(); prev(); break;
+        case 'p': case 'P':
+          e.preventDefault(); isPlaying ? stop() : play(); break;
+        case 'r': case 'R':
+          e.preventDefault(); reset(); break;
+        case 'Home':
+          e.preventDefault(); stop(); go(0); break;
+        case 'End':
+          e.preventDefault(); stop(); go(FRAMES.length - 1); break;
+        case '1': speed = 0.5; $('speed-sel').value = '0.5'; break;
+        case '2': speed = 1;   $('speed-sel').value = '1';   break;
+        case '3': speed = 2;   $('speed-sel').value = '2';   break;
+        case '4': speed = 4;   $('speed-sel').value = '4';   break;
+      }
+    });
+
+    // initial render
+    go(0);
+  </script>
+</body>
+</html>

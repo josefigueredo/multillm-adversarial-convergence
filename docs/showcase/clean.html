@@ -127,201 +127,191 @@ One LLM, one pass, one perspective.</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="7">
+    <section class="slide pattern focus" data-slide="7">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="1--evaluator-optimizer">1 · Evaluator-Optimizer</h2>
 <blockquote>
 <p><em>The outer loop. Propose, score, keep or discard, repeat.</em></p>
 </blockquote>
-<p><img src="patterns/01-evaluator-optimizer.svg" alt="" style="width:880px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/research_loop.py</code> — owns the iteration cycle</li>
-<li><code>src/scorer.py</code> — composite score (heuristic 40% + judge 60%); see <code>IterationScore</code></li>
-<li><code>KEEP</code> vs <code>DISCARD</code> decision recorded per iteration in <code>audit_trail.jsonl</code></li>
-</ul>
+<p><img src="patterns/01-evaluator-optimizer.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/research_loop.py — owns the iteration cycle
+       · src/scorer.py — composite score (heuristic 40% + judge 60%); see IterationScore
+       · KEEP vs DISCARD decision recorded per iteration in audit_trail.jsonl -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="8">
+    <section class="slide pattern focus" data-slide="8">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="2--llm-as-judge">2 · LLM-as-Judge</h2>
 <blockquote>
 <p><em>A different model scores the candidate. No self-grading.</em></p>
 </blockquote>
-<p><img src="patterns/02-llm-as-judge.svg" alt="" style="width:920px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/scorer.py</code> — <code>judge_response()</code> calls a non-producer backend</li>
-<li>Hybrid: 40% deterministic heuristic + 60% LLM judge (configurable via <code>scoring.weights</code>)</li>
-<li>Multi-judge mode: <code>evaluation.judges = [...]</code> enables consensus + disagreement detection (<code>detect_judge_disagreement()</code>)</li>
-</ul>
+<p><img src="patterns/02-llm-as-judge.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/scorer.py — judge_response() calls a non-producer backend
+       · Hybrid: 40% deterministic heuristic + 60% LLM judge (configurable via scoring.weights)
+       · Multi-judge mode: evaluation.judges = [...] enables consensus + disagreement detection
+         via detect_judge_disagreement() -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://agentic-design.ai/patterns/reflection/llm-as-judge">agentic-design.ai — LLM-as-Judge</a> · <a href="https://arxiv.org/abs/2410.10934">arXiv 2410.10934</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="9">
+    <section class="slide pattern focus" data-slide="9">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="3--reflection--self-compression">3 · Reflection / Self-Compression</h2>
 <blockquote>
 <p><em>Every N iterations: distill the corpus, drop noise.</em></p>
 </blockquote>
-<p><img src="patterns/03-reflection-compression.svg" alt="" style="width:1080px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>compression_interval</code> config flag (default: every 4 iterations)</li>
-<li>The agent re-reads its own corpus and emits a distilled version</li>
-<li>Audit event: <code>corpus_compressed</code> with before/after token counts</li>
-</ul>
+<p><img src="patterns/03-reflection-compression.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · compression_interval config flag (default: every 4 iterations)
+       · The agent re-reads its own corpus and emits a distilled version
+       · Audit event: corpus_compressed with before/after token counts -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://www.deeplearning.ai/the-batch/how-agents-can-improve-llm-performance/">Andrew Ng — Agentic Patterns</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="10">
+    <section class="slide pattern focus" data-slide="10">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="4--orchestrator--subagents">4 · Orchestrator / Subagents</h2>
 <blockquote>
 <p><em>One owner of lifecycle. Many narrow-contract workers.</em></p>
 </blockquote>
-<p><img src="patterns/04-orchestrator-subagents.svg" alt="" style="width:780px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/orchestrator.py</code> — the only owner of phase transitions, convergence checks, compression triggers</li>
-<li><code>src/backends/</code> — adapters with a single contract: <code>run(prompt) → response</code></li>
-<li>Backends never call each other; they only return to the orchestrator</li>
-</ul>
+<p><img src="patterns/04-orchestrator-subagents.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/orchestrator.py — the only owner of phase transitions, convergence checks, compression triggers
+       · src/backends/ — adapters with a single contract: run(prompt) → response
+       · Backends never call each other; they only return to the orchestrator -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="11">
+    <section class="slide pattern focus" data-slide="11">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="5--multi-agent-role-topology">5 · Multi-Agent Role Topology</h2>
 <blockquote>
 <p><em>Configure roles, not models. Swap backends without changing logic.</em></p>
 </blockquote>
-<p><img src="patterns/05-role-topology.svg" alt="" style="width:900px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>configs/research/&lt;topic&gt;.yaml</code> — <code>execution.backends</code> map roles to backend IDs</li>
-<li><code>src/config.py</code> — <code>BackendsConfig</code> schema; validates role completeness</li>
-<li>Role names appear in audit events: <code>role=judge backend=codex-cli</code></li>
-</ul>
+<p><img src="patterns/05-role-topology.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · configs/research/<topic>.yaml — execution.backends map roles to backend IDs
+       · src/config.py — BackendsConfig schema; validates role completeness
+       · Role names appear in audit events: role=judge backend=codex-cli -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://arxiv.org/abs/2405.10467">arXiv 2405.10467 — Multi-Agent Role Topology</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="12">
+    <section class="slide pattern focus" data-slide="12">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="6--routing--specialist-dispatch">6 · Routing / Specialist Dispatch</h2>
 <blockquote>
 <p><em>Each dimension goes to the backend best suited for it.</em></p>
 </blockquote>
-<p><img src="patterns/06-routing-specialist.svg" alt="" style="width:920px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/strategy.py</code> — <code>specialist</code> strategy</li>
-<li>Each dimension declares a persona in config; persona → backend lookup at dispatch time</li>
-<li>Falls back to <code>primary</code> if no specialist matches</li>
-</ul>
+<p><img src="patterns/06-routing-specialist.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/strategy.py — specialist strategy
+       · Each dimension declares a persona in config; persona → backend lookup at dispatch time
+       · Falls back to primary if no specialist matches -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="13">
+    <section class="slide pattern focus" data-slide="13">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="7--parallelization-ensemble">7 · Parallelization (Ensemble)</h2>
 <blockquote>
 <p><em>Fan out to all backends in parallel. Merge via judge.</em></p>
 </blockquote>
-<p><img src="patterns/07-parallel-ensemble.svg" alt="" style="width:880px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/strategy.py</code> — <code>ensemble</code> and <code>parallel</code> strategies</li>
-<li><code>concurrent.futures.ThreadPoolExecutor</code> — bounded parallelism</li>
-<li>Judge selects best response or synthesises an ensemble answer</li>
-</ul>
+<p><img src="patterns/07-parallel-ensemble.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/strategy.py — ensemble and parallel strategies
+       · concurrent.futures.ThreadPoolExecutor — bounded parallelism
+       · Judge selects best response or synthesises an ensemble answer -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="14">
+    <section class="slide pattern focus" data-slide="14">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="8--prompt-chaining-serial">8 · Prompt Chaining (Serial)</h2>
 <blockquote>
 <p><em>Backends take turns. Each stage receives the previous stage's output.</em></p>
 </blockquote>
-<p><img src="patterns/08-prompt-chaining-serial.svg" alt="" style="width:960px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/strategy.py</code> — <code>serial</code> strategy</li>
-<li>Stage N+1's prompt includes stage N's full output as context</li>
-<li>Used when stages have asymmetric specialisations (research → critique → synthesis)</li>
-</ul>
+<p><img src="patterns/08-prompt-chaining-serial.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/strategy.py — serial strategy
+       · Stage N+1's prompt includes stage N's full output as context
+       · Used when stages have asymmetric specialisations (research → critique → synthesis) -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/research/building-effective-agents">Anthropic — Building Effective Agents</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="15">
+    <section class="slide pattern focus" data-slide="15">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="9--adversarial-critique">9 · Adversarial Critique</h2>
 <blockquote>
 <p><em>Researcher · Critic · Arbitrator — across different model families.</em></p>
 </blockquote>
-<p><img src="patterns/09-adversarial-critique.svg" alt="" style="width:880px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/strategy.py</code> — <code>adversarial</code> strategy (used in the demo run)</li>
-<li>Three roles: <code>researcher</code>, <code>critic</code>, <code>arbitrator</code> — each a different backend family</li>
-<li>Audit log records every critique flag and arbitrator decision</li>
-</ul>
+<p><img src="patterns/09-adversarial-critique.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/strategy.py — adversarial strategy (used in the demo run)
+       · Three roles: researcher, critic, arbitrator — each a different backend family
+       · Audit log records every critique flag and arbitrator decision -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://arxiv.org/abs/2305.19118">arXiv 2305.19118 — Multi-Agent Debate</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="16">
+    <section class="slide pattern focus" data-slide="16">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="10--tool-use--sandboxed-execution">10 · Tool Use + Sandboxed Execution</h2>
 <blockquote>
 <p><em>The capability registry is the agentic equivalent of an IAM policy.</em></p>
 </blockquote>
-<p><img src="patterns/10-tool-use-sandbox.svg" alt="" style="width:920px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/policy/</code> — capability registry, sandbox executor, audit hooks</li>
-<li>Write boundary: <code>output/&lt;run&gt;/.workspace/</code> — outside is read-only</li>
-<li>Network policy: <code>web_only</code> (allowlisted endpoints) or <code>none</code></li>
-<li>Audit events: <code>tool_denied</code>, <code>write_intent</code>, <code>network_intent</code></li>
-</ul>
+<p><img src="patterns/10-tool-use-sandbox.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/policy/ — capability registry, sandbox executor, audit hooks
+       · Write boundary: output/<run>/.workspace/ — outside is read-only
+       · Network policy: web_only (allowlisted endpoints) or none
+       · Audit events: tool_denied, write_intent, network_intent -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://www.anthropic.com/engineering/writing-tools-for-agents">Anthropic — Writing Tools for Agents</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide pattern" data-slide="17">
+    <section class="slide pattern focus" data-slide="17">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="11--human-in-the-loop-hitl">11 · Human-in-the-Loop (HITL)</h2>
 <blockquote>
 <p><em>Phase-transition gates. Operator approves before irreversible actions.</em></p>
 </blockquote>
-<p><img src="patterns/11-human-in-the-loop.svg" alt="" style="width:920px;" /></p>
-<p><strong>In this codebase</strong></p>
-<ul>
-<li><code>src/policy/hitl.py</code> — phase-transition gate</li>
-<li>Configurable per-phase: <code>hitl.gates = [research_to_synthesis, plan_approve, ...]</code></li>
-<li>Audit events: <code>hitl_approved</code>, <code>hitl_aborted</code> — both with operator identity</li>
-</ul>
+<p><img src="patterns/11-human-in-the-loop.svg" alt="" /></p>
+<!-- "In this codebase" body deliberately moved out so the diagram can breathe.
+     Speaker references (covered in control.html notes):
+       · src/policy/hitl.py — phase-transition gate
+       · Configurable per-phase: hitl.gates = [research_to_synthesis, plan_approve, ...]
+       · Audit events: hitl_approved, hitl_aborted — both with operator identity -->
 <p><span class="ref"><strong>Reference:</strong> <a href="https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/">LangGraph — Human-in-the-Loop</a></span></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
@@ -404,11 +394,23 @@ One LLM, one pass, one perspective.</p>
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="dry-run-first--validate-without-spending-tokens">Dry-run first — validate without spending tokens</h2>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-bash"><span class="hljs-comment"># Validate config wiring, provider health, and tool capabilities — no backend calls</span>
-uv run python -m src.cli research \
-  --config configs/research/localstack_alternatives_copilot_codex.yaml \
-  --dry-run
-</code></pre>
+<div class="terminal" data-tid="mllm-s21-t1">
+  <div class="terminal-titlebar">
+    <div class="window-controls"><span class="dot dot-close"></span><span class="dot dot-min"></span><span class="dot dot-max"></span></div>
+    <div class="terminal-title">~/research — bash</div>
+    <div class="terminal-step"><strong class="terminal-cur">0</strong> / <span class="terminal-total">—</span></div>
+  </div>
+  <div class="terminal-body"></div>
+  <script class="terminal-script" type="application/json">[
+  { "type": "comment", "text": "# Validate config wiring, provider health, and tool capabilities — no backend calls", "delay": 400 },
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\\n  --config configs/research/localstack_alternatives_copilot_codex.yaml \\\n  --dry-run", "delay": 900 },
+  { "type": "output",  "text": "[OK] resolving backends · 3/3 reachable",   "delay": 250 },
+  { "type": "output",  "text": "[OK] strategy valid for declared role topology", "delay": 250 },
+  { "type": "output",  "text": "[OK] capability registry satisfied", "delay": 250 },
+  { "type": "output",  "text": "[OK] sandbox policy coherent", "delay": 250 },
+  { "type": "success", "text": "\u2713 dry-run passed \u2014 safe to spend tokens", "delay": 700 }
+]</script>
+</div>
 <p>Output confirms:</p>
 <ul>
 <li>All backend adapters resolve and are reachable</li>
@@ -416,14 +418,49 @@ uv run python -m src.cli research \
 <li>Tool capability registry is satisfied</li>
 <li>Sandbox policy is coherent</li>
 </ul>
-<p>Then run for real (this is the staged playback):</p>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-bash">uv run python -m src.cli research \
-  --config configs/research/localstack_alternatives_copilot_codex.yaml
-</code></pre>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide divider video-bg" data-slide="22">
+    <section class="slide" data-slide="22">
+<header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
+
+<h2 id="real-run--and-the-replay-dashboard">Real run — and the replay dashboard</h2>
+<p>Once the dry-run passes, run for real. The full execution streams to <code>audit_trail.jsonl</code> \u2014 every iteration's hypothesis, score, and KEEP/DISCARD decision is replayable.</p>
+<div class="terminal" data-tid="mllm-s22-t1">
+  <div class="terminal-titlebar">
+    <div class="window-controls"><span class="dot dot-close"></span><span class="dot dot-min"></span><span class="dot dot-max"></span></div>
+    <div class="terminal-title">~/research \u2014 bash</div>
+    <div class="terminal-step"><strong class="terminal-cur">0</strong> / <span class="terminal-total">\u2014</span></div>
+  </div>
+  <div class="terminal-body"></div>
+  <script class="terminal-script" type="application/json">[
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\\n  --config configs/research/localstack_alternatives_copilot_codex.yaml", "delay": 900 },
+  { "type": "output", "text": "[INFO] strategy: adversarial \u00b7 3 backends \u00b7 max_iterations: 10", "delay": 350 },
+  { "type": "output", "text": "[i01] HYPOTHESISE  \u00b7 dim REST vs HTTP",  "delay": 220 },
+  { "type": "output", "text": "[i01] EXECUTE      \u00b7 copilot-cli (research)", "delay": 220 },
+  { "type": "output", "text": "[i01] CRITIQUE     \u00b7 codex-cli (different family)", "delay": 220 },
+  { "type": "output", "text": "[i01] SCORE        \u00b7 heuristic 42 \u00b7 judge 58 \u00b7 total 51.6", "delay": 250 },
+  { "type": "success","text": "[i01] KEEP         \u00b7 corpus +1",         "delay": 600 },
+  { "type": "comment","text": "# \u2026 iterations 02 through 11 \u2026",    "delay": 500 },
+  { "type": "output", "text": "[i07] SCORE        \u00b7 total 67.6 (dipped \u2014 critic flagged citation)", "delay": 250 },
+  { "type": "error",  "text": "[i07] DISCARD      \u00b7 retry dim",          "delay": 400 },
+  { "type": "output", "text": "[i12] SCORE        \u00b7 total 85.0",          "delay": 250 },
+  { "type": "success","text": "[i12] KEEP         \u00b7 11/13 dimensions covered", "delay": 400 },
+  { "type": "success","text": "\u2713 run complete \u2014 see audit_trail.jsonl", "delay": 600 }
+]</script>
+</div>
+<p style="text-align:center; margin-top: 18px;">
+  <a class="dashboard-cta" href="dashboard-for-slide.html" target="_blank" rel="noopener">
+    <span class="cta-icon">▸</span>
+    <span class="cta-label">Open live replay dashboard</span>
+    <span class="cta-meta">step through the real iterations \u00b7 \u2197</span>
+  </a>
+</p>
+<footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+
+    <section class="slide divider video-bg" data-slide="23">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="iii--adversarial">III · ADVERSARIAL</h2>
@@ -432,7 +469,7 @@ uv run python -m src.cli research \
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide" data-slide="23">
+    <section class="slide" data-slide="24">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="the-critic-finds-real-errors">The critic finds real errors</h2>
@@ -452,7 +489,7 @@ uv run python -m src.cli research \
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide tight" data-slide="24">
+    <section class="slide tight" data-slide="25">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="score-progression--convergence-is-measurable">Score progression — convergence is measurable</h2>
@@ -530,7 +567,7 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide" data-slide="25">
+    <section class="slide" data-slide="26">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="from-one-corpus--three-artifacts">From one corpus — three artifacts</h2>
@@ -539,15 +576,27 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
   <span class="hljs-attr">output_style:</span> <span class="hljs-string">technical_doc</span>   <span class="hljs-comment"># default | paper | technical_doc | executive_brief | decision_memo</span>
 </code></pre>
 <p>Re-render any past run without re-running research:</p>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-bash">uv run python -m src.cli research \
-  --config configs/research/localstack_alternatives_copilot_codex_paper.yaml \
-  --synthesize   <span class="hljs-comment"># skips research loop, only re-renders</span>
-</code></pre>
+<div class="terminal" data-tid="mllm-s25-t3">
+  <div class="terminal-titlebar">
+    <div class="window-controls"><span class="dot dot-close"></span><span class="dot dot-min"></span><span class="dot dot-max"></span></div>
+    <div class="terminal-title">~/research — bash</div>
+    <div class="terminal-step"><strong class="terminal-cur">0</strong> / <span class="terminal-total">—</span></div>
+  </div>
+  <div class="terminal-body"></div>
+  <script class="terminal-script" type="application/json">[
+  {
+    "type": "prompt",
+    "prompt": "~ $ ",
+    "text": "uv run python -m src.cli research \\\n  --config configs/research/localstack_alternatives_copilot_codex_paper.yaml \\\n  --synthesize   # skips research loop, only re-renders",
+    "delay": 800
+  }
+]</script>
+</div>
 <p><strong>Same data. Same citations. Different artifact.</strong></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide split-right" data-slide="26">
+    <section class="slide split-right" data-slide="27">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="output-default--for-internal-exploration">Output: <code>default</code> — for internal exploration</h2>
@@ -564,7 +613,7 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
       <figure class="bg-right" style="background-image: url('localstack-alternatives/images/raw.png');"></figure>
     </section>
 
-    <section class="slide split-right" data-slide="27">
+    <section class="slide split-right" data-slide="28">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="output-paper--for-stakeholders-and-external-review">Output: <code>paper</code> — for stakeholders and external review</h2>
@@ -581,7 +630,7 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
       <figure class="bg-right" style="background-image: url('localstack-alternatives/images/paper.png');"></figure>
     </section>
 
-    <section class="slide split-right" data-slide="28">
+    <section class="slide split-right" data-slide="29">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="output-technical_doc--for-engineering-decisions">Output: <code>technical_doc</code> — for engineering decisions</h2>
@@ -598,7 +647,7 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
       <figure class="bg-right" style="background-image: url('localstack-alternatives/images/technical.png');"></figure>
     </section>
 
-    <section class="slide tight" data-slide="29">
+    <section class="slide tight" data-slide="30">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="every-run-is-fully-replayable">Every run is fully replayable</h2>
@@ -619,7 +668,7 @@ No &quot;it worked on my machine.&quot;</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide tight" data-slide="30">
+    <section class="slide tight" data-slide="31">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="trust--certainty--every-claim-is-classified">Trust + certainty — every claim is classified</h2>
@@ -658,7 +707,7 @@ No &quot;it worked on my machine.&quot;</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide tight" data-slide="31">
+    <section class="slide tight" data-slide="32">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="this-run">This run</h2>
@@ -708,7 +757,7 @@ API adapters (for CI/unattended runs) bill per-token. Choose based on context.</
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide" data-slide="32">
+    <section class="slide" data-slide="33">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="what-you-just-saw">What you just saw</h2>
@@ -727,7 +776,7 @@ as code review: a second set of eyes with different priors catches different bug
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
-    <section class="slide tighter spec video-bg" data-slide="33">
+    <section class="slide tighter spec video-bg" data-slide="34">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="multi-llm-adversarial-convergence-framework-1">Multi-LLM Adversarial Convergence Framework</h2>
@@ -766,11 +815,40 @@ as code review: a second set of eyes with different priors catches different bug
 </tbody>
 </table>
 <h3 id="try-it">Try it</h3>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-bash">uv <span class="hljs-built_in">sync</span>
-CONFIG=configs/research/localstack_alternatives_copilot_codex.yaml
-uv run python -m src.cli research --config <span class="hljs-string">&quot;<span class="hljs-variable">$CONFIG</span>&quot;</span> --dry-run    <span class="hljs-comment"># validate</span>
-uv run python -m src.cli research --config <span class="hljs-string">&quot;<span class="hljs-variable">$CONFIG</span>&quot;</span>              <span class="hljs-comment"># run</span>
-</code></pre>
+<div class="terminal" data-tid="mllm-s33-t4">
+  <div class="terminal-titlebar">
+    <div class="window-controls"><span class="dot dot-close"></span><span class="dot dot-min"></span><span class="dot dot-max"></span></div>
+    <div class="terminal-title">~/research — bash</div>
+    <div class="terminal-step"><strong class="terminal-cur">0</strong> / <span class="terminal-total">—</span></div>
+  </div>
+  <div class="terminal-body"></div>
+  <script class="terminal-script" type="application/json">[
+  {
+    "type": "prompt",
+    "prompt": "~ $ ",
+    "text": "uv sync",
+    "delay": 800
+  },
+  {
+    "type": "prompt",
+    "prompt": "~ $ ",
+    "text": "CONFIG=configs/research/localstack_alternatives_copilot_codex.yaml",
+    "delay": 800
+  },
+  {
+    "type": "prompt",
+    "prompt": "~ $ ",
+    "text": "uv run python -m src.cli research --config \"$CONFIG\" --dry-run    # validate",
+    "delay": 800
+  },
+  {
+    "type": "prompt",
+    "prompt": "~ $ ",
+    "text": "uv run python -m src.cli research --config \"$CONFIG\"              # run",
+    "delay": 800
+  }
+]</script>
+</div>
 <p>Copy a template for your own topic: <code>configs/research/_template.yaml</code> · Read on: <a href="../research.md"><code>docs/research.md</code></a> · <a href="../design/agentic-design-patterns.md"><code>docs/design/agentic-design-patterns.md</code></a> · <a href="../../AGENTS.md"><code>AGENTS.md</code></a></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
@@ -778,7 +856,7 @@ uv run python -m src.cli research --config <span class="hljs-string">&quot;<span
 
   <nav class="deck-controls" aria-label="Slide navigation">
     <button id="btn-prev" aria-label="Previous slide">‹</button>
-    <span id="page-indicator">1 / 33</span>
+    <span id="page-indicator">1 / 34</span>
     <button id="btn-next" aria-label="Next slide">›</button>
   </nav>
 
