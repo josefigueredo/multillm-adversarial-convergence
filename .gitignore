@@ -12,3 +12,7 @@ build/
 .remember/
 .logs/
 .playwright-mcp/
+*.mp4
+logs/
+plans/
+TRANSFER_*.md
