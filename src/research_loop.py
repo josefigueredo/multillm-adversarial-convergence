@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -319,12 +320,19 @@ def _generate_hypothesis(ctx: LoopContext, state: LoopState) -> dict[str, Any] |
     "explore Y".  The prompt template prefixes refinements with
     ``[refinement]`` so the model can distinguish them.
     """
-    unexplored = [
-        d for d in [*ctx.config.dimensions, *state.discovered_dimensions]
-        if d not in state.explored_dimensions
+    configured_unexplored = [
+        d for d in ctx.config.dimensions
+        if not _dimension_already_explored(d, state.explored_dimensions)
     ]
-    refinement_items = [f"[refinement] {topic}" for topic in state.refinement_requests]
-    eligible = unexplored + refinement_items
+    if configured_unexplored:
+        eligible = configured_unexplored
+    else:
+        discovered_unexplored = [
+            d for d in state.discovered_dimensions
+            if not _dimension_already_explored(d, state.explored_dimensions)
+        ]
+        refinement_items = [f"[refinement] {topic}" for topic in state.refinement_requests]
+        eligible = discovered_unexplored + refinement_items
 
     prompt = _render(
         "research_hypothesis.md",
@@ -362,6 +370,77 @@ def _generate_hypothesis(ctx: LoopContext, state: LoopState) -> dict[str, Any] |
                 pass
         log.warning("Could not parse hypothesis JSON: %.200s", resp.text)
         return None
+
+
+_DIMENSION_STOPWORDS = {
+    "across",
+    "analysis",
+    "and",
+    "including",
+    "into",
+    "that",
+    "the",
+    "what",
+    "when",
+    "with",
+}
+
+
+def _dimension_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", value.lower())
+        if len(token) > 2 and token not in _DIMENSION_STOPWORDS
+    }
+
+
+def _dimension_prefix_tokens(value: str) -> set[str]:
+    prefix = re.split(r"[:—-]", value, maxsplit=1)[0]
+    return _dimension_tokens(prefix)
+
+
+def _dimension_distinctive_prefix_tokens(value: str) -> set[str]:
+    generic = {"api", "gateway", "http", "rest", "websocket"}
+    return {token for token in _dimension_prefix_tokens(value) if token not in generic}
+
+
+def _dimension_already_explored(candidate: str, explored_dimensions: list[str]) -> bool:
+    """Match configured dimensions to explored dimensions despite wording drift."""
+    candidate_norm = " ".join(candidate.lower().split())
+    candidate_tokens = _dimension_tokens(candidate)
+    candidate_prefix_tokens = _dimension_distinctive_prefix_tokens(candidate)
+    if not candidate_tokens:
+        return candidate in explored_dimensions
+
+    # Substring containment can collide on short generic dimensions like
+    # "cost" or "performance" — those would match any explored entry that
+    # mentions the word. Require the shorter side to be ≥ MIN_SUBSTRING_LEN
+    # before substring containment counts; below that, fall through to the
+    # token-overlap heuristic which is far less collision-prone.
+    MIN_SUBSTRING_LEN = 25
+
+    for explored in explored_dimensions:
+        explored_norm = " ".join(explored.lower().split())
+        if candidate_norm == explored_norm:
+            return True
+        shorter_len = min(len(candidate_norm), len(explored_norm))
+        if shorter_len >= MIN_SUBSTRING_LEN and (
+            candidate_norm in explored_norm or explored_norm in candidate_norm
+        ):
+            return True
+
+        explored_tokens = _dimension_tokens(explored)
+        if not explored_tokens:
+            continue
+        if len(candidate_prefix_tokens) >= 2 and candidate_prefix_tokens <= explored_tokens:
+            return True
+        overlap = len(candidate_tokens & explored_tokens)
+        candidate_recall = overlap / len(candidate_tokens)
+        explored_recall = overlap / len(explored_tokens)
+        if candidate_recall >= 0.55 and explored_recall >= 0.35:
+            return True
+
+    return False
 
 
 def _execute_research(
@@ -976,10 +1055,53 @@ def _log_result(
 
 
 # Memory needed to safely invoke a CLI-backed compress: claude-cli's Node heap
-# baseline (~1.5 GB) plus python framework headroom plus a margin. Below this,
-# the kernel is likely to SIGKILL the python process during the subprocess
-# spawn. Tunable via env var for ops who want to override on bigger machines.
-_COMPRESS_MIN_FREE_GB = 2.0
+# baseline (~1.5 GB), the parent's Popen.communicate() stdout buffer (verbose
+# JSON across many turns can be hundreds of MB to a few GB), plus python
+# framework headroom and a margin. Below this, the kernel is likely to SIGKILL
+# the python process during the subprocess spawn or while buffering stdout.
+#
+# Default is 4.0 GB — sized for WSL2 (default 50% host cap → 12 GB on a 24 GB
+# host) and 16 GB Apple Silicon. Override on bigger hosts (or smaller ones) via
+# RESEARCH_COMPRESS_MIN_FREE_GB.
+def _compress_min_free_gb() -> float:
+    raw = os.environ.get("RESEARCH_COMPRESS_MIN_FREE_GB")
+    if raw:
+        try:
+            return float(raw)
+        except ValueError:
+            log.warning(
+                "RESEARCH_COMPRESS_MIN_FREE_GB=%r is not a number; using default.",
+                raw,
+            )
+    return 4.0
+
+
+def _compress_timeout_seconds() -> int:
+    """Per-invocation timeout for the compress CLI call.
+
+    Default 300s (5 min) is comfortable for ~20k-word corpora on opus.
+    Operators with smaller corpora or stricter latency budgets can tighten
+    via env var ``RESEARCH_COMPRESS_TIMEOUT_SECONDS``; the AWS API Gateway
+    run that finally succeeded used the default. Lower bound enforced at
+    30s so an accidental ``=0`` doesn't disable compress entirely.
+    """
+    raw = os.environ.get("RESEARCH_COMPRESS_TIMEOUT_SECONDS")
+    if raw:
+        try:
+            value = int(raw)
+            if value < 30:
+                log.warning(
+                    "RESEARCH_COMPRESS_TIMEOUT_SECONDS=%d is too low; using 30s minimum.",
+                    value,
+                )
+                return 30
+            return value
+        except ValueError:
+            log.warning(
+                "RESEARCH_COMPRESS_TIMEOUT_SECONDS=%r is not an integer; using default 300.",
+                raw,
+            )
+    return 300
 
 
 def _available_memory_gb() -> float | None:
@@ -1060,7 +1182,8 @@ def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
 
     Two-layer defense against OOM:
       1. PREVENT — pre-flight memory check refuses to invoke the compress
-         backend when free RAM is below ``_COMPRESS_MIN_FREE_GB``. The CLI
+         backend when free RAM is below ``_compress_min_free_gb()``
+         (env: RESEARCH_COMPRESS_MIN_FREE_GB, default 4.0). The CLI
          backends spawn a Node subprocess (~1.5 GB heap baseline); below
          the threshold, the kernel is likely to SIGKILL python during
          the spawn. Falls back to truncation.
@@ -1078,18 +1201,19 @@ def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
         return
 
     # Layer 1: pre-flight memory guard.
+    threshold_gb = _compress_min_free_gb()
     free_gb = _available_memory_gb()
-    if free_gb is not None and free_gb < _COMPRESS_MIN_FREE_GB:
+    if free_gb is not None and free_gb < threshold_gb:
         log.warning(
             "Skipping LLM compress at iter %d: only %.2f GB free (need %.1f GB). "
             "Falling back to truncation.",
-            state.iteration, free_gb, _COMPRESS_MIN_FREE_GB,
+            state.iteration, free_gb, threshold_gb,
         )
         ctx.audit_trail.emit(
             "compress_skipped_low_memory",
             iteration=state.iteration,
             free_gb=round(free_gb, 2),
-            threshold_gb=_COMPRESS_MIN_FREE_GB,
+            threshold_gb=threshold_gb,
             corpus_words=word_count,
         )
         _truncate_knowledge_base(state, reason="low memory pre-flight")
@@ -1108,6 +1232,15 @@ def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
     )
 
     # Layer 2: try the LLM compress, fall through to truncation on any failure.
+    #
+    # Compress is pure text-in / text-out. Force ``allowed_tools=""`` and
+    # ``max_turns=1`` so the backend can't pull WebSearch/WebFetch results
+    # (each can be MBs) into the CLI subprocess's heap or our parent's
+    # ``communicate()`` stdout buffer. Without this clamp, the call inherits
+    # the run's allowed_tools (typically WebSearch,WebFetch,Read,Bash,Glob,
+    # Grep) and a max_turns of 12 — which silently SIGKILLs on memory-tight
+    # hosts (WSL2's default 50% cap, 16 GB Macs) without leaving an OOM
+    # trace because V8 aborts internally before the Linux OOM killer fires.
     compress_backend = ctx.strategy.get_compress_backend()
     try:
         with ctx.audit_trail.step(
@@ -1116,7 +1249,21 @@ def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
             iteration=state.iteration,
             backend=compress_backend.name,
         ):
-            resp = ctx.call_with(compress_backend, prompt, max_turns=3, timeout=120)
+            resp = ctx.call_with(
+                compress_backend,
+                prompt,
+                max_turns=1,
+                allowed_tools="",
+                # 120s was the historical default and was the actual cause
+                # of "killed" mid-compress: claude-cli on a 20k-word KB
+                # routinely takes 140s+, the timeout fired, and the
+                # process-group SIGKILL hit the parent too. Now that
+                # _run_process puts the child in its own session, the
+                # parent survives a timeout — but compress still needs
+                # enough headroom to finish on a tight host. Default 300s,
+                # tunable via RESEARCH_COMPRESS_TIMEOUT_SECONDS.
+                timeout=_compress_timeout_seconds(),
+            )
         ctx.track_usage(resp, compress_backend.name)
     except Exception as exc:  # noqa: BLE001 — never let compress kill the run
         log.warning(

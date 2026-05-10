@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.audit_trail import NullAuditTrailWriter
-from src.research_loop import LoopContext, LoopState, run_iteration
+from src.research_loop import LoopContext, LoopState, _dimension_already_explored, run_iteration
 from src.scorer import IterationScore
 from src.workflows.research_states import ResearchState
 
@@ -56,6 +56,29 @@ def _make_loop_ctx(audit_trail=None) -> LoopContext:
 _FAKE_HYPOTHESIS = {"dimension": "safety", "questions": ["Is it safe?"], "approach": "search"}
 _SCORE_KEEP = IterationScore(coverage=80.0, quality=80.0, total=80.0)
 _SCORE_DISCARD = IterationScore(coverage=10.0, quality=10.0, total=10.0)
+
+
+def test_dimension_matching_tolerates_config_and_result_wording_drift():
+    explored = [
+        "Deployment lifecycle and IaC: stages, canary releases, OpenAPI import/export, and CDK vs SAM vs Terraform across REST, HTTP, and WebSocket APIs",
+    ]
+
+    assert _dimension_already_explored(
+        "Deployment: stages, canary releases, versioning, OpenAPI export/import, CDK vs SAM vs Terraform",
+        explored,
+    )
+    assert _dimension_already_explored(
+        "Cost modeling: per-request pricing, data transfer, caching, free tier, and the cost crossover REST↔HTTP",
+        ["Cost modeling and total cost of ownership across API Gateway variants at enterprise scale"],
+    )
+    assert not _dimension_already_explored(
+        "REST API vs HTTP API: feature matrix, pricing, performance, and what HTTP API still cannot do",
+        ["Migration path REST API → HTTP API: feature gap analysis, breaking-change inventory, and when NOT to migrate"],
+    )
+    assert not _dimension_already_explored(
+        "CORS handling and pre-flight optimization across REST API vs HTTP API",
+        explored,
+    )
 
 
 # ---------------------------------------------------------------------------

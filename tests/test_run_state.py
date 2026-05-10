@@ -89,3 +89,31 @@ def test_resume_state_rebuilds_tracking(tmp_path: Path):
     assert state["explored_dimensions"] == ["DX"]
     assert state["discovered_dimensions"] == ["Testing"]
     assert state["knowledge_base"] == "KB"
+
+
+def test_resume_state_uses_highest_iteration_number_when_files_have_gaps(tmp_path: Path):
+    iterations_dir = tmp_path / "iterations"
+    iterations_dir.mkdir()
+    (iterations_dir / "iter_001.md").write_text("dummy", encoding="utf-8")
+    (iterations_dir / "iter_003.md").write_text("dummy", encoding="utf-8")
+    results_path = tmp_path / "results.tsv"
+    results_path.write_text(
+        "iteration\ttimestamp\tdimension\tcoverage_score\tquality_score\ttotal_score\tstatus\thypothesis\tdiscovered_gaps\tcumulative_cost_usd\tcumulative_input_tokens\tcumulative_output_tokens\n"
+        "001\t2026-01-01T00:00:00\tA\t80.0\t80.0\t80.0\tkeep\thypo\t[]\t0.100\t10\t2\n"
+        "002\t2026-01-01T00:00:00\tB\t0.0\t0.0\t0.0\tcrash\t\t[]\t0.100\t10\t2\n"
+        "003\t2026-01-01T00:00:00\tC\t70.0\t70.0\t70.0\tkeep\thypo\t[]\t0.100\t10\t2\n",
+        encoding="utf-8",
+    )
+    kb_path = tmp_path / "knowledge_base.md"
+    kb_path.write_text("KB", encoding="utf-8")
+
+    state = resume_state(
+        iterations_dir=iterations_dir,
+        results_path=results_path,
+        knowledge_base_path=kb_path,
+        configured_dimensions=["A", "B", "C"],
+        max_attempts_per_dimension=3,
+    )
+
+    assert state["iteration"] == 3
+    assert state["explored_dimensions"] == ["A", "C"]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -11,6 +12,28 @@ from typing import Any, Callable
 from .backends import AgentResponse
 from .strategy import ResearchCandidate
 from .workflows.decisions import IterationDecision, classify_iteration_decision
+
+log = logging.getLogger("autoresearch")
+
+
+def _max_iteration_number(iteration_files: list[Path]) -> int:
+    """Return the highest numeric iter_NNN suffix found on disk.
+
+    Filenames whose suffix isn't numeric (e.g. ``iter_garbage.md`` from a
+    typo or rename) are skipped with a single WARNING per file so a weird
+    resume offset later isn't a debugging mystery.
+    """
+    highest = 0
+    for path in iteration_files:
+        try:
+            highest = max(highest, int(path.stem.rsplit("_", 1)[-1]))
+        except (ValueError, IndexError):
+            log.warning(
+                "Ignoring iteration file with non-numeric suffix: %s",
+                path.name,
+            )
+            continue
+    return highest
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +475,7 @@ def resume_state(
     )
 
     existing = sorted(iterations_dir.glob("iter_*.md"))
+    next_iteration_base = _max_iteration_number(existing)
     if not existing:
         return {
             "iteration": 0,
@@ -562,7 +586,7 @@ def resume_state(
 
     knowledge_base = knowledge_base_path.read_text(encoding="utf-8") if knowledge_base_path.exists() else ""
     return {
-        "iteration": len(existing),
+        "iteration": next_iteration_base,
         "results": results,
         "best_score": best_score,
         "best_scores": best_scores,
