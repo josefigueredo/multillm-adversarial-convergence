@@ -154,7 +154,7 @@
     .card-stack {
       display: grid;
       gap: 10px;
-      grid-template-rows: 2fr 1fr 1fr 2fr;  /* score · dims · cost · events */
+      grid-template-rows: 2fr 1.333fr 0.667fr 2fr;  /* score · dims · cost · events */
       min-height: 0;
     }
     .card-stack > .card {
@@ -334,6 +334,10 @@
       display: flex; align-items: center; justify-content: center;
       transition: opacity 0.35s ease, background 0.25s, color 0.25s, transform 0.2s, border-color 0.25s, box-shadow 0.25s;
       line-height: 1.25;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       /* Hidden until the iteration first hypothesises this dim */
       opacity: 0;
       transform: scale(0.92);
@@ -361,27 +365,39 @@
     .cost {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
+      gap: 8px;
     }
     .cost .cell {
       background: rgba(13,17,23,0.6);
       border: 1px solid var(--hairline);
-      border-radius: 6px;
-      padding: 12px 14px;
+      border-radius: 5px;
+      padding: 6px 9px;
+      min-height: 0;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      overflow: hidden;
     }
     .cost .label {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--ink-mute); margin-bottom: 6px;
+      font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--ink-mute); margin-bottom: 0;
+      flex: 0 0 auto;
     }
     .cost .value {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 22px; font-weight: 600;
+      font-size: 16px; font-weight: 600;
       color: var(--ink);
       font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+      min-width: 0;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .cost .value .unit {
-      font-size: 11px; color: var(--ink-mute); font-weight: 400; margin-left: 4px;
+      font-size: 9px; color: var(--ink-mute); font-weight: 400; margin-left: 3px;
     }
 
     /* EVENT LOG (height controlled by .card-stack grid track) */
@@ -398,6 +414,7 @@
     .events .ev-state { color: var(--ink-soft); min-width: 80px; }
     .events .ev-state.keep { color: var(--phosphor-green); }
     .events .ev-state.discard { color: var(--phosphor-warn); }
+    .events .ev-state.crash { color: var(--phosphor-warn); }
     .events .ev-state.compress { color: var(--phosphor-cool); }
     .events .ev-state.synth { color: var(--phosphor-green); }
     .events .ev-detail { color: var(--ink-mute); flex: 1; }
@@ -566,11 +583,11 @@
             <text class="eyebrow" x="212" y="378">EXECUTE</text>
             <text class="title"  x="212" y="398">Research</text>
             <text class="sub"    x="212" y="414">research[] · web · docs · code</text>
-            <g class="model-badge provider-github" transform="translate(498 380)">
+            <g class="model-badge provider-anthropic" transform="translate(498 380)">
               <circle r="13"/>
-              <use class="logo" href="#logo-github" width="18" height="18" x="-9" y="-9"/>
+              <use class="logo" href="#logo-anthropic" width="18" height="18" x="-9" y="-9"/>
             </g>
-            <text class="model-name" x="511" y="414">copilot-cli</text>
+            <text class="model-name" x="511" y="414">claude-cli</text>
           </g>
           <g class="node" id="n-critique" data-role="critique">
             <rect x="200" y="450" width="320" height="60" rx="6"/>
@@ -622,7 +639,7 @@
             <rect x="720" y="180" width="220" height="60" rx="6"/>
             <text class="eyebrow" x="732" y="198">⚙ COMPRESS</text>
             <text class="title"  x="732" y="218">Distill</text>
-            <text class="sub"    x="732" y="234">every 5 iter</text>
+            <text class="sub"    x="732" y="234">every 2 iter</text>
             <g class="model-badge provider-anthropic" transform="translate(920 200)">
               <circle r="12"/>
               <use class="logo" href="#logo-anthropic" width="18" height="18" x="-9" y="-9"/>
@@ -661,7 +678,7 @@
           <!-- edge labels -->
           <text class="edge-label" x="155" y="635" text-anchor="middle">YES</text>
           <text class="edge-label" x="565" y="635" text-anchor="middle">NO</text>
-          <text class="edge-label" x="715" y="200" text-anchor="end">every 5</text>
+          <text class="edge-label" x="715" y="200" text-anchor="end">every 2</text>
           <text class="edge-label" x="715" y="290" text-anchor="end">on stop</text>
         </svg>
       </section>
@@ -732,27 +749,11 @@
     'use strict';
 
     // ── Data ────────────────────────────────────────────────────────
-    // 13 dimensions, 12 iterations: [iter, dim_idx, heuristic, quality, decision]
-    const DIMENSIONS = [
-      'REST vs HTTP', 'WebSocket', 'AuthN/AuthZ', 'Rate limiting',
-      'Integrations', 'VTL mapping', 'CORS', 'Observability',
-      'Cost model', 'Deployment', 'Custom domains', 'Hard limits',
-      'REST→HTTP migration',
-    ];
-    const ITERATIONS = [
-      [ 1,  0, 42, 58, 'KEEP'],
-      [ 2,  1, 48, 62, 'KEEP'],
-      [ 3,  2, 55, 65, 'KEEP'],
-      [ 4,  3, 58, 68, 'KEEP'],
-      [ 5,  4, 62, 70, 'KEEP'],   // compress after iter 5
-      [ 6,  5, 66, 72, 'KEEP'],
-      [ 7,  6, 64, 70, 'DISCARD'],// the dip — critic flags weak citation
-      [ 8,  6, 70, 75, 'KEEP'],   // retry of dim 6 succeeds
-      [ 9,  7, 73, 78, 'KEEP'],
-      [10,  8, 75, 81, 'KEEP'],   // compress after iter 10
-      [11,  9, 78, 83, 'KEEP'],
-      [12, 10, 82, 87, 'KEEP'],
-    ];
+    const RUN_BASE = '../../output/aws_api_gateway_opus_sonnet_codex';
+    let DIMENSIONS = [];
+    let ITERATIONS = [];
+    let FRAMES = [];
+    let RUN_CONFIG = { topic: 'AWS API Gateway', execution: { compress_every: 2 }, scoring: { target_dimensions_total: 13 } };
 
     // STATES per iteration: 7 frames + optional COMPRESS = 8
     const STATE_SEQ = [
@@ -773,22 +774,25 @@
       frames.push({ state: 'STRATEGY', node: 'n-strategy', edge: 'e-init-strategy',    iter: 0, total: 0, dim: '', dimIdx: -1, decision: null, calls, tokens, dollars, covered: 0, chartPoint: null });
       frames.push({ state: 'LOOP',     node: 'n-loop',     edge: 'e-strategy-loop',    iter: 0, total: 0, dim: '', dimIdx: -1, decision: null, calls, tokens, dollars, covered: 0, chartPoint: null });
 
-      for (const [iter, dimIdx, heur, qual, decision] of ITERATIONS) {
-        const total = +(0.4 * heur + 0.6 * qual).toFixed(1);
+      for (const row of ITERATIONS) {
+        const { iter, dimIdx, heuristic: heur, quality: qual, total, decision, tokens: rowTokens, dollars: rowDollars } = row;
         const dim = DIMENSIONS[dimIdx] || `dim ${dimIdx}`;
         STATE_SEQ.forEach((step, i) => {
-          if (i < 4) { calls += 1; tokens += 8 + ((i*7 + iter) % 7); }
+          if (i < 4) calls += 1;
+          if (rowTokens) tokens = Math.max(tokens, rowTokens);
+          if (rowDollars) dollars = Math.max(dollars, rowDollars);
           frames.push({
             ...step, iter, total, heuristic: heur, quality: qual, dim, dimIdx, decision,
             calls, tokens, dollars,
             covered: covered.size + (decision === 'KEEP' ? 1 : 0) - (decision === 'KEEP' ? 1 : 0),
-            chartPoint: step.state === 'SCORE' ? { iter, heuristic: heur, quality: qual, total } : null,
+            chartPoint: step.state === 'SCORE' ? { iter, order: row.order, heuristic: heur, quality: qual, total } : null,
           });
         });
         // KEEP / DISCARD frame
         const isKeep = decision === 'KEEP';
+        const isCrash = decision === 'CRASH';
         frames.push({
-          state: isKeep ? 'KEEP' : 'DISCARD',
+          state: isKeep ? 'KEEP' : (isCrash ? 'CRASH' : 'DISCARD'),
           node: isKeep ? 'n-keep' : 'n-discard',
           edge: isKeep ? 'e-decide-keep' : 'e-decide-discard',
           iter, total, heuristic: heur, quality: qual, dim, dimIdx, decision,
@@ -807,9 +811,9 @@
           chartPoint: null,
         });
         if (isKeep) covered.add(dimIdx);
-        // Compress every 5 iterations
-        if (iter % 5 === 0) {
-          calls += 1; tokens += 14;
+        const compressEvery = Number(RUN_CONFIG.execution?.compress_every || 0);
+        if (compressEvery > 0 && iter % compressEvery === 0 && isKeep) {
+          calls += 1;
           frames.push({
             state: 'COMPRESS', node: 'n-compress', edge: 'e-loop-compress',
             iter, total, heuristic: heur, quality: qual, dim, dimIdx, decision,
@@ -820,11 +824,11 @@
         }
       }
       // synth final
-      const last = ITERATIONS[ITERATIONS.length - 1];
+      const last = ITERATIONS[ITERATIONS.length - 1] || { iter: 0, total: 0, heuristic: 0, quality: 0 };
       frames.push({
         state: 'SYNTHESISE', node: 'n-synth', edge: 'e-hypo-synth',
-        iter: last[0], total: +(0.4*last[2] + 0.6*last[3]).toFixed(1),
-        heuristic: last[2], quality: last[3], dim: '', dimIdx: -1,
+        iter: last.iter, total: last.total,
+        heuristic: last.heuristic, quality: last.quality, dim: '', dimIdx: -1,
         decision: 'SYNTHESISED',
         calls, tokens, dollars, covered: covered.size,
         chartPoint: null,
@@ -832,27 +836,128 @@
       return frames;
     }
 
-    const FRAMES = buildFrames();
-
     // ── DOM helpers ─────────────────────────────────────────────────
     const $ = (id) => document.getElementById(id);
 
-    // build dim grid
-    (() => {
+    function shortLabel(value) {
+      return String(value || '')
+        .replace(/ across REST API vs HTTP API.*/, '')
+        .replace(/ across REST, HTTP, and WebSocket APIs.*/, '')
+        .replace(/: .*/, '')
+        .replace('Migration path REST API → HTTP API', 'REST→HTTP migration')
+        .replace('REST API vs HTTP API', 'REST vs HTTP')
+        .trim();
+    }
+
+    function parseTsv(text) {
+      const lines = text.trim().split(/\r?\n/).filter(Boolean);
+      if (!lines.length) return [];
+      const rows = lines.map(line => {
+        const out = [];
+        let cur = '', quoted = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i], next = line[i + 1];
+          if (ch === '"' && quoted && next === '"') { cur += '"'; i++; continue; }
+          if (ch === '"') { quoted = !quoted; continue; }
+          if (ch === '\t' && !quoted) { out.push(cur); cur = ''; continue; }
+          cur += ch;
+        }
+        out.push(cur);
+        return out;
+      });
+      const header = rows.shift();
+      return rows.map(cols => Object.fromEntries(header.map((key, i) => [key, cols[i] || ''])));
+    }
+
+    function tokens(value) {
+      const stop = new Set(['and', 'the', 'with', 'that', 'into', 'what', 'when', 'across', 'including']);
+      return new Set(String(value || '').toLowerCase().match(/[a-z0-9]+/g)?.filter(t => t.length > 2 && !stop.has(t)) || []);
+    }
+    function prefixTokens(value) {
+      return tokens(String(value || '').split(/[:—-]/, 1)[0]);
+    }
+    function distinctivePrefixTokens(value) {
+      const generic = new Set(['api', 'rest', 'http', 'websocket', 'gateway']);
+      return new Set([...prefixTokens(value)].filter(t => !generic.has(t)));
+    }
+
+    function dimensionMatches(a, b) {
+      const an = String(a || '').toLowerCase().trim();
+      const bn = String(b || '').toLowerCase().trim();
+      if (an === bn || an.includes(bn) || bn.includes(an)) return true;
+      const at = tokens(a), bt = tokens(b);
+      if (!at.size || !bt.size) return false;
+      const ap = distinctivePrefixTokens(a), bp = distinctivePrefixTokens(b);
+      if (ap.size >= 2 && [...ap].every(t => bt.has(t))) return true;
+      if (bp.size >= 2 && [...bp].every(t => at.has(t))) return true;
+      const overlap = [...at].filter(t => bt.has(t)).length;
+      return overlap / at.size >= 0.45 && overlap / bt.size >= 0.30;
+    }
+
+    function dimensionIndexFor(dimension) {
+      const exact = DIMENSIONS.findIndex(d => d === dimension);
+      if (exact >= 0) return exact;
+      const fuzzy = DIMENSIONS.findIndex(d => dimensionMatches(d, dimension));
+      if (fuzzy >= 0) return fuzzy;
+      DIMENSIONS.push(dimension);
+      return DIMENSIONS.length - 1;
+    }
+
+    async function loadRunData() {
+      const [resultsText, config] = await Promise.all([
+        fetch(`${RUN_BASE}/results.tsv`, { cache: 'no-store' }).then(r => {
+          if (!r.ok) throw new Error(`Could not load results.tsv (${r.status})`);
+          return r.text();
+        }),
+        fetch(`${RUN_BASE}/effective_config.json`, { cache: 'no-store' }).then(r => r.ok ? r.json() : RUN_CONFIG),
+      ]);
+      RUN_CONFIG = config || RUN_CONFIG;
+      DIMENSIONS = Array.isArray(RUN_CONFIG.dimensions) ? [...RUN_CONFIG.dimensions] : [];
+      const rows = parseTsv(resultsText);
+      const cleanRows = rows.filter(row => String(row.status || '').toLowerCase() !== 'crash');
+      ITERATIONS = cleanRows.map((row, index) => {
+        const dimIdx = dimensionIndexFor(row.dimension);
+        const input = Number(row.cumulative_input_tokens || 0);
+        const output = Number(row.cumulative_output_tokens || 0);
+        return {
+          iter: index + 1,
+          sourceIter: Number(row.iteration || index + 1),
+          order: index + 1,
+          dimIdx,
+          heuristic: Number(row.coverage_score || 0),
+          quality: Number(row.quality_score || 0),
+          total: Number(row.total_score || 0),
+          decision: String(row.status || '').toUpperCase(),
+          tokens: input + output,
+          dollars: Number(row.cumulative_cost_usd || 0),
+        };
+      });
+      FRAMES = buildFrames();
+    }
+
+    function buildDimGrid() {
       const grid = $('dim-grid');
+      grid.innerHTML = '';
       DIMENSIONS.forEach((d, i) => {
         const el = document.createElement('div');
         el.className = 'dim-cell';
         el.dataset.idx = i;
-        el.textContent = d;
+        el.title = d;
+        el.textContent = shortLabel(d);
         grid.appendChild(el);
       });
       $('dim-total').textContent = DIMENSIONS.length;
-      $('chip-iter-total').textContent = ITERATIONS.length;
+      const maxIter = ITERATIONS.reduce((max, row) => Math.max(max, row.iter || 0), 0);
+      $('chip-iter-total').textContent = maxIter || ITERATIONS.length;
       $('chip-frame-total').textContent = FRAMES.length;
       $('pos-total').textContent = FRAMES.length;
       $('scrub').max = FRAMES.length - 1;
-    })();
+      $('topic').textContent = 'AWS API Gateway';
+      const compressEvery = RUN_CONFIG.execution?.compress_every || 2;
+      document.querySelector('.flow #n-compress .sub').textContent = `every ${compressEvery} iter`;
+      const sub = document.querySelector('.card.flow .eyebrow .sub');
+      if (sub) sub.textContent = `${ITERATIONS.length} rows · ${RUN_CONFIG.execution?.strategy || 'adversarial'} · ${RUN_CONFIG.scoring?.target_dimensions_total || DIMENSIONS.length} target dims`;
+    }
 
     // chart geometry (matches viewBox 0 0 800 200)
     const CHART_X_MIN = 40, CHART_X_MAX = 790;
@@ -909,7 +1014,7 @@
       // cost
       $('c-calls').textContent  = f.calls;
       $('c-tokens').innerHTML   = `${(f.tokens / 1000).toFixed(1)}<span class="unit">k</span>`;
-      $('c-spend').textContent  = '0.00';
+      $('c-spend').textContent  = Number(f.dollars || 0).toFixed(2);
 
       // dim grid: rebuild discovered + covered + current
       // - discovered: any frame so far has touched this dim. SYNTHESISE
@@ -951,7 +1056,7 @@
       eventLog = [];
       for (let i = 0; i <= idx; i++) {
         const ff = FRAMES[i];
-        if (ff.state === 'KEEP' || ff.state === 'DISCARD') {
+        if (ff.state === 'KEEP' || ff.state === 'DISCARD' || ff.state === 'CRASH') {
           eventLog.push({ iter: ff.iter, type: ff.state.toLowerCase(), detail: `${ff.dim} → ${ff.total.toFixed(1)}` });
         } else if (ff.state === 'COMPRESS') {
           eventLog.push({ iter: ff.iter, type: 'compress', detail: 'distill · drop noise' });
@@ -964,11 +1069,11 @@
 
     function drawChart(points) {
       const xMax = ITERATIONS.length;
-      const X = (i) => CHART_X_MIN + (i / xMax) * (CHART_X_MAX - CHART_X_MIN);
+      const X = (i) => CHART_X_MIN + ((i - 1) / Math.max(1, xMax - 1)) * (CHART_X_MAX - CHART_X_MIN);
       const Y = (v) => CHART_Y_MAX - (v / 100) * (CHART_Y_MAX - CHART_Y_MIN);
-      const totalPath = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.iter)} ${Y(p.total)}`).join(' ');
-      const heurPath  = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.iter)} ${Y(p.heuristic)}`).join(' ');
-      const qualPath  = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.iter)} ${Y(p.quality)}`).join(' ');
+      const totalPath = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.order || p.iter)} ${Y(p.total)}`).join(' ');
+      const heurPath  = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.order || p.iter)} ${Y(p.heuristic)}`).join(' ');
+      const qualPath  = points.map((p, i) => `${i ? 'L' : 'M'} ${X(p.order || p.iter)} ${Y(p.quality)}`).join(' ');
       $('chart-total').setAttribute('d', totalPath);
       $('chart-heur').setAttribute('d', heurPath);
       $('chart-qual').setAttribute('d', qualPath);
@@ -976,7 +1081,7 @@
       pts.innerHTML = '';
       points.forEach((p, i) => {
         const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        c.setAttribute('cx', X(p.iter));
+        c.setAttribute('cx', X(p.order || p.iter));
         c.setAttribute('cy', Y(p.total));
         c.setAttribute('r', i === points.length - 1 ? 3.5 : 2.2);
         c.setAttribute('class', i === points.length - 1 ? 'pt-current' : 'pt-total');
@@ -991,7 +1096,7 @@
         const div = document.createElement('div');
         div.className = 'ev';
         div.innerHTML =
-          `<span class="ev-iter">i${String(ev.iter).padStart(2, '0')}</span>` +
+          `<span class="ev-iter">i${String(ev.iter).padStart(3, '0')}</span>` +
           `<span class="ev-state ${ev.type}">${ev.type.toUpperCase()}</span>` +
           `<span class="ev-detail">${ev.detail}</span>`;
         list.appendChild(div);
@@ -1060,8 +1165,18 @@
       }
     });
 
-    // initial render
-    go(0);
+    async function init() {
+      try {
+        await loadRunData();
+        buildDimGrid();
+        go(0);
+      } catch (err) {
+        $('events').innerHTML = `<div class="ev"><span class="ev-state crash">ERROR</span><span class="ev-detail">${String(err.message || err)}</span></div>`;
+        $('chip-state').textContent = 'LOAD ERROR';
+      }
+    }
+
+    init();
   </script>
 </body>
 </html>

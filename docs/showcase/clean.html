@@ -357,8 +357,8 @@ One LLM, one pass, one perspective.</p>
 
 <h2 id="ii--demo">II · DEMO</h2>
 <h1 id="demo">Demo</h1>
-<h3 id="localstack-alternatives--a-real-research-question">LocalStack alternatives — a real research question</h3>
-<p><em>&quot;LocalStack went fully paid. Should our team pay Pro or migrate to an open-source alternative?&quot;</em></p>
+<h3 id="aws-api-gateway--a-real-architecture-question">AWS API Gateway — a real architecture question</h3>
+<p><em>&quot;Which AWS API Gateway option should an enterprise platform choose for REST and WebSocket APIs — and when should it not migrate?&quot;</em></p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
@@ -366,27 +366,24 @@ One LLM, one pass, one perspective.</p>
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="the-config--three-backends-adversarial-strategy">The config — three backends, adversarial strategy</h2>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-yaml"><span class="hljs-comment"># configs/research/localstack_alternatives_copilot_codex.yaml</span>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-yaml"><span class="hljs-comment"># configs/research/aws_api_gateway_opus_sonnet_codex.yaml</span>
 <span class="hljs-attr">research:</span>
   <span class="hljs-attr">topic:</span> <span class="hljs-string">&gt;
-    Compare alternatives to LocalStack for local AWS service emulation.
-    LocalStack is moving to a fully paid model. Evaluate MiniStack, Floci,
-    and other viable open-source alternatives.
+    Compare AWS API Gateway options for enterprise REST and WebSocket APIs.
 </span>  <span class="hljs-attr">goal:</span> <span class="hljs-string">&gt;
-    A decision-ready comparison for a team evaluating LocalStack Pro vs
-    open-source migration. Include migration effort, service coverage gaps,
-    and a clear recommendation.
+    Produce an architect-level comparison of REST API, HTTP API, and
+    WebSocket API with a recommendation per use-case bucket.
 </span>  <span class="hljs-attr">execution:</span>
     <span class="hljs-attr">strategy:</span> <span class="hljs-string">adversarial</span>
     <span class="hljs-attr">backends:</span>
-      <span class="hljs-attr">primary:</span>   <span class="hljs-string">primary_reasoner</span>    <span class="hljs-comment"># claude-cli (Claude Code)</span>
-      <span class="hljs-attr">research:</span>  [<span class="hljs-string">research_coder</span>]    <span class="hljs-comment"># copilot-cli (GitHub Copilot)</span>
-      <span class="hljs-attr">judge:</span>     <span class="hljs-string">adversary_reasoner</span>  <span class="hljs-comment"># codex-cli   (GPT-5.4) ← critic + judge</span>
-      <span class="hljs-attr">utility:</span>   <span class="hljs-string">adversary_reasoner</span>
-    <span class="hljs-attr">max_iterations:</span> <span class="hljs-number">10</span>
+      <span class="hljs-attr">primary:</span>   <span class="hljs-string">claude_opus</span>      <span class="hljs-comment"># claude-cli (Opus)</span>
+      <span class="hljs-attr">research:</span>  [<span class="hljs-string">claude_sonnet</span>]  <span class="hljs-comment"># claude-cli (Sonnet)</span>
+      <span class="hljs-attr">judge:</span>     <span class="hljs-string">codex_critic</span>    <span class="hljs-comment"># codex-cli (GPT-5.4) ← critic + judge</span>
+      <span class="hljs-attr">utility:</span>   <span class="hljs-string">codex_critic</span>
+    <span class="hljs-attr">target_dimensions_total:</span> <span class="hljs-number">13</span>
     <span class="hljs-attr">allowed_tools:</span> <span class="hljs-string">&quot;WebSearch,WebFetch,Read,Bash,Glob,Grep&quot;</span>
 </code></pre>
-<p>Three different model families. Critic and judge are <strong>deliberately different</strong> from the researcher.</p>
+<p>Researcher and critic are deliberately separated. The critic is also the judge, so every dimension is reviewed from a different model family.</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
@@ -402,9 +399,11 @@ One LLM, one pass, one perspective.</p>
   </div>
   <div class="terminal-body"></div>
   <script class="terminal-script" type="application/json">[
-  { "type": "comment", "text": "# Validate config wiring, provider health, and tool capabilities — no backend calls", "delay": 400 },
-  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\\n  --config configs/research/localstack_alternatives_copilot_codex.yaml \\\n  --dry-run", "delay": 900 },
+  { "type": "comment", "text": "# Validate config wiring, provider health, and backend readiness before spending tokens", "delay": 400 },
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\\n  --config configs/research/aws_api_gateway_opus_sonnet_codex.yaml \\\n  --dry-run", "delay": 900 },
   { "type": "output",  "text": "[OK] resolving backends · 3/3 reachable",   "delay": 250 },
+  { "type": "output",  "text": "[OK] backend preflight · claude_sonnet responded OK", "delay": 250 },
+  { "type": "output",  "text": "[OK] backend preflight · codex_critic responded OK", "delay": 250 },
   { "type": "output",  "text": "[OK] strategy valid for declared role topology", "delay": 250 },
   { "type": "output",  "text": "[OK] capability registry satisfied", "delay": 250 },
   { "type": "output",  "text": "[OK] sandbox policy coherent", "delay": 250 },
@@ -413,7 +412,7 @@ One LLM, one pass, one perspective.</p>
 </div>
 <p>Output confirms:</p>
 <ul>
-<li>All backend adapters resolve and are reachable</li>
+<li>All backend adapters resolve and answer a tiny <code>OK</code> preflight</li>
 <li>Strategy is valid for the declared role topology</li>
 <li>Tool capability registry is satisfied</li>
 <li>Sandbox policy is coherent</li>
@@ -434,19 +433,19 @@ One LLM, one pass, one perspective.</p>
   </div>
   <div class="terminal-body"></div>
   <script class="terminal-script" type="application/json">[
-  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\\n  --config configs/research/localstack_alternatives_copilot_codex.yaml", "delay": 900 },
-  { "type": "output", "text": "[INFO] strategy: adversarial \u00b7 3 backends \u00b7 max_iterations: 10", "delay": 350 },
-  { "type": "output", "text": "[i01] HYPOTHESISE  \u00b7 dim REST vs HTTP",  "delay": 220 },
-  { "type": "output", "text": "[i01] EXECUTE      \u00b7 copilot-cli (research)", "delay": 220 },
-  { "type": "output", "text": "[i01] CRITIQUE     \u00b7 codex-cli (different family)", "delay": 220 },
-  { "type": "output", "text": "[i01] SCORE        \u00b7 heuristic 42 \u00b7 judge 58 \u00b7 total 51.6", "delay": 250 },
+  { "type": "prompt", "prompt": "~ $ ", "text": "RESEARCH_COMPRESS_MIN_FREE_GB=8.0 ./scripts/research_with_retry.sh \\\n  configs/research/aws_api_gateway_opus_sonnet_codex.yaml", "delay": 900 },
+  { "type": "output", "text": "[INFO] strategy: adversarial \u00b7 researcher: claude_sonnet \u00b7 judge: codex_critic", "delay": 350 },
+  { "type": "output", "text": "[i01] HYPOTHESISE  \u00b7 REST API vs HTTP API",  "delay": 220 },
+  { "type": "output", "text": "[i01] EXECUTE      \u00b7 claude-cli (Sonnet researcher)", "delay": 220 },
+  { "type": "output", "text": "[i01] CRITIQUE     \u00b7 codex-cli (GPT-5.4 critic)", "delay": 220 },
+  { "type": "output", "text": "[i01] SCORE        \u00b7 coverage 96.2 \u00b7 quality 50.0 \u00b7 total 84.5", "delay": 250 },
   { "type": "success","text": "[i01] KEEP         \u00b7 corpus +1",         "delay": 600 },
-  { "type": "comment","text": "# \u2026 iterations 02 through 11 \u2026",    "delay": 500 },
-  { "type": "output", "text": "[i07] SCORE        \u00b7 total 67.6 (dipped \u2014 critic flagged citation)", "delay": 250 },
-  { "type": "error",  "text": "[i07] DISCARD      \u00b7 retry dim",          "delay": 400 },
-  { "type": "output", "text": "[i12] SCORE        \u00b7 total 85.0",          "delay": 250 },
-  { "type": "success","text": "[i12] KEEP         \u00b7 11/13 dimensions covered", "delay": 400 },
-  { "type": "success","text": "\u2713 run complete \u2014 see audit_trail.jsonl", "delay": 600 }
+  { "type": "comment","text": "# \u2026 auth, throttling, integrations, observability, domains, transformations \u2026",    "delay": 500 },
+  { "type": "error",  "text": "[i09] CRASH        \u00b7 Claude quota stopped the CORS dimension", "delay": 400 },
+  { "type": "output", "text": "[resume] rollback partial work \u00b7 continue from saved corpus", "delay": 250 },
+  { "type": "output", "text": "[i14] SCORE        \u00b7 CORS dimension total 101.5",          "delay": 250 },
+  { "type": "success","text": "[i14] KEEP         \u00b7 13/13 dimensions covered", "delay": 400 },
+  { "type": "success","text": "\u2713 run complete \u2014 report_default, report_paper, report_technical_doc generated", "delay": 600 }
 ]</script>
 </div>
 <p style="text-align:center; margin-top: 18px;">
@@ -473,19 +472,19 @@ One LLM, one pass, one perspective.</p>
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="the-critic-finds-real-errors">The critic finds real errors</h2>
-<p><strong>Iteration 001</strong> — Researcher (Copilot) delivers AWS service coverage findings. Score: <strong>62.0</strong></p>
-<p>The judge backend (GPT-5.4) reviews and raises:</p>
+<p><strong>Iteration 014</strong> — the rerun completes the CORS dimension after the earlier quota crash. Score: <strong>101.5</strong></p>
+<p>The judge backend (GPT-5.4) keeps the result, but still opens concrete follow-up gaps:</p>
 <blockquote>
-<p><em>&quot;MiniStack section appears materially stale — API Gateway v1, Cognito, and KMS coverage are asserted without current primary source evidence.&quot;</em></p>
+<p><em>&quot;Verify HTTP API rejected-origin behavior with a primary source or reproducible test.&quot;</em></p>
 </blockquote>
 <blockquote>
-<p><em>&quot;Moto capabilities are mischaracterized — Lambda execution mode and IAM enforcement nuance are factually wrong.&quot;</em></p>
+<p><em>&quot;Re-check HTTP API authorizer interaction when CORS is enabled, especially the $default-route case.&quot;</em></p>
 </blockquote>
 <blockquote>
-<p><em>&quot;Many fine-grained feature claims are overconfident relative to the cited evidence.&quot;</em></p>
+<p><em>&quot;Separate documented behavior from inferred or implementation-specific behavior.&quot;</em></p>
 </blockquote>
-<p><strong>These are not style comments. They are factual challenges</strong> — a different model, different training data, catching different errors.</p>
-<p>The loop forces the next iteration to resolve these gaps or be discarded.</p>
+<p><strong>These are not style comments. They are architecture risks</strong> — exact status codes, headers, authorizer paths, and IaC behavior are the difference between a working browser API and a production incident.</p>
+<p>The loop preserves those gaps in <code>discovered_gaps.json</code> so a later pass can target them directly.</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
 
@@ -506,63 +505,57 @@ One LLM, one pass, one perspective.</p>
 <tbody>
 <tr>
 <td>001</td>
-<td>AWS service coverage</td>
-<td><strong>62.0</strong></td>
+<td>REST API vs HTTP API</td>
+<td><strong>84.5</strong></td>
 <td>KEEP</td>
 </tr>
 <tr>
 <td>002</td>
-<td>Community activity &amp; bus factor</td>
-<td>63.0</td>
+<td>WebSocket API lifecycle</td>
+<td>84.3</td>
 <td>KEEP</td>
 </tr>
 <tr>
 <td>003</td>
-<td>Migration effort</td>
-<td>63.5</td>
-<td>KEEP</td>
-</tr>
-<tr>
-<td>004</td>
-<td>CI/CD integration</td>
-<td>63.5</td>
+<td>AuthN/AuthZ</td>
+<td>83.5</td>
 <td>KEEP</td>
 </tr>
 <tr>
 <td>005</td>
-<td>IaC toolchain (Terraform/CDK/SAM)</td>
-<td><strong>69.5</strong></td>
+<td>Integration patterns</td>
+<td><strong>84.8</strong></td>
 <td>KEEP</td>
 </tr>
 <tr>
-<td>006</td>
-<td>CloudFormation source verification</td>
-<td>68.0</td>
+<td>009</td>
+<td>CORS preflight</td>
+<td>0.0</td>
+<td>CRASH</td>
+</tr>
+<tr>
+<td>012</td>
+<td>Cost modeling</td>
+<td>83.7</td>
 <td>KEEP</td>
 </tr>
 <tr>
-<td>007</td>
-<td>Migration effort by team profile</td>
-<td>63.5</td>
-<td>KEEP <em>(harder dimension)</em></td>
-</tr>
-<tr>
-<td>008</td>
-<td>API behavioral fidelity</td>
-<td>66.0</td>
+<td>013</td>
+<td>Deployment lifecycle / IaC</td>
+<td>83.7</td>
 <td>KEEP</td>
 </tr>
 <tr>
-<td><strong>009</strong></td>
-<td>Migration effort (final)</td>
-<td><strong>76.3</strong></td>
+<td><strong>014</strong></td>
+<td>CORS preflight rerun</td>
+<td><strong>101.5</strong></td>
 <td>KEEP</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p>Iter 007 dipped because the critic flagged under-validated migration estimates.<br />
-The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12.8 points</strong> on the final dimension.</p>
+<p>Iteration 009 was a real failure: Claude ran out of tokens during CORS.<br />
+Resume preserved the previous corpus, reran only the missing dimension, and finished with <strong>13 kept dimensions</strong>.</p>
 </blockquote>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
     </section>
@@ -587,7 +580,7 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
   {
     "type": "prompt",
     "prompt": "~ $ ",
-    "text": "uv run python -m src.cli research \\\n  --config configs/research/localstack_alternatives_copilot_codex_paper.yaml \\\n  --synthesize   # skips research loop, only re-renders",
+    "text": "uv run python -m src.cli research \\\n  --config configs/research/aws_api_gateway_opus_sonnet_codex.yaml \\\n  --output output/aws_api_gateway_opus_sonnet_codex \\\n  --synthesize   # skips research loop, only re-renders",
     "delay": 800
   }
 ]</script>
@@ -601,16 +594,16 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
 
 <h2 id="output-default--for-internal-exploration">Output: <code>default</code> — for internal exploration</h2>
 
-<p>Quick narrative synthesis, sectioned by dimension, embedded comparison tables.</p>
+<p>Quick narrative synthesis for the AWS API Gateway decision: recommendations first, then dimensions, caveats, and references.</p>
 <p><strong>Use when:</strong></p>
 <ul>
-<li>Exploring a topic</li>
-<li>Sharing internal findings</li>
-<li>Fast iteration before committing to a format</li>
+<li>Sharing the run with engineers during discovery</li>
+<li>Scanning REST vs HTTP vs WebSocket trade-offs</li>
+<li>Fast iteration before committing to a formal memo</li>
 </ul>
 <p><strong>Closest analog:</strong> a thorough Notion research page</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
-      <figure class="bg-right" style="background-image: url('localstack-alternatives/images/raw.png');"></figure>
+      <iframe class="bg-right" src="../../output/aws_api_gateway_opus_sonnet_codex/report_default.html" title="Default AWS API Gateway report preview"></iframe>
     </section>
 
     <section class="slide split-right" data-slide="28">
@@ -618,7 +611,7 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
 
 <h2 id="output-paper--for-stakeholders-and-external-review">Output: <code>paper</code> — for stakeholders and external review</h2>
 
-<p>Abstract, methodology section, evidence-backed claims, deterministic <code>## References</code> built from <code>citations.json</code>.</p>
+<p>Abstract, methodology section, evidence-backed claims, and deterministic references built from the same AWS corpus.</p>
 <p><strong>Use when:</strong></p>
 <ul>
 <li>Writing for external review</li>
@@ -627,7 +620,7 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
 </ul>
 <p><strong>Closest analog:</strong> a literature review or RFC with bibliography</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
-      <figure class="bg-right" style="background-image: url('localstack-alternatives/images/paper.png');"></figure>
+      <iframe class="bg-right" src="../../output/aws_api_gateway_opus_sonnet_codex/report_paper.html" title="Paper AWS API Gateway report preview"></iframe>
     </section>
 
     <section class="slide split-right" data-slide="29">
@@ -635,23 +628,23 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
 
 <h2 id="output-technical_doc--for-engineering-decisions">Output: <code>technical_doc</code> — for engineering decisions</h2>
 
-<p>Comparison tables, decision matrix, recommendation upfront, structured pros/cons per alternative.</p>
+<p>Comparison tables, decision matrix, recommendation upfront, and explicit disqualifiers for REST API, HTTP API, and WebSocket API.</p>
 <p><strong>Use when:</strong></p>
 <ul>
 <li>Architecture Decision Records (ADRs)</li>
-<li>Vendor / tool evaluation</li>
+<li>Platform architecture reviews</li>
 <li>Decision memos for engineering teams</li>
 </ul>
 <p><strong>Closest analog:</strong> an RFC or ADR with a verdict</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
-      <figure class="bg-right" style="background-image: url('localstack-alternatives/images/technical.png');"></figure>
+      <iframe class="bg-right" src="../../output/aws_api_gateway_opus_sonnet_codex/report_technical_doc.html" title="Technical AWS API Gateway report preview"></iframe>
     </section>
 
     <section class="slide tight" data-slide="30">
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="every-run-is-fully-replayable">Every run is fully replayable</h2>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code>output/localstack_alternatives_copilot_codex/
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code>output/aws_api_gateway_opus_sonnet_codex/
 ├── run.log                  ← human-readable operational log
 ├── audit_trail.jsonl        ← append-only structured trail: steps, tool calls, denials, policy events
 ├── effective_config.json    ← full normalized config snapshot at run time
@@ -660,8 +653,10 @@ The loop forced a harder verification pass. Iter 009 resolved it — <strong>+12
 ├── rerun.sh                 ← runnable exact-replay script
 ├── iterations/
 │   ├── iter_001.md          ← hypothesis + findings + critique + score
-│   └── iter_009.md
-└── report.html              ← rendered output
+│   └── iter_014.md          ← CORS rerun after quota failure
+├── report_default.html      ← exploratory rendering
+├── report_paper.html        ← paper-style rendering
+└── report_technical_doc.html ← engineering decision rendering
 </code></pre>
 <p><code>rerun.sh</code> is not documentation — it's an executable that reconstructs the exact run.<br />
 No &quot;it worked on my machine.&quot;</p>
@@ -711,7 +706,7 @@ No &quot;it worked on my machine.&quot;</p>
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="this-run">This run</h2>
-<p>Real execution data from the <code>localstack_alternatives_copilot_codex</code> run:</p>
+<p>Real execution data from the <code>aws_api_gateway_opus_sonnet_codex</code> run:</p>
 <table>
 <thead>
 <tr>
@@ -722,7 +717,7 @@ No &quot;it worked on my machine.&quot;</p>
 <tbody>
 <tr>
 <td>Backends</td>
-<td><code>claude-cli</code> (Claude Sonnet) · <code>copilot-cli</code> (Claude Sonnet 4.6) · <code>codex-cli</code> (GPT-5.4)</td>
+<td><code>claude-cli</code> (Opus + Sonnet) · <code>codex-cli</code> (GPT-5.4 critic/judge)</td>
 </tr>
 <tr>
 <td>Strategy</td>
@@ -730,15 +725,15 @@ No &quot;it worked on my machine.&quot;</p>
 </tr>
 <tr>
 <td>Dimensions covered</td>
-<td><strong>8 of 8</strong></td>
+<td><strong>13 of 13</strong></td>
 </tr>
 <tr>
 <td>Iterations</td>
-<td><strong>9</strong> (+ compression at iter 4)</td>
+<td><strong>14 raw attempts</strong> → <strong>13 kept dimensions</strong> after the CORS rerun</td>
 </tr>
 <tr>
 <td>Best score reached</td>
-<td><strong>76.3 / 100</strong></td>
+<td><strong>101.5</strong> composite score on the CORS rerun</td>
 </tr>
 <tr>
 <td>Output formats generated</td>
@@ -746,7 +741,7 @@ No &quot;it worked on my machine.&quot;</p>
 </tr>
 <tr>
 <td>Execution cost</td>
-<td><strong>$0.00</strong> — all CLI adapters, flat-rate subscriptions</td>
+<td><strong>$0.00 tracked</strong> for CLI adapters during the final resume/synthesis pass</td>
 </tr>
 </tbody>
 </table>
@@ -762,12 +757,12 @@ API adapters (for CI/unattended runs) bill per-token. Choose based on context.</
 
 <h2 id="what-you-just-saw">What you just saw</h2>
 <ol>
-<li>Two different model families <strong>argued about LocalStack alternatives</strong> for 9 iterations</li>
-<li>The critic (GPT-5.4) caught real factual errors in the researcher's (Copilot) output</li>
-<li>The loop forced resolution — the final score improved <strong>+14.3 points</strong> from iteration 1 to 9</li>
+<li>Two different model families <strong>argued about AWS API Gateway architecture</strong> across 13 kept dimensions</li>
+<li>The critic (GPT-5.4) found real unresolved risks in CORS, authorizers, pricing, and evidence confidence</li>
+<li>The loop survived a quota failure: the bad CORS attempt was excluded and the missing dimension was rerun</li>
 <li>Three publication-ready artifacts were produced from <strong>one research corpus</strong></li>
-<li>Every claim carries a <code>trust_class</code> — the system is honest about what it doesn't know</li>
-<li>The full run is <strong>exactly reproducible</strong> via <code>rerun.sh</code></li>
+<li>Every claim carries a <code>trust_class</code>, and the report still flags where citations are too thin</li>
+<li>The full run remains replayable through <code>audit_trail.jsonl</code>, <code>results.tsv</code>, and <code>rerun.sh</code></li>
 </ol>
 <blockquote>
 <p><strong>The adversarial loop isn't about being clever. It's about the same engineering principle<br />
@@ -832,7 +827,7 @@ as code review: a second set of eyes with different priors catches different bug
   {
     "type": "prompt",
     "prompt": "~ $ ",
-    "text": "CONFIG=configs/research/localstack_alternatives_copilot_codex.yaml",
+    "text": "CONFIG=configs/research/aws_api_gateway_opus_sonnet_codex.yaml",
     "delay": 800
   },
   {
@@ -844,7 +839,7 @@ as code review: a second set of eyes with different priors catches different bug
   {
     "type": "prompt",
     "prompt": "~ $ ",
-    "text": "uv run python -m src.cli research --config \"$CONFIG\"              # run",
+    "text": "RESEARCH_COMPRESS_MIN_FREE_GB=8.0 ./scripts/research_with_retry.sh \"$CONFIG\"",
     "delay": 800
   }
 ]</script>

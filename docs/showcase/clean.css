@@ -457,6 +457,10 @@ body {
   background-position: center;
   box-shadow: 0 16px 60px rgba(0,0,0,0.5), inset 0 0 0 1px var(--hairline);
 }
+.slide.split-right > iframe.bg-right {
+  border: 0;
+  background: var(--bg-panel);
+}
 
 /* ── SPEC CARD (closer) ─────────────────────────────────────────── */
 .slide.spec {

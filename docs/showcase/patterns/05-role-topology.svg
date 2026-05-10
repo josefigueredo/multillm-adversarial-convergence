@@ -90,7 +90,7 @@
     <text y="3" fill="#b1bac4">2 ROLES · 1 BACKEND</text>
   </g>
   <g transform="translate(540 388)" font-family="JetBrains Mono, monospace" font-size="9" letter-spacing="1.2" text-anchor="middle">
-    <rect x="-58" y="-9" width="116" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
+    <rect x="-58" y="-9" width="136" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
     <text y="3" fill="#7ee787">FAN-OUT · 1 ROLE → N</text>
   </g>
 

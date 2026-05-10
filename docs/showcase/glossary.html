@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concept Glossary · Multi-LLM Adversarial Convergence</title>
+  <link rel="stylesheet" href="glossary.css">
+</head>
+<body>
+  <video class="persistent-bg" src="animation-veryslow.mp4" autoplay muted loop playsinline></video>
+
+  <div class="frame">
+    <header class="topbar">
+      <div>
+        <div class="brand">CONCEPT GLOSSARY · <strong>Multi-LLM Adversarial Convergence</strong></div>
+        <p class="lede">Static, preloaded explanations for mixed technical and non-technical audiences.</p>
+      </div>
+      <div class="top-actions">
+        <div class="language-widget" aria-label="Language selector">
+          <button type="button" data-language="es" class="active">Español</button>
+          <button type="button" data-language="en">English</button>
+        </div>
+        <nav class="nav-links" aria-label="Showcase navigation">
+          <a href="clean.html">Deck</a>
+          <a href="control.html">Presenter</a>
+          <a href="dashboard-for-slide.html">Dashboard</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="search-panel" aria-label="Glossary search">
+        <div class="search-box">
+          <label for="search" data-i18n="searchLabel">Search concept</label>
+          <div class="search-row">
+            <input id="search" type="search" placeholder="Try: harness, judge, context window, sandbox..." autocomplete="off">
+            <button id="clear-search" type="button" aria-label="Clear search" data-i18n="clear">Clear</button>
+          </div>
+        </div>
+
+        <div class="filters" id="filters" aria-label="Category filters"></div>
+
+        <div class="stats">
+          <span id="result-count">0 terms</span>
+          <span data-i18n="staticData">offline · static data</span>
+        </div>
+
+        <div class="term-list" id="term-list" aria-label="Matching terms"></div>
+      </section>
+
+      <section class="detail-panel" aria-live="polite">
+        <div class="detail-card" id="detail-card">
+          <div class="empty-state">
+            <span class="empty-kicker" data-i18n="ready">READY</span>
+            <h1 data-i18n="emptyTitle">Type a term or pick one from the list.</h1>
+            <p data-i18n="emptyBody">The card will show a plain definition, business analogy, technical analogy, why it matters, and how the concept maps to this project.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="hint">
+      <span><kbd>/</kbd> <span data-i18n="hintFocus">focus search</span></span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="hintMove">move</span></span>
+      <span><kbd>Enter</kbd> <span data-i18n="hintOpen">open selected</span></span>
+      <span><kbd>Esc</kbd> <span data-i18n="hintClear">clear</span></span>
+    </footer>
+  </div>
+
+  <script src="glossary-data.js"></script>
+  <script src="glossary-i18n.js"></script>
+  <script src="glossary.js"></script>
+</body>
+</html>
