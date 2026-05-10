@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="clean.css">
 </head>
 <body>
-  <video class="persistent-bg" src="animation-veryslow.mp4" autoplay muted loop playsinline></video>
+  <video class="persistent-bg" src="../common/animation-veryslow.mp4" autoplay muted loop playsinline></video>
 
   <main class="deck">
     <section class="slide lead video-bg" data-slide="1">
@@ -89,7 +89,7 @@ One LLM, one pass, one perspective.</p>
 <header>MULTI-LLM ADVERSARIAL CONVERGENCE</header>
 
 <h2 id="the-loop">The loop</h2>
-<p><img src="patterns/00-research-loop.svg" alt="" /></p>
+<p><img src="../common/patterns/00-research-loop.svg" alt="" /></p>
 <!-- Legend + stopping criteria deliberately removed — the diagram's
      own eyebrows / stroke colors / invariant footer already convey:
        · Critique (cyan)  — different backend = different blind spots
@@ -134,7 +134,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>The outer loop. Propose, score, keep or discard, repeat.</em></p>
 </blockquote>
-<p><img src="patterns/01-evaluator-optimizer.svg" alt="" /></p>
+<p><img src="../common/patterns/01-evaluator-optimizer.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/research_loop.py — owns the iteration cycle
@@ -151,7 +151,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>A different model scores the candidate. No self-grading.</em></p>
 </blockquote>
-<p><img src="patterns/02-llm-as-judge.svg" alt="" /></p>
+<p><img src="../common/patterns/02-llm-as-judge.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/scorer.py — judge_response() calls a non-producer backend
@@ -169,7 +169,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>Every N iterations: distill the corpus, drop noise.</em></p>
 </blockquote>
-<p><img src="patterns/03-reflection-compression.svg" alt="" /></p>
+<p><img src="../common/patterns/03-reflection-compression.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · compression_interval config flag (default: every 4 iterations)
@@ -186,7 +186,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>One owner of lifecycle. Many narrow-contract workers.</em></p>
 </blockquote>
-<p><img src="patterns/04-orchestrator-subagents.svg" alt="" /></p>
+<p><img src="../common/patterns/04-orchestrator-subagents.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/orchestrator.py — the only owner of phase transitions, convergence checks, compression triggers
@@ -203,7 +203,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>Configure roles, not models. Swap backends without changing logic.</em></p>
 </blockquote>
-<p><img src="patterns/05-role-topology.svg" alt="" /></p>
+<p><img src="../common/patterns/05-role-topology.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · configs/research/<topic>.yaml — execution.backends map roles to backend IDs
@@ -220,7 +220,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>Each dimension goes to the backend best suited for it.</em></p>
 </blockquote>
-<p><img src="patterns/06-routing-specialist.svg" alt="" /></p>
+<p><img src="../common/patterns/06-routing-specialist.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/strategy.py — specialist strategy
@@ -237,7 +237,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>Fan out to all backends in parallel. Merge via judge.</em></p>
 </blockquote>
-<p><img src="patterns/07-parallel-ensemble.svg" alt="" /></p>
+<p><img src="../common/patterns/07-parallel-ensemble.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/strategy.py — ensemble and parallel strategies
@@ -254,7 +254,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>Backends take turns. Each stage receives the previous stage's output.</em></p>
 </blockquote>
-<p><img src="patterns/08-prompt-chaining-serial.svg" alt="" /></p>
+<p><img src="../common/patterns/08-prompt-chaining-serial.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/strategy.py — serial strategy
@@ -271,7 +271,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>Researcher · Critic · Arbitrator — across different model families.</em></p>
 </blockquote>
-<p><img src="patterns/09-adversarial-critique.svg" alt="" /></p>
+<p><img src="../common/patterns/09-adversarial-critique.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/strategy.py — adversarial strategy (used in the demo run)
@@ -288,7 +288,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>The capability registry is the agentic equivalent of an IAM policy.</em></p>
 </blockquote>
-<p><img src="patterns/10-tool-use-sandbox.svg" alt="" /></p>
+<p><img src="../common/patterns/10-tool-use-sandbox.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/policy/ — capability registry, sandbox executor, audit hooks
@@ -306,7 +306,7 @@ One LLM, one pass, one perspective.</p>
 <blockquote>
 <p><em>Phase-transition gates. Operator approves before irreversible actions.</em></p>
 </blockquote>
-<p><img src="patterns/11-human-in-the-loop.svg" alt="" /></p>
+<p><img src="../common/patterns/11-human-in-the-loop.svg" alt="" /></p>
 <!-- "In this codebase" body deliberately moved out so the diagram can breathe.
      Speaker references (covered in control.html notes):
        · src/policy/hitl.py — phase-transition gate
@@ -449,7 +449,7 @@ One LLM, one pass, one perspective.</p>
 ]</script>
 </div>
 <p style="text-align:center; margin-top: 18px;">
-  <a class="dashboard-cta" href="dashboard-for-slide.html" target="_blank" rel="noopener">
+  <a class="dashboard-cta" href="../widgets/dashboard-for-slide.html" target="_blank" rel="noopener">
     <span class="cta-icon">▸</span>
     <span class="cta-label">Open live replay dashboard</span>
     <span class="cta-meta">step through the real iterations \u00b7 \u2197</span>
@@ -603,7 +603,7 @@ Resume preserved the previous corpus, reran only the missing dimension, and fini
 </ul>
 <p><strong>Closest analog:</strong> a thorough Notion research page</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
-      <iframe class="bg-right" src="../../output/aws_api_gateway_opus_sonnet_codex/report_default.html" title="Default AWS API Gateway report preview"></iframe>
+      <iframe class="bg-right" src="../../../output/aws_api_gateway_opus_sonnet_codex/report_default.html" title="Default AWS API Gateway report preview"></iframe>
     </section>
 
     <section class="slide split-right" data-slide="28">
@@ -620,7 +620,7 @@ Resume preserved the previous corpus, reran only the missing dimension, and fini
 </ul>
 <p><strong>Closest analog:</strong> a literature review or RFC with bibliography</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
-      <iframe class="bg-right" src="../../output/aws_api_gateway_opus_sonnet_codex/report_paper.html" title="Paper AWS API Gateway report preview"></iframe>
+      <iframe class="bg-right" src="../../../output/aws_api_gateway_opus_sonnet_codex/report_paper.html" title="Paper AWS API Gateway report preview"></iframe>
     </section>
 
     <section class="slide split-right" data-slide="29">
@@ -637,7 +637,7 @@ Resume preserved the previous corpus, reran only the missing dimension, and fini
 </ul>
 <p><strong>Closest analog:</strong> an RFC or ADR with a verdict</p>
 <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
-      <iframe class="bg-right" src="../../output/aws_api_gateway_opus_sonnet_codex/report_technical_doc.html" title="Technical AWS API Gateway report preview"></iframe>
+      <iframe class="bg-right" src="../../../output/aws_api_gateway_opus_sonnet_codex/report_technical_doc.html" title="Technical AWS API Gateway report preview"></iframe>
     </section>
 
     <section class="slide tight" data-slide="30">
