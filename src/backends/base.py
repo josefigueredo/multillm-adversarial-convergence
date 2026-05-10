@@ -169,12 +169,24 @@ class Backend(ABC):
         cwd: str | None = None,
         env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        """Run a subprocess with reliable timeout on Windows.
+        """Run a subprocess with reliable timeout on every platform.
 
-        On Windows, ``subprocess.run(timeout=...)`` kills the top-level
-        shell shim but leaves child ``node`` processes alive.  This helper
-        uses ``CREATE_NEW_PROCESS_GROUP`` + ``taskkill /T`` to ensure the
-        entire process tree is terminated on timeout.
+        Two platform-specific concerns:
+
+        * **Windows**: ``subprocess.run(timeout=...)`` kills the top-level
+          shell shim but leaves child ``node`` processes alive.  Use
+          ``CREATE_NEW_PROCESS_GROUP`` + ``taskkill /T`` so the entire
+          process tree dies on timeout.
+
+        * **POSIX (Linux/macOS)**: by default child processes inherit the
+          parent's process group.  If we then call
+          ``os.killpg(getpgid(child), SIGKILL)`` to enforce a timeout, the
+          parent (the python interpreter) is in the **same** process group
+          and gets SIGKILL'd alongside the child — taking the whole run
+          down with no OOM trace.  ``start_new_session=True`` puts the
+          child in its own session/PG so ``killpg`` only hits the child
+          tree.  This was the actual cause of "killed" mid-compress on
+          WSL2 and on memory-tight Macs: the timeout, not OOM.
         """
         kwargs: dict[str, Any] = dict(
             stdin=subprocess.PIPE if input is not None else None,
@@ -187,6 +199,8 @@ class Backend(ABC):
         )
         if sys.platform == "win32":
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            kwargs["start_new_session"] = True
 
         proc = subprocess.Popen(cmd, **kwargs)
         try:
@@ -299,4 +313,4 @@ class Backend(ABC):
             self.name, result.returncode, stderr or "(empty stderr)",
         )
         if result.stdout:
-            log.debug("%s CLI stdout (last 1000 chars): %s", self.name, result.stdout[-1000:])
+            log.error("%s CLI stdout (last 1000 chars): %s", self.name, result.stdout[-1000:])

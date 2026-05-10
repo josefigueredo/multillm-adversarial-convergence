@@ -126,3 +126,16 @@ class TestClaudeBackend:
         assert resp.is_error is False
         assert resp.input_tokens == 500
         assert resp.output_tokens == 200
+
+    @patch.object(ClaudeBackend, "_run_process")
+    def test_invoke_does_not_salvage_usage_limit_banner(self, mock_run):
+        mock_run.return_value = MagicMock(
+            returncode=1,
+            stdout=json.dumps([
+                {"type": "result", "result": "You're out of extra usage - resets 8:30pm (UTC)"},
+            ]),
+            stderr="",
+        )
+        resp = self.backend.invoke("prompt", CallOptions(), timeout=10)
+        assert resp.is_error is True
+        assert resp.text == ""

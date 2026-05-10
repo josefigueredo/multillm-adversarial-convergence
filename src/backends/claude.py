@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import subprocess
 import time
 
@@ -20,6 +22,24 @@ log = logging.getLogger("autoresearch")
 RATE_LIMIT_BACKOFF_SECONDS = 120
 RATE_LIMIT_WARN_THRESHOLD = 0.80
 RATE_LIMIT_COOLDOWN_SECONDS = 30
+
+# Anchored regex matches for CLI/account banners that are NOT usable model
+# output. Anchored to the start of the (normalized, lower-cased) text so
+# benign legitimate phrasings like "the API hit a usage limit during the
+# benchmark" inside real research findings won't be dropped.
+#
+# Set RESEARCH_DISABLE_BANNER_FILTER=1 to bypass the filter entirely (useful
+# when debugging a real-content false positive). When the filter drops
+# content, the dropped text is logged at DEBUG level so operators can audit.
+_NON_RESULT_ERROR_PATTERNS = (
+    re.compile(r"^you'?re out of (extra )?usage", re.IGNORECASE),
+    re.compile(r"^claude (code )?usage limit", re.IGNORECASE),
+    re.compile(r"^usage limit (reached|exceeded)", re.IGNORECASE),
+    re.compile(r"^quota exceeded", re.IGNORECASE),
+    re.compile(r"^rate limit (exceeded|reached|hit)", re.IGNORECASE),
+    re.compile(r"^you have been rate limited", re.IGNORECASE),
+    re.compile(r"^rate limited\b", re.IGNORECASE),
+)
 
 
 class ClaudeBackend(Backend):
@@ -120,6 +140,10 @@ class ClaudeBackend(Backend):
         if isinstance(payload, dict):
             text = payload.get("result", "")
             if text:
+                if self._looks_like_non_result_error(text):
+                    log.warning("Claude CLI returned a non-result error message; not salvaging.")
+                    log.debug("Dropped (non-result) text: %r", text[:500])
+                    return None
                 cost = payload.get("total_cost_usd", payload.get("cost_usd", 0.0))
                 usage = payload.get("usage", {})
                 in_tok = (
@@ -140,6 +164,10 @@ class ClaudeBackend(Backend):
                 if isinstance(event, dict) and event.get("type") == "result":
                     text = event.get("result", "")
                     if text:
+                        if self._looks_like_non_result_error(text):
+                            log.warning("Claude CLI returned a non-result error message; not salvaging.")
+                            log.debug("Dropped (non-result) text: %r", text[:500])
+                            return None
                         cost = event.get("total_cost_usd", event.get("cost_usd", 0.0))
                         usage = event.get("usage", {})
                         in_tok = (
@@ -154,6 +182,22 @@ class ClaudeBackend(Backend):
                         return AgentResponse(text=text, cost_usd=cost, is_error=False, input_tokens=in_tok, output_tokens=out_tok)
 
         return None
+
+    @staticmethod
+    def _looks_like_non_result_error(text: str) -> bool:
+        """Return true for CLI/account banners that are not usable model output.
+
+        Bypass via env var ``RESEARCH_DISABLE_BANNER_FILTER=1`` if a legitimate
+        finding is being dropped. Patterns are anchored at the start of the
+        normalized text to avoid false positives on real content that
+        mentions usage limits in passing.
+        """
+        if os.environ.get("RESEARCH_DISABLE_BANNER_FILTER") == "1":
+            return False
+        normalized = " ".join(text.split()).lstrip()
+        if not normalized:
+            return True
+        return any(pat.search(normalized) for pat in _NON_RESULT_ERROR_PATTERNS)
 
     def invoke(self, prompt: str, opts: CallOptions, timeout: int = 300) -> AgentResponse:
         """Claude-specific invoke that salvages results from budget-exceeded calls."""
