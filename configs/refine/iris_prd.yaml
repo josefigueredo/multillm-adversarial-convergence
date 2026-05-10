@@ -62,3 +62,7 @@ document:
       - challenger_fast
     judge: builder_main
     utility: challenger_fast
+
+  execution:
+    backend_preflight: true # Live OK probe per CLI backend before the run
+    backend_preflight_timeout_seconds: 60 # per probe

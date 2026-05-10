@@ -131,6 +131,15 @@ def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
     if timeout <= 0:
         raise ValueError(f"timeout_seconds must be positive, got {timeout}")
 
+    preflight_timeout = raw.get(
+        "backend_preflight_timeout_seconds",
+        exec_defaults.backend_preflight_timeout_seconds,
+    )
+    if preflight_timeout <= 0:
+        raise ValueError(
+            f"backend_preflight_timeout_seconds must be positive, got {preflight_timeout}"
+        )
+
     max_budget = raw.get("max_budget_per_call", exec_defaults.max_budget_per_call)
     if max_budget < 0:
         raise ValueError(f"max_budget_per_call must be non-negative, got {max_budget}")
@@ -158,6 +167,8 @@ def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
         backend=raw.get("backend", exec_defaults.backend),
         model=model,
         max_budget_per_call=max_budget,
+        backend_preflight=raw.get("backend_preflight", exec_defaults.backend_preflight),
+        backend_preflight_timeout_seconds=preflight_timeout,
         lightweight_mode=raw.get("lightweight_mode", exec_defaults.lightweight_mode),
         isolate_backend_context=raw.get(
             "isolate_backend_context",
@@ -501,6 +512,9 @@ class ExecutionConfig:
         model: Model name (backend-specific, e.g. ``"sonnet"`` for Claude).
         max_budget_per_call: USD cap per CLI invocation (backends that don't
             support per-call budgets ignore this).
+        backend_preflight: Run a cheap live "OK" probe for CLI backends before
+            starting a non-dry-run workflow.
+        backend_preflight_timeout_seconds: Timeout for each CLI preflight probe.
         lightweight_mode: Prefer shorter prompts/artifacts and stricter goal-shape
             obedience for trivial or smoke-test runs.
         isolate_backend_context: Prefer running backend CLIs from an isolated
@@ -524,6 +538,8 @@ class ExecutionConfig:
     backend: str = "claude-cli"
     model: str = "sonnet"
     max_budget_per_call: float = 0.50
+    backend_preflight: bool = True
+    backend_preflight_timeout_seconds: int = 60
     lightweight_mode: bool = False
     isolate_backend_context: bool = True
     sanitize_backend_env: bool = True
@@ -985,6 +1001,15 @@ class ResearchConfig:
         if timeout <= 0:
             raise ValueError(f"timeout_seconds must be positive, got {timeout}")
 
+        preflight_timeout = exec_raw.get(
+            "backend_preflight_timeout_seconds",
+            exec_defaults.backend_preflight_timeout_seconds,
+        )
+        if preflight_timeout <= 0:
+            raise ValueError(
+                f"backend_preflight_timeout_seconds must be positive, got {preflight_timeout}"
+            )
+
         # --- Strategy / multi-backend -----------------------------------------
         strategy = exec_raw.get("strategy", "single")
         if strategy not in VALID_STRATEGIES:
@@ -1066,6 +1091,8 @@ class ResearchConfig:
             backend=backend,
             model=model,
             max_budget_per_call=max_budget,
+            backend_preflight=exec_raw.get("backend_preflight", exec_defaults.backend_preflight),
+            backend_preflight_timeout_seconds=preflight_timeout,
             lightweight_mode=exec_raw.get("lightweight_mode", exec_defaults.lightweight_mode),
             isolate_backend_context=exec_raw.get(
                 "isolate_backend_context",

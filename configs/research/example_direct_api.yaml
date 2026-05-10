@@ -9,6 +9,8 @@ research:
     strategy: ensemble
     model: sonnet
     timeout_seconds: 600
+    backend_preflight: true # Live OK probe per CLI backend before the run
+    backend_preflight_timeout_seconds: 60 # per probe
 
     providers:
       anthropic_primary:

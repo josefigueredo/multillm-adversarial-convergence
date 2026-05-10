@@ -41,5 +41,7 @@ document:
     allowed_tools: ""
     max_turns: 3
     timeout_seconds: 180
+    backend_preflight: true # Live OK probe per CLI backend before the run
+    backend_preflight_timeout_seconds: 60 # per probe
     max_budget_per_call: 1.00
     lightweight_mode: true

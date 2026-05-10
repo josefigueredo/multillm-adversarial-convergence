@@ -130,6 +130,8 @@ research:
     allowed_tools: "WebSearch,WebFetch,Read,Bash,Glob,Grep"
     max_turns: 10           # max agent turns per research call
     timeout_seconds: 600    # timeout per invocation
+    backend_preflight: true # Run a cheap live "respond OK" probe for CLI backends before non-dry runs
+    backend_preflight_timeout_seconds: 60 # timeout per backend preflight probe
 
     backend: claude-cli         # "claude-cli", "codex-cli", "gemini-cli", "copilot-cli", "claude-api", "codex-api", "gemini-api", "litellm-api", "copilot-api", or "bedrock-api"
     model: sonnet           # model name (backend-specific, see below)

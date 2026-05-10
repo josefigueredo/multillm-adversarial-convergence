@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .backends import Backend, CallOptions
+from .backends.types import CLAUDE_SHORTNAMES
 from .config import ExecutionConfig, ProviderConfig
 
 
@@ -54,3 +55,19 @@ def apply_backend_capabilities(backend: Backend, opts: CallOptions) -> CallOptio
         sanitize_environment=opts.sanitize_environment,
         process_env=opts.process_env,
     )
+
+
+def resolve_backend_model(backend: Backend, config_model: str) -> str:
+    """Resolve model shortcuts into identifiers that are safe for a backend."""
+    if config_model in CLAUDE_SHORTNAMES:
+        if backend.name == "claude-cli":
+            return config_model
+        if backend.capabilities.provider_kind == "aggregator":
+            raise ValueError(
+                f"Backend '{backend.name}' requires an explicit model identifier; "
+                f"shortname '{config_model}' is ambiguous for aggregators."
+            )
+        resolved = backend.capabilities.default_model
+        if resolved:
+            return resolved
+    return config_model

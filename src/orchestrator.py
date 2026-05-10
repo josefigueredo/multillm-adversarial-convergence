@@ -17,8 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .backends import CLAUDE_SHORTNAMES, AgentResponse, Backend, CallOptions, StreamEvent, get_backends
-from .backend_options import apply_backend_capabilities, build_call_options
+from .backends import AgentResponse, Backend, CallOptions, StreamEvent, get_backends
+from .backend_options import apply_backend_capabilities, build_call_options, resolve_backend_model
 from .audit_trail import AuditTrailWriter
 from .artifacts import (
     cli_version,
@@ -292,22 +292,13 @@ class AutoResearcher:
         - aggregators must receive explicit model identifiers because silent
           translation hides routing semantics.
         """
-        if config_model in CLAUDE_SHORTNAMES:
-            if backend.name == "claude-cli":
-                return config_model
-            if backend.capabilities.provider_kind == "aggregator":
-                raise ValueError(
-                    f"Backend '{backend.name}' requires an explicit model identifier; "
-                    f"shortname '{config_model}' is ambiguous for aggregators."
-                )
-            resolved = backend.capabilities.default_model
-            if resolved:
-                log.debug(
-                    "Model '%s' not valid for %s, using '%s'.",
-                    config_model, backend.name, resolved,
-                )
-                return resolved
-        return config_model
+        resolved = resolve_backend_model(backend, config_model)
+        if resolved != config_model:
+            log.debug(
+                "Model '%s' not valid for %s, using '%s'.",
+                config_model, backend.name, resolved,
+            )
+        return resolved
 
     def _call_with(self, backend: Backend, prompt: str, **kwargs: Any) -> AgentResponse:
         """Invoke a specific backend with default options from config.

@@ -61,6 +61,13 @@ document:
   #     layer: execution
   #     review: false
 
+  # ── Execution settings ──────────────────────────────────────────────────────
+  execution:
+    max_turns: 10
+    timeout_seconds: 600
+    backend_preflight: true
+    backend_preflight_timeout_seconds: 60
+
   # ── Backend configuration ───────────────────────────────────────────────────
   providers:
     builder_main:

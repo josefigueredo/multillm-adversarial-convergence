@@ -11,6 +11,7 @@ import logging
 import sys
 from pathlib import Path
 
+from .backend_preflight import preflight_backends, require_preflight_success
 from .backends import VALID_BACKENDS, get_backend, get_backends
 from .config import VALID_STRATEGIES, BackendsConfig, DocumentConfig, PlanConfig, ResearchConfig
 from .dry_run import build_convergence_dry_run_summary, build_dry_run_summary, render_dry_run_summary
@@ -36,6 +37,30 @@ def _setup_logging(verbose: bool, *, log_path: Path | None = None) -> None:
         force=True,
         handlers=handlers,
     )
+
+
+def _preflight_or_error(
+    *,
+    backends: dict,
+    execution,
+    providers: dict,
+    log: logging.Logger,
+) -> int:
+    """Run configured live backend preflight probes."""
+    if not execution.backend_preflight:
+        log.info("Backend preflight disabled by config.")
+        return 0
+    try:
+        results = preflight_backends(
+            backends=backends,
+            execution=execution,
+            provider_lookup=providers,
+        )
+        require_preflight_success(results)
+    except Exception as exc:
+        log.error("Backend preflight failed: %s", exc)
+        return 1
+    return 0
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -312,6 +337,9 @@ def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
         print(f"  target.allowed_roots:   {roots_display}")
         return 0
 
+    _setup_logging(getattr(args, "verbose", False), log_path=output_dir / "run.log")
+    log = logging.getLogger("autoresearch")
+
     if impl_config.providers:
         backends = instantiate_provider_backends(impl_config.providers, impl_config.backends)
     else:
@@ -326,6 +354,14 @@ def _run_implement(args: argparse.Namespace, log: logging.Logger) -> int:
                 name, be.cli_executable(),
             )
             return 1
+
+    if _preflight_or_error(
+        backends=backends,
+        execution=impl_config.execution,
+        providers=impl_config.providers,
+        log=log,
+    ):
+        return 1
 
     runner = ImplementRunner(
         config=impl_config,
@@ -417,6 +453,14 @@ def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
     _setup_logging(args.verbose, log_path=output_dir / "run.log")
     log = logging.getLogger("autoresearch")
 
+    if _preflight_or_error(
+        backends=backends,
+        execution=config.execution,
+        providers=config.providers,
+        log=log,
+    ):
+        return 1
+
     researcher = AutoResearcher(
         config=config,
         backend=backend,
@@ -486,6 +530,14 @@ def _run_refine(args: argparse.Namespace, log: logging.Logger) -> int:
     _setup_logging(args.verbose, log_path=output_dir / "run.log")
     log = logging.getLogger("autoresearch")
 
+    if _preflight_or_error(
+        backends=backends,
+        execution=config.execution,
+        providers=config.providers,
+        log=log,
+    ):
+        return 1
+
     refiner = DocumentRefiner(
         config=config,
         output_dir=output_dir,
@@ -546,6 +598,14 @@ def _research_plan(args: argparse.Namespace, log: logging.Logger) -> int:
 
     _setup_logging(args.verbose, log_path=output_dir / "run.log")
     log = logging.getLogger("autoresearch")
+
+    if _preflight_or_error(
+        backends=backends,
+        execution=config.execution,
+        providers=config.providers,
+        log=log,
+    ):
+        return 1
 
     refiner = PlanRefiner(
         config=config,

@@ -35,3 +35,5 @@ research:
     backend: claude-cli              # "claude-cli", "codex-cli", "gemini-cli", or "copilot-cli"
     model: sonnet                # model name (backend-specific)
     timeout_seconds: 600
+    backend_preflight: true # Live OK probe per CLI backend before the run
+    backend_preflight_timeout_seconds: 60 # per probe

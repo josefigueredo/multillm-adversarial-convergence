@@ -126,6 +126,8 @@ research:
     allowed_tools: "WebSearch,WebFetch,Read,Bash,Glob,Grep"
     max_turns: 12               # more turns per call — let opus think
     timeout_seconds: 900        # 15 min per call — opus + deep dimensions need it
+    backend_preflight: true # Live OK probe per CLI backend before the run
+    backend_preflight_timeout_seconds: 60 # per probe
     max_budget_per_call: 3.00   # bound per-call spend (opus is pricier than sonnet)
 
     strategy: adversarial

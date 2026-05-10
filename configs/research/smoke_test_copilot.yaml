@@ -22,4 +22,6 @@ research:
     model: gpt-4.1
     max_budget_per_call: 1.00
     timeout_seconds: 300
+    backend_preflight: true # Live OK probe per CLI backend before the run
+    backend_preflight_timeout_seconds: 60 # per probe
     lightweight_mode: true

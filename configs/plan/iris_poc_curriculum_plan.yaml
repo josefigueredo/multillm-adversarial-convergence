@@ -19,6 +19,8 @@ plan:
     allowed_tools: ""
     max_turns: 5
     timeout_seconds: 600
+    backend_preflight: true # Live OK probe per CLI backend before the run
+    backend_preflight_timeout_seconds: 60 # per probe
 
   # ── Convergence settings ──────────────────────────────────────────────────
   convergence_cycles: 2

@@ -28,8 +28,10 @@ from typing import Any, Callable
 
 from src.config import (
     BackendsConfig,
+    ExecutionConfig,
     ProviderConfig,
     _parse_backends_config,
+    _parse_execution_config,
     _parse_providers_config,
     _validate_provider_references,
 )
@@ -128,6 +130,7 @@ class ImplementConfig:
     convergence_cycles: int = 1
     backends: BackendsConfig = field(default_factory=BackendsConfig)
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
+    execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     allow_same_repo: bool = False
 
     @classmethod
@@ -256,6 +259,14 @@ class ImplementConfig:
         else:
             backends_config = _parse_backends_config(raw.get("backends", {}))
 
+        # Parse execution settings (mirrors ResearchConfig / DocumentConfig).
+        # Without this, YAML execution.* keys (incl. backend_preflight) were
+        # silently ignored — every implement run got the dataclass defaults.
+        execution_raw = raw.get("execution", {})
+        if not isinstance(execution_raw, dict):
+            raise ValueError("execution must be a YAML mapping")
+        execution_config = _parse_execution_config(execution_raw)
+
         return cls(
             target=ImplementTarget(
                 path=target_path,
@@ -267,6 +278,7 @@ class ImplementConfig:
             convergence_cycles=convergence_cycles,
             backends=backends_config,
             providers=providers,
+            execution=execution_config,
             allow_same_repo=allow_same_repo,
         )
 

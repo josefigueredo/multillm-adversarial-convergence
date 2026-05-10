@@ -154,6 +154,8 @@ class TestExecutionConfig:
         assert ec.retry_api_errors == 0
         assert ec.retry_backoff_seconds == 1.0
         assert ec.max_budget_per_call == 0.50
+        assert ec.backend_preflight is True
+        assert ec.backend_preflight_timeout_seconds == 60
         assert ec.lightweight_mode is False
         assert ec.isolate_backend_context is True
         assert ec.sanitize_backend_env is True
@@ -678,6 +680,31 @@ class TestConvergenceSmokeConfigs:
         p = tmp_path / "bad_timeout.yaml"
         p.write_text("research:\n  topic: test\n  execution:\n    timeout_seconds: 0\n", encoding="utf-8")
         with pytest.raises(ValueError, match="positive"):
+            ResearchConfig.from_yaml(p)
+
+    def test_backend_preflight_settings_parse(self, tmp_path: Path):
+        p = tmp_path / "preflight.yaml"
+        p.write_text(
+            """
+research:
+  topic: test
+  execution:
+    backend_preflight: false
+    backend_preflight_timeout_seconds: 9
+""",
+            encoding="utf-8",
+        )
+        cfg = ResearchConfig.from_yaml(p)
+        assert cfg.execution.backend_preflight is False
+        assert cfg.execution.backend_preflight_timeout_seconds == 9
+
+    def test_zero_backend_preflight_timeout_raises(self, tmp_path: Path):
+        p = tmp_path / "bad_preflight_timeout.yaml"
+        p.write_text(
+            "research:\n  topic: test\n  execution:\n    backend_preflight_timeout_seconds: 0\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="backend_preflight_timeout_seconds"):
             ResearchConfig.from_yaml(p)
 
     def test_frozen(self, minimal_yaml: Path):
