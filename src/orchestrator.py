@@ -12,6 +12,7 @@ import json
 import logging
 import subprocess
 import tempfile
+import random
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -89,6 +90,12 @@ log = logging.getLogger("autoresearch")
 
 KB_MAX_WORDS = 4000
 LIGHTWEIGHT_KB_WORDS = 800
+
+# Upper bound for the jittered exponential backoff between API retries.
+# Even with retry_backoff_seconds * 2^attempt growing fast, a single
+# retry will never sleep more than this long. Tunable via constant only
+# (no config knob today — change here if real runs exhaust the cap).
+RETRY_BACKOFF_MAX_SECONDS = 60.0
 
 
 # ---------------------------------------------------------------------------
@@ -510,7 +517,15 @@ class AutoResearcher:
                     retry_summary={"categories": dict(categories)},
                 )
             attempt += 1
-            time.sleep(self.config.execution.retry_backoff_seconds * (2 ** (attempt - 1)))
+            # Full jitter on exponential backoff to avoid thundering herd when
+            # ensemble/parallel strategies all retry the same provider after
+            # a shared rate-limit event. Capped at RETRY_BACKOFF_MAX_SECONDS
+            # so a long backoff window doesn't stall the whole run.
+            cap = min(
+                self.config.execution.retry_backoff_seconds * (2 ** (attempt - 1)),
+                RETRY_BACKOFF_MAX_SECONDS,
+            )
+            time.sleep(random.uniform(0, cap))
 
     @staticmethod
     def _should_retry_response(response: AgentResponse) -> bool:

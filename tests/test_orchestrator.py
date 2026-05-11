@@ -1559,7 +1559,12 @@ class TestAutoResearcherCall:
         assert resp.raw["retry_summary"]["categories"]["rate_limit"] == 1
         backend.invoke.assert_called()
         assert backend.invoke.call_count == 2
-        sleep_mock.assert_called_once_with(2.5)
+        # Full-jitter exponential backoff: first retry sleeps a random
+        # value in [0, retry_backoff_seconds * 2^0] = [0, 2.5]. Pins the
+        # contract (jitter present + correct cap) without pinning the RNG.
+        sleep_mock.assert_called_once()
+        slept = sleep_mock.call_args[0][0]
+        assert 0 <= slept <= 2.5, f"expected jittered sleep in [0, 2.5], got {slept}"
 
     def test_call_with_does_not_retry_non_retryable_api_errors(self, researcher):
         backend = _mock_backend()
