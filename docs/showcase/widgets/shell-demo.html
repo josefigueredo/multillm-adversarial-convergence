@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Scripted Terminal · prototype</title>
+  <title>Shell Demo · Multi-LLM Adversarial Convergence</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -213,7 +213,7 @@
 <body>
   <div class="frame">
     <header class="topbar">
-      <div class="brand">SCRIPTED TERMINAL · <strong>prototype</strong></div>
+      <div class="brand">SHELL DEMO · <strong>Multi-LLM Adversarial Convergence</strong></div>
       <div class="controls-hint">
         <kbd>↓</kbd>/<kbd>→</kbd> next  ·  <kbd>↑</kbd>/<kbd>←</kbd> back  ·  <kbd>P</kbd> play  ·  <kbd>R</kbd> reset  ·  <kbd>End</kbd> jump-end
       </div>
@@ -226,7 +226,7 @@
           <span class="dot dot-min"></span>
           <span class="dot dot-max"></span>
         </div>
-        <div class="terminal-title" id="term-title">~/dev/np-skill-demo — bash</div>
+        <div class="terminal-title" id="term-title">~/research/aws-api-gateway — zsh</div>
         <div class="terminal-step"><strong id="step-cur">0</strong> / <span id="step-total">—</span></div>
       </header>
       <div class="terminal-body" id="term-body"></div>
@@ -256,57 +256,113 @@
        prompt: when type='prompt', this is the prompt prefix (default '~ $ '). -->
   <script id="script-data" type="application/json">
 [
-  { "type": "comment", "text": "# Live demo — install + use the np-skill suite in a fresh container", "delay": 600 },
+  { "type": "comment", "text": "# Multi-LLM Adversarial Convergence — AWS API Gateway research run", "delay": 600 },
   { "type": "comment", "text": "# Up/Down to step · P to autoplay", "delay": 600 },
 
-  { "type": "prompt", "prompt": "host:~ $ ", "text": "./scripts/demo.sh", "delay": 900 },
-  { "type": "output", "text": "[INFO] Building np-skill-demo image…", "delay": 250 },
-  { "type": "output", "text": "[INFO] Pulling base image debian:trixie-slim", "delay": 350 },
-  { "type": "output", "text": "[INFO] Removing old container if any", "delay": 200 },
-  { "type": "output", "text": "[INFO] Starting np-skill-demo (detached)", "delay": 250 },
-  { "type": "success", "text": "✓ container running on host network", "delay": 700 },
+  { "type": "heading", "text": "── step 1 · validate config ─────────────────────────", "delay": 400 },
 
-  { "type": "prompt", "prompt": "host:~ $ ", "text": "docker logs -f np-skill-demo", "delay": 900 },
-  { "type": "output", "text": "→ installing @github/copilot",  "delay": 200 },
-  { "type": "output", "text": "→ installing platform skills",  "delay": 200 },
-  { "type": "output", "text": "  · np-cli-assistant",  "delay": 120 },
-  { "type": "output", "text": "  · np-api",  "delay": 120 },
-  { "type": "output", "text": "  · np-investigation",  "delay": 120 },
-  { "type": "output", "text": "  · np-developer-actions",  "delay": 120 },
-  { "type": "success", "text": "✓ /tmp/demo-ready written — container ready", "delay": 700 },
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli doctor config \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "--config configs/research/aws_api_gateway.yaml", "delay": 300 },
+  { "type": "output", "text": "[doctor] loading config…", "delay": 200 },
+  { "type": "output", "text": "[doctor] backend roles: research=[claude-api, codex-api]  judge=claude-api  utility=claude-api", "delay": 250 },
+  { "type": "output", "text": "[doctor] strategy: adversarial  dimensions: 10  max_iterations: 12", "delay": 200 },
+  { "type": "output", "text": "[doctor] scoring weights: coverage=0.40 quality=0.60 novelty=0.00", "delay": 200 },
+  { "type": "success", "text": "✓ config valid — no issues found", "delay": 700 },
 
-  { "type": "prompt", "prompt": "host:~ $ ", "text": "docker exec -it np-skill-demo bash", "delay": 900 },
+  { "type": "heading", "text": "── step 2 · dry-run (no execution, no artifacts) ────", "delay": 400 },
 
-  { "type": "heading", "text": "── inside the container ──────────────────────────────", "delay": 400 },
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "--config configs/research/aws_api_gateway.yaml --dry-run", "delay": 300 },
+  { "type": "output", "text": "[dry-run] resolved output dir: output/aws_api_gateway", "delay": 200 },
+  { "type": "output", "text": "[dry-run] adversarial inner loop per iteration: researcher → adversary → judge", "delay": 200 },
+  { "type": "output", "text": "[dry-run] convergence threshold: 82.0   patience: 3", "delay": 200 },
+  { "type": "output", "text": "[dry-run] prompt templates: research.md, research_critique.md, research_synthesize.md", "delay": 200 },
+  { "type": "success", "text": "✓ dry-run passed — all backends reachable", "delay": 700 },
 
-  { "type": "prompt", "prompt": "container:/work $ ", "text": "copilot", "delay": 900 },
-  { "type": "output", "text": "GitHub Copilot CLI · interactive session", "delay": 250 },
-  { "type": "comment", "text": "# 4 platform skills loaded", "delay": 500 },
+  { "type": "heading", "text": "── step 3 · live run (auto-retry wrapper) ───────────", "delay": 400 },
 
-  { "type": "prompt", "prompt": "copilot> ", "text": "list my apps in production", "delay": 1100 },
-  { "type": "output", "text": "I'll use np-cli-assistant to list applications.", "delay": 350 },
-  { "type": "output", "text": "$ np application list --namespace prod", "delay": 250 },
-  { "type": "output", "text": "┌──────┬──────────────────┬───────────┐", "delay": 80 },
-  { "type": "output", "text": "│ ID   │ Name             │ Status    │", "delay": 80 },
-  { "type": "output", "text": "├──────┼──────────────────┼───────────┤", "delay": 80 },
-  { "type": "output", "text": "│ 1234 │ web-app          │ running   │", "delay": 100 },
-  { "type": "output", "text": "│ 5678 │ api-gateway      │ running   │", "delay": 100 },
-  { "type": "output", "text": "│ 9012 │ worker           │ stopped   │", "delay": 100 },
-  { "type": "output", "text": "└──────┴──────────────────┴───────────┘", "delay": 600 },
+  { "type": "prompt", "prompt": "~ $ ", "text": "./scripts/research_with_retry.sh \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "configs/research/aws_api_gateway.yaml", "delay": 300 },
+  { "type": "output", "text": "[wrapper] attempt 1/10  output: output/aws_api_gateway", "delay": 300 },
+  { "type": "comment", "text": "# each iteration explores ONE dimension; inside, all three roles fire:", "delay": 250 },
+  { "type": "comment", "text": "# researcher (claude-api) drafts → adversary (codex-api) critiques → judge (claude-api) scores", "delay": 500 },
 
-  { "type": "prompt", "prompt": "copilot> ", "text": "create a staging scope for app 1234", "delay": 1300 },
-  { "type": "output", "text": "Switching to np-developer-actions (mutation request)", "delay": 350 },
-  { "type": "output", "text": "Plan:", "delay": 200 },
-  { "type": "output", "text": "  POST /apps/1234/scopes", "delay": 150 },
-  { "type": "output", "text": "  body: { \"name\": \"staging\", \"slug\": \"staging\" }", "delay": 150 },
-  { "type": "output", "text": "Type literal `yes` to confirm:", "delay": 600 },
+  { "type": "output", "text": "[research] Iteration 001 — REST API vs HTTP API: feature matrix, pricing, performance", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1180 tok  →  adversary: 640 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 54.1 [target=21/40 evidence=18/35 questions=10/15 length=5/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 61.3 [d=7 a=6 n=6 act=5]  novelty: 92.0  total: 58.5  → KEEP", "delay": 400 },
 
-  { "type": "prompt", "prompt": "› ", "text": "y", "delay": 900 },
-  { "type": "error", "text": "✗ aborted — only literal `yes` advances.", "delay": 700 },
+  { "type": "output", "text": "[research] Iteration 002 — WebSocket API: capabilities, connection limits, scaling", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1340 tok  →  adversary: 720 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 62.8 [target=25/40 evidence=22/35 questions=11/15 length=6/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 69.7 [d=8 a=7 n=7 act=6]  novelty: 88.4  total: 66.9  → KEEP", "delay": 400 },
 
-  { "type": "prompt", "prompt": "› ", "text": "yes", "delay": 1100 },
-  { "type": "success", "text": "✓ scope `staging` created (id 33221)", "delay": 250 },
-  { "type": "output", "text": "  audit: ~/.platform/np-developer-actions.log", "delay": 800 }
+  { "type": "output", "text": "[research] Iteration 003 — Authentication: IAM, Cognito, Lambda authorizers, JWT", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1510 tok  →  adversary: 880 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 71.4 [target=29/40 evidence=25/35 questions=12/15 length=7/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 76.2 [d=8 a=8 n=7 act=7]  novelty: 79.1  total: 74.3  → KEEP", "delay": 350 },
+  { "type": "output", "text": "  gap_promoted: \"WebSocket API support in API Gateway v2\"  (confidence: 0.83)", "delay": 200 },
+  { "type": "output", "text": "  gap_promoted: \"VPC link pricing at high RPS\"  (confidence: 0.76)", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 004 — Rate limiting, throttling, usage plans for multi-tenant SaaS", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1420 tok  →  adversary: 750 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 75.8 [target=30/40 evidence=27/35 questions=13/15 length=6/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 75.5 [d=8 a=8 n=7 act=7]  novelty: 71.2  total: 75.6  → KEEP", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 005 — Integration patterns: Lambda proxy, VPC Link, service integrations", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1640 tok  →  adversary: 920 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 78.7 [target=31/40 evidence=28/35 questions=13/15 length=8/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 78.0 [d=8 a=8 n=8 act=7]  novelty: 64.8  total: 78.3  → KEEP", "delay": 350 },
+  { "type": "output", "text": "  gap_promoted: \"JWT authorizer cache invalidation edge cases\"  (confidence: 0.79)", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 006 — Observability: CloudWatch, X-Ray, access logging, CloudTrail", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1480 tok  →  adversary: 830 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 80.2 [target=32/40 evidence=29/35 questions=13/15 length=8/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 79.5 [d=9 a=8 n=8 act=7]  novelty: 58.4  total: 79.8  → KEEP", "delay": 500 },
+
+  { "type": "output", "text": "[research] Iteration 007 — Cost modeling: per-request pricing, data transfer, caching", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1320 tok  →  adversary: 1110 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 77.5 [target=31/40 evidence=26/35 questions=13/15 length=9/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 75.3 [d=8 a=8 n=7 act=7]  novelty: 52.0  total: 76.2  → DISCARD", "delay": 500 },
+  { "type": "comment", "text": "  # score regressed (79.8 → 76.2) — adversary flagged 4 unsupported pricing claims", "delay": 500 },
+
+  { "type": "output", "text": "[research] Iteration 008 — Cost modeling: per-request pricing, data transfer, caching (attempt 2/3)", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1610 tok  →  adversary: 690 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 81.1 [target=33/40 evidence=29/35 questions=14/15 length=8/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 80.1 [d=9 a=8 n=8 act=8]  novelty: 49.3  total: 80.5  → KEEP", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 009 — Deployment: stages, canary releases, versioning, CI/CD", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1520 tok  →  adversary: 800 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 82.4 [target=33/40 evidence=30/35 questions=14/15 length=9/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 81.9 [d=9 a=9 n=8 act=8]  novelty: 44.1  total: 82.1  → KEEP", "delay": 350 },
+  { "type": "output", "text": "  gap_seen_again: \"VPC link pricing at high RPS\"  (×2 — convergence signal)", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 010 — Custom domains, TLS, edge-optimized vs regional endpoints", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1390 tok  →  adversary: 710 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 83.6 [target=34/40 evidence=30/35 questions=14/15 length=9/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 84.1 [d=9 a=9 n=8 act=8]  novelty: 38.7  total: 83.9  → KEEP", "delay": 300 },
+  { "type": "success", "text": "✓ converged at iteration 10  threshold=82.0  patience=3  (3 consecutive runs ≥ 82.0)", "delay": 600 },
+
+  { "type": "heading", "text": "── step 4 · synthesize all three output styles ──────", "delay": 400 },
+
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "--config configs/research/aws_api_gateway.yaml --synthesize", "delay": 300 },
+  { "type": "output", "text": "[synthesize] rendering default  → output/aws_api_gateway/report_default.html", "delay": 200 },
+  { "type": "output", "text": "[synthesize] rendering paper    → output/aws_api_gateway/report_paper.html", "delay": 200 },
+  { "type": "output", "text": "[synthesize] rendering technical_doc → output/aws_api_gateway/report_technical_doc.html", "delay": 200 },
+  { "type": "success", "text": "✓ 3 reports written  audit_trail: output/aws_api_gateway/audit_trail.jsonl", "delay": 700 },
+
+  { "type": "heading", "text": "── step 5 · inspect the run ─────────────────────────", "delay": 400 },
+
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli explain resume \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "--output output/aws_api_gateway", "delay": 300 },
+  { "type": "output", "text": "  run          aws_api_gateway", "delay": 100 },
+  { "type": "output", "text": "  strategy     adversarial", "delay": 80 },
+  { "type": "output", "text": "  iterations   10 / 12  (converged)", "delay": 80 },
+  { "type": "output", "text": "  final score  83.9", "delay": 80 },
+  { "type": "output", "text": "  gaps found   7  (promoted: 4)", "delay": 80 },
+  { "type": "output", "text": "  cost est.    $0.41  (claude-api $0.27 [researcher+judge] · codex-api $0.14 [adversary])", "delay": 300 },
+  { "type": "success", "text": "✓ to rerun synthesis only: --synthesize   to resume: --resume", "delay": 800 }
 ]
   </script>
 
