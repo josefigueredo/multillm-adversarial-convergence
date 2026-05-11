@@ -25,6 +25,33 @@ class TestAgentResponse:
         assert r.input_tokens == 0
         assert r.output_tokens == 0
 
+    def test_with_meta_returns_new_instance(self):
+        """``with_meta`` must NOT mutate the receiver — the freeze is real."""
+        original = AgentResponse(text="hi", cost_usd=0.01, is_error=False, raw={"a": 1})
+        decorated = original.with_meta(retry_attempts=2)
+
+        assert decorated is not original
+        assert original.raw == {"a": 1}, "original.raw was mutated"
+        assert decorated.raw == {"a": 1, "retry_attempts": 2}
+
+    def test_with_meta_preserves_core_fields(self):
+        original = AgentResponse(
+            text="findings", cost_usd=0.05, is_error=False,
+            input_tokens=100, output_tokens=50,
+        )
+        decorated = original.with_meta(tool_loop={"turns": 3})
+
+        assert decorated.text == "findings"
+        assert decorated.cost_usd == 0.05
+        assert decorated.is_error is False
+        assert decorated.input_tokens == 100
+        assert decorated.output_tokens == 50
+        assert decorated.raw == {"tool_loop": {"turns": 3}}
+
+    def test_with_meta_later_keys_overwrite_earlier(self):
+        original = AgentResponse(text="x", cost_usd=0.0, is_error=False, raw={"k": 1})
+        assert original.with_meta(k=2).raw == {"k": 2}
+
 
 class TestCallOptions:
     def test_defaults(self):

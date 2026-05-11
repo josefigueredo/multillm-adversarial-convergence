@@ -79,6 +79,18 @@ class TestGeminiBackend:
         assert resp.text == "not json"
         assert resp.is_error is False
 
+    def test_parse_banner_on_decode_fail_is_error(self):
+        """Quota/auth banners on Gemini's stdout must NOT pass the JSON-decode
+        fallback as is_error=False — the banner would otherwise land in the KB.
+        """
+        resp = self.backend.parse_response("You have been rate limited by the API.")
+        assert resp.is_error is True
+        assert resp.text == ""
+
+    def test_parse_empty_stdout_is_error(self):
+        resp = self.backend.parse_response("")
+        assert resp.is_error is True
+
     def test_parse_dict_response_strips_json_fence(self):
         """Gemini wraps JSON output in ```json\\n...\\n``` fences even when told not to."""
         wrapped = '```json\n{"hello":"world"}\n```'

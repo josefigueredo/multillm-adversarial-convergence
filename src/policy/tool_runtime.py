@@ -48,16 +48,12 @@ def run_function_tool_loop(
         summary["turns"] += 1
         response = backend.invoke(current_input, opts, timeout=timeout)
         if response.is_error:
-            response.raw["tool_loop"] = dict(summary)
-            response.raw["tool_trace"] = list(tool_trace)
-            return response
+            return response.with_meta(tool_loop=dict(summary), tool_trace=list(tool_trace))
 
         extract_calls = getattr(backend, "extract_function_tool_calls", None)
         tool_calls = extract_calls(response.raw) if callable(extract_calls) else []
         if not tool_calls:
-            response.raw["tool_loop"] = dict(summary)
-            response.raw["tool_trace"] = list(tool_trace)
-            return response
+            return response.with_meta(tool_loop=dict(summary), tool_trace=list(tool_trace))
         summary["tool_calls"] += len(tool_calls)
 
         tool_outputs: list[dict[str, Any]] = []

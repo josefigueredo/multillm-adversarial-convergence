@@ -24,10 +24,13 @@ class TestParseJsonlLastResult:
         resp = parse_jsonl_last_result("\n".join(lines))
         assert resp.text == "final answer"
 
-    def test_plain_text_fallback(self):
+    def test_unparseable_stream_returns_error(self):
+        """Stdout that doesn't yield any recognizable JSONL must NOT be
+        promoted to is_error=False findings — that path historically let
+        rate-limit/quota banners and truncated streams land in the KB."""
         resp = parse_jsonl_last_result("just plain text")
-        assert resp.text == "just plain text"
-        assert resp.is_error is False
+        assert resp.is_error is True
+        assert resp.text == ""
 
     def test_codex_agent_message(self):
         stdout = json.dumps({

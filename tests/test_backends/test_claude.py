@@ -139,3 +139,24 @@ class TestClaudeBackend:
         resp = self.backend.invoke("prompt", CallOptions(), timeout=10)
         assert resp.is_error is True
         assert resp.text == ""
+
+    def test_parse_response_banner_on_success_is_error(self):
+        """JSON-parse failure on a banner-shaped stdout must NOT be promoted
+        to is_error=False findings — historically banners on rc=0 (or with
+        broken JSON contract) bypassed the salvage filter and poisoned the KB.
+        """
+        resp = self.backend.parse_response("Rate limit exceeded for this org")
+        assert resp.is_error is True
+        assert resp.text == ""
+
+    def test_parse_response_empty_stdout_is_error(self):
+        resp = self.backend.parse_response("")
+        assert resp.is_error is True
+        assert resp.text == ""
+
+    def test_parse_response_non_banner_plain_text_passes_through(self):
+        """Genuine plain text (not banner-shaped) must still pass through;
+        the salvage filter should not over-reach."""
+        resp = self.backend.parse_response("Here is a real finding about caching.")
+        assert resp.is_error is False
+        assert resp.text == "Here is a real finding about caching."

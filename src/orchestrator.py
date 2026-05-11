@@ -482,16 +482,19 @@ class AutoResearcher:
             response = backend.invoke(prompt, opts, timeout=timeout)
             if not self._should_retry_response(response):
                 if attempt > 0:
-                    response.raw["retry_attempts"] = attempt
-                    response.raw["retry_summary"] = {"categories": dict(categories)}
+                    response = response.with_meta(
+                        retry_attempts=attempt,
+                        retry_summary={"categories": dict(categories)},
+                    )
                 return response
             category = self._response_error_category(response)
             if category:
                 categories[category] = categories.get(category, 0) + 1
             if attempt >= max_retries:
-                response.raw["retry_attempts"] = attempt
-                response.raw["retry_summary"] = {"categories": dict(categories)}
-                return response
+                return response.with_meta(
+                    retry_attempts=attempt,
+                    retry_summary={"categories": dict(categories)},
+                )
             attempt += 1
             time.sleep(self.config.execution.retry_backoff_seconds * (2 ** (attempt - 1)))
 

@@ -47,6 +47,22 @@ class AgentResponse:
     output_tokens: int = 0
     raw: dict[str, Any] = field(default_factory=dict)
 
+    def with_meta(self, **meta: Any) -> "AgentResponse":
+        """Return a copy with extra telemetry merged into ``raw``.
+
+        Prefer this over in-place ``response.raw[key] = value`` — the
+        in-place form defeats ``frozen=True`` and risks shared-reference
+        leakage when a backend reuses the parsed payload across calls.
+        """
+        return AgentResponse(
+            text=self.text,
+            cost_usd=self.cost_usd,
+            is_error=self.is_error,
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+            raw={**self.raw, **meta},
+        )
+
 
 @dataclass(frozen=True)
 class StreamEvent:

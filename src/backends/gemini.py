@@ -7,10 +7,14 @@ triggers headless mode while stdin provides the actual prompt text.
 from __future__ import annotations
 
 import json
+import logging
 
+from .banners import looks_like_quota_banner
 from .base import Backend
 from .jsonl import parse_jsonl_last_result, strip_markdown_fences
 from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode
+
+log = logging.getLogger("autoresearch")
 
 
 class GeminiBackend(Backend):
@@ -41,6 +45,11 @@ class GeminiBackend(Backend):
         try:
             payload = json.loads(stdout)
         except json.JSONDecodeError:
+            if looks_like_quota_banner(stdout):
+                log.warning("Gemini CLI returned a quota/rate-limit banner instead of JSON; treating as error.")
+                log.debug("Dropped (banner) stdout: %r", stdout[:500])
+                return AgentResponse(text="", cost_usd=0.0, is_error=True)
+            log.warning("Gemini CLI returned non-JSON stdout (%d chars); passing through as fenced text.", len(stdout))
             return AgentResponse(text=strip_markdown_fences(stdout), cost_usd=0.0, is_error=False)
 
         if isinstance(payload, dict):

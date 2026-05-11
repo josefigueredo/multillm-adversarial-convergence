@@ -158,6 +158,16 @@ class TestCopilotBackend:
         resp = self.backend.parse_response(stdout)
         assert resp.text == "fallback output"
 
+    def test_parse_response_truncated_stream_is_error(self):
+        """A truncated/corrupt JSONL stream (no recognizable Copilot shape AND
+        decode failures) must NOT fall through to the generic JSONL helper
+        and from there to a raw-stdout passthrough — that path used to
+        promote rate-limit chunks into is_error=False findings."""
+        truncated = '{"type": "session.bootstrap", "data":\n{"this is not valid json'
+        resp = self.backend.parse_response(truncated)
+        assert resp.is_error is True
+        assert resp.text == ""
+
     def test_parse_response_extracts_task_complete_summary(self):
         """Copilot's autopilot agent delivers structured final answers via
         the session.task_complete tool's `data.summary` field, not via

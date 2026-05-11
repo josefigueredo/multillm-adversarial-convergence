@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from .types import AgentResponse
+
+log = logging.getLogger("autoresearch")
 
 
 def strip_markdown_fences(text: str) -> str:
@@ -88,6 +91,11 @@ def parse_jsonl_last_result(stdout: str, *, cost_key: str = "cost_usd") -> Agent
             continue
 
     if not last_text:
-        return AgentResponse(text=stdout.strip(), cost_usd=0.0, is_error=False, input_tokens=in_tok, output_tokens=out_tok)
+        log.warning(
+            "JSONL stream (%d line(s)) yielded no recognizable agent_message/result/response/message; "
+            "treating as error rather than returning raw stdout as findings.",
+            len(lines),
+        )
+        return AgentResponse(text="", cost_usd=0.0, is_error=True, input_tokens=in_tok, output_tokens=out_tok)
 
     return AgentResponse(text=last_text, cost_usd=cost, is_error=False, input_tokens=in_tok, output_tokens=out_tok)

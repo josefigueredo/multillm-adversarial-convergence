@@ -82,6 +82,7 @@ class CopilotBackend(Backend):
         primary_interaction_id: str | None = None
         is_copilot_shaped = False
         task_complete_summary: str | None = None
+        decode_failures = 0
         for line in lines:
             line = line.strip()
             if not line:
@@ -89,6 +90,7 @@ class CopilotBackend(Backend):
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
+                decode_failures += 1
                 continue
             if not isinstance(obj, dict):
                 continue
@@ -134,6 +136,14 @@ class CopilotBackend(Backend):
             return AgentResponse(text=last_text, cost_usd=0.0, is_error=False)
 
         if is_copilot_shaped:
+            return AgentResponse(text="", cost_usd=0.0, is_error=True)
+
+        if decode_failures > 0:
+            log.warning(
+                "Copilot stdout had %d unparseable JSONL line(s) and no recognizable session/assistant shape; "
+                "treating as error rather than falling through to raw-stdout passthrough.",
+                decode_failures,
+            )
             return AgentResponse(text="", cost_usd=0.0, is_error=True)
 
         return parse_jsonl_last_result(stdout, cost_key="cost_usd")
