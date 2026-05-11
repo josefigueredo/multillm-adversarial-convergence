@@ -289,7 +289,7 @@ class TestAutoResearcherSetup:
         assert "network_access" in evt
         assert "allow_host_bash" in evt
 
-
+    def test_generate_synthesis_lightweight_mode(self, researcher):
         researcher.config = ResearchConfig(
             topic="What are three pros and cons of Python?",
             goal="A bullet-point list in under 100 words",
