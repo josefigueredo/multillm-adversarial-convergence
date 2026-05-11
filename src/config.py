@@ -171,6 +171,47 @@ def _build_backends_config_from_raw(
     )
 
 
+def _resolve_backends_and_providers(
+    raw_section: dict[str, Any],
+) -> tuple[dict[str, "ProviderConfig"], "BackendsConfig"]:
+    """Common provider + backends resolution for Document/Plan workflows.
+
+    When the YAML section has a ``providers:`` block, ``backends:`` keys
+    refer to provider-instance names (the indirection layer) and we don't
+    apply ``VALID_BACKENDS`` validation against role names — that check
+    runs against the provider adapters inside ``_parse_providers_config``.
+    When there is no ``providers:`` block, ``backends:`` keys refer
+    directly to adapter names and we validate them via ``_parse_backends_config``.
+
+    ResearchConfig has its own slightly different variant (emits a warning
+    when judge is also a research backend); this helper is for the simpler
+    Document and Plan workflows that used to carry byte-identical copies
+    of this block.
+    """
+    providers = _parse_providers_config(raw_section.get("providers", {}))
+    if providers:
+        backends_raw = raw_section.get("backends", {})
+        if backends_raw:
+            research_val = backends_raw.get(
+                "research", [backends_raw.get("primary", next(iter(providers)))]
+            )
+            if isinstance(research_val, str):
+                research_val = [research_val]
+            backends_cfg = BackendsConfig(
+                primary=backends_raw.get("primary", next(iter(providers))),
+                research=tuple(research_val),
+                judge=backends_raw.get("judge", ""),
+                utility=backends_raw.get("utility", ""),
+            )
+        else:
+            first_provider = next(iter(providers))
+            backends_cfg = BackendsConfig(primary=first_provider, research=(first_provider,))
+        _validate_provider_references(backends_cfg, providers)
+    else:
+        backends_cfg = _parse_backends_config(raw_section.get("backends", {}))
+    return providers, backends_cfg
+
+
 def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
     """Parse the shared execution settings used by all workflows.
 
@@ -1466,25 +1507,7 @@ class DocumentConfig:
             for a in doc.get("artifacts", [])
         )
 
-        providers = _parse_providers_config(doc.get("providers", {}))
-        if providers:
-            backends_raw = doc.get("backends", {})
-            if backends_raw:
-                research_val = backends_raw.get("research", [backends_raw.get("primary", next(iter(providers)))])
-                if isinstance(research_val, str):
-                    research_val = [research_val]
-                backends_cfg = BackendsConfig(
-                    primary=backends_raw.get("primary", next(iter(providers))),
-                    research=tuple(research_val),
-                    judge=backends_raw.get("judge", ""),
-                    utility=backends_raw.get("utility", ""),
-                )
-            else:
-                first_provider = next(iter(providers))
-                backends_cfg = BackendsConfig(primary=first_provider, research=(first_provider,))
-            _validate_provider_references(backends_cfg, providers)
-        else:
-            backends_cfg = _parse_backends_config(doc.get("backends", {}))
+        providers, backends_cfg = _resolve_backends_and_providers(doc)
 
         strat_raw: dict[str, Any] = doc.get("strategy_config", {})
         strategy_cfg = StrategyConfig(
@@ -1681,25 +1704,7 @@ class PlanConfig:
             for a in plan_raw.get("artifacts", [])
         )
 
-        providers = _parse_providers_config(plan_raw.get("providers", {}))
-        if providers:
-            backends_raw = plan_raw.get("backends", {})
-            if backends_raw:
-                research_val = backends_raw.get("research", [backends_raw.get("primary", next(iter(providers)))])
-                if isinstance(research_val, str):
-                    research_val = [research_val]
-                backends_cfg = BackendsConfig(
-                    primary=backends_raw.get("primary", next(iter(providers))),
-                    research=tuple(research_val),
-                    judge=backends_raw.get("judge", ""),
-                    utility=backends_raw.get("utility", ""),
-                )
-            else:
-                first_provider = next(iter(providers))
-                backends_cfg = BackendsConfig(primary=first_provider, research=(first_provider,))
-            _validate_provider_references(backends_cfg, providers)
-        else:
-            backends_cfg = _parse_backends_config(plan_raw.get("backends", {}))
+        providers, backends_cfg = _resolve_backends_and_providers(plan_raw)
 
         strat_raw: dict[str, Any] = plan_raw.get("strategy_config", {})
         strategy_cfg = StrategyConfig(
