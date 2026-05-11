@@ -275,7 +275,7 @@
   { "type": "prompt", "prompt": "      ", "text": "--config configs/research/aws_api_gateway.yaml --dry-run", "delay": 300 },
   { "type": "output", "text": "[dry-run] resolved output dir: output/aws_api_gateway", "delay": 200 },
   { "type": "output", "text": "[dry-run] adversarial inner loop per iteration: researcher → adversary → judge", "delay": 200 },
-  { "type": "output", "text": "[dry-run] convergence threshold: 82.0   patience: 3", "delay": 200 },
+  { "type": "output", "text": "[dry-run] stop when: target_dimensions_total=10 reached (max_iterations: unbounded)", "delay": 200 },
   { "type": "output", "text": "[dry-run] prompt templates: research.md, research_critique.md, research_synthesize.md", "delay": 200 },
   { "type": "success", "text": "✓ dry-run passed — all backends reachable", "delay": 700 },
 
@@ -340,8 +340,15 @@
   { "type": "output", "text": "[research] Iteration 010 — Custom domains, TLS, edge-optimized vs regional endpoints", "delay": 350 },
   { "type": "output", "text": "  researcher: 1390 tok  →  adversary: 710 tok  →  judge scoring…", "delay": 200 },
   { "type": "output", "text": "  Scores — coverage: 83.6 [target=34/40 evidence=30/35 questions=14/15 length=9/10]", "delay": 120 },
-  { "type": "output", "text": "           quality: 84.1 [d=9 a=9 n=8 act=8]  novelty: 38.7  total: 83.9  → KEEP", "delay": 300 },
-  { "type": "success", "text": "✓ converged at iteration 10  threshold=82.0  patience=3  (3 consecutive runs ≥ 82.0)", "delay": 600 },
+  { "type": "output", "text": "           quality: 84.1 [d=9 a=9 n=8 act=8]  novelty: 38.7  total: 83.9  → KEEP", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 011 — Hard limits and quotas that constrain architecture decisions", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1280 tok  →  adversary: 660 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 84.2 [target=34/40 evidence=31/35 questions=14/15 length=9/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 83.5 [d=9 a=9 n=8 act=8]  novelty: 33.2  total: 83.9  → KEEP", "delay": 300 },
+  { "type": "output", "text": "[research] Reached target_dimensions_total=10 with 10 explored dimensions, stopping.", "delay": 350 },
+  { "type": "output", "text": "[research] workflow_transition: merge → converged  (iteration 11, terminal)", "delay": 250 },
+  { "type": "success", "text": "✓ run complete — 10/10 dimensions explored in 11 iterations (iter 7 DISCARD, iter 8 retry)", "delay": 600 },
 
   { "type": "heading", "text": "── step 4 · synthesize all three output styles ──────", "delay": 400 },
 
@@ -356,11 +363,13 @@
 
   { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli explain resume \\", "delay": 900 },
   { "type": "prompt", "prompt": "      ", "text": "--output output/aws_api_gateway", "delay": 300 },
-  { "type": "output", "text": "  run          aws_api_gateway", "delay": 100 },
-  { "type": "output", "text": "  strategy     adversarial", "delay": 80 },
-  { "type": "output", "text": "  iterations   10 / 12  (converged)", "delay": 80 },
-  { "type": "output", "text": "  final score  83.9", "delay": 80 },
-  { "type": "output", "text": "  gaps found   7  (promoted: 4)", "delay": 80 },
+  { "type": "output", "text": "  run                 aws_api_gateway", "delay": 100 },
+  { "type": "output", "text": "  strategy            adversarial", "delay": 80 },
+  { "type": "output", "text": "  iterations          11   (1 DISCARD, 10 KEEP)", "delay": 80 },
+  { "type": "output", "text": "  dimensions          10 / 10  (target reached)", "delay": 80 },
+  { "type": "output", "text": "  workflow_state      converged  (terminal)", "delay": 80 },
+  { "type": "output", "text": "  final iter score    83.9", "delay": 80 },
+  { "type": "output", "text": "  gaps found          7   (promoted: 3)", "delay": 80 },
   { "type": "output", "text": "  cost est.    $0.41  (claude-api $0.27 [researcher+judge] · codex-api $0.14 [adversary])", "delay": 300 },
   { "type": "success", "text": "✓ to rerun synthesis only: --synthesize   to resume: --resume", "delay": 800 }
 ]
