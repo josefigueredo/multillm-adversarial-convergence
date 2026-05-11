@@ -11,7 +11,24 @@ _REGISTRY: dict[str, type[Backend]] = {}
 
 
 def _register(name: str, cls: type[Backend]) -> None:
-    """Called by ``Backend.__init_subclass__`` to auto-register backends."""
+    """Called by ``Backend.__init_subclass__`` to auto-register backends.
+
+    Raises ``ValueError`` if *name* is empty, or if it collides with an
+    already-registered class that isn't *cls*. Idempotent re-registration
+    of the same class (e.g. when an aliased entry already points to it)
+    is allowed.
+    """
+    if not name:
+        raise ValueError(
+            f"Cannot register backend {cls.__name__!r} with empty name; "
+            "set a non-empty ``name`` class attribute."
+        )
+    existing = _REGISTRY.get(name)
+    if existing is not None and existing is not cls:
+        raise ValueError(
+            f"Backend name {name!r} is already registered to "
+            f"{existing.__name__!r}; cannot reassign to {cls.__name__!r}."
+        )
     _REGISTRY[name] = cls
 
 

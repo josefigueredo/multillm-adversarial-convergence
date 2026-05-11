@@ -31,7 +31,13 @@ def _validate_backend_name(name: str, role: str) -> None:
 
 @dataclass(frozen=True)
 class ProviderConfig:
-    """Named provider instance configuration."""
+    """Named provider instance configuration.
+
+    Construction-time validation enforces that ``adapter`` is a known
+    backend. The YAML loader (``_parse_providers_config``) does the same
+    check, but having the invariant on the dataclass means programmatic
+    construction from tests/tooling can't bypass it.
+    """
 
     adapter: str
     model: str = ""
@@ -44,6 +50,21 @@ class ProviderConfig:
     max_turns: int = 0
     timeout_seconds: int = 0
     max_budget_per_call: float = -1.0
+
+    def __post_init__(self) -> None:
+        if not self.adapter:
+            raise ValueError("ProviderConfig.adapter must be non-empty")
+        if self.adapter not in VALID_BACKENDS:
+            raise ValueError(
+                f"Invalid ProviderConfig.adapter {self.adapter!r}. "
+                f"Must be one of: {', '.join(VALID_BACKENDS)}"
+            )
+        if self.max_turns < 0:
+            raise ValueError(f"ProviderConfig.max_turns must be >= 0, got {self.max_turns}")
+        if self.timeout_seconds < 0:
+            raise ValueError(
+                f"ProviderConfig.timeout_seconds must be >= 0, got {self.timeout_seconds}"
+            )
 
 
 @dataclass(frozen=True)

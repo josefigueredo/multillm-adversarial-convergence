@@ -17,6 +17,7 @@ from .types import AgentResponse, CallOptions, PromptMode
 class ApiBackend(Backend):
     """Base backend for direct HTTP API integrations."""
 
+    _abstract_base = True
     api_key_env_vars: tuple[str, ...] = ()
     default_timeout_seconds: int = 300
 

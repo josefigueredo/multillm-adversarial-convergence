@@ -11,6 +11,7 @@ from .types import AgentResponse, CallOptions, StreamEvent, ToolCallRequest
 class OpenAICompatibleResponsesApiBackend(ApiBackend):
     """Base class for gateway adapters that expose /v1/responses semantics."""
 
+    _abstract_base = True
     supports_json_schema_format: bool = True
 
     def check_available(self) -> bool:

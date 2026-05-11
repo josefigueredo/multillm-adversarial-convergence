@@ -2217,6 +2217,7 @@ class TestAutoResearcherEnforcement:
         from src.policy.policy_denial import PolicyDeniedError
         invoke_called = []
         class TrackingBackend(FakeBackend):
+            name = "fake_tracking_a"
             def invoke(self, prompt, opts, timeout=300):
                 invoke_called.append(True)
                 return AgentResponse(text="x", cost_usd=0.0, is_error=False)
@@ -2251,6 +2252,7 @@ class TestAutoResearcherEnforcement:
         from src.policy.policy_denial import PolicyDeniedError
         from src.backends.types import BackendCapabilities
         class NoToolsBackend(FakeBackend):
+            name = "fake_no_tools_a"
             @property
             def capabilities(self):
                 return BackendCapabilities(supports_tools=False)
@@ -2435,6 +2437,7 @@ class TestAutoResearcherEnforcement:
         from src.config import SandboxConfig, SecurityConfig
 
         class NoToolsBackend(FakeBackend):
+            name = "fake_no_tools_b"
             @property
             def capabilities(self):
                 return BackendCapabilities(supports_tools=False)
@@ -2456,6 +2459,7 @@ class TestAutoResearcherEnforcement:
         invoke_called = []
 
         class TrackingBackend(FakeBackend):
+            name = "fake_tracking_b"
             def invoke(self, prompt, opts, timeout=300):
                 invoke_called.append(True)
                 return AgentResponse(text="x", cost_usd=0.0, is_error=False)

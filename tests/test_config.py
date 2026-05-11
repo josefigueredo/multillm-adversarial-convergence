@@ -141,6 +141,39 @@ class TestReportingConfig:
 
 
 # ---------------------------------------------------------------------------
+# ProviderConfig validation (T4.3)
+# ---------------------------------------------------------------------------
+
+
+class TestProviderConfigValidation:
+    """Construction-time invariants prevent programmatic mis-construction
+    (the YAML loader already enforces these; this class makes the contract
+    a property of the dataclass itself)."""
+
+    def test_empty_adapter_raises(self):
+        with pytest.raises(ValueError, match="adapter must be non-empty"):
+            ProviderConfig(adapter="")
+
+    def test_unknown_adapter_raises(self):
+        with pytest.raises(ValueError, match="Invalid ProviderConfig.adapter"):
+            ProviderConfig(adapter="claude-clxi")
+
+    def test_negative_max_turns_raises(self):
+        with pytest.raises(ValueError, match="max_turns must be >= 0"):
+            ProviderConfig(adapter="claude-cli", max_turns=-1)
+
+    def test_negative_timeout_raises(self):
+        with pytest.raises(ValueError, match="timeout_seconds must be >= 0"):
+            ProviderConfig(adapter="claude-cli", timeout_seconds=-5)
+
+    def test_max_budget_per_call_negative_one_is_sentinel(self):
+        """-1.0 means 'unset' (falls back to execution-level budget); this
+        is a legitimate construction and must NOT trip a validation error."""
+        p = ProviderConfig(adapter="claude-cli")
+        assert p.max_budget_per_call == -1.0
+
+
+# ---------------------------------------------------------------------------
 # ExecutionConfig defaults
 # ---------------------------------------------------------------------------
 

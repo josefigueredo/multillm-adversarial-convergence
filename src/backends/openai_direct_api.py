@@ -9,6 +9,8 @@ from .types import CallOptions
 class OpenAIDirectResponsesApiBackend(OpenAICompatibleResponsesApiBackend):
     """Base class for direct OpenAI Responses API backends."""
 
+    _abstract_base = True
+
     def default_service_base_url(self) -> str:
         return "https://api.openai.com"
 

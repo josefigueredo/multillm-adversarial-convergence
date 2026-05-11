@@ -1,4 +1,5 @@
-"""Tests for src.backends.registry — get_backend, get_backends."""
+"""Tests for src.backends.registry — get_backend, get_backends, and the
+T4.6 registration-validation contract (non-empty name + no collision)."""
 
 import pytest
 
@@ -17,6 +18,20 @@ from src.backends import (
     get_backend,
     get_backends,
 )
+from src.backends.base import Backend
+from src.backends.types import BackendCapabilities, PromptMode
+
+
+def _concrete_attrs(name: str) -> dict:
+    """Minimal attribute dict for a concrete Backend subclass."""
+    return {
+        "name": name,
+        "cli_executable": lambda self: "x",
+        "prompt_mode": lambda self: PromptMode.STDIN,
+        "build_command": lambda self, opts: [],
+        "parse_response": lambda self, stdout: None,
+        "capabilities": BackendCapabilities(),
+    }
 
 
 class TestGetBackend:
@@ -81,3 +96,33 @@ class TestCanonicalBackendName:
     def test_invalid_name_raises(self):
         with pytest.raises(ValueError, match="Unknown backend"):
             canonical_backend_name("nope")
+
+
+class TestRegistrationValidation:
+    """T4.6: concrete subclasses must declare a non-empty unique name."""
+
+    def test_missing_name_raises(self):
+        attrs = _concrete_attrs("_dummy")
+        del attrs["name"]
+        with pytest.raises(TypeError, match="non-empty string ``name``"):
+            type("_NoName", (Backend,), attrs)
+
+    def test_empty_name_raises(self):
+        with pytest.raises(TypeError, match="non-empty string ``name``"):
+            type("_EmptyName", (Backend,), _concrete_attrs(""))
+
+    def test_collision_with_existing_class_raises(self):
+        """Two distinct classes claiming the same name → ValueError on the
+        second registration. ``claude-cli`` is already taken by ClaudeBackend."""
+        with pytest.raises(ValueError, match="already registered"):
+            type("_Imposter", (Backend,), _concrete_attrs("claude-cli"))
+
+    def test_abstract_base_skipped(self):
+        """``_abstract_base = True`` opts the class out of registration —
+        used by intermediate code-sharing layers like ApiBackend."""
+        intermediate = type("_Intermediate", (Backend,), {"_abstract_base": True})
+        assert intermediate.__name__ == "_Intermediate"
+        # Subsequent concrete subclass with a fresh name still registers.
+        concrete = type("_Child", (intermediate,),
+                        _concrete_attrs("_t4_6_intermediate_child"))
+        assert concrete.name == "_t4_6_intermediate_child"

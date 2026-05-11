@@ -43,13 +43,29 @@ class Backend(ABC):
     provider_config: "ProviderConfig | None" = None
     instance_name: str = ""
 
+    # Subclasses set this to True to opt out of registry validation —
+    # used by intermediate abstract classes like ApiBackend that exist
+    # only as a code-sharing layer between Backend and concrete adapters.
+    # (We can't rely on ``__abstractmethods__`` here because ABCMeta
+    # populates it AFTER ``__init_subclass__`` runs.)
+    _abstract_base: bool = False
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        if hasattr(cls, "name") and isinstance(cls.name, str):
-            from .registry import _register
-            _register(cls.name, cls)
-            for alias in getattr(cls, "aliases", ()):
-                _register(alias, cls)
+        if cls.__dict__.get("_abstract_base", False):
+            return
+        # Concrete subclasses MUST declare a non-empty string ``name``.
+        # ``_register`` additionally rejects collisions with other classes.
+        cls_name = getattr(cls, "name", None)
+        if not isinstance(cls_name, str) or not cls_name:
+            raise TypeError(
+                f"Concrete Backend subclass {cls.__name__!r} must declare a "
+                f"non-empty string ``name`` class attribute (got {cls_name!r})."
+            )
+        from .registry import _register
+        _register(cls_name, cls)
+        for alias in getattr(cls, "aliases", ()):
+            _register(alias, cls)
 
     @abstractmethod
     def cli_executable(self) -> str:

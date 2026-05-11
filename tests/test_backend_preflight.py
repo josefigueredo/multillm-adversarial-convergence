@@ -101,7 +101,10 @@ def test_preflight_probes_duplicate_backend_object_once():
 
 def test_preflight_uses_provider_model_and_resolves_claude_shortname_for_non_claude():
     backend = FakeBackend(AgentResponse(text="OK", cost_usd=0.0, is_error=False), default_model="gpt-test")
-    provider = ProviderConfig(adapter="fake-cli", model="opus")
+    # adapter must pass ProviderConfig validation against VALID_BACKENDS;
+    # we still rely on FakeBackend (not the real claude-cli) for the probe
+    # via the ``backends={"critic": backend}`` indirection below.
+    provider = ProviderConfig(adapter="claude-cli", model="opus")
     setattr(backend, "provider_config", provider)
 
     results = preflight_backends(
