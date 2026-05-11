@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 from .backends import AgentResponse
 from .strategy import ResearchCandidate
+from .text_utils import canonical_topic
 from .workflows.decisions import IterationDecision, classify_iteration_decision
 
 log = logging.getLogger("autoresearch")
@@ -563,10 +564,7 @@ def resume_state(
                                 # resume.  Conservative defaults:
                                 # confidence=5, kind=research_target,
                                 # promoted=True.
-                                # Use lazy canonical-topic computation —
-                                # avoids importing the full helper here.
-                                from .research_loop import _canonical_topic
-                                canonical = _canonical_topic(gap)
+                                canonical = canonical_topic(gap)
                                 if canonical not in discovered_gaps:
                                     discovered_gaps[canonical] = GapEntry(
                                         canonical_topic=canonical,

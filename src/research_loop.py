@@ -27,6 +27,7 @@ from .run_state import (
     merge_findings,
     record_gap,
 )
+from .text_utils import canonical_topic, edit_distance_ratio, looks_spanish
 from .scorer import (
     IterationScore,
     combine_scores,
@@ -615,46 +616,6 @@ def _select_candidate_findings(
 
 # --- Discovery plan Phase 1: gap intake processing ---------------------------
 
-# A small set of Spanish-only stop-words covers the actual code-switch
-# noise observed in the localstack run (the Gemini adversary occasionally
-# emitted gaps starting with "Verificación de" / "Detalle de" / "Falta de"
-# with several Spanish particles). When ``discovery.language_filter`` is
-# ``"en"`` we drop any gap topic with two or more of these tokens — that
-# threshold catches the observed Spanish noise without false-positives on
-# English text that happens to include a single foreign loan-word.
-_SPANISH_STOPWORDS = frozenset({
-    "de", "la", "el", "los", "las", "una", "uno", "por", "con", "del",
-    "para", "como", "que", "es", "en", "se", "lo", "al", "su", "sus",
-    "y", "o", "pero", "este", "esta", "estos", "estas", "no",
-})
-
-
-def _looks_spanish(topic: str) -> bool:
-    """Return True if ``topic`` reads as Spanish using a stop-word
-    heuristic. Avoids the langdetect dependency for this minimal need.
-    """
-    tokens = re.findall(r"\b[a-záéíóúñü]+\b", topic.lower())
-    if len(tokens) < 4:
-        return False
-    spanish_hits = sum(1 for t in tokens if t in _SPANISH_STOPWORDS)
-    return spanish_hits >= 2
-
-
-def _canonical_topic(topic: str) -> str:
-    """Lowercase, collapse whitespace, strip surrounding punctuation.
-    Used as a hash for duplicate detection."""
-    cleaned = re.sub(r"\s+", " ", topic.strip()).strip(".:;,!?\"'`")
-    return cleaned.lower()
-
-
-def _edit_distance_ratio(a: str, b: str) -> float:
-    """Cheap Levenshtein-style similarity ratio in [0, 1]. Returns 1.0
-    for identical strings, lower for divergent. Implementation uses
-    difflib (stdlib) to avoid a new dependency."""
-    from difflib import SequenceMatcher
-    return SequenceMatcher(a=a, b=b).ratio()
-
-
 _DEFAULT_DEDUPE_THRESHOLD = 0.85
 _GAP_MIN_CHARS = 30
 _GAP_MAX_CHARS = 200
@@ -690,7 +651,7 @@ def process_discovered_gaps(
     dedupe_threshold = getattr(discovery_cfg, "dedupe_threshold", _DEFAULT_DEDUPE_THRESHOLD)
 
     existing_topics = [
-        _canonical_topic(d) for d in (
+        canonical_topic(d) for d in (
             *config.dimensions,
             *state.discovered_dimensions,
         )
@@ -703,7 +664,7 @@ def process_discovered_gaps(
         topic = raw.get("topic", "").strip()
         if not topic:
             continue
-        canonical = _canonical_topic(topic)
+        canonical = canonical_topic(topic)
         record = {**raw, "canonical_topic": canonical}
 
         # Length filter
@@ -715,7 +676,7 @@ def process_discovered_gaps(
             continue
 
         # Language filter
-        if language_filter == "en" and _looks_spanish(topic):
+        if language_filter == "en" and looks_spanish(topic):
             _audit_gap_filter(audit_trail, "non_english", record, iteration, dimension)
             continue
 
@@ -725,7 +686,7 @@ def process_discovered_gaps(
         for prior in accepted_canonicals:
             if not prior:
                 continue
-            if canonical == prior or _edit_distance_ratio(canonical, prior) >= dedupe_threshold:
+            if canonical == prior or edit_distance_ratio(canonical, prior) >= dedupe_threshold:
                 _audit_gap_filter(
                     audit_trail, "duplicate", record, iteration, dimension,
                     extra={"matched_topic": prior},
@@ -911,7 +872,7 @@ def _merge(ctx: LoopContext, state: LoopState, dimension: str, findings: str, sc
         promotion_min_occ = int(getattr(discovery_cfg, "promotion_min_occurrences", 2))
         promotion_high_conf = int(getattr(discovery_cfg, "promotion_high_confidence", 8))
         for record in score.gap_records:
-            canonical = record.get("canonical_topic") or _canonical_topic(record["topic"])
+            canonical = record.get("canonical_topic") or canonical_topic(record["topic"])
             entry, is_new = record_gap(
                 discovered_gaps=state.discovered_gaps,
                 discovered_dimensions=state.discovered_dimensions,

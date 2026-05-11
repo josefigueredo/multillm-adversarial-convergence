@@ -12,12 +12,8 @@ from __future__ import annotations
 import pytest
 
 from src.config import DiscoveryConfig, ResearchConfig
-from src.research_loop import (
-    LoopState,
-    _canonical_topic,
-    _looks_spanish,
-    process_discovered_gaps,
-)
+from src.research_loop import LoopState, process_discovered_gaps
+from src.text_utils import canonical_topic, looks_spanish
 
 
 class _RecordingAudit:
@@ -84,36 +80,36 @@ def audit() -> _RecordingAudit:
 
 class TestCanonicalTopic:
     def test_lowercases_and_collapses_whitespace(self):
-        assert _canonical_topic("  Some  Mixed  Case ") == "some mixed case"
+        assert canonical_topic("  Some  Mixed  Case ") == "some mixed case"
 
     def test_strips_trailing_punctuation(self):
-        assert _canonical_topic("A topic.") == "a topic"
-        assert _canonical_topic("Question?") == "question"
+        assert canonical_topic("A topic.") == "a topic"
+        assert canonical_topic("Question?") == "question"
 
     def test_idempotent(self):
-        once = _canonical_topic("Pricing tier breakdown")
-        twice = _canonical_topic(once)
+        once = canonical_topic("Pricing tier breakdown")
+        twice = canonical_topic(once)
         assert once == twice
 
 
 class TestLooksSpanish:
     def test_clean_english_returns_false(self):
-        assert _looks_spanish("Migration effort from LocalStack to alternatives") is False
+        assert looks_spanish("Migration effort from LocalStack to alternatives") is False
 
     def test_obvious_spanish_returns_true(self):
         # The actual noise pattern observed in the localstack run
-        assert _looks_spanish(
+        assert looks_spanish(
             "Verificación de números de tipos de recursos en CloudFormation"
         ) is True
-        assert _looks_spanish("Detalle de graceful fallback y hard-fails") is True
+        assert looks_spanish("Detalle de graceful fallback y hard-fails") is True
 
     def test_short_text_skipped(self):
         # < 4 tokens — too short to reliably classify
-        assert _looks_spanish("de la el") is False
+        assert looks_spanish("de la el") is False
 
     def test_single_loanword_does_not_trigger(self):
         # A single Spanish loan-word in English text shouldn't trip the filter
-        assert _looks_spanish(
+        assert looks_spanish(
             "the localstack alternative is fine but the migration cost is high"
         ) is False
 
