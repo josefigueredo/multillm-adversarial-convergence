@@ -58,6 +58,88 @@ _SCORE_KEEP = IterationScore(coverage=80.0, quality=80.0, total=80.0)
 _SCORE_DISCARD = IterationScore(coverage=10.0, quality=10.0, total=10.0)
 
 
+class TestDimensionMatcherTierPrecedence:
+    """T5.1: pin each of the 4 matcher tiers in isolation.
+
+    ``_dimension_already_explored`` cascades through:
+      1. Exact equality (after lowercase + whitespace normalize)
+      2. Substring containment (both sides ≥ 25 chars)
+      3. Distinctive-prefix-token subset (≥ 2 prefix tokens)
+      4. Jaccard-style recall (candidate ≥ 0.55, explored ≥ 0.35)
+
+    Each test isolates ONE tier by constructing inputs that wouldn't
+    match any later tier — so a regression that breaks the tier's logic
+    can't be masked by a coincidentally-matching downstream check.
+    """
+
+    def test_tier1_exact_equality(self):
+        """Exact match after lowercase + whitespace collapse."""
+        # Different case + extra whitespace; nothing else would match.
+        assert _dimension_already_explored(
+            "  Cost  Modeling  ", ["cost modeling"]
+        )
+
+    def test_tier1_normalizes_whitespace_but_not_punctuation(self):
+        """Internal multi-spaces collapse; trailing chars distinct."""
+        assert _dimension_already_explored(
+            "Cost\tmodeling", ["cost modeling"]
+        )
+
+    def test_tier2_substring_containment(self):
+        """Candidate is a verbatim substring of explored, both ≥ 25 chars,
+        with too few shared tokens to trip the Jaccard tier."""
+        # Designed so that candidate is contained in explored (substring tier
+        # fires), but the candidate's distinctive prefix tokens are not a
+        # subset of explored's tokens.
+        candidate = "performance benchmarks at enterprise scale"  # 42 chars
+        explored = [
+            "evaluation of performance benchmarks at enterprise scale across regions"  # 71 chars, contains candidate
+        ]
+        assert _dimension_already_explored(candidate, explored)
+
+    def test_tier2_substring_below_min_length_does_not_match(self):
+        """MIN_SUBSTRING_LEN guard: short generic substrings (like 'cost')
+        must NOT match every explored entry that mentions the word."""
+        # 4-char candidate that's a substring — too short to count.
+        # explored has 'cost' embedded but the matcher should fall through.
+        assert not _dimension_already_explored(
+            "cost", ["evaluation of cost reduction across cloud vendors"]
+        )
+
+    def test_tier3_prefix_token_subset(self):
+        """≥2 distinctive prefix tokens of the candidate are a subset of
+        explored's tokens. Generic API/HTTP tokens are excluded from
+        prefix matching."""
+        # Distinctive prefix of "Pricing comparison ..." is {pricing, comparison}.
+        # explored has both plus more — prefix subset matches.
+        assert _dimension_already_explored(
+            "Pricing comparison",
+            ["enterprise pricing comparison across vendors with seat tiers"],
+        )
+
+    def test_tier4_jaccard_recall(self):
+        """Token overlap satisfies candidate ≥ 0.55 AND explored ≥ 0.35,
+        without hitting exact / substring / prefix tiers."""
+        # candidate has 4 distinctive tokens (after stopword + generic
+        # filter); explored shares 3+ of them with extra noise. Recall:
+        # candidate_recall = 3/4 = 0.75, explored_recall = 3/8 = 0.375.
+        candidate = "cold start latency on lambdas"
+        explored = [
+            "investigation of cold start latency profiles across serverless lambdas vendors"
+        ]
+        assert _dimension_already_explored(candidate, explored)
+
+    def test_no_tier_matches_returns_false(self):
+        """Completely unrelated topics fall through all four tiers."""
+        assert not _dimension_already_explored(
+            "Pricing tiers for support contracts",
+            ["Latency under cold start on serverless functions"],
+        )
+
+    def test_empty_explored_returns_false(self):
+        assert not _dimension_already_explored("anything", [])
+
+
 def test_dimension_matching_tolerates_config_and_result_wording_drift():
     explored = [
         "Deployment lifecycle and IaC: stages, canary releases, OpenAPI import/export, and CDK vs SAM vs Terraform across REST, HTTP, and WebSocket APIs",
