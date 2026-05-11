@@ -190,6 +190,78 @@ class Strategy(ABC):
             A ``ResearchResult`` with findings and cost breakdown.
         """
 
+    def _fan_out_research(
+        self,
+        prompt: str,
+        invoke: "InvokeCallback",
+        *,
+        allowed_tools: str,
+        max_turns: int,
+        timeout: int,
+        label_fn,
+    ) -> ResearchResult:
+        """Run research_backends in parallel, materialize a ``ResearchResult``.
+
+        Shared body for Ensemble/Parallel strategies — they used to be
+        line-for-line duplicates differing only in how each backend is
+        labelled (``backend_label(b)`` vs ``b.name``) and the warning
+        prefix. ``label_fn`` parameterises the labelling; the warning
+        prefix is taken from ``self.name``.
+        """
+        research = self.research_backends
+        stagger = self.strategy_config.stagger_seconds
+        results: list[tuple[str, AgentResponse]] = []
+
+        with ThreadPoolExecutor(max_workers=self.strategy_config.max_parallel) as pool:
+            futures = {}
+            for i, backend in enumerate(research):
+                if i > 0 and stagger > 0:
+                    time.sleep(stagger)
+                fut = pool.submit(
+                    invoke, backend, prompt,
+                    allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
+                )
+                futures[fut] = label_fn(backend)
+
+            for fut in as_completed(futures):
+                name = futures[fut]
+                try:
+                    resp = fut.result()
+                    results.append((name, resp))
+                except Exception as exc:
+                    log.warning("%s: %s failed: %s", self.name.capitalize(), name, exc)
+                    results.append((name, AgentResponse(text="", cost_usd=0.0, is_error=True)))
+
+        per_backend: dict[str, float] = {}
+        for name, resp in results:
+            per_backend[name] = per_backend.get(name, 0.0) + resp.cost_usd
+
+        valid = [(name, resp) for name, resp in results if not resp.is_error and resp.text]
+        if not valid:
+            return ResearchResult(
+                findings="", backend_name="none",
+                cost_usd=sum(per_backend.values()),
+                per_backend_costs=per_backend,
+                candidates=[],
+            )
+
+        return ResearchResult(
+            findings="",
+            backend_name="multiple",
+            cost_usd=sum(per_backend.values()),
+            per_backend_costs=per_backend,
+            candidates=[
+                ResearchCandidate(
+                    findings=resp.text,
+                    backend_name=name,
+                    cost_usd=resp.cost_usd,
+                    input_tokens=resp.input_tokens,
+                    output_tokens=resp.output_tokens,
+                )
+                for name, resp in valid
+            ],
+        )
+
     def post_research(
         self,
         findings: str,
@@ -270,57 +342,10 @@ class EnsembleStrategy(Strategy):
     def execute_research(
         self, prompt, invoke, *, allowed_tools="", max_turns=10, timeout=600
     ) -> ResearchResult:
-        research = self.research_backends
-        stagger = self.strategy_config.stagger_seconds
-        results: list[tuple[str, AgentResponse]] = []
-
-        with ThreadPoolExecutor(max_workers=self.strategy_config.max_parallel) as pool:
-            futures = {}
-            for i, backend in enumerate(research):
-                if i > 0 and stagger > 0:
-                    time.sleep(stagger)
-                fut = pool.submit(
-                    invoke, backend, prompt,
-                    allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
-                )
-                futures[fut] = backend_label(backend)
-
-            for fut in as_completed(futures):
-                name = futures[fut]
-                try:
-                    resp = fut.result()
-                    results.append((name, resp))
-                except Exception as exc:
-                    log.warning("Ensemble: %s failed: %s", name, exc)
-                    results.append((name, AgentResponse(text="", cost_usd=0.0, is_error=True)))
-
-        # Collect costs
-        per_backend: dict[str, float] = {}
-        for name, resp in results:
-            per_backend[name] = per_backend.get(name, 0.0) + resp.cost_usd
-
-        valid = [(name, resp) for name, resp in results if not resp.is_error and resp.text]
-        if not valid:
-            return ResearchResult(
-                findings="", backend_name="none", cost_usd=sum(per_backend.values()),
-                per_backend_costs=per_backend,
-                candidates=[],
-            )
-        return ResearchResult(
-            findings="",
-            backend_name="multiple",
-            cost_usd=sum(per_backend.values()),
-            per_backend_costs=per_backend,
-            candidates=[
-                ResearchCandidate(
-                    findings=resp.text,
-                    backend_name=name,
-                    cost_usd=resp.cost_usd,
-                    input_tokens=resp.input_tokens,
-                    output_tokens=resp.output_tokens,
-                )
-                for name, resp in valid
-            ],
+        return self._fan_out_research(
+            prompt, invoke,
+            allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
+            label_fn=backend_label,
         )
 
     def describe(self) -> str:
@@ -433,59 +458,10 @@ class ParallelStrategy(Strategy):
     def execute_research(
         self, prompt, invoke, *, allowed_tools="", max_turns=10, timeout=600
     ) -> ResearchResult:
-        # Same as ensemble but uses ALL backends
-        research = self.research_backends
-        stagger = self.strategy_config.stagger_seconds
-        results: list[tuple[str, AgentResponse]] = []
-
-        with ThreadPoolExecutor(max_workers=self.strategy_config.max_parallel) as pool:
-            futures = {}
-            for i, backend in enumerate(research):
-                if i > 0 and stagger > 0:
-                    time.sleep(stagger)
-                fut = pool.submit(
-                    invoke, backend, prompt,
-                    allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
-                )
-                futures[fut] = backend.name
-
-            for fut in as_completed(futures):
-                name = futures[fut]
-                try:
-                    resp = fut.result()
-                    results.append((name, resp))
-                except Exception as exc:
-                    log.warning("Parallel: %s failed: %s", name, exc)
-                    results.append((name, AgentResponse(text="", cost_usd=0.0, is_error=True)))
-
-        per_backend: dict[str, float] = {}
-        for name, resp in results:
-            per_backend[name] = per_backend.get(name, 0.0) + resp.cost_usd
-
-        valid = [(name, resp) for name, resp in results if not resp.is_error and resp.text]
-        if not valid:
-            return ResearchResult(
-                findings="", backend_name="none",
-                cost_usd=sum(per_backend.values()),
-                per_backend_costs=per_backend,
-                candidates=[],
-            )
-
-        return ResearchResult(
-            findings="",
-            backend_name="multiple",
-            cost_usd=sum(per_backend.values()),
-            per_backend_costs=per_backend,
-            candidates=[
-                ResearchCandidate(
-                    findings=resp.text,
-                    backend_name=name,
-                    cost_usd=resp.cost_usd,
-                    input_tokens=resp.input_tokens,
-                    output_tokens=resp.output_tokens,
-                )
-                for name, resp in valid
-            ],
+        return self._fan_out_research(
+            prompt, invoke,
+            allowed_tools=allowed_tools, max_turns=max_turns, timeout=timeout,
+            label_fn=lambda b: b.name,
         )
 
     def describe(self) -> str:
