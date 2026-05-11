@@ -132,38 +132,6 @@ class AutoResearcher:
         self.config_path = config_path
         self.output_dir = output_dir
         self.paths = RunPaths.for_output_dir(output_dir)
-        self.iterations_dir = self.paths.iterations_dir
-        self.results_path = self.paths.results
-        self.kb_path = self.paths.knowledge_base
-        self.synthesis_path = self.paths.synthesis
-        self.methods_path = self.paths.methods
-        self.run_log_path = self.paths.run_log
-        self.audit_trail_path = self.paths.audit_trail
-        self.manifest_path = self.paths.manifest
-        self.metrics_path = self.paths.metrics
-        self.claims_path = self.paths.claims
-        self.citations_path = self.paths.citations
-        self.evidence_links_path = self.paths.evidence_links
-        self.evidence_quality_path = self.paths.evidence_quality
-        self.rubric_path = self.paths.rubric
-        self.contradictions_path = self.paths.contradictions
-        self.certainty_tables_path = self.paths.certainty_tables
-        self.search_log_path = self.paths.search_log
-        self.screening_log_path = self.paths.screening_log
-        self.baseline_path = self.paths.baseline
-        self.evaluation_path = self.paths.evaluation
-        self.comparison_path = self.paths.comparison
-        self.strategy_summary_path = self.paths.strategy_summary
-        self.dashboard_path = self.paths.dashboard
-        self.semantic_calibration_path = self.paths.semantic_calibration
-        self.semantic_review_path = self.paths.semantic_review
-        self.tool_trace_path = self.paths.tool_trace
-        self.prompt_snapshot_path = self.paths.prompt_snapshot
-        self.rerun_script_path = self.paths.rerun_script
-        self.report_html_path = self.paths.report_html
-        self.report_pdf_path = self.paths.report_pdf
-        self.portfolio_path = self.paths.portfolio
-        self.portfolio_html_path = self.paths.portfolio_html
 
         # Multi-backend support
         if backends is None:
@@ -236,41 +204,88 @@ class AutoResearcher:
         self._latest_score: Any = None
         self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="research", run_id=self.output_dir.name)
 
+    # ── Path accessors ─────────────────────────────────────────────────────
+    # Read-only forwarders to ``self.paths`` (a ``RunPaths`` dataclass). They
+    # exist for two reasons: (1) historical surface area — many readers in
+    # this class and external modules use ``researcher.kb_path`` etc., and
+    # (2) the RunPaths fields use trailing-suffix-less names (``knowledge_base``)
+    # while the orchestrator's historical aliases use ``_path``/``_dir`` suffixes.
+    # Each property below is a one-line forwarder; assignment is blocked
+    # (use ``self.paths = RunPaths.for_output_dir(...)`` to rebuild instead).
+    @property
+    def iterations_dir(self): return self.paths.iterations_dir
+    @property
+    def results_path(self): return self.paths.results
+    @property
+    def kb_path(self): return self.paths.knowledge_base
+    @property
+    def synthesis_path(self): return self.paths.synthesis
+    @property
+    def methods_path(self): return self.paths.methods
+    @property
+    def run_log_path(self): return self.paths.run_log
+    @property
+    def audit_trail_path(self): return self.paths.audit_trail
+    @property
+    def manifest_path(self): return self.paths.manifest
+    @property
+    def metrics_path(self): return self.paths.metrics
+    @property
+    def claims_path(self): return self.paths.claims
+    @property
+    def citations_path(self): return self.paths.citations
+    @property
+    def evidence_links_path(self): return self.paths.evidence_links
+    @property
+    def evidence_quality_path(self): return self.paths.evidence_quality
+    @property
+    def rubric_path(self): return self.paths.rubric
+    @property
+    def contradictions_path(self): return self.paths.contradictions
+    @property
+    def certainty_tables_path(self): return self.paths.certainty_tables
+    @property
+    def search_log_path(self): return self.paths.search_log
+    @property
+    def screening_log_path(self): return self.paths.screening_log
+    @property
+    def baseline_path(self): return self.paths.baseline
+    @property
+    def evaluation_path(self): return self.paths.evaluation
+    @property
+    def comparison_path(self): return self.paths.comparison
+    @property
+    def strategy_summary_path(self): return self.paths.strategy_summary
+    @property
+    def dashboard_path(self): return self.paths.dashboard
+    @property
+    def semantic_calibration_path(self): return self.paths.semantic_calibration
+    @property
+    def semantic_review_path(self): return self.paths.semantic_review
+    @property
+    def tool_trace_path(self): return self.paths.tool_trace
+    @property
+    def prompt_snapshot_path(self): return self.paths.prompt_snapshot
+    @property
+    def rerun_script_path(self): return self.paths.rerun_script
+    @property
+    def report_html_path(self): return self.paths.report_html
+    @property
+    def report_pdf_path(self): return self.paths.report_pdf
+    @property
+    def portfolio_path(self): return self.paths.portfolio
+    @property
+    def portfolio_html_path(self): return self.paths.portfolio_html
+
     def _sync_paths(self) -> None:
-        """Recompute derived artifact paths from the current output directory."""
+        """Recompute derived artifact paths from the current output directory.
+
+        Path accessors (``self.kb_path``, ``self.results_path``, etc.) are
+        ``@property`` forwarders to ``self.paths``, so rebuilding the
+        ``RunPaths`` dataclass is enough — there are no individual aliases
+        to re-mirror.
+        """
         self.paths = RunPaths.for_output_dir(self.output_dir)
-        self.iterations_dir = self.paths.iterations_dir
-        self.results_path = self.paths.results
-        self.kb_path = self.paths.knowledge_base
-        self.synthesis_path = self.paths.synthesis
-        self.methods_path = self.paths.methods
-        self.run_log_path = self.paths.run_log
-        self.audit_trail_path = self.paths.audit_trail
-        self.manifest_path = self.paths.manifest
-        self.metrics_path = self.paths.metrics
-        self.claims_path = self.paths.claims
-        self.citations_path = self.paths.citations
-        self.evidence_links_path = self.paths.evidence_links
-        self.evidence_quality_path = self.paths.evidence_quality
-        self.rubric_path = self.paths.rubric
-        self.contradictions_path = self.paths.contradictions
-        self.certainty_tables_path = self.paths.certainty_tables
-        self.search_log_path = self.paths.search_log
-        self.screening_log_path = self.paths.screening_log
-        self.baseline_path = self.paths.baseline
-        self.evaluation_path = self.paths.evaluation
-        self.comparison_path = self.paths.comparison
-        self.strategy_summary_path = self.paths.strategy_summary
-        self.dashboard_path = self.paths.dashboard
-        self.semantic_calibration_path = self.paths.semantic_calibration
-        self.semantic_review_path = self.paths.semantic_review
-        self.tool_trace_path = self.paths.tool_trace
-        self.prompt_snapshot_path = self.paths.prompt_snapshot
-        self.rerun_script_path = self.paths.rerun_script
-        self.report_html_path = self.paths.report_html
-        self.report_pdf_path = self.paths.report_pdf
-        self.portfolio_path = self.paths.portfolio
-        self.portfolio_html_path = self.paths.portfolio_html
         self._audit_trail = AuditTrailWriter(self.audit_trail_path, mode="research", run_id=self.output_dir.name)
 
     def _call(self, prompt: str, **kwargs: Any) -> AgentResponse:
@@ -1189,12 +1204,10 @@ class AutoResearcher:
 
     def _write_prompt_snapshot_artifact(self) -> None:
         """Write captured prompt inputs for later audit and replay."""
-        self.prompt_snapshot_path = self.output_dir / "prompt_snapshot.json"
         write_prompt_snapshot(self.prompt_snapshot_path, prompts=self._prompt_snapshots)
 
     def _write_rerun_artifact(self) -> None:
         """Write a convenience shell script that replays the run."""
-        self.rerun_script_path = self.output_dir / "rerun.sh"
         write_rerun_script(self.rerun_script_path, config_path=self.config_path, output_dir=self.output_dir)
 
     def _write_agreement_artifact(self) -> None:

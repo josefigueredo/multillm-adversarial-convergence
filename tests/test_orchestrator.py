@@ -770,32 +770,7 @@ class TestAutoResearcherSetup:
             encoding="utf-8",
         )
         researcher.output_dir = tmp_path / "current-run"
-        researcher.iterations_dir = researcher.output_dir / "iterations"
-        researcher.results_path = researcher.output_dir / "results.tsv"
-        researcher.kb_path = researcher.output_dir / "knowledge_base.md"
-        researcher.synthesis_path = researcher.output_dir / "synthesis.md"
-        researcher.methods_path = researcher.output_dir / "methods.md"
-        researcher.manifest_path = researcher.output_dir / "run_manifest.json"
-        researcher.metrics_path = researcher.output_dir / "metrics.json"
-        researcher.claims_path = researcher.output_dir / "claims.json"
-        researcher.citations_path = researcher.output_dir / "citations.json"
-        researcher.evidence_links_path = researcher.output_dir / "evidence_links.json"
-        researcher.evidence_quality_path = researcher.output_dir / "evidence_quality.json"
-        researcher.rubric_path = researcher.output_dir / "rubric.json"
-        researcher.contradictions_path = researcher.output_dir / "contradictions.json"
-        researcher.search_log_path = researcher.output_dir / "search_log.json"
-        researcher.screening_log_path = researcher.output_dir / "screening_log.json"
-        researcher.baseline_path = researcher.output_dir / "baseline.md"
-        researcher.evaluation_path = researcher.output_dir / "evaluation.json"
-        researcher.comparison_path = researcher.output_dir / "comparison.json"
-        researcher.strategy_summary_path = researcher.output_dir / "strategy_summary.json"
-        researcher.dashboard_path = researcher.output_dir / "dashboard.json"
-        researcher.semantic_calibration_path = researcher.output_dir / "semantic_calibration.json"
-        researcher.semantic_review_path = researcher.output_dir / "semantic_review.json"
-        researcher.report_html_path = researcher.output_dir / "report.html"
-        researcher.report_pdf_path = researcher.output_dir / "report.pdf"
-        researcher.portfolio_path = researcher.output_dir.parent / "portfolio.json"
-        researcher.portfolio_html_path = researcher.output_dir.parent / "portfolio.html"
+        researcher._sync_paths()
 
         with patch("src.orchestrator.git_commit", return_value="abc123"), \
              patch("src.orchestrator.cli_version", return_value="1.0"), \
