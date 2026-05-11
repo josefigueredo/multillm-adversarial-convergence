@@ -121,8 +121,8 @@ def preflight_backends(
             continue
         seen.add(identity)
 
-        provider = getattr(backend, "provider_config", None)
-        if not isinstance(provider, ProviderConfig):
+        provider = backend.provider_config
+        if provider is None:
             provider = provider_lookup.get(backend_name)
         config_model = provider.model if provider and provider.model else execution.model
         model = resolve_backend_model(backend, config_model)

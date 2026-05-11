@@ -16,6 +16,10 @@ class FakeBackend:
         self.response = response
         self.calls: list[tuple[str, CallOptions, int]] = []
         self.capabilities = BackendCapabilities(transport=transport, default_model=default_model)
+        # FakeBackend is a duck-type stand-in, not a Backend subclass, so
+        # it doesn't inherit Backend's class-level defaults for these.
+        self.provider_config = None
+        self.instance_name = ""
 
     def invoke(self, prompt: str, opts: CallOptions, timeout: int = 300) -> AgentResponse:
         self.calls.append((prompt, opts, timeout))

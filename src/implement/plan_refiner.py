@@ -377,8 +377,7 @@ class PlanRefiner:
     # ── Backend invocation ──────────────────────────────────────────────────
 
     def _invoke(self, prompt: str, backend: Backend, backend_name: str) -> AgentResponse:
-        provider = getattr(backend, "provider_config", None)
-        provider = provider if isinstance(provider, ProviderConfig) else None
+        provider = backend.provider_config
         opts = build_call_options(self._config.execution, provider=provider)
         opts = apply_backend_capabilities(backend, opts)
         timeout = (

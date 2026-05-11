@@ -50,6 +50,11 @@ def _make_config(**kwargs) -> PlanConfig:
 
 def _make_backend(text: str = "# Generated Plan") -> MagicMock:
     backend = MagicMock()
+    # Backend declares these as class attributes; bare MagicMock would
+    # auto-create them as fresh mocks, which downstream `provider is not
+    # None` checks would treat as a real ProviderConfig.
+    backend.provider_config = None
+    backend.instance_name = ""
     backend.invoke.return_value = AgentResponse(
         text=text, cost_usd=0.01, is_error=False,
         input_tokens=100, output_tokens=50,

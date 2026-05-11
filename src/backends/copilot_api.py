@@ -27,7 +27,7 @@ class CopilotApiBackend(ApiBackend):
     )
 
     def build_request(self, prompt: str, opts: CallOptions) -> tuple[str, dict[str, str], dict[str, Any]]:
-        provider = getattr(self, "provider_config", None)
+        provider = self.provider_config
         organization = getattr(provider, "organization", "") if provider is not None else ""
         api_version = getattr(provider, "api_version", "") if provider is not None else ""
         api_version = api_version or "2026-03-10"

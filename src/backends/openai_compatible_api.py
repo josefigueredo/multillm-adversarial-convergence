@@ -66,7 +66,7 @@ class OpenAICompatibleResponsesApiBackend(ApiBackend):
         )
 
     def service_base_url(self) -> str:
-        provider = getattr(self, "provider_config", None)
+        provider = self.provider_config
         base_url = getattr(provider, "base_url", "") if provider is not None else ""
         return base_url or self.default_service_base_url()
 

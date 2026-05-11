@@ -11,9 +11,12 @@ import sys
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .types import AgentResponse, BackendCapabilities, CallOptions, PromptMode
+
+if TYPE_CHECKING:
+    from ..config import ProviderConfig
 
 log = logging.getLogger("autoresearch")
 
@@ -26,11 +29,19 @@ class Backend(ABC):
     """Abstract interface for an AI CLI backend.
 
     Subclasses auto-register in the global registry via ``__init_subclass__``.
+
+    ``provider_config`` and ``instance_name`` are populated by
+    ``provider_instances.instantiate_provider_backends`` after construction.
+    They are class-level defaults so the attribute always exists on every
+    Backend instance — callers can read ``backend.provider_config`` directly
+    without ``getattr(..., None)`` guards.
     """
 
     name: str
     aliases: tuple[str, ...] = ()
     capabilities: BackendCapabilities = BackendCapabilities()
+    provider_config: "ProviderConfig | None" = None
+    instance_name: str = ""
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)

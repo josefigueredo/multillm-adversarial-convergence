@@ -312,8 +312,7 @@ class AutoResearcher:
         is called to ensure it exists.  For direct-mode runs the existing
         ``isolate_backend_context`` path is unchanged.
         """
-        provider = getattr(backend, "provider_config", None)
-        provider = provider if isinstance(provider, ProviderConfig) else None
+        provider = backend.provider_config
         default_model = provider.model if provider is not None and provider.model else self.config.execution.model
         config_model = kwargs.pop("model", default_model)
         model = self._resolve_model(backend, config_model)

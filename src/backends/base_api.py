@@ -148,7 +148,7 @@ class ApiBackend(Backend):
                 yield json.loads(payload)
 
     def _base_url(self, default_url: str) -> str:
-        provider = getattr(self, "provider_config", None)
+        provider = self.provider_config
         base_url = getattr(provider, "base_url", "") if provider is not None else ""
         if not base_url:
             return default_url

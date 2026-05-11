@@ -202,12 +202,12 @@ class BedrockApiBackend(Backend):
             yield StreamEvent(type="error", raw=self._error_response_from_exception(exc).raw)
 
     def _region(self) -> str:
-        provider = getattr(self, "provider_config", None)
+        provider = self.provider_config
         region = getattr(provider, "region", "") if provider is not None else ""
         return region or os.environ.get("AWS_REGION", "") or os.environ.get("AWS_DEFAULT_REGION", "")
 
     def _aws_profile(self) -> str:
-        provider = getattr(self, "provider_config", None)
+        provider = self.provider_config
         return getattr(provider, "aws_profile", "") if provider is not None else ""
 
     @staticmethod

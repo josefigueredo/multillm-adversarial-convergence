@@ -20,6 +20,20 @@ from src.strategy import ResearchCandidate
 # Fixtures
 # ---------------------------------------------------------------------------
 
+def _mock_backend(**overrides) -> MagicMock:
+    """Build a MagicMock backend that respects the Backend contract.
+
+    Backend declares ``provider_config`` and ``instance_name`` as class
+    attributes; a bare MagicMock would auto-create them as fresh mocks,
+    which downstream ``provider is not None`` checks would treat as a
+    real ProviderConfig and break with a TypeError on attribute reads.
+    """
+    backend = MagicMock(**overrides)
+    backend.provider_config = None
+    backend.instance_name = ""
+    return backend
+
+
 class FakeBackend(Backend):
     """In-memory backend for testing (no subprocess calls)."""
 
@@ -1446,14 +1460,14 @@ class TestAutoResearcherSaveLog:
 
 class TestAutoResearcherCall:
     def test_call_delegates_to_backend(self, researcher):
-        researcher.backend = MagicMock()
+        researcher.backend = _mock_backend()
         researcher.backend.invoke.return_value = AgentResponse(text="ok", cost_usd=0.01, is_error=False)
         resp = researcher._call("prompt")
         researcher.backend.invoke.assert_called_once()
         assert resp.text == "ok"
 
     def test_call_passes_config_defaults(self, researcher):
-        mock_backend = MagicMock()
+        mock_backend = _mock_backend()
         mock_backend.name = "claude-cli"
         mock_backend.invoke.return_value = AgentResponse(text="ok", cost_usd=0.01, is_error=False)
         researcher.backend = mock_backend
@@ -1464,7 +1478,7 @@ class TestAutoResearcherCall:
         assert opts.max_budget_usd == 0.10
 
     def test_call_allows_overrides(self, researcher):
-        mock_backend = MagicMock()
+        mock_backend = _mock_backend()
         mock_backend.name = "claude-cli"
         mock_backend.invoke.return_value = AgentResponse(text="ok", cost_usd=0.01, is_error=False)
         researcher.backend = mock_backend
@@ -1496,7 +1510,7 @@ class TestAutoResearcherCall:
         assert mock_backend.last_opts.stream is True
 
     def test_call_with_uses_streaming_backend_for_run_progress(self, researcher):
-        backend = MagicMock()
+        backend = _mock_backend()
         backend.name = "litellm-api"
         backend.capabilities = get_backend("litellm-api").capabilities
         backend.parse_payload.return_value = AgentResponse(
@@ -1526,7 +1540,7 @@ class TestAutoResearcherCall:
         assert "Hello world" in stdout.getvalue()
 
     def test_call_with_falls_back_to_invoke_when_streaming_disabled(self, researcher):
-        backend = MagicMock()
+        backend = _mock_backend()
         backend.name = "litellm-api"
         backend.capabilities = get_backend("litellm-api").capabilities
         backend.invoke.return_value = AgentResponse(text="ok", cost_usd=0.01, is_error=False)
@@ -1537,7 +1551,7 @@ class TestAutoResearcherCall:
         backend.invoke_stream.assert_not_called()
 
     def test_call_with_retries_retryable_api_errors(self, researcher):
-        backend = MagicMock()
+        backend = _mock_backend()
         backend.name = "litellm-api"
         backend.capabilities = get_backend("litellm-api").capabilities
         researcher.config = ResearchConfig(
@@ -1573,7 +1587,7 @@ class TestAutoResearcherCall:
         sleep_mock.assert_called_once_with(2.5)
 
     def test_call_with_does_not_retry_non_retryable_api_errors(self, researcher):
-        backend = MagicMock()
+        backend = _mock_backend()
         backend.name = "litellm-api"
         backend.capabilities = get_backend("litellm-api").capabilities
         researcher.config = ResearchConfig(
