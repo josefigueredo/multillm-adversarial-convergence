@@ -124,8 +124,63 @@ def _parse_backends_config(raw: dict[str, Any], *, default_primary: str = "claud
     )
 
 
+def _build_strategy_config_from_raw(strat_raw: dict[str, Any]) -> "StrategyConfig":
+    """Build a typed StrategyConfig from a raw mapping, applying typed defaults."""
+    return StrategyConfig(
+        merge_mode=strat_raw.get("merge_mode", "best"),
+        merge_threshold=strat_raw.get("merge_threshold", 40.0),
+        critique_depth=strat_raw.get("critique_depth", "standard"),
+        refiner_sees_draft=strat_raw.get("refiner_sees_draft", True),
+        max_parallel=strat_raw.get("max_parallel", 3),
+        stagger_seconds=strat_raw.get("stagger_seconds", 5),
+    )
+
+
+def _build_backends_config_from_raw(
+    backends_raw: dict[str, Any], *, default_backend: str
+) -> "BackendsConfig":
+    """Build a typed BackendsConfig from a raw {primary, research, judge, utility}
+    mapping, validating every role against VALID_BACKENDS.
+
+    Used by non-research workflows (Document, Plan, Implement) where backend
+    role assignment doesn't go through a provider-instance indirection.
+    ResearchConfig has its own provider-aware path and does not call this.
+    """
+    research_val = backends_raw.get("research", [default_backend])
+    if isinstance(research_val, str):
+        research_val = [research_val]
+    for name in research_val:
+        _validate_backend_name(name, "research")
+
+    primary = backends_raw.get("primary", default_backend)
+    _validate_backend_name(primary, "primary")
+
+    judge = backends_raw.get("judge", "")
+    if judge:
+        _validate_backend_name(judge, "judge")
+
+    utility = backends_raw.get("utility", "")
+    if utility:
+        _validate_backend_name(utility, "utility")
+
+    return BackendsConfig(
+        primary=primary,
+        research=tuple(research_val),
+        judge=judge,
+        utility=utility,
+    )
+
+
 def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
-    """Parse the shared execution settings used by all workflows."""
+    """Parse the shared execution settings used by all workflows.
+
+    Performs the same validation that ``ResearchConfig.from_yaml`` performs
+    inline — backend name + strategy name against the valid-value sets, and
+    builds typed ``BackendsConfig`` / ``StrategyConfig`` objects rather than
+    passing raw dicts through to fields the dataclass declares as typed
+    (which used to slip past at construction time and AttributeError later
+    on first read).
+    """
     exec_defaults = ExecutionConfig()
     timeout = raw.get("timeout_seconds", exec_defaults.timeout_seconds)
     if timeout <= 0:
@@ -152,6 +207,28 @@ def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
     if retry_backoff_seconds <= 0:
         raise ValueError(f"retry_backoff_seconds must be positive, got {retry_backoff_seconds}")
 
+    backend = raw.get("backend", exec_defaults.backend)
+    _validate_backend_name(backend, "primary")
+
+    strategy = raw.get("strategy", exec_defaults.strategy)
+    if strategy not in VALID_STRATEGIES:
+        raise ValueError(
+            f"Invalid strategy '{strategy}'. Must be one of: {', '.join(VALID_STRATEGIES)}"
+        )
+
+    backends_raw = raw.get("backends", {})
+    if isinstance(backends_raw, dict) and backends_raw:
+        backends_config = _build_backends_config_from_raw(
+            backends_raw, default_backend=backend
+        )
+    else:
+        backends_config = BackendsConfig(primary=backend, research=(backend,))
+
+    strat_raw = raw.get("strategy_config", {})
+    strategy_config = _build_strategy_config_from_raw(
+        strat_raw if isinstance(strat_raw, dict) else {}
+    )
+
     model = raw.get("model", exec_defaults.model)
 
     return ExecutionConfig(
@@ -164,7 +241,7 @@ def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
         allowed_tools=raw.get("allowed_tools", exec_defaults.allowed_tools),
         max_turns=raw.get("max_turns", exec_defaults.max_turns),
         timeout_seconds=timeout,
-        backend=raw.get("backend", exec_defaults.backend),
+        backend=backend,
         model=model,
         max_budget_per_call=max_budget,
         backend_preflight=raw.get("backend_preflight", exec_defaults.backend_preflight),
@@ -178,9 +255,9 @@ def _parse_execution_config(raw: dict[str, Any]) -> "ExecutionConfig":
             "sanitize_backend_env",
             exec_defaults.sanitize_backend_env,
         ),
-        strategy=raw.get("strategy", exec_defaults.strategy),
-        backends=raw.get("backends", exec_defaults.backends),
-        strategy_config=raw.get("strategy_config", exec_defaults.strategy_config),
+        strategy=strategy,
+        backends=backends_config,
+        strategy_config=strategy_config,
     )
 
 
@@ -1069,14 +1146,7 @@ class ResearchConfig:
             )
 
         strat_raw: dict[str, Any] = exec_raw.get("strategy_config", {})
-        strategy_config = StrategyConfig(
-            merge_mode=strat_raw.get("merge_mode", "best"),
-            merge_threshold=strat_raw.get("merge_threshold", 40.0),
-            critique_depth=strat_raw.get("critique_depth", "standard"),
-            refiner_sees_draft=strat_raw.get("refiner_sees_draft", True),
-            max_parallel=strat_raw.get("max_parallel", 3),
-            stagger_seconds=strat_raw.get("stagger_seconds", 5),
-        )
+        strategy_config = _build_strategy_config_from_raw(strat_raw)
 
         execution = ExecutionConfig(
             max_iterations=exec_raw.get("max_iterations", exec_defaults.max_iterations),

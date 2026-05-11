@@ -21,6 +21,7 @@ from src.config import (
     ScoringConfig,
     SecurityConfig,
     StrategyConfig,
+    _parse_execution_config,
 )
 
 
@@ -167,6 +168,62 @@ class TestExecutionConfig:
         ec = ExecutionConfig()
         with pytest.raises(AttributeError):
             ec.model = "opus"
+
+
+class TestParseExecutionConfig:
+    """Validation contract for the shared parser used by Document/Plan/Implement.
+
+    Pins the fix for the latent bug where this parser used to skip the
+    backend / strategy validation that ResearchConfig.from_yaml performs
+    inline, AND used to pass raw dicts through to the typed BackendsConfig
+    / StrategyConfig fields (which would AttributeError on first read).
+    """
+
+    def test_invalid_backend_raises(self):
+        with pytest.raises(ValueError, match="Invalid primary backend 'claude-clxi'"):
+            _parse_execution_config({"backend": "claude-clxi"})
+
+    def test_invalid_strategy_raises(self):
+        with pytest.raises(ValueError, match="Invalid strategy 'turbo-ensemble'"):
+            _parse_execution_config({"strategy": "turbo-ensemble"})
+
+    def test_backends_field_is_typed(self):
+        """The ``backends`` field must be a real BackendsConfig, not the
+        raw dict the user wrote in their YAML."""
+        ec = _parse_execution_config({
+            "backends": {"primary": "claude-cli", "research": ["claude-cli", "codex-cli"]},
+        })
+        assert isinstance(ec.backends, BackendsConfig)
+        assert ec.backends.primary == "claude-cli"
+        assert ec.backends.research == ("claude-cli", "codex-cli")
+
+    def test_strategy_config_field_is_typed(self):
+        """``strategy_config`` must be a real StrategyConfig with typed defaults."""
+        ec = _parse_execution_config({"strategy_config": {"max_parallel": 7}})
+        assert isinstance(ec.strategy_config, StrategyConfig)
+        assert ec.strategy_config.max_parallel == 7
+        # Unspecified fields take typed defaults, not None
+        assert ec.strategy_config.merge_mode == "best"
+
+    def test_invalid_role_backend_in_backends_block_raises(self):
+        """The per-role validation in the BackendsConfig builder must fire."""
+        with pytest.raises(ValueError, match="Invalid research backend 'unknown-cli'"):
+            _parse_execution_config({
+                "backends": {"primary": "claude-cli", "research": ["unknown-cli"]},
+            })
+
+    def test_string_research_value_is_normalized_to_tuple(self):
+        """``research: claude-cli`` (string) must become ``("claude-cli",)`` —
+        same contract ResearchConfig.from_yaml has."""
+        ec = _parse_execution_config({"backends": {"research": "claude-cli"}})
+        assert ec.backends.research == ("claude-cli",)
+
+    def test_defaults_when_no_backends_block(self):
+        """No ``backends:`` block → primary + research mirror the
+        top-level ``backend`` field (backward-compat shape)."""
+        ec = _parse_execution_config({"backend": "codex-cli"})
+        assert ec.backends.primary == "codex-cli"
+        assert ec.backends.research == ("codex-cli",)
 
 
 # ---------------------------------------------------------------------------
