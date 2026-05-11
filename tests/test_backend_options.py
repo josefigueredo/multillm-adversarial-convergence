@@ -1,5 +1,7 @@
 """Tests for backend option normalization."""
 
+import pytest
+
 from src.backend_options import apply_backend_capabilities, build_call_options
 from src.backends import get_backend
 from src.backends.types import CallOptions, ToolDefinition
@@ -117,17 +119,16 @@ def test_apply_backend_capabilities_strips_function_tools_when_unsupported():
     assert normalized.tool_choice == "none"
 
 
-def test_apply_backend_capabilities_normalizes_invalid_tool_choice_for_supported_backend():
-    backend = get_backend("codex-api")
-    normalized = apply_backend_capabilities(
-        backend,
+def test_invalid_tool_choice_fails_at_construction():
+    """T4.4 made ``CallOptions.tool_choice`` a typed enum; invalid values
+    now raise ValueError at construction time (was: silently normalized
+    to ``"auto"`` later by ``apply_backend_capabilities``)."""
+    with pytest.raises(ValueError, match="not a valid ToolChoice"):
         CallOptions(
             model="gpt-5.4",
             tools=(ToolDefinition(type="function", name="echo"),),
             tool_choice="wild-west",
-        ),
-    )
-    assert normalized.tool_choice == "auto"
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,38 @@ class PromptMode(Enum):
     ARGUMENT = "argument"
 
 
+class BackendTransport(str, Enum):
+    """How the backend delivers calls — subprocess CLI or HTTP API.
+
+    ``str``-mixin: string equality still works (``transport == "cli"``)
+    so existing comparison sites in orchestrator/preflight/backend_options
+    keep working without a sweeping rewrite. New code should prefer the
+    enum members.
+    """
+
+    CLI = "cli"
+    API = "api"
+
+
+class ProviderKind(str, Enum):
+    """Direct provider vs aggregator gateway (LiteLLM, Bedrock, OpenRouter…).
+
+    Used by the preflight + model resolution logic to decide whether to
+    translate Claude shortnames to the backend's default model.
+    """
+
+    DIRECT = "direct"
+    AGGREGATOR = "aggregator"
+
+
+class ToolChoice(str, Enum):
+    """How the backend should treat tool use on a single call."""
+
+    AUTO = "auto"          # model decides
+    REQUIRED = "required"  # model must call a tool
+    NONE = "none"          # model must NOT call a tool
+
+
 @dataclass(frozen=True)
 class CallOptions:
     """Options for a single CLI invocation.
@@ -26,7 +58,7 @@ class CallOptions:
     system_prompt: str = ""
     stream: bool = False
     tools: tuple["ToolDefinition", ...] = ()
-    tool_choice: str = "auto"
+    tool_choice: ToolChoice = ToolChoice.AUTO
     allowed_tools: str = ""
     max_turns: int = 10
     max_budget_usd: float = 0.0
@@ -34,6 +66,13 @@ class CallOptions:
     working_directory: str = ""
     sanitize_environment: bool = False
     process_env: dict[str, str] | None = None
+
+    def __post_init__(self) -> None:
+        # YAML loaders and ad-hoc constructions pass tool_choice as a
+        # raw string; coerce to the enum so type checkers see the contract
+        # while string equality at call sites keeps working via str-mixin.
+        if isinstance(self.tool_choice, str) and not isinstance(self.tool_choice, ToolChoice):
+            object.__setattr__(self, "tool_choice", ToolChoice(self.tool_choice))
 
 
 @dataclass(frozen=True)
@@ -122,8 +161,8 @@ class BackendCapabilities:
             shortname (e.g. ``"sonnet"``) that this backend doesn't understand.
     """
 
-    transport: str = "cli"
-    provider_kind: str = "direct"
+    transport: BackendTransport = BackendTransport.CLI
+    provider_kind: ProviderKind = ProviderKind.DIRECT
     supports_json_schema: bool = False
     supports_budget_cap: bool = False
     supports_rate_limit_detection: bool = False
@@ -134,6 +173,16 @@ class BackendCapabilities:
     supports_function_tools: bool = False
     supports_tools: bool = True
     default_model: str = ""
+
+    def __post_init__(self) -> None:
+        # Auto-coerce string assignments to the enum types so existing
+        # ``BackendCapabilities(transport="cli", provider_kind="direct")``
+        # call sites in every backend keep working — but the field is now
+        # typed and IDE autocomplete knows the valid values.
+        if isinstance(self.transport, str) and not isinstance(self.transport, BackendTransport):
+            object.__setattr__(self, "transport", BackendTransport(self.transport))
+        if isinstance(self.provider_kind, str) and not isinstance(self.provider_kind, ProviderKind):
+            object.__setattr__(self, "provider_kind", ProviderKind(self.provider_kind))
 
 
 # Claude shortnames that non-Claude backends should translate

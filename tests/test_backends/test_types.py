@@ -5,12 +5,56 @@ import pytest
 from src.backends.types import (
     AgentResponse,
     BackendCapabilities,
+    BackendTransport,
     CallOptions,
+    ProviderKind,
     StreamEvent,
     ToolCallRequest,
+    ToolChoice,
     ToolDefinition,
     ToolResult,
 )
+
+
+class TestEnums:
+    """T4.4 — transport / provider_kind / tool_choice are typed enums but
+    keep string equality via the ``str, Enum`` mixin so existing comparison
+    sites (``cap.transport == 'cli'``) keep working."""
+
+    def test_backend_transport_string_equality(self):
+        assert BackendTransport.CLI == "cli"
+        assert BackendTransport.API == "api"
+
+    def test_provider_kind_string_equality(self):
+        assert ProviderKind.DIRECT == "direct"
+        assert ProviderKind.AGGREGATOR == "aggregator"
+
+    def test_tool_choice_string_equality(self):
+        assert ToolChoice.AUTO == "auto"
+        assert ToolChoice.REQUIRED == "required"
+        assert ToolChoice.NONE == "none"
+
+    def test_capabilities_coerces_strings_to_enums(self):
+        """Existing ``BackendCapabilities(transport="cli", ...)`` call sites
+        in every backend keep working — strings auto-coerce to enums."""
+        cap = BackendCapabilities(transport="api", provider_kind="aggregator")
+        assert isinstance(cap.transport, BackendTransport)
+        assert isinstance(cap.provider_kind, ProviderKind)
+        assert cap.transport == BackendTransport.API
+        assert cap.provider_kind == ProviderKind.AGGREGATOR
+
+    def test_capabilities_rejects_unknown_string(self):
+        with pytest.raises(ValueError, match="not a valid BackendTransport"):
+            BackendCapabilities(transport="quantum-tunnel")
+
+    def test_call_options_coerces_tool_choice(self):
+        opts = CallOptions(tool_choice="required")
+        assert isinstance(opts.tool_choice, ToolChoice)
+        assert opts.tool_choice == ToolChoice.REQUIRED
+
+    def test_call_options_rejects_unknown_tool_choice(self):
+        with pytest.raises(ValueError, match="not a valid ToolChoice"):
+            CallOptions(tool_choice="wild-west")
 
 
 class TestAgentResponse:
