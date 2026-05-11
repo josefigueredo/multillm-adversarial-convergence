@@ -750,8 +750,16 @@ class AutoResearcher:
                 self._citations = _json.loads(
                     self.citations_path.read_text(encoding="utf-8")
                 )
-            except Exception:
-                pass  # best-effort; synthesis will proceed with partial citations
+            except (json.JSONDecodeError, OSError) as exc:
+                # Corrupt or unreadable file — synthesis will rebuild
+                # citations from the current run only. Surfacing this is
+                # important: the operator should know provenance from
+                # prior iterations is lost from the synthesis.
+                log.warning(
+                    "Could not restore citations from %s (%s); synthesis will "
+                    "include citations from this run only.",
+                    self.citations_path, exc,
+                )
 
     # -- Core loop ---------------------------------------------------------
 

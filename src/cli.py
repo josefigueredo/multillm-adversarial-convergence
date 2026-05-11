@@ -477,7 +477,7 @@ def _run_research(args: argparse.Namespace, log: logging.Logger) -> int:
         else:
             researcher.run()
     except Exception as exc:
-        log.error("Unexpected error: %s", exc, exc_info=args.verbose)
+        log.error("Unexpected %s: %s", type(exc).__name__, exc, exc_info=True)
         return 1
 
     return 0
@@ -548,7 +548,7 @@ def _run_refine(args: argparse.Namespace, log: logging.Logger) -> int:
     try:
         return refiner.run(interactive=not args.no_interactive)
     except Exception as exc:
-        log.error("Unexpected error: %s", exc, exc_info=args.verbose)
+        log.error("Unexpected %s: %s", type(exc).__name__, exc, exc_info=True)
         return 1
 
 
@@ -617,7 +617,7 @@ def _research_plan(args: argparse.Namespace, log: logging.Logger) -> int:
     try:
         return refiner.run(interactive=not args.no_interactive)
     except Exception as exc:
-        log.error("Unexpected error: %s", exc, exc_info=args.verbose)
+        log.error("Unexpected %s: %s", type(exc).__name__, exc, exc_info=True)
         return 1
 
 

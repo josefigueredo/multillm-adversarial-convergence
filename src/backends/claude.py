@@ -187,7 +187,9 @@ class ClaudeBackend(Backend):
             result = self._run_process(cmd, input=prompt, timeout=timeout, cwd=cwd, env=env)
         except subprocess.TimeoutExpired:
             log.warning("%s CLI timed out after %ds.", self.name, timeout)
-            return AgentResponse(text="", cost_usd=0.0, is_error=True)
+            return AgentResponse(text="", cost_usd=0.0, is_error=True).with_meta(
+                failure_reason="timeout", timeout_seconds=timeout,
+            )
 
         if result.returncode != 0:
             salvaged = self._try_salvage_response(result.stdout)
@@ -196,7 +198,9 @@ class ClaudeBackend(Backend):
                 self.post_invoke(result.stdout)
                 return salvaged
             self._handle_error(result)
-            return AgentResponse(text="", cost_usd=0.0, is_error=True)
+            return AgentResponse(text="", cost_usd=0.0, is_error=True).with_meta(
+                failure_reason="nonzero_exit", returncode=result.returncode,
+            )
 
         response = self.parse_response(result.stdout)
         self.post_invoke(result.stdout)

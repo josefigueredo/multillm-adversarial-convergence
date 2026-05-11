@@ -275,8 +275,14 @@ def run_iteration(ctx: LoopContext, state: LoopState) -> None:
         try:
             from .run_io import write_discovered_gaps_sidecar
             write_discovered_gaps_sidecar(ctx.artifact_root, state.discovered_gaps)
-        except Exception:
-            log.debug("Failed to persist discovered_gaps sidecar", exc_info=True)
+        except OSError as exc:
+            log.warning(
+                "Failed to persist discovered_gaps sidecar (%s); --resume will fall back "
+                "to the legacy TSV path and lose cross-judge promotion / kind / confidence "
+                "fidelity for iterations after this point.",
+                exc,
+            )
+            ctx.audit_trail.emit("sidecar_persist_failed", artifact="discovered_gaps", error=str(exc))
     ctx.collect_provenance(findings, scope=f"iteration-{state.iteration:03d}", dimension=dimension)
     _log_result(
         ctx, state, dimension, score, hypothesis.get("rationale", ""),
@@ -543,7 +549,14 @@ def _emit_research_failure_diagnosis(ctx: LoopContext, dimension: str) -> None:
             _json.dumps(artifact.to_dict(), indent=2), encoding="utf-8"
         )
     except Exception:
-        log.debug("[research][diagnosis] could not emit diagnosis artifact", exc_info=True)
+        # Failure of the failure handler — operator must see this or the
+        # whole research-empty case will look like "backend produced nothing"
+        # when actually the diagnostic pipeline itself is broken.
+        log.warning(
+            "[research][diagnosis] could not emit diagnosis artifact for dimension=%r",
+            dimension,
+            exc_info=True,
+        )
 
 
 def _select_candidate_findings(
@@ -1228,8 +1241,8 @@ def _compress_knowledge_base(ctx: LoopContext, state: LoopState) -> None:
         ctx.track_usage(resp, compress_backend.name)
     except Exception as exc:  # noqa: BLE001 — never let compress kill the run
         log.warning(
-            "Compress raised %s at iter %d; falling back to truncation.",
-            exc.__class__.__name__, state.iteration,
+            "Compress raised %s at iter %d (%s); falling back to truncation.",
+            exc.__class__.__name__, state.iteration, exc,
         )
         ctx.audit_trail.emit(
             "compress_failed_fallback_truncate",
