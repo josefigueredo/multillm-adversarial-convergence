@@ -19,40 +19,24 @@ import yaml
 # ContainerBackendConfig
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestContainerBackendConfigImportable:
-    def test_importable_from_config(self):
-        from src.config import ContainerBackendConfig
-        assert ContainerBackendConfig is not None
+class TestContainerBackendConfigContract:
+    """Collapsed from Importable + Defaults — six single-assertion tests
+    that all built a default ContainerBackendConfig and asserted one
+    field. Now one test covers all the dataclass invariants in one
+    construction."""
 
-
-class TestContainerBackendConfigDefaults:
-    def test_has_default_image(self):
+    def test_defaults_and_overrides_round_trip(self):
         from src.config import ContainerBackendConfig
-        cfg = ContainerBackendConfig()
-        assert isinstance(cfg.image, str)
-        assert len(cfg.image) > 0
-
-    def test_has_default_container_workspace(self):
-        from src.config import ContainerBackendConfig
-        cfg = ContainerBackendConfig()
-        assert isinstance(cfg.container_workspace, str)
-        assert cfg.container_workspace.startswith("/")
-
-    def test_custom_image(self):
-        from src.config import ContainerBackendConfig
-        cfg = ContainerBackendConfig(image="ubuntu:22.04")
-        assert cfg.image == "ubuntu:22.04"
-
-    def test_custom_container_workspace(self):
-        from src.config import ContainerBackendConfig
-        cfg = ContainerBackendConfig(container_workspace="/work")
-        assert cfg.container_workspace == "/work"
-
-    def test_is_frozen(self):
-        from src.config import ContainerBackendConfig
-        cfg = ContainerBackendConfig()
+        default = ContainerBackendConfig()
+        assert isinstance(default.image, str) and default.image
+        assert default.container_workspace.startswith("/")
+        # Field overrides
+        custom = ContainerBackendConfig(image="ubuntu:22.04", container_workspace="/work")
+        assert custom.image == "ubuntu:22.04"
+        assert custom.container_workspace == "/work"
+        # Frozen
         with pytest.raises((AttributeError, TypeError)):
-            cfg.image = "other"  # type: ignore[misc]
+            default.image = "other"  # type: ignore[misc]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -178,12 +162,6 @@ class TestSandboxBackendYAMLParsing:
 # ══════════════════════════════════════════════════════════════════════════════
 # select_sandbox_backend() factory
 # ══════════════════════════════════════════════════════════════════════════════
-
-class TestSelectSandboxBackendImportable:
-    def test_importable_from_sandbox(self):
-        from src.sandbox import select_sandbox_backend
-        assert callable(select_sandbox_backend)
-
 
 class TestSelectSandboxBackendLocalProcess:
     def test_local_process_backend_by_default(self, tmp_path: Path):

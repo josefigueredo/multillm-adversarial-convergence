@@ -16,63 +16,35 @@ from unittest.mock import patch
 import pytest
 
 
-class TestContainerBackendImportable:
-    def test_module_importable(self):
-        from src.sandbox.backends import container  # noqa: F401
+class TestContainerBackendContract:
+    """Type-system / class-shape invariants — collapsed from five separate
+    classes (Importable, Inheritance, Construction) that each tested a
+    single trivial property. Behaviour tests live in the dedicated
+    PrepareWorkspace / BuildEnvironment / Availability / Validation
+    classes below."""
 
-    def test_class_importable(self):
-        from src.sandbox.backends.container import ContainerBackend
-        assert ContainerBackend is not None
-
-
-class TestContainerBackendInheritance:
-    def test_implements_sandbox_backend(self):
+    def test_is_a_sandbox_backend(self):
         from src.sandbox.backends.base import SandboxBackend
         from src.sandbox.backends.container import ContainerBackend
         assert issubclass(ContainerBackend, SandboxBackend)
-
-    def test_has_prepare_workspace(self):
-        from src.sandbox.backends.container import ContainerBackend
-        assert hasattr(ContainerBackend, "prepare_workspace")
         assert callable(ContainerBackend.prepare_workspace)
-
-    def test_has_build_environment(self):
-        from src.sandbox.backends.container import ContainerBackend
-        assert hasattr(ContainerBackend, "build_environment")
         assert callable(ContainerBackend.build_environment)
 
-
-class TestContainerBackendConstruction:
-    def test_instantiates_with_image_and_workspace(self, tmp_path: Path):
+    def test_construction_stores_fields(self, tmp_path: Path):
         from src.sandbox.backends.container import ContainerBackend
-        backend = ContainerBackend(image="python:3.11-slim", host_workspace=tmp_path)
-        assert backend is not None
-
-    def test_stores_image(self, tmp_path: Path):
-        from src.sandbox.backends.container import ContainerBackend
-        backend = ContainerBackend(image="python:3.11-slim", host_workspace=tmp_path)
-        assert backend.image == "python:3.11-slim"
-
-    def test_stores_host_workspace(self, tmp_path: Path):
-        from src.sandbox.backends.container import ContainerBackend
-        backend = ContainerBackend(image="python:3.11-slim", host_workspace=tmp_path)
-        assert backend.host_workspace == tmp_path
-
-    def test_default_container_workspace(self, tmp_path: Path):
-        from src.sandbox.backends.container import ContainerBackend
-        backend = ContainerBackend(image="python:3.11-slim", host_workspace=tmp_path)
-        # Should have a sensible default container-side workspace path
-        assert backend.container_workspace is not None
-        assert isinstance(backend.container_workspace, str)
-
-    def test_custom_container_workspace(self, tmp_path: Path):
-        from src.sandbox.backends.container import ContainerBackend
-        backend = ContainerBackend(
+        # Default container_workspace path
+        default = ContainerBackend(image="python:3.11-slim", host_workspace=tmp_path)
+        assert default.image == "python:3.11-slim"
+        assert default.host_workspace == tmp_path
+        assert isinstance(default.container_workspace, str)
+        assert default.container_workspace  # non-empty default
+        # Explicit container_workspace override
+        custom = ContainerBackend(
             image="python:3.11-slim",
             host_workspace=tmp_path,
             container_workspace="/sandbox/work",
         )
-        assert backend.container_workspace == "/sandbox/work"
+        assert custom.container_workspace == "/sandbox/work"
 
 
 class TestContainerBackendPrepareWorkspace:
