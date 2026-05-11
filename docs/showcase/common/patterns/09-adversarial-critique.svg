@@ -67,7 +67,7 @@
       <text y="3" fill="#22d3ee">CLAIM</text>
     </g>
     <g transform="translate(630 122)">
-      <rect x="-66" y="-9" width="132" height="16" rx="3" fill="#0d1117" stroke="#ff7b72" stroke-width="0.75"/>
+      <rect x="-76" y="-9" width="152" height="16" rx="3" fill="#0d1117" stroke="#ff7b72" stroke-width="0.75"/>
       <text y="3" fill="#ff7b72">FLAGGED · WEAK CITE</text>
     </g>
     <g transform="translate(980 122)">
@@ -80,7 +80,7 @@
   <path stroke="#f5a524" stroke-width="1.2" stroke-dasharray="4 4" fill="none"
         d="M 830 190 C 830 280, 130 280, 130 190" marker-end="url(#ah-mute)"/>
   <g transform="translate(480 286)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
-    <rect x="-78" y="-9" width="156" height="16" rx="3" fill="#0d1117" stroke="#f5a524" stroke-width="0.75"/>
+    <rect x="-94" y="-9" width="186" height="16" rx="3" fill="#0d1117" stroke="#f5a524" stroke-width="0.75"/>
     <text y="3" fill="#f5a524">REVISE ON REJECT · RETRY</text>
   </g>
 

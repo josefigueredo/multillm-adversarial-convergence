@@ -14,15 +14,15 @@
 
   <!-- T -->
   <g transform="translate(20 130)" filter="url(#node-shadow)">
-    <rect width="160" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+    <rect width="120" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
     <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">INPUT</text>
     <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Task</text>
     <text x="14" y="74" font-size="11" fill="#b1bac4">research request</text>
   </g>
 
   <!-- S1 · Research (cyan) -->
-  <g transform="translate(260 130)" filter="url(#node-shadow)">
-    <rect width="220" height="100" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+  <g transform="translate(240 130)" filter="url(#node-shadow)">
+    <rect width="200" height="100" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
     <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">STAGE · 1 · RESEARCH</text>
     <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Producer</text>
     <text x="14" y="74" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">copilot-cli</text>
@@ -30,7 +30,7 @@
 
   <!-- S2 · Critique (warn) -->
   <g transform="translate(580 130)" filter="url(#node-shadow)">
-    <rect width="220" height="100" rx="6" fill="#0d1117" stroke="#ff7b72" stroke-width="1.5"/>
+    <rect width="190" height="100" rx="6" fill="#0d1117" stroke="#ff7b72" stroke-width="1.5"/>
     <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#ff7b72" letter-spacing="1.6">STAGE · 2 · CRITIQUE</text>
     <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Adversary</text>
     <text x="14" y="74" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">codex-cli</text>
@@ -38,7 +38,7 @@
 
   <!-- S3 · Refine (green) -->
   <g transform="translate(900 130)" filter="url(#node-shadow)">
-    <rect width="220" height="100" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+    <rect width="190" height="100" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
     <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" letter-spacing="1.6">STAGE · 3 · REFINE</text>
     <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Synthesiser</text>
     <text x="14" y="74" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">claude-cli</text>
@@ -52,26 +52,26 @@
   </g>
 
   <!-- ─── ARROWS with contract labels ─── -->
-  <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 180 180 L 260 180" marker-end="url(#ah-mute)"/>
-  <g transform="translate(220 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+  <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 140 180 L 240 180" marker-end="url(#ah-mute)"/>
+  <g transform="translate(190 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
     <rect x="-22" y="-9" width="44" height="16" rx="3" fill="#0d1117" stroke="#7d8590" stroke-width="0.75"/>
     <text y="3" fill="#b1bac4">TASK</text>
   </g>
 
-  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 480 180 L 580 180" marker-end="url(#ah-warn)"/>
-  <g transform="translate(530 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
-    <rect x="-44" y="-9" width="88" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 440 180 L 580 180" marker-end="url(#ah-cyan)"/>
+  <g transform="translate(510 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+    <rect x="-64" y="-9" width="128" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
     <text y="3" fill="#22d3ee">CORPUS · CLAIMS</text>
   </g>
 
-  <path stroke="#ff7b72" stroke-width="1.4" fill="none" d="M 800 180 L 900 180" marker-end="url(#ah-green)"/>
-  <g transform="translate(850 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
-    <rect x="-50" y="-9" width="100" height="16" rx="3" fill="#0d1117" stroke="#ff7b72" stroke-width="0.75"/>
+  <path stroke="#ff7b72" stroke-width="1.4" fill="none" d="M 770 180 L 900 180" marker-end="url(#ah-warn)"/>
+  <g transform="translate(835 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+    <rect x="-60" y="-9" width="120" height="16" rx="3" fill="#0d1117" stroke="#ff7b72" stroke-width="0.75"/>
     <text y="3" fill="#ff7b72">FLAGGED ISSUES</text>
   </g>
 
-  <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 1120 180 L 1220 180" marker-end="url(#ah-green)"/>
-  <g transform="translate(1170 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+  <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 1090 180 L 1220 180" marker-end="url(#ah-green)"/>
+  <g transform="translate(1155 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
     <rect x="-32" y="-9" width="64" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
     <text y="3" fill="#7ee787">FINAL</text>
   </g>

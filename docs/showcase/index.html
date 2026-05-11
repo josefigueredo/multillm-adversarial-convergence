@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Showcase Index · Multi-LLM Adversarial Convergence</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg-deep:        #0a0c10;
+      --bg-panel:       rgba(13, 17, 23, 0.82);
+      --bg-card:        rgba(13, 17, 23, 0.65);
+      --bg-card-hover:  rgba(13, 17, 23, 0.88);
+      --ink:            #e6edf3;
+      --ink-soft:       #b1bac4;
+      --ink-mute:       #7d8590;
+      --hairline:       rgba(230, 237, 243, 0.10);
+      --hairline-2:     rgba(230, 237, 243, 0.22);
+      --phosphor:       #f5a524;
+      --phosphor-cool:  #22d3ee;
+      --phosphor-green: #7ee787;
+      --phosphor-warn:  #ff7b72;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: var(--bg-deep);
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── PERSISTENT VIDEO ───────────────────────────────── */
+    .persistent-bg {
+      position: fixed;
+      inset: 0;
+      width: 100vw; height: 100vh;
+      object-fit: cover;
+      z-index: 0;
+      pointer-events: none;
+      filter: contrast(1.05) saturate(0.9) brightness(0.75);
+    }
+
+    /* ── SCANLINE OVERLAY ───────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+        radial-gradient(circle at 100% 0%, rgba(245,165,36,0.06), transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(34,211,238,0.04), transparent 50%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────────── */
+    .shell {
+      position: relative;
+      z-index: 2;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 32px 80px;
+    }
+
+    /* ── TOPBAR ─────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 28px 0 24px;
+      border-bottom: 1px solid var(--hairline-2);
+      margin-bottom: 52px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-dot {
+      display: inline-block;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--phosphor);
+      box-shadow: 0 0 8px 2px rgba(245,165,36,0.55);
+      flex-shrink: 0;
+    }
+    .brand-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .brand-label strong {
+      color: var(--phosphor);
+      font-weight: 600;
+    }
+    .topbar-links {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .topbar-links a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+      text-decoration: none;
+      padding: 5px 12px;
+      border: 1px solid var(--hairline);
+      border-radius: 3px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .topbar-links a:hover {
+      color: var(--phosphor-cool);
+      border-color: rgba(34, 211, 238, 0.35);
+    }
+
+    /* ── HERO ───────────────────────────────────────────── */
+    .hero {
+      margin-bottom: 60px;
+    }
+    .hero-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--phosphor);
+      margin: 0 0 16px;
+    }
+    .hero-eyebrow::before { content: '╱╱  '; opacity: 0.6; }
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -0.030em;
+      line-height: 1.05;
+      background: linear-gradient(160deg, #ffffff 0%, var(--phosphor) 180%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0 0 16px;
+    }
+    .hero-lede {
+      font-size: 18px;
+      color: var(--ink-soft);
+      line-height: 1.6;
+      max-width: 680px;
+      margin: 0;
+    }
+
+    /* ── SECTION ────────────────────────────────────────── */
+    .section {
+      margin-bottom: 52px;
+    }
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--hairline-2);
+    }
+    .section-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--phosphor);
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      color: var(--ink-soft);
+      margin: 0;
+    }
+
+    /* ── CARD GRID ──────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+    @media (max-width: 720px) {
+      .card-grid.cols-2,
+      .card-grid.cols-3 { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 34px; }
+    }
+
+    /* ── CARD ───────────────────────────────────────────── */
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--hairline-2);
+      border-radius: 8px;
+      overflow: hidden;
+      backdrop-filter: blur(18px) saturate(1.2);
+      -webkit-backdrop-filter: blur(18px) saturate(1.2);
+      transition: background 0.15s, border-color 0.15s, transform 0.12s;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+    .card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--hairline-2);
+      transform: translateY(-2px);
+    }
+    .card:hover .card-accent { opacity: 1; }
+
+    .card-accent {
+      height: 2px;
+      opacity: 0.55;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    .card-accent.amber  { background: var(--phosphor); }
+    .card-accent.cyan   { background: var(--phosphor-cool); }
+    .card-accent.green  { background: var(--phosphor-green); }
+    .card-accent.warn   { background: var(--phosphor-warn); }
+    .card-accent.mute   { background: var(--ink-mute); }
+
+    .card-body {
+      padding: 20px 22px 22px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 2px;
+      border: 1px solid;
+      font-weight: 500;
+    }
+    .card-tag.amber { color: var(--phosphor);       border-color: rgba(245,165,36,0.30);  background: rgba(245,165,36,0.07); }
+    .card-tag.cyan  { color: var(--phosphor-cool);  border-color: rgba(34,211,238,0.30);  background: rgba(34,211,238,0.07); }
+    .card-tag.green { color: var(--phosphor-green); border-color: rgba(126,231,135,0.30); background: rgba(126,231,135,0.07); }
+    .card-tag.warn  { color: var(--phosphor-warn);  border-color: rgba(255,123,114,0.30); background: rgba(255,123,114,0.07); }
+    .card-tag.mute  { color: var(--ink-mute);       border-color: rgba(125,133,144,0.30); background: rgba(125,133,144,0.06); }
+
+    .card-slides {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: var(--ink-mute);
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.010em;
+      color: var(--ink);
+      line-height: 1.2;
+      margin: 4px 0 0;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: var(--ink-soft);
+      line-height: 1.55;
+      margin: 0;
+      flex: 1;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 22px 14px;
+      border-top: 1px solid var(--hairline);
+    }
+    .card-path {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      color: var(--ink-mute);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-open {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--phosphor-cool);
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .card:hover .card-open { opacity: 1; }
+
+    /* ── FLAT LIST (legacy section) ─────────────────────── */
+    .flat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .flat-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 14px;
+      border-radius: 4px;
+      text-decoration: none;
+      color: var(--ink-soft);
+      transition: background 0.12s, color 0.12s;
+      font-size: 14px;
+    }
+    .flat-item:hover {
+      background: rgba(230,237,243,0.04);
+      color: var(--ink);
+    }
+    .flat-item .fi-path {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink-mute);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .flat-item .fi-desc {
+      font-size: 13px;
+      color: var(--ink-soft);
+      flex: 2;
+    }
+    .flat-item .fi-arrow {
+      color: var(--ink-mute);
+      opacity: 0;
+      transition: opacity 0.12s;
+      font-size: 12px;
+    }
+    .flat-item:hover .fi-arrow { opacity: 1; }
+
+    /* ── ASSETS TABLE ───────────────────────────────────── */
+    .assets-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .assets-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--hairline);
+      vertical-align: top;
+    }
+    .assets-table tr:last-child td { border-bottom: none; }
+    .assets-table td:first-child {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--phosphor);
+      white-space: nowrap;
+      padding-right: 20px;
+      width: 200px;
+    }
+    .assets-table td:last-child { color: var(--ink-soft); }
+
+    /* ── FOOTER ─────────────────────────────────────────── */
+    .page-footer {
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid var(--hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .page-footer span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--ink-mute);
+    }
+    .page-footer a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--ink-mute);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(125,133,144,0.4);
+    }
+    .page-footer a:hover { color: var(--phosphor-cool); }
+  </style>
+</head>
+<body>
+  <video class="persistent-bg" src="common/animation-veryslow.mp4" autoplay muted loop playsinline></video>
+
+  <div class="shell">
+
+    <!-- ── TOPBAR ──────────────────────────────────────────── -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span class="brand-label">◉ &nbsp;SHOWCASE · <strong>Multi-LLM Adversarial Convergence</strong></span>
+      </div>
+      <nav class="topbar-links" aria-label="Quick links">
+        <a href="deck/clean.html" target="_blank">Main Deck</a>
+        <a href="glossary/glossary.html" target="_blank">Glossary</a>
+        <a href="presenter/control.html" target="_blank">Presenter</a>
+        <a href="https://github.com/josefigueredo/multillm-adversarial-convergence" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <!-- ── HERO ────────────────────────────────────────────── -->
+    <section class="hero">
+      <p class="hero-eyebrow">Showcase Index</p>
+      <h1>Presentations, tools,<br>and reference artifacts</h1>
+      <p class="hero-lede">Every visual artifact produced for the Multi-LLM Adversarial Convergence Framework — decks, interactive dashboards, concept glossary, and persisted research outputs — in one place.</p>
+    </section>
+
+    <!-- ── SECTION: PRESENTATIONS ──────────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">I · Presentations</span>
+        <p class="section-title">Slide decks and presenter view</p>
+      </div>
+      <div class="card-grid cols-3">
+
+        <a class="card" href="deck/clean.html" target="_blank">
+          <div class="card-accent amber"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag amber">Deck</span>
+              <span class="card-slides">34 slides</span>
+            </div>
+            <div class="card-title">Main Deck</div>
+            <p class="card-desc">The problem, Karpathy's loop, 11 agentic design patterns, and a full adversarial demo run against AWS API Gateway with real iteration scores.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">deck/clean.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="deck/strategies.html" target="_blank">
+          <div class="card-accent cyan"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag cyan">Deck</span>
+              <span class="card-slides">7 slides</span>
+            </div>
+            <div class="card-title">Strategies Deep-Dive</div>
+            <p class="card-desc">All 6 execution strategies — single, ensemble, parallel, serial, specialist, adversarial — as individual annotated flow diagrams with invariants.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">deck/strategies.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="presenter/control.html" target="_blank">
+          <div class="card-accent mute"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag mute">Tool</span>
+            </div>
+            <div class="card-title">Presenter View</div>
+            <p class="card-desc">Speaker notes synced to the main deck via <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">localStorage</code>. Open in a second window — navigation in either pane moves both.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">presenter/control.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ── SECTION: INTERACTIVE TOOLS ──────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">II · Interactive Tools</span>
+        <p class="section-title">Live data and animated demos</p>
+      </div>
+      <div class="card-grid cols-2">
+
+        <a class="card" href="widgets/dashboard-for-slide.html" target="_blank">
+          <div class="card-accent green"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag green">Dashboard</span>
+            </div>
+            <div class="card-title">Live Replay Dashboard</div>
+            <p class="card-desc">Step through every iteration of the real <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">aws_api_gateway_opus_sonnet_codex</code> run. Score sparkline, dimension grid, state machine, KEEP/DISCARD decisions, and cost block.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">widgets/dashboard-for-slide.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="widgets/shell-demo.html" target="_blank">
+          <div class="card-accent cyan"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag cyan">Demo</span>
+            </div>
+            <div class="card-title">Shell Demo</div>
+            <p class="card-desc">Standalone animated terminal playback. The same scripted-terminal component used inside the main deck, running independently as a shareable demo artifact.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">widgets/shell-demo.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ── SECTION: REFERENCE ───────────────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">III · Reference</span>
+        <p class="section-title">Concept glossary and engineering framing</p>
+      </div>
+      <div class="card-grid cols-2">
+
+        <a class="card" href="glossary/glossary.html" target="_blank">
+          <div class="card-accent amber"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag amber">Reference</span>
+              <span class="card-tag mute">es / en</span>
+            </div>
+            <div class="card-title">Concept Glossary</div>
+            <p class="card-desc">Static bilingual explanations for all key terms — adversarial convergence, evaluator-optimizer, LLM-as-judge, trust classes, atomicity, and more. Designed for mixed technical and non-technical audiences.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">glossary/glossary.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="common/HARNES.md" target="_blank">
+          <div class="card-accent mute"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag mute">Notes</span>
+            </div>
+            <div class="card-title">Harness Engineering Framing</div>
+            <p class="card-desc">Speaker prep material — OS analogy (CPU:LLM, kernel:harness), three-layer stack, and the eight responsibilities of the harness layer. Useful as an opening framing before the patterns section.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">common/HARNES.md</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ── SECTION: SHOWCASE OUTPUTS ───────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">IV · Showcase Outputs</span>
+        <p class="section-title">AWS API Gateway — one corpus, three rendering profiles</p>
+      </div>
+      <div class="card-grid cols-3">
+
+        <a class="card" href="aws-api-gateway/report-default.html" target="_blank">
+          <div class="card-accent amber"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag amber">default</span>
+            </div>
+            <div class="card-title">Raw / Default</div>
+            <p class="card-desc">Exploratory synthesis — recommendations first, then dimensions, caveats, and inline references. Best for engineering discovery and internal sharing.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">aws-api-gateway/report-default.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="aws-api-gateway/report-paper.html" target="_blank">
+          <div class="card-accent cyan"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag cyan">paper</span>
+            </div>
+            <div class="card-title">Paper Style</div>
+            <p class="card-desc">Research-paper structure — abstract, methodology, discussion, and a deterministic references section built from <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#22d3ee">citations.json</code>. For stakeholder review.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">aws-api-gateway/report-paper.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="aws-api-gateway/report-technical.html" target="_blank">
+          <div class="card-accent green"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag green">technical_doc</span>
+            </div>
+            <div class="card-title">Technical Doc</div>
+            <p class="card-desc">ADR-style format — comparison tables, upfront recommendation, disqualifiers, and open questions. Closest analog to an RFC or architecture decision record.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">aws-api-gateway/report-technical.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ── SECTION: LEGACY ──────────────────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">V · Legacy</span>
+        <p class="section-title">Older Marp-based decks — superseded by deck/clean.html</p>
+      </div>
+      <div class="flat-list">
+        <a class="flat-item" href="legacy/demo_merged_pro.html" target="_blank">
+          <span class="fi-path">legacy/demo_merged_pro.html</span>
+          <span class="fi-desc">Most recent Marp iteration before the clean-deck rewrite</span>
+          <span class="fi-arrow">→</span>
+        </a>
+        <a class="flat-item" href="legacy/demo_merged_commented_es_vbg.html" target="_blank">
+          <span class="fi-path">legacy/demo_merged_commented_es_vbg.html</span>
+          <span class="fi-desc">Spanish-commented version with video background</span>
+          <span class="fi-arrow">→</span>
+        </a>
+        <a class="flat-item" href="legacy/demo_merged_commented_es.html" target="_blank">
+          <span class="fi-path">legacy/demo_merged_commented_es.html</span>
+          <span class="fi-desc">Spanish-commented version, static background</span>
+          <span class="fi-arrow">→</span>
+        </a>
+        <a class="flat-item" href="legacy/demo_merged.html" target="_blank">
+          <span class="fi-path">legacy/demo_merged.html</span>
+          <span class="fi-desc">Merged English deck with all sections</span>
+          <span class="fi-arrow">→</span>
+        </a>
+        <a class="flat-item" href="legacy/demo_extended.html" target="_blank">
+          <span class="fi-path">legacy/demo_extended.html</span>
+          <span class="fi-desc">Extended English deck</span>
+          <span class="fi-arrow">→</span>
+        </a>
+        <a class="flat-item" href="legacy/demo.html" target="_blank">
+          <span class="fi-path">legacy/demo.html</span>
+          <span class="fi-desc">Original 30-minute presentation</span>
+          <span class="fi-arrow">→</span>
+        </a>
+        <a class="flat-item" href="legacy/dashboard.html" target="_blank">
+          <span class="fi-path">legacy/dashboard.html</span>
+          <span class="fi-desc">Legacy dashboard view</span>
+          <span class="fi-arrow">→</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── SECTION: SHARED ASSETS ───────────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">VI · Shared Assets</span>
+        <p class="section-title">Common resources used across all HTML artifacts</p>
+      </div>
+      <table class="assets-table">
+        <tbody>
+          <tr>
+            <td>common/animation-veryslow.mp4</td>
+            <td>Persistent background video — used by every HTML page in this showcase</td>
+          </tr>
+          <tr>
+            <td>common/patterns/00 – 11</td>
+            <td>12 agentic design pattern SVG diagrams in the CRT/phosphor palette, embedded in the main deck slides 7–17</td>
+          </tr>
+          <tr>
+            <td>deck/clean.css</td>
+            <td>Core stylesheet — CRT/phosphor design system, 1280×720 slide format, terminal component, all variant classes</td>
+          </tr>
+          <tr>
+            <td>deck/clean.js</td>
+            <td>Slide runtime — keyboard navigation, viewport scaling, scripted terminal engine, cross-tab sync</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ── FOOTER ───────────────────────────────────────────── -->
+    <footer class="page-footer">
+      <span>MULTI-LLM ADVERSARIAL CONVERGENCE · SHOWCASE INDEX</span>
+      <a href="https://github.com/josefigueredo/multillm-adversarial-convergence" target="_blank" rel="noopener">github.com/josefigueredo ↗</a>
+    </footer>
+
+  </div>
+</body>
+</html>

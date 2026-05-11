@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Execution Strategies — Multi-LLM Adversarial Convergence</title>
+  <link rel="stylesheet" href="clean.css">
+  <style>
+    /* inline SVGs in pattern·focus slides get the same treatment as <img> */
+    .slide.pattern.focus svg {
+      display: block;
+      margin: 10px auto 14px;
+      max-height: 460px;
+      width: 100%;
+      filter: drop-shadow(0 4px 14px rgba(0,0,0,0.45));
+    }
+  </style>
+</head>
+<body>
+  <video class="persistent-bg" src="../common/animation-veryslow.mp4" autoplay muted loop playsinline></video>
+
+  <main class="deck">
+
+    <!-- ═══ 1 · INDEX ════════════════════════════════════════════════ -->
+    <section class="slide tight video-bg" data-slide="1">
+      <header>MULTI-LLM ADVERSARIAL CONVERGENCE · STRATEGIES</header>
+      <h2 id="execution-strategies">Execution Strategies</h2>
+      <p><em>One config field. Six fundamentally different backend wiring shapes.</em></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Strategy</th>
+            <th>Wiring</th>
+            <th>Cost</th>
+            <th>Min backends</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>single</code></td><td>One backend for everything</td><td>1×</td><td>1</td></tr>
+          <tr><td><code>ensemble</code></td><td>2 backends research in parallel, different judge</td><td>~1.5×</td><td>2</td></tr>
+          <tr><td><code>parallel</code></td><td>All backends independently, best score wins</td><td>N×</td><td>2+</td></tr>
+          <tr><td><code>serial</code></td><td>Cheap backend drafts, precise one refines</td><td>~1.5×</td><td>2</td></tr>
+          <tr><td><code>specialist</code></td><td>Route each dimension to best-fit backend</td><td>1×</td><td>2+</td></tr>
+          <tr><td><code>adversarial</code></td><td>Research + critique + adjudication</td><td>~1.3×</td><td>2</td></tr>
+        </tbody>
+      </table>
+      <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <!-- ═══ 2 · SINGLE ════════════════════════════════════════════════ -->
+    <section class="slide pattern focus" data-slide="2">
+      <header>MULTI-LLM ADVERSARIAL CONVERGENCE · STRATEGIES</header>
+      <h2 id="strategy-single">single</h2>
+      <blockquote><p><em>One backend plays every role — hypothesis, research, judge, utility, synthesis.</em></p></blockquote>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 396" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+        <defs>
+          <marker id="s1-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+          <marker id="s1-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/></marker>
+          <marker id="s1-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+          <marker id="s1-warn"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#ff7b72"/></marker>
+          <filter id="s1-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <!-- DIMENSION -->
+        <g transform="translate(20 140)" filter="url(#s1-shadow)">
+          <rect width="190" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">DIMENSION</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">Research</text>
+          <text x="14" y="74" font-size="11" fill="#b1bac4">topic + context</text>
+        </g>
+
+        <!-- PRIMARY BACKEND — all roles -->
+        <g transform="translate(290 55)" filter="url(#s1-shadow)">
+          <rect width="360" height="270" rx="6" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+          <text x="14" y="24" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" letter-spacing="1.6">PRIMARY BACKEND · ALL ROLES</text>
+          <line x1="0" y1="36" x2="360" y2="36" stroke="#f5a524" stroke-opacity="0.25" stroke-width="1"/>
+          <circle cx="18" cy="59" r="3.5" fill="#f5a524" fill-opacity="0.7"/>
+          <text x="30" y="63" font-family="JetBrains Mono, monospace" font-size="10" fill="#b1bac4" letter-spacing="1.2">HYPOTHESIS</text>
+          <circle cx="18" cy="87" r="3.5" fill="#f5a524" fill-opacity="0.7"/>
+          <text x="30" y="91" font-family="JetBrains Mono, monospace" font-size="10" fill="#b1bac4" letter-spacing="1.2">RESEARCH</text>
+          <circle cx="18" cy="115" r="3.5" fill="#f5a524" fill-opacity="0.7"/>
+          <text x="30" y="119" font-family="JetBrains Mono, monospace" font-size="10" fill="#b1bac4" letter-spacing="1.2">JUDGE</text>
+          <circle cx="18" cy="143" r="3.5" fill="#f5a524" fill-opacity="0.7"/>
+          <text x="30" y="147" font-family="JetBrains Mono, monospace" font-size="10" fill="#b1bac4" letter-spacing="1.2">UTILITY</text>
+          <line x1="0" y1="162" x2="360" y2="162" stroke="#7d8590" stroke-opacity="0.20" stroke-width="1"/>
+          <text x="14" y="196" font-size="22" font-weight="600" fill="#e6edf3">claude-cli</text>
+          <text x="14" y="220" font-size="12" fill="#7d8590">one provider · all phases</text>
+          <text x="14" y="246" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524">cost: 1× · min_backends: 1</text>
+        </g>
+
+        <!-- SCORE diamond -->
+        <g transform="translate(740 142)" filter="url(#s1-shadow)">
+          <polygon points="90,0 180,48 90,96 0,48" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+          <text x="90" y="32" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" text-anchor="middle" letter-spacing="1.6">DECISION</text>
+          <text x="90" y="54" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="middle">Score ≥ τ?</text>
+          <text x="90" y="74" font-size="11" fill="#b1bac4" text-anchor="middle">heuristic + judge</text>
+        </g>
+
+        <!-- KEEP -->
+        <g transform="translate(1010 78)" filter="url(#s1-shadow)">
+          <rect width="250" height="82" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" letter-spacing="1.6">✓ KEEP</text>
+          <text x="14" y="50" font-size="17" font-weight="600" fill="#e6edf3">Merge to corpus</text>
+          <text x="14" y="70" font-size="11" fill="#b1bac4">knowledge grows</text>
+        </g>
+
+        <!-- DISCARD -->
+        <g transform="translate(1010 262)" filter="url(#s1-shadow)">
+          <rect width="250" height="82" rx="6" fill="#0d1117" stroke="#ff7b72" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#ff7b72" letter-spacing="1.6">✗ DISCARD</text>
+          <text x="14" y="50" font-size="17" font-weight="600" fill="#e6edf3">Retry dimension</text>
+          <text x="14" y="70" font-size="11" fill="#b1bac4">up to 3 attempts</text>
+        </g>
+
+        <!-- ARROWS -->
+        <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 210 190 L 290 190" marker-end="url(#s1-mute)"/>
+        <path stroke="#f5a524" stroke-width="1.4" fill="none" d="M 650 190 L 740 190" marker-end="url(#s1-amber)"/>
+        <!-- SCORE → KEEP (YES) -->
+        <path stroke="#7ee787" stroke-width="1.5" fill="none" d="M 920 190 C 968 190 968 119 1010 119" marker-end="url(#s1-green)"/>
+        <g transform="translate(962 168)">
+          <rect x="-22" y="-9" width="44" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
+          <text x="0" y="3" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" text-anchor="middle" letter-spacing="1.4">YES</text>
+        </g>
+        <!-- SCORE → DISCARD (NO) -->
+        <path stroke="#ff7b72" stroke-width="1.5" fill="none" d="M 830 238 C 830 303 962 303 1010 303" marker-end="url(#s1-warn)"/>
+        <g transform="translate(826 272)">
+          <rect x="-16" y="-9" width="32" height="16" rx="3" fill="#0d1117" stroke="#ff7b72" stroke-width="0.75"/>
+          <text x="0" y="3" font-family="JetBrains Mono, monospace" font-size="10" fill="#ff7b72" text-anchor="middle" letter-spacing="1.4">NO</text>
+        </g>
+        <!-- retry L-shaped arc: DISCARD → PRIMARY -->
+        <path stroke="#f5a524" stroke-width="1.2" stroke-dasharray="4 4" fill="none"
+              d="M 1010 344 L 1010 362 L 250 362 L 250 192 L 290 192" marker-end="url(#s1-mute)"/>
+        <g transform="translate(640 368)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-60" y="-9" width="120" height="16" rx="3" fill="#0d1117" stroke="#f5a524" stroke-width="0.75"/>
+          <text y="3" fill="#f5a524">RETRY · SAME BACKEND</text>
+        </g>
+
+        <!-- INVARIANT -->
+        <g transform="translate(20 376)">
+          <line x1="0" y1="0" x2="1240" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+          <text x="0" y="16" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">▸ INVARIANT — one provider for all phases · no cross-provider independence · cost: 1× · min_backends: 1</text>
+        </g>
+      </svg>
+      <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <!-- ═══ 3 · ENSEMBLE ══════════════════════════════════════════════ -->
+    <section class="slide pattern focus" data-slide="3">
+      <header>MULTI-LLM ADVERSARIAL CONVERGENCE · STRATEGIES</header>
+      <h2 id="strategy-ensemble">ensemble</h2>
+      <blockquote><p><em>Two backends research the same dimension in parallel; a third — different family — judges which answer is best.</em></p></blockquote>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+        <defs>
+          <marker id="s2-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+          <marker id="s2-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+          <marker id="s2-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/></marker>
+          <marker id="s2-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+          <filter id="s2-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <!-- DIMENSION -->
+        <g transform="translate(20 150)" filter="url(#s2-shadow)">
+          <rect width="190" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">DIMENSION</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">Research</text>
+          <text x="14" y="74" font-size="11" fill="#b1bac4">same prompt, twice</text>
+        </g>
+
+        <!-- BACKEND A -->
+        <g transform="translate(340 75)" filter="url(#s2-shadow)">
+          <rect width="250" height="90" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">BACKEND · A · RESEARCH</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">claude-cli</text>
+          <text x="14" y="74" font-size="11" fill="#7d8590">family · Claude</text>
+        </g>
+
+        <!-- BACKEND B -->
+        <g transform="translate(340 235)" filter="url(#s2-shadow)">
+          <rect width="250" height="90" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">BACKEND · B · RESEARCH</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">codex-cli</text>
+          <text x="14" y="74" font-size="11" fill="#7d8590">family · GPT*</text>
+        </g>
+
+        <!-- JUDGE — different family -->
+        <g transform="translate(700 148)" filter="url(#s2-shadow)">
+          <rect width="290" height="104" rx="6" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" letter-spacing="1.6">JUDGE · DIFFERENT FAMILY</text>
+          <text x="14" y="54" font-size="17" font-weight="600" fill="#e6edf3">gemini-cli</text>
+          <text x="14" y="76" font-size="11" fill="#b1bac4">family · Gemini</text>
+          <text x="14" y="94" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524">consensus · select best</text>
+        </g>
+
+        <!-- OUTCOME -->
+        <g transform="translate(1070 158)" filter="url(#s2-shadow)">
+          <rect width="190" height="84" rx="42" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+          <text x="95" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" text-anchor="middle" letter-spacing="1.6">OUTCOME</text>
+          <text x="95" y="50" font-size="16" font-weight="600" fill="#e6edf3" text-anchor="middle">Best answer</text>
+          <text x="95" y="70" font-size="11" fill="#b1bac4" text-anchor="middle">low-variance</text>
+        </g>
+
+        <!-- ARROWS: DIMENSION → A, B (fan-out) -->
+        <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 210 200 C 270 200 270 120 340 120" marker-end="url(#s2-mute)"/>
+        <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 210 200 C 270 200 270 280 340 280" marker-end="url(#s2-mute)"/>
+        <!-- FAN-OUT annotation -->
+        <g transform="translate(268 190)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-42" y="-9" width="84" height="16" rx="3" fill="#0d1117" stroke="#7d8590" stroke-width="0.75"/>
+          <text y="3" fill="#b1bac4">PARALLEL</text>
+        </g>
+
+        <!-- ARROWS: A, B → JUDGE -->
+        <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 590 120 C 645 120 645 200 700 200" marker-end="url(#s2-cyan)"/>
+        <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 590 280 C 645 280 645 200 700 200" marker-end="url(#s2-cyan)"/>
+        <!-- FINDINGS annotation on convergence -->
+        <g transform="translate(643 155)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-38" y="-9" width="76" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+          <text y="3" fill="#22d3ee">FINDINGS</text>
+        </g>
+
+        <!-- ARROW: JUDGE → OUTCOME -->
+        <path stroke="#7ee787" stroke-width="1.5" fill="none" d="M 990 200 L 1070 200" marker-end="url(#s2-green)"/>
+        <g transform="translate(1030 188)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-22" y="-9" width="44" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
+          <text y="3" fill="#7ee787">BEST</text>
+        </g>
+
+        <!-- INVARIANT -->
+        <g transform="translate(20 370)">
+          <line x1="0" y1="0" x2="1240" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+          <text x="0" y="16" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">▸ INVARIANT — judge must be a different provider family than research backends · prevents self-confirmation bias · cost: ~1.5× · min_backends: 2</text>
+        </g>
+      </svg>
+      <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <!-- ═══ 4 · PARALLEL ══════════════════════════════════════════════ -->
+    <section class="slide pattern focus" data-slide="4">
+      <header>MULTI-LLM ADVERSARIAL CONVERGENCE · STRATEGIES</header>
+      <h2 id="strategy-parallel">parallel</h2>
+      <blockquote><p><em>All backends research independently; the one with the highest composite score wins the iteration.</em></p></blockquote>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 430" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+        <defs>
+          <marker id="s3-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+          <marker id="s3-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+          <marker id="s3-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/></marker>
+          <marker id="s3-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+          <filter id="s3-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <!-- DIMENSION -->
+        <g transform="translate(20 165)" filter="url(#s3-shadow)">
+          <rect width="190" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">DIMENSION</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">Research</text>
+          <text x="14" y="74" font-size="11" fill="#b1bac4">same prompt, N times</text>
+        </g>
+
+        <!-- BACKEND A -->
+        <g transform="translate(330 60)" filter="url(#s3-shadow)">
+          <rect width="250" height="90" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">BACKEND · A</text>
+          <text x="14" y="50" font-size="17" font-weight="600" fill="#e6edf3">claude-cli</text>
+          <text x="14" y="70" font-size="11" fill="#7d8590">scores independently</text>
+        </g>
+
+        <!-- BACKEND B -->
+        <g transform="translate(330 185)" filter="url(#s3-shadow)">
+          <rect width="250" height="90" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">BACKEND · B</text>
+          <text x="14" y="50" font-size="17" font-weight="600" fill="#e6edf3">codex-cli</text>
+          <text x="14" y="70" font-size="11" fill="#7d8590">scores independently</text>
+        </g>
+
+        <!-- BACKEND C -->
+        <g transform="translate(330 310)" filter="url(#s3-shadow)">
+          <rect width="250" height="90" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">BACKEND · C</text>
+          <text x="14" y="50" font-size="17" font-weight="600" fill="#e6edf3">gemini-cli</text>
+          <text x="14" y="70" font-size="11" fill="#7d8590">scores independently</text>
+        </g>
+
+        <!-- PICK MAX diamond -->
+        <g transform="translate(700 172)" filter="url(#s3-shadow)">
+          <polygon points="80,0 160,43 80,86 0,43" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+          <text x="80" y="30" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" text-anchor="middle" letter-spacing="1.6">PICK MAX</text>
+          <text x="80" y="52" font-size="14" font-weight="600" fill="#e6edf3" text-anchor="middle">best_score</text>
+          <text x="80" y="70" font-size="10" fill="#b1bac4" text-anchor="middle">winner takes all</text>
+        </g>
+
+        <!-- WINNER -->
+        <g transform="translate(940 172)" filter="url(#s3-shadow)">
+          <rect width="320" height="86" rx="43" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+          <text x="160" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" text-anchor="middle" letter-spacing="1.6">OUTCOME · WINNER</text>
+          <text x="160" y="52" font-size="17" font-weight="600" fill="#e6edf3" text-anchor="middle">Highest-scoring answer</text>
+          <text x="160" y="72" font-size="11" fill="#b1bac4" text-anchor="middle">merged into corpus</text>
+        </g>
+
+        <!-- ARROWS: DIMENSION → A, B, C (fan-out) -->
+        <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 210 215 C 270 215 270 105 330 105" marker-end="url(#s3-mute)"/>
+        <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 210 215 L 330 230" marker-end="url(#s3-mute)"/>
+        <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 210 215 C 270 215 270 355 330 355" marker-end="url(#s3-mute)"/>
+
+        <!-- FAN-OUT annotation -->
+        <g transform="translate(268 205)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-36" y="-9" width="72" height="16" rx="3" fill="#0d1117" stroke="#7d8590" stroke-width="0.75"/>
+          <text y="3" fill="#b1bac4">FAN-OUT</text>
+        </g>
+
+        <!-- ARROWS: A, B, C → PICK MAX -->
+        <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 580 105 C 640 105 640 215 700 215" marker-end="url(#s3-cyan)"/>
+        <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 580 230 C 640 230 640 215 700 215" marker-end="url(#s3-cyan)"/>
+        <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 580 355 C 640 355 640 215 700 215" marker-end="url(#s3-cyan)"/>
+
+        <!-- SCORE annotation on convergence -->
+        <g transform="translate(640 170)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-30" y="-9" width="60" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+          <text y="3" fill="#22d3ee">SCORES</text>
+        </g>
+
+        <!-- ARROW: PICK MAX → WINNER -->
+        <path stroke="#7ee787" stroke-width="1.5" fill="none" d="M 860 215 L 940 215" marker-end="url(#s3-green)"/>
+
+        <!-- INVARIANT -->
+        <g transform="translate(20 402)">
+          <line x1="0" y1="0" x2="1240" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+          <text x="0" y="16" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">▸ INVARIANT — no consensus or merge · winner takes all by composite score · cost: N× · min_backends: 2+</text>
+        </g>
+      </svg>
+      <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <!-- ═══ 5 · SERIAL ════════════════════════════════════════════════ -->
+    <section class="slide pattern focus" data-slide="5">
+      <header>MULTI-LLM ADVERSARIAL CONVERGENCE · STRATEGIES</header>
+      <h2 id="strategy-serial">serial</h2>
+      <blockquote><p><em>A cheap backend generates a broad draft; a precise backend refines it — progressive cost profile.</em></p></blockquote>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 354" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+        <defs>
+          <marker id="s4-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+          <marker id="s4-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+          <marker id="s4-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/></marker>
+          <marker id="s4-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+          <filter id="s4-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <!-- DIMENSION -->
+        <g transform="translate(20 127)" filter="url(#s4-shadow)">
+          <rect width="190" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">DIMENSION</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">Research</text>
+          <text x="14" y="74" font-size="11" fill="#b1bac4">topic + context</text>
+        </g>
+
+        <!-- STAGE 1 · DRAFT (cheap) -->
+        <g transform="translate(280 72)" filter="url(#s4-shadow)">
+          <rect width="290" height="210" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="14" y="24" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">STAGE 1 · DRAFT</text>
+          <line x1="0" y1="36" x2="290" y2="36" stroke="#22d3ee" stroke-opacity="0.25" stroke-width="1"/>
+          <text x="14" y="72" font-size="22" font-weight="600" fill="#e6edf3">copilot-cli</text>
+          <text x="14" y="98" font-size="12" fill="#b1bac4">fast · broad coverage</text>
+          <line x1="14" y1="114" x2="276" y2="114" stroke="#7d8590" stroke-opacity="0.15" stroke-width="1"/>
+          <text x="14" y="136" font-size="11" fill="#7d8590">• generates raw findings</text>
+          <text x="14" y="158" font-size="11" fill="#7d8590">• explores all dimensions</text>
+          <line x1="0" y1="178" x2="290" y2="178" stroke="#22d3ee" stroke-opacity="0.20" stroke-width="1"/>
+          <text x="14" y="198" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee">cost: low · speed: fast</text>
+        </g>
+
+        <!-- STAGE 2 · REFINE (precise) -->
+        <g transform="translate(660 72)" filter="url(#s4-shadow)">
+          <rect width="290" height="210" rx="6" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+          <text x="14" y="24" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" letter-spacing="1.6">STAGE 2 · REFINE</text>
+          <line x1="0" y1="36" x2="290" y2="36" stroke="#f5a524" stroke-opacity="0.25" stroke-width="1"/>
+          <text x="14" y="72" font-size="22" font-weight="600" fill="#e6edf3">claude-cli</text>
+          <text x="14" y="98" font-size="12" fill="#b1bac4">accurate · deep analysis</text>
+          <line x1="14" y1="114" x2="276" y2="114" stroke="#7d8590" stroke-opacity="0.15" stroke-width="1"/>
+          <text x="14" y="136" font-size="11" fill="#7d8590">• receives full draft context</text>
+          <text x="14" y="158" font-size="11" fill="#7d8590">• applies precision filter</text>
+          <line x1="0" y1="178" x2="290" y2="178" stroke="#f5a524" stroke-opacity="0.20" stroke-width="1"/>
+          <text x="14" y="198" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524">cost: higher · speed: slower</text>
+        </g>
+
+        <!-- OUTPUT -->
+        <g transform="translate(1030 137)" filter="url(#s4-shadow)">
+          <rect width="230" height="80" rx="40" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+          <text x="115" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" text-anchor="middle" letter-spacing="1.6">OUTPUT</text>
+          <text x="115" y="52" font-size="16" font-weight="600" fill="#e6edf3" text-anchor="middle">Refined answer</text>
+          <text x="115" y="70" font-size="11" fill="#b1bac4" text-anchor="middle">merged to corpus</text>
+        </g>
+
+        <!-- ARROWS -->
+        <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 210 177 L 280 177" marker-end="url(#s4-mute)"/>
+
+        <path stroke="#22d3ee" stroke-width="1.5" fill="none" d="M 570 177 L 660 177" marker-end="url(#s4-cyan)"/>
+        <g transform="translate(615 165)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-28" y="-9" width="56" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+          <text y="3" fill="#22d3ee">DRAFT</text>
+        </g>
+
+        <path stroke="#7ee787" stroke-width="1.5" fill="none" d="M 950 177 L 1030 177" marker-end="url(#s4-green)"/>
+        <g transform="translate(990 165)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-36" y="-9" width="72" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
+          <text y="3" fill="#7ee787">REFINED</text>
+        </g>
+
+        <!-- INVARIANT -->
+        <g transform="translate(20 330)">
+          <line x1="0" y1="0" x2="1240" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+          <text x="0" y="16" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">▸ INVARIANT — stage 2 always receives stage 1 full output as context · progressive cost: cheap draft + precise refine ≈ 1.5× total</text>
+        </g>
+      </svg>
+      <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <!-- ═══ 6 · SPECIALIST ════════════════════════════════════════════ -->
+    <section class="slide pattern focus" data-slide="6">
+      <header>MULTI-LLM ADVERSARIAL CONVERGENCE · STRATEGIES</header>
+      <h2 id="strategy-specialist">specialist</h2>
+      <blockquote><p><em>Each dimension is routed to the backend whose persona best matches the required expertise.</em></p></blockquote>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 440" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+        <defs>
+          <marker id="s5-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+          <marker id="s5-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+          <marker id="s5-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/></marker>
+          <marker id="s5-warn"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#ff7b72"/></marker>
+          <marker id="s5-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+          <filter id="s5-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <!-- DIMENSION -->
+        <g transform="translate(20 170)" filter="url(#s5-shadow)">
+          <rect width="200" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">DIMENSION</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">Research</text>
+          <text x="14" y="74" font-size="11" fill="#b1bac4">e.g. "IaC toolchain"</text>
+        </g>
+
+        <!-- ROUTER diamond -->
+        <g transform="translate(310 170)" filter="url(#s5-shadow)">
+          <polygon points="90,0 180,50 90,100 0,50" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+          <text x="90" y="34" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" text-anchor="middle" letter-spacing="1.6">ROUTER</text>
+          <text x="90" y="56" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="middle">specialist</text>
+          <text x="90" y="76" font-size="11" fill="#b1bac4" text-anchor="middle">strategy = persona</text>
+        </g>
+
+        <!-- Specialist A — BREADTH -->
+        <g transform="translate(600 60)" filter="url(#s5-shadow)">
+          <rect width="280" height="92" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">PERSONA · BREADTH</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">copilot-cli</text>
+          <text x="14" y="74" font-size="11" fill="#7d8590">coverage dimensions</text>
+        </g>
+
+        <!-- Specialist B — PRECISION -->
+        <g transform="translate(600 187)" filter="url(#s5-shadow)">
+          <rect width="280" height="92" rx="6" fill="#0d1117" stroke="#ff7b72" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#ff7b72" letter-spacing="1.6">PERSONA · PRECISION</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">codex-cli</text>
+          <text x="14" y="74" font-size="11" fill="#7d8590">technical verification</text>
+        </g>
+
+        <!-- Specialist C — SYNTHESIS -->
+        <g transform="translate(600 314)" filter="url(#s5-shadow)">
+          <rect width="280" height="92" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" letter-spacing="1.6">PERSONA · SYNTHESIS</text>
+          <text x="14" y="52" font-size="17" font-weight="600" fill="#e6edf3">claude-cli</text>
+          <text x="14" y="74" font-size="11" fill="#7d8590">integration + ADRs</text>
+        </g>
+
+        <!-- OUTCOME -->
+        <g transform="translate(970 174)" filter="url(#s5-shadow)">
+          <rect width="290" height="92" rx="46" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+          <text x="145" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" text-anchor="middle" letter-spacing="1.6">OUTCOME</text>
+          <text x="145" y="52" font-size="17" font-weight="600" fill="#e6edf3" text-anchor="middle">Best-fit answer</text>
+          <text x="145" y="74" font-size="11" fill="#b1bac4" text-anchor="middle">routed to right prior</text>
+        </g>
+
+        <!-- ARROWS: DIMENSION → ROUTER -->
+        <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 220 220 L 310 220" marker-end="url(#s5-mute)"/>
+
+        <!-- ARROWS: ROUTER → A, B, C (fan-out) -->
+        <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 490 220 C 545 220 545 106 600 106" marker-end="url(#s5-cyan)"/>
+        <path stroke="#ff7b72" stroke-width="1.4" fill="none" d="M 490 220 L 600 233" marker-end="url(#s5-warn)"/>
+        <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 490 220 C 545 220 545 360 600 360" marker-end="url(#s5-green)"/>
+
+        <!-- Persona labels on dispatch arrows -->
+        <g transform="translate(540 174)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-36" y="-9" width="72" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+          <text y="3" fill="#22d3ee">BREADTH</text>
+        </g>
+        <g transform="translate(540 266)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-40" y="-9" width="80" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
+          <text y="3" fill="#7ee787">SYNTHESIS</text>
+        </g>
+
+        <!-- ARROWS: A, B, C → OUTCOME -->
+        <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 880 106 C 930 106 930 220 970 220" marker-end="url(#s5-cyan)"/>
+        <path stroke="#ff7b72" stroke-width="1.4" fill="none" d="M 880 233 L 970 230" marker-end="url(#s5-warn)"/>
+        <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 880 360 C 930 360 930 220 970 220" marker-end="url(#s5-green)"/>
+
+        <!-- fallback note -->
+        <text x="316" y="294" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">fall-through → primary if no persona match</text>
+
+        <!-- INVARIANT -->
+        <g transform="translate(20 414)">
+          <line x1="0" y1="0" x2="1240" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+          <text x="0" y="16" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">▸ INVARIANT — if no specialist matches, falls through to primary (fail-safe, not fail-stop) · cost: 1× avg · min_backends: 2+</text>
+        </g>
+      </svg>
+      <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+    <!-- ═══ 7 · ADVERSARIAL ═══════════════════════════════════════════ -->
+    <section class="slide pattern focus" data-slide="7">
+      <header>MULTI-LLM ADVERSARIAL CONVERGENCE · STRATEGIES</header>
+      <h2 id="strategy-adversarial">adversarial</h2>
+      <blockquote><p><em>Researcher produces, Critic flags weaknesses, Arbitrator rules — three roles, three model families.</em></p></blockquote>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+        <defs>
+          <marker id="s6-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+          <marker id="s6-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+          <marker id="s6-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/></marker>
+          <marker id="s6-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+          <marker id="s6-warn"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#ff7b72"/></marker>
+          <filter id="s6-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <!-- RESEARCHER -->
+        <g transform="translate(20 80)" filter="url(#s6-shadow)">
+          <rect width="230" height="120" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">ROLE · RESEARCHER</text>
+          <text x="14" y="58" font-size="20" font-weight="600" fill="#e6edf3">Producer</text>
+          <text x="14" y="82" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">claude-cli</text>
+          <text x="14" y="102" font-size="11" fill="#7d8590">family · Claude</text>
+        </g>
+
+        <!-- CRITIC -->
+        <g transform="translate(340 80)" filter="url(#s6-shadow)">
+          <rect width="230" height="120" rx="6" fill="#0d1117" stroke="#ff7b72" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#ff7b72" letter-spacing="1.6">ROLE · CRITIC</text>
+          <text x="14" y="58" font-size="20" font-weight="600" fill="#e6edf3">Adversary</text>
+          <text x="14" y="82" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">codex-cli</text>
+          <text x="14" y="102" font-size="11" fill="#7d8590">family · GPT* (diff. RLHF)</text>
+        </g>
+
+        <!-- ARBITRATOR -->
+        <g transform="translate(660 80)" filter="url(#s6-shadow)">
+          <rect width="230" height="120" rx="6" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" letter-spacing="1.6">ROLE · ARBITRATOR</text>
+          <text x="14" y="58" font-size="20" font-weight="600" fill="#e6edf3">Judge</text>
+          <text x="14" y="82" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">gemini-cli</text>
+          <text x="14" y="102" font-size="11" fill="#7d8590">family · Gemini</text>
+        </g>
+
+        <!-- VERDICT -->
+        <g transform="translate(980 80)" filter="url(#s6-shadow)">
+          <rect width="280" height="120" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+          <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" letter-spacing="1.6">VERDICT</text>
+          <text x="14" y="58" font-size="18" font-weight="600" fill="#e6edf3">Keep · Revise · Reject</text>
+          <text x="14" y="82" font-size="11" fill="#b1bac4">decision recorded in</text>
+          <text x="14" y="100" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">audit_trail.jsonl</text>
+        </g>
+
+        <!-- FORWARD ARROWS -->
+        <path stroke="#22d3ee" stroke-width="1.5" fill="none" d="M 250 140 L 340 140" marker-end="url(#s6-cyan)"/>
+        <g transform="translate(295 128)">
+          <rect x="-30" y="-9" width="60" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+          <text x="0" y="3" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" text-anchor="middle" letter-spacing="1.4">CLAIM</text>
+        </g>
+
+        <path stroke="#ff7b72" stroke-width="1.5" fill="none" d="M 570 140 L 660 140" marker-end="url(#s6-warn)"/>
+        <g transform="translate(615 128)">
+          <rect x="-36" y="-9" width="72" height="16" rx="3" fill="#0d1117" stroke="#ff7b72" stroke-width="0.75"/>
+          <text x="0" y="3" font-family="JetBrains Mono, monospace" font-size="10" fill="#ff7b72" text-anchor="middle" letter-spacing="1.4">FLAGGED</text>
+        </g>
+
+        <path stroke="#7ee787" stroke-width="1.5" fill="none" d="M 890 140 L 980 140" marker-end="url(#s6-green)"/>
+        <g transform="translate(935 128)">
+          <rect x="-30" y="-9" width="60" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
+          <text x="0" y="3" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" text-anchor="middle" letter-spacing="1.4">RULING</text>
+        </g>
+
+        <!-- REVISE arc: ARBITRATOR → RESEARCHER (dashed amber loop below) -->
+        <path stroke="#f5a524" stroke-width="1.2" stroke-dasharray="4 4" fill="none"
+              d="M 775 200 C 775 290, 135 290, 135 200" marker-end="url(#s6-mute)"/>
+        <g transform="translate(455 295)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+          <rect x="-94" y="-9" width="188" height="16" rx="3" fill="#0d1117" stroke="#f5a524" stroke-width="0.75"/>
+          <text y="3" fill="#f5a524">REVISE ON REJECT · RETRY</text>
+        </g>
+
+        <!-- INVARIANT -->
+        <g transform="translate(20 342)">
+          <line x1="0" y1="0" x2="1240" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+          <text x="0" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">▸ INVARIANT — three roles must come from different model families · same RLHF ≠ independent critique · ~1.3× cost · min_backends: 2</text>
+        </g>
+      </svg>
+      <footer>github.com/josefigueredo/multillm-adversarial-convergence</footer>
+    </section>
+
+  </main>
+
+  <nav class="deck-controls" aria-label="Slide navigation">
+    <button id="btn-prev" aria-label="Previous slide">‹</button>
+    <span id="page-indicator">1 / 7</span>
+    <button id="btn-next" aria-label="Next slide">›</button>
+  </nav>
+
+  <script src="clean.js"></script>
+</body>
+</html>

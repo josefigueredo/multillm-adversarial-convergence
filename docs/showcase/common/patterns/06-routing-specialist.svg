@@ -61,14 +61,14 @@
   <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 240 250 L 290 250" marker-end="url(#ah-mute)"/>
 
   <!-- R → A,B,C (amber, fanning) -->
-  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 490 220 C 540 220, 540 106, 580 106" marker-end="url(#ah-cyan)"/>
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 490 250 C 540 220, 540 106, 580 106" marker-end="url(#ah-cyan)"/>
   <path stroke="#ff7b72" stroke-width="1.4" fill="none" d="M 490 250 L 580 246" marker-end="url(#ah-warn)"/>
-  <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 490 280 C 540 280, 540 386, 580 386" marker-end="url(#ah-green)"/>
+  <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 490 250 C 540 280, 540 386, 580 386" marker-end="url(#ah-green)"/>
 
   <!-- A,B,C → OUT (gray, converging) -->
-  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 860 106 C 940 106, 940 220, 1000 220" marker-end="url(#ah-cyan)"/>
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 860 106 C 940 106, 940 220, 1010 220" marker-end="url(#ah-cyan)"/>
   <path stroke="#ff7b72" stroke-width="1.4" fill="none" d="M 860 246 L 1000 250" marker-end="url(#ah-warn)"/>
-  <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 860 386 C 940 386, 940 280, 1000 280" marker-end="url(#ah-green)"/>
+  <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 860 386 C 940 386, 940 280, 1010 280" marker-end="url(#ah-green)"/>
 
   <!-- ─── INVARIANT FOOTER ─── -->
   <g transform="translate(40 450)" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">

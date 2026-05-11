@@ -94,7 +94,7 @@
   <path stroke="#7d8590" stroke-width="1.2" stroke-dasharray="4 4" fill="none"
         d="M 480 323 C 280 323, 130 323, 130 192" marker-end="url(#ah-mute)"/>
   <g transform="translate(330 332)">
-    <rect x="-58" y="-9" width="116" height="16" rx="3" fill="#0d1117" stroke="#7d8590" stroke-width="0.75"/>
+    <rect x="-75" y="-9" width="148" height="16" rx="3" fill="#0d1117" stroke="#7d8590" stroke-width="0.75"/>
     <text x="0" y="3" font-family="JetBrains Mono, monospace" font-size="10" fill="#b1bac4" text-anchor="middle" letter-spacing="1.4">RETRY · REGENERATE</text>
   </g>
 
