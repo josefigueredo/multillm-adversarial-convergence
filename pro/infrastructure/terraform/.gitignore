@@ -1,0 +1,7 @@
+.terraform/
+build/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# .terraform.lock.hcl IS committed — it pins provider versions for reproducibility.
