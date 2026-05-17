@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patterns Simulator · Multi-LLM Adversarial Convergence</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg-deep:        #0a0c10;
+      --bg-panel:       rgba(13, 17, 23, 0.78);
+      --bg-card:        rgba(13, 17, 23, 0.62);
+      --ink:            #e6edf3;
+      --ink-soft:       #b1bac4;
+      --ink-mute:       #7d8590;
+      --hairline:       rgba(230, 237, 243, 0.10);
+      --hairline-2:     rgba(230, 237, 243, 0.22);
+      --phosphor:       #f5a524;
+      --phosphor-cool:  #22d3ee;
+      --phosphor-green: #7ee787;
+      --phosphor-warn:  #ff7b72;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: var(--bg-deep);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+        radial-gradient(circle at 100% 0%, rgba(245,165,36,0.06), transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(34,211,238,0.04), transparent 50%);
+      background-attachment: fixed;
+      color: var(--ink);
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .frame {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 16px 20px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    /* HEADER — mirrors main grid (1.7fr · 1fr) so chips align under right column */
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
+      gap: 14px;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .brand::before { content: '◉ '; color: var(--phosphor); }
+    .brand strong { color: var(--phosphor); font-weight: 500; margin-left: 4px; }
+    .brand .pattern-name { color: var(--ink); font-weight: 500; margin-left: 4px; }
+
+    .topbar .meta-chips {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--ink-soft);
+      padding: 5px 8px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 6px;
+      background: rgba(13,17,23,0.5);
+      min-height: 38px;
+      overflow: hidden;
+    }
+    .chip-label {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--ink-mute);
+      line-height: 1.1;
+    }
+    .chip-value {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink);
+      letter-spacing: 0.04em;
+      margin-top: 2px;
+      width: 100%;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+    .chip-value strong { font-weight: 600; }
+    .chip.pat   .chip-value strong { color: var(--phosphor); }
+    .chip.role  .chip-value         { color: var(--phosphor-cool); }
+    .chip.cat[data-cat="Engine"]    .chip-value { color: var(--phosphor); }
+    .chip.cat[data-cat="Topology"]  .chip-value { color: var(--phosphor-cool); }
+    .chip.cat[data-cat="Guardrail"] .chip-value { color: var(--phosphor-warn); }
+
+    /* MAIN GRID — left flow card, right card-stack */
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
+      gap: 14px;
+      align-items: stretch;
+      min-height: 0;
+    }
+    main > .card.flow {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    main > .card-stack { min-height: 0; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--hairline);
+      border-radius: 8px;
+      padding: 12px 16px 14px;
+      backdrop-filter: blur(20px) saturate(1.3);
+      -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    }
+    .card .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--phosphor); margin: 0 0 8px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px;
+    }
+    .card .eyebrow .sub {
+      color: var(--ink-mute); font-weight: 400; letter-spacing: 0.1em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .card-stack {
+      display: grid;
+      gap: 10px;
+      grid-template-rows: 1.2fr 1.4fr 1.4fr;  /* prompt · events · output */
+      min-height: 0;
+    }
+    .card-stack > .card {
+      display: flex; flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .card-stack > .card > .scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+    }
+    .card-stack > .card > .scroll::-webkit-scrollbar { width: 6px; }
+    .card-stack > .card > .scroll::-webkit-scrollbar-thumb { background: var(--hairline-2); border-radius: 3px; }
+
+    /* PROMPT — mono, terminal flavor */
+    .prompt-body {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      line-height: 1.55;
+      color: var(--ink-soft);
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+    }
+    .prompt-meta {
+      margin-top: 8px;
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .prompt-meta span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 2px;
+      color: var(--phosphor-cool);
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      background: rgba(34, 211, 238, 0.06);
+    }
+
+    /* EVENT LOG — same convention as dashboard */
+    .events {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; line-height: 1.55;
+      padding: 2px 0;
+    }
+    .events .ev {
+      display: grid;
+      grid-template-columns: 44px 110px 1fr;
+      gap: 8px;
+      padding: 3px 4px;
+      border-left: 2px solid transparent;
+      transition: opacity 0.3s, color 0.3s, border-color 0.3s, background 0.3s;
+      opacity: 0.42;
+    }
+    .events .ev-ts    { color: var(--phosphor); font-weight: 500; }
+    .events .ev-role  { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .events .ev-text  { color: var(--ink-mute); }
+    .events .ev.done    { opacity: 1; border-left-color: rgba(126,231,135,0.45); }
+    .events .ev.done .ev-ts,
+    .events .ev.done .ev-role  { color: var(--phosphor-green); }
+    .events .ev.done .ev-text  { color: var(--ink-soft); }
+    .events .ev.current {
+      opacity: 1;
+      border-left-color: var(--phosphor);
+      background: rgba(245,165,36,0.06);
+    }
+    .events .ev.current .ev-ts    { color: var(--phosphor); }
+    .events .ev.current .ev-role  { color: var(--ink); font-weight: 600; }
+    .events .ev.current .ev-text  { color: var(--ink); }
+
+    /* CONTRACT OUTPUT — JSON */
+    .output-body {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--ink);
+      white-space: pre;
+      margin: 0;
+    }
+
+    /* SVG FLOW — inline original pattern SVG, animate IN it */
+    .flow .stage {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+      padding: 4px;
+    }
+    #flow-host {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #flow-host svg {
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      display: block;
+    }
+
+    /* Loaded-SVG node state — all node <g> get .pf-node tag at runtime.
+       Default: faded. Done: near-full. Active: full + glow + pulse. */
+    #flow-host g.pf-node {
+      opacity: 0.42;
+      transition: opacity 0.35s ease;
+    }
+    #flow-host g.pf-node.pf-done   { opacity: 0.85; }
+    #flow-host g.pf-node.pf-active { opacity: 1; }
+
+    /* Override the SVG's default node-shadow filter with a phosphor glow
+       on the active node. CSS filter wins over the SVG filter= attribute. */
+    #flow-host g.pf-node.pf-active {
+      filter:
+        drop-shadow(0 0 16px rgba(245, 165, 36, 0.90))
+        drop-shadow(0 0 4px  rgba(245, 165, 36, 0.55));
+    }
+    #flow-host g.pf-node.pf-done {
+      filter: drop-shadow(0 0 6px rgba(126, 231, 135, 0.30));
+    }
+
+    /* Thicken active node's stroke. SVGs declare stroke-width on each
+       shape, so we target them directly and override with !important. */
+    #flow-host g.pf-node.pf-active rect,
+    #flow-host g.pf-node.pf-active polygon,
+    #flow-host g.pf-node.pf-active ellipse {
+      stroke-width: 3 !important;
+      animation: pf-stroke-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pf-stroke-pulse {
+      0%, 100% { stroke-width: 2.4 !important; }
+      50%      { stroke-width: 3.6 !important; }
+    }
+
+    /* Marching ants on edges touching the active node — added at runtime
+       via .pf-edge-active. Tries to mirror the dashboard's state-machine
+       active-edge effect (flow-dash keyframe). */
+    @keyframes pf-edge-march {
+      to { stroke-dashoffset: -20; }
+    }
+    #flow-host path.pf-edge-active {
+      stroke-width: 2.5 !important;
+      stroke-dasharray: 6 4 !important;
+      animation: pf-edge-march 0.55s linear infinite;
+      filter: drop-shadow(0 0 6px rgba(245, 165, 36, 0.65));
+    }
+    /* Done edges (between done nodes) get a subtle green tint */
+    #flow-host path.pf-edge-done {
+      opacity: 0.9;
+    }
+    /* Faded paths (not yet traversed) */
+    #flow-host path.pf-edge {
+      transition: opacity 0.35s ease;
+    }
+    #flow-host path.pf-edge:not(.pf-edge-active):not(.pf-edge-done) {
+      opacity: 0.45;
+    }
+
+    /* BOTTOM RAIL — keyboard hint + pill player (mirrors dashboard) */
+    .bottom-rail {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
+      gap: 14px;
+      align-items: center;
+      padding-top: 6px;
+      border-top: 1px solid var(--hairline);
+    }
+    .hint {
+      text-align: left;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.14em;
+      color: var(--ink-mute); opacity: 0.7;
+      padding-top: 4px;
+    }
+    .hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 3px;
+      margin: 0 2px;
+      font-size: 9px;
+    }
+    footer.controls {
+      position: relative;
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 14px;
+      border-radius: 99px;
+      background: rgba(13, 17, 23, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--hairline-2);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink-soft);
+      z-index: 50;
+      width: 100%;
+      justify-content: space-between;
+    }
+    footer.controls button {
+      background: transparent;
+      border: 1px solid var(--hairline);
+      color: var(--ink);
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      display: grid; place-items: center;
+      transition: border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    footer.controls button:hover { border-color: var(--phosphor); color: var(--phosphor); }
+    footer.controls .scrub {
+      flex: 1 1 auto; min-width: 80px;
+      accent-color: var(--phosphor);
+    }
+    footer.controls .pos {
+      letter-spacing: 0.18em;
+      min-width: 42px; text-align: center;
+      font-size: 11px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    footer.controls .pos strong { color: var(--phosphor); font-weight: 600; }
+    footer.controls select {
+      background: transparent;
+      border: 1px solid var(--hairline-2);
+      color: var(--ink);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    /* Pattern picker — cap width so long names don't blow out the rail */
+    footer.controls .pattern-sel {
+      max-width: 160px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      flex-shrink: 1;
+    }
+    footer.controls .sep {
+      width: 1px; height: 18px; background: var(--hairline-2); margin: 0 2px;
+    }
+
+    /* Compact responsive fallback */
+    @media (max-width: 980px) {
+      .frame { height: auto; padding: 12px; }
+      main, .topbar, .bottom-rail { grid-template-columns: 1fr; }
+      .card-stack { grid-template-rows: auto auto auto; }
+      .flow .stage { min-height: 360px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+
+    <header class="topbar">
+      <div class="brand">
+        PATTERNS SIMULATOR · <strong id="brand-num">01</strong><span class="pattern-name" id="brand-name">Evaluator-Optimizer</span>
+      </div>
+      <div class="meta-chips">
+        <div class="chip pat">
+          <span class="chip-label">PATTERN</span>
+          <span class="chip-value"><strong id="chip-pat">01</strong> / <span id="chip-pat-total">11</span></span>
+        </div>
+        <div class="chip cat" id="chip-cat-wrap" data-cat="Engine">
+          <span class="chip-label">CATEGORY</span>
+          <span class="chip-value" id="chip-cat">Engine</span>
+        </div>
+        <div class="chip">
+          <span class="chip-label">STEP</span>
+          <span class="chip-value"><strong id="chip-step">0</strong> / <span id="chip-step-total">—</span></span>
+        </div>
+        <div class="chip role">
+          <span class="chip-label">ACTIVE ROLE</span>
+          <span class="chip-value" id="chip-role">—</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="card flow" id="flow-card" data-category="Engine">
+        <div class="eyebrow">▸ PATTERN FLOW <span class="sub" id="flow-sub">iterative propose-score-optimize loop</span></div>
+        <div class="stage">
+          <div id="flow-host" aria-label="Pattern flow"></div>
+        </div>
+      </section>
+
+      <aside class="card-stack">
+
+        <section class="card">
+          <div class="eyebrow">▸ PROMPT <span class="sub" id="prompt-sub">topic · constraints · contract</span></div>
+          <div class="scroll">
+            <pre class="prompt-body" id="prompt-text"></pre>
+            <div class="prompt-meta" id="meta-badges"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="eyebrow">▸ EVENT LOG <span class="sub" id="events-sub">role transitions</span></div>
+          <div class="scroll">
+            <div class="events" id="events"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="eyebrow">▸ CONTRACT OUTPUT <span class="sub">structured return</span></div>
+          <div class="scroll">
+            <pre class="output-body" id="contract-output"></pre>
+          </div>
+        </section>
+
+      </aside>
+    </main>
+
+    <div class="bottom-rail">
+      <div class="hint">
+        <kbd>←</kbd>/<kbd>→</kbd> step  ·  <kbd>Space</kbd>/<kbd>P</kbd> play  ·  <kbd>R</kbd> reset  ·  <kbd>[</kbd>/<kbd>]</kbd> prev/next pattern  ·  <kbd>Home</kbd>/<kbd>End</kbd> jump  ·  <kbd>1</kbd>–<kbd>4</kbd> speed
+      </div>
+      <footer class="controls">
+        <button id="btn-prev-pattern" title="previous pattern">«</button>
+        <button id="btn-prev"  title="previous step">‹</button>
+        <button id="btn-play"  title="play / pause">▶</button>
+        <button id="btn-next"  title="next step">›</button>
+        <button id="btn-next-pattern" title="next pattern">»</button>
+        <input type="range" class="scrub" id="scrub" min="0" value="0" />
+        <span class="pos"><strong id="pos-cur">0</strong> / <span id="pos-total">—</span></span>
+        <select id="pattern-sel" title="pattern" class="pattern-sel"></select>
+        <select id="speed-sel" title="playback speed">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+        </select>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ── DATA ────────────────────────────────────────────────────────
+    // Each pattern's flowMap[i] is the substring to search for in the
+    // node text content of the loaded SVG. Null = no node to highlight
+    // for that step (orchestrator-only or off-diagram).
+    const PATTERNS = [
+      {
+        id: "01-evaluator-optimizer",
+        name: "Evaluator-Optimizer",
+        category: "Engine",
+        svg: "01-evaluator-optimizer.svg",
+        caption: "Iterative propose-score-optimize loop",
+        prompt: [
+          "Run Evaluator-Optimizer for topic:",
+          '"Design an enterprise API Gateway strategy for REST and WebSocket workloads with migration controls and cost guardrails."',
+          "Threshold=0.8, max_iterations=4, required dimensions=cost/risk/rollout/observability.",
+          "Return final_candidate, final_score, iteration_log."
+        ].join("\n"),
+        badges: ["topic=valid", "threshold=0.80", "concurrency=sequential"],
+        timeline: [
+          { role: "ORCHESTRATOR", text: "Initialized rubric and stop conditions.", ts: "00:00" },
+          { role: "PROPOSER",     text: "Drafted candidate v1 with recommendation split by API type.", ts: "00:06" },
+          { role: "EVALUATOR",    text: "Score=0.63, missing rollback gates and observability.", ts: "00:11" },
+          { role: "OPTIMIZER",    text: "Injected phased rollout checkpoints and fallback policy.", ts: "00:16" },
+          { role: "EVALUATOR",    text: "Score=0.86, all required dimensions covered.", ts: "00:22" },
+          { role: "ORCHESTRATOR", text: "Decision=KEEP and emitted contract output.", ts: "00:24" }
+        ],
+        flowMap: [ null, "PRODUCER", "EVALUATOR", "DISCARD", "EVALUATOR", "KEEP" ],
+        output: {
+          final_candidate: "Default to HTTP API for stateless endpoints, retain REST for advanced transformation/auth paths, isolate WebSocket for bidirectional channels with phased migration and rollback gates.",
+          final_score: 0.86,
+          iteration_log: [
+            { iteration: 1, score: 0.63, action: "REVISE" },
+            { iteration: 2, score: 0.86, action: "KEEP" }
+          ]
+        }
+      },
+      {
+        id: "02-orchestrator-subagents",
+        name: "Orchestrator / Subagents",
+        category: "Topology",
+        svg: "04-orchestrator-subagents.svg",
+        caption: "One owner orchestrates narrow workers",
+        prompt: [
+          "Run Orchestrator/Subagents for topic:",
+          '"Produce an executive architecture recommendation for API Gateway selection in a multi-tenant platform."',
+          "Subagents=research/risk/synthesis; enforce no peer-to-peer calls.",
+          "Return findings, risks, recommendation, audit_log."
+        ].join("\n"),
+        badges: ["lifecycle=centralized", "workers=3", "contracts=strict"],
+        timeline: [
+          { role: "ORCHESTRATOR", text: "Defined phases and completion criteria.", ts: "00:00" },
+          { role: "RESEARCHER",   text: "Submitted findings on REST/HTTP/WebSocket fit.", ts: "00:07" },
+          { role: "CRITIC",       text: "Delivered migration and security risk list.", ts: "00:13" },
+          { role: "ORCHESTRATOR", text: "Validated contract and dispatched synthesis.", ts: "00:17" },
+          { role: "PROPOSER",     text: "Produced final memo with recommendation matrix.", ts: "00:21" },
+          { role: "ORCHESTRATOR", text: "Published audit trail per phase.", ts: "00:24" }
+        ],
+        flowMap: [ "ORCHESTRATOR", "BACKEND · A", "BACKEND · B", "ORCHESTRATOR", "BACKEND · C", "ORCHESTRATOR" ],
+        output: {
+          findings: [
+            "HTTP API for stateless endpoints offers 40% lower cost vs REST",
+            "REST API essential for legacy clients requiring advanced auth chains",
+            "WebSocket required for <100ms; isolate to dedicated broker"
+          ],
+          risks: [{ risk: "Tenant isolation breach via stateful WebSocket", mitigation: "Per-request tenant ID validation + connection tag isolation" }],
+          recommendation: "Hybrid: HTTP API default, REST for transformation paths, isolate WebSocket",
+          audit_log: [{ phase: "research", status: "complete" }, { phase: "critique", status: "complete" }, { phase: "synthesis", status: "complete" }]
+        }
+      },
+      {
+        id: "03-parallelization-ensemble",
+        name: "Parallelization (Ensemble)",
+        category: "Topology",
+        svg: "07-parallel-ensemble.svg",
+        caption: "Fan-out responses, fan-in with judge",
+        prompt: [
+          "Run Parallelization/Ensemble for topic:",
+          '"Recommend API Gateway architecture with explicit cost, reliability, and operational tradeoffs."',
+          "Workers=3 lenses (cost, architecture, operations), judge merges final.",
+          "Return candidates_by_worker, ranking, final_ensemble_answer."
+        ].join("\n"),
+        badges: ["fanout=3", "judge=enabled", "concurrency=parallel"],
+        timeline: [
+          { role: "ORCHESTRATOR", text: "Broadcasted same prompt to 3 workers.", ts: "00:00" },
+          { role: "SPECIALIST",   text: "Worker(cost) returned TCO-focused recommendation.", ts: "00:05" },
+          { role: "SPECIALIST",   text: "Worker(architecture) returned compatibility matrix.", ts: "00:09" },
+          { role: "SPECIALIST",   text: "Worker(operations) returned migration playbook.", ts: "00:14" },
+          { role: "JUDGE",        text: "Scored outputs and synthesized best-of-ensemble.", ts: "00:20" },
+          { role: "ORCHESTRATOR", text: "Emitted merged answer with disagreement notes.", ts: "00:23" }
+        ],
+        flowMap: [ "TASK", "BACKEND · A", "BACKEND · B", "BACKEND · C", "JUDGE", "OUTCOME" ],
+        output: {
+          candidates_by_worker: { cost_lens: "HTTP API + reserved capacity", architecture_lens: "REST + HTTP/2 dual deployment", operations_lens: "Phased canary 5%→25%→50%→100%" },
+          ranking: [{ worker: "architecture_lens", score: 0.88 }, { worker: "operations_lens", score: 0.85 }, { worker: "cost_lens", score: 0.8 }],
+          final_ensemble_answer: "HTTP API default + REST for advanced paths, 4-week canary gates, $X cost cap per tenant",
+          disagreement_notes: ["Cost lens prioritized savings; architecture lens balanced cost and compatibility."]
+        }
+      },
+      {
+        id: "04-prompt-chaining-serial",
+        name: "Prompt Chaining (Serial)",
+        category: "Topology",
+        svg: "08-prompt-chaining-serial.svg",
+        caption: "Stage output feeds next stage",
+        prompt: [
+          "Run Prompt Chaining/Serial for topic:",
+          '"Create a migration decision memo from analysis to critique to final synthesis."',
+          "Stages=research→critique→synthesis. Preserve assumptions and unresolved risks.",
+          "Return stage_1_output, stage_2_output, final_decision_memo."
+        ].join("\n"),
+        badges: ["stages=3", "handoff=strict", "lossless-context=true"],
+        timeline: [
+          { role: "ORCHESTRATOR", text: "Initialized serial chain with stage contracts.", ts: "00:00" },
+          { role: "RESEARCHER",   text: "Stage1 produced baseline analysis and assumptions.", ts: "00:06" },
+          { role: "CRITIC",       text: "Stage2 injected missing constraints and risk gaps.", ts: "00:12" },
+          { role: "PROPOSER",     text: "Stage3 synthesized final decision memo.", ts: "00:18" },
+          { role: "ORCHESTRATOR", text: "Validated assumption continuity across stages.", ts: "00:22" }
+        ],
+        flowMap: [ "INPUT", "STAGE · 1", "STAGE · 2", "STAGE · 3", null ],
+        output: {
+          stage_1_output: "Analysis: HTTP API achieves 60% cost reduction; REST retains 15% of workloads",
+          stage_2_output: "Critique: Missing rollback SLA, no compliance gating for PII",
+          final_decision_memo: "Proceed with phased migration (4 weeks), $X monthly cap, SOC2 pre-cutover"
+        }
+      },
+      {
+        id: "05-routing-specialist-dispatch",
+        name: "Routing / Specialist Dispatch",
+        category: "Topology",
+        svg: "06-routing-specialist.svg",
+        caption: "Router dispatches to best specialist",
+        prompt: [
+          "Run Routing/Specialist Dispatch for request:",
+          '"How should we harden API auth, throttling, and tenant isolation?"',
+          "Route by dimension and confidence; fallback if confidence < 0.65.",
+          "Return route_decision, specialist_answer, fallback_used."
+        ].join("\n"),
+        badges: ["router=active", "confidence=0.91", "fallback=false"],
+        timeline: [
+          { role: "ORCHESTRATOR", text: "Started routing workflow.", ts: "00:00" },
+          { role: "ROUTER",       text: "Classified request as security (confidence 0.91).", ts: "00:04" },
+          { role: "SPECIALIST",   text: "Security specialist returned control matrix.", ts: "00:09" },
+          { role: "ORCHESTRATOR", text: "Attached route rationale and metadata.", ts: "00:13" }
+        ],
+        flowMap: [ "REQUEST", "ROUTER", "PERSONA · PRECISION", "OUTCOME" ],
+        output: {
+          route_decision: "Cost optimization specialist (confidence: 0.92)",
+          specialist_answer: "Reserved capacity model: commit 60% baseline (30% annual savings), throttle at 110%",
+          fallback_used: false
+        }
+      },
+      {
+        id: "06-adversarial-critique",
+        name: "Adversarial Critique",
+        category: "Guardrail",
+        svg: "09-adversarial-critique.svg",
+        caption: "Researcher vs critic with arbitrator",
+        prompt: [
+          "Run Adversarial Critique for topic:",
+          '"Should we migrate all existing REST APIs to HTTP API immediately?"',
+          "Perform one full round: proposal→critique→rebuttal→arbitration.",
+          "Return proposal, critique, rebuttal, arbitration_decision."
+        ].join("\n"),
+        badges: ["debate-rounds=1", "severity=8", "decision=REVISE"],
+        timeline: [
+          { role: "RESEARCHER",   text: "Proposed immediate migration for all REST endpoints.", ts: "00:00" },
+          { role: "CRITIC",       text: "Flagged feature parity gaps (severity 8/10).", ts: "00:06" },
+          { role: "RESEARCHER",   text: "Rebutted with phased migration and exclusion rules.", ts: "00:12" },
+          { role: "ARBITRATOR",   text: "Decision=REVISE before approval.", ts: "00:16" },
+          { role: "ORCHESTRATOR", text: "Recorded critique and decision in audit output.", ts: "00:18" }
+        ],
+        flowMap: [ "RESEARCHER", "CRITIC", "RESEARCHER", "ARBITRATOR", "VERDICT" ],
+        output: {
+          proposal: "Immediate full migration REST→HTTP API",
+          critique: "Severity 8: ignores transformation edge cases, no rollback gate",
+          rebuttal: "Phased 4-week migration with per-service criticality gates",
+          arbitration_decision: "REVISE — phased approach reduces blast radius"
+        }
+      },
+      {
+        id: "07-llm-as-judge",
+        name: "LLM-as-Judge",
+        category: "Engine",
+        svg: "02-llm-as-judge.svg",
+        caption: "Independent judge scores candidates",
+        prompt: [
+          "Run LLM-as-Judge for topic:",
+          '"Rank two architecture recommendations for API Gateway modernization."',
+          "Rubric=coverage/correctness/actionability/constraints; no self-scoring.",
+          "Return candidate_set, judge_scores, selected_answer, judge_rationale."
+        ].join("\n"),
+        badges: ["candidates=2", "judge=separate", "winner=producer_b"],
+        timeline: [
+          { role: "PROPOSER",     text: "Producer A returned concise recommendation.", ts: "00:00" },
+          { role: "PROPOSER",     text: "Producer B returned comprehensive strategy.", ts: "00:05" },
+          { role: "JUDGE",        text: "Scored A=0.71, B=0.89 and selected B.", ts: "00:12" },
+          { role: "ORCHESTRATOR", text: "Published ranking and rationale.", ts: "00:15" }
+        ],
+        flowMap: [ "PRODUCER", "ARTIFACT", "JUDGE", "SCORE" ],
+        output: {
+          candidate_set: ["Candidate A: HTTP default, 3-month migration", "Candidate B: Hybrid HTTP/REST, 6-week phased"],
+          judge_scores: [0.71, 0.89],
+          selected_answer: "Candidate B",
+          judge_rationale: "Candidate B addresses compliance pre-checks and cost anomaly detection"
+        }
+      },
+      {
+        id: "08-reflection-self-compression",
+        name: "Reflection / Self-Compression",
+        category: "Engine",
+        svg: "03-reflection-compression.svg",
+        caption: "Periodic context distillation",
+        prompt: [
+          "Run Reflection/Self-Compression for topic:",
+          '"Collect and compress findings from 8 iterations of API strategy research."',
+          "compression_interval=3; keep high-signal facts and unresolved risks.",
+          "Return raw_iteration_log, compressed_memory, dropped_items_reason."
+        ].join("\n"),
+        badges: ["iterations=8", "compression=every3", "token-trim=46%"],
+        timeline: [
+          { role: "ORCHESTRATOR", text: "Started long-run collection loop.", ts: "00:00" },
+          { role: "RESEARCHER",   text: "Accumulated findings through iteration 3.", ts: "00:07" },
+          { role: "REFLECTOR",    text: "Compressed corpus v1 and removed duplicates.", ts: "00:11" },
+          { role: "RESEARCHER",   text: "Accumulated findings through iteration 6.", ts: "00:18" },
+          { role: "REFLECTOR",    text: "Compressed corpus v2 preserving unresolved risks.", ts: "00:22" },
+          { role: "ORCHESTRATOR", text: "Emitted compressed memory artifact.", ts: "00:25" }
+        ],
+        flowMap: [ "ITER", "ITER", "COMPRESS", "ITER", "COMPRESS", null ],
+        output: {
+          raw_iteration_log: ["I1: HTTP API cost", "I2: REST retention", "I3: WebSocket isolation", "I4: Compliance gating", "I5: Rollback SLA", "I6: Cost cap", "I7: Canary gates", "I8: Audit trail"],
+          compressed_memory: "HTTP default (60% cost savings), retain REST 15% transformation, isolate WebSocket, phased 4-week rollout with $X/tenant cap",
+          dropped_items_reason: "Dropped: tool selection debates (low signal); retained: cost drivers, compliance, rollout gates"
+        }
+      },
+      {
+        id: "09-tool-use-sandboxed-execution",
+        name: "Tool Use + Sandboxed Execution",
+        category: "Guardrail",
+        svg: "10-tool-use-sandbox.svg",
+        caption: "Policy-gated tool execution",
+        prompt: [
+          "Run Tool Use + Sandboxed Execution for task:",
+          '"Generate migration notes and write report to sandbox workspace only."',
+          "Allowed=Read,Grep,Glob,Write(sandbox/*); deny destructive commands.",
+          "Return tool_intents, policy_decisions, execution_results, audit_events."
+        ].join("\n"),
+        badges: ["intents=3", "denied=1", "sandbox=enforced"],
+        timeline: [
+          { role: "ORCHESTRATOR",     text: "Initialized policy guardrails.", ts: "00:00" },
+          { role: "PROPOSER",         text: "Planned intents: read, write report.md, rm -rf /tmp.", ts: "00:05" },
+          { role: "POLICY_ENFORCER",  text: "Allowed read/write, denied destructive shell intent.", ts: "00:11" },
+          { role: "SANDBOX_EXECUTOR", text: "Executed approved intents inside sandbox boundary.", ts: "00:16" },
+          { role: "ORCHESTRATOR",     text: "Published audit events tool_allowed/denied/executed.", ts: "00:19" }
+        ],
+        flowMap: [ "AGENT", "TOOL CALL", "CAPABILITY REGISTRY", "✓ EXECUTE", "EVIDENCE" ],
+        output: {
+          tool_intents: ["Read migration analysis", "Grep for cost figures", "Write migration_report.md"],
+          policy_decisions: ["ALLOW Read(*)", "ALLOW Grep(*)", "DENY Write(/root) — enforce sandbox/*"],
+          execution_results: ["migration_report.md: 2.4KB written", "Grep found 14 cost references", "Read succeeded for 3 files"],
+          audit_events: [{ action: "WRITE", path: "sandbox/migration_report.md", status: "allowed" }]
+        }
+      },
+      {
+        id: "10-multi-agent-role-topology",
+        name: "Multi-Agent Role Topology",
+        category: "Topology",
+        svg: "05-role-topology.svg",
+        caption: "Role map decoupled from backend selection",
+        prompt: [
+          "Run Multi-Agent Role Topology for scenario:",
+          '"Map researcher/critic/judge/utility roles for cross-model architecture evaluation."',
+          "Validate required roles and execute by role contracts.",
+          "Return role_map, role_execution_log, final_artifact."
+        ].join("\n"),
+        badges: ["roles=4", "validation=passed", "backend-swappable=true"],
+        timeline: [
+          { role: "TOPOLOGY_MANAGER", text: "Constructed role→backend map.", ts: "00:00" },
+          { role: "ORCHESTRATOR",     text: "Validated required roles are complete.", ts: "00:04" },
+          { role: "ROLE_RUNNER",      text: "Executed workflow by role contracts only.", ts: "00:10" },
+          { role: "ORCHESTRATOR",     text: "Published final artifact with provenance.", ts: "00:14" }
+        ],
+        flowMap: [ "ROLE · ARRAY", "ROLE", "BACKEND", "ROLE · ARRAY" ],
+        output: {
+          role_map: { RESEARCHER: "Gathers API Gateway facts", CRITIC: "Identifies risks", JUDGE: "Scores recommendations", ORCHESTRATOR: "Routes and validates" },
+          role_execution_log: [{ role: "RESEARCHER", status: "complete" }, { role: "CRITIC", status: "complete" }, { role: "JUDGE", status: "complete", winner: "Hybrid approach" }],
+          final_artifact: "Hybrid HTTP+REST+WebSocket with phased migration"
+        }
+      },
+      {
+        id: "11-human-in-the-loop-hitl",
+        name: "Human-in-the-Loop (HITL)",
+        category: "Guardrail",
+        svg: "11-human-in-the-loop.svg",
+        caption: "Approval gate before critical transition",
+        prompt: [
+          "Run HITL gate for transition:",
+          '"research_to_synthesis" with action "publish enterprise recommendation".',
+          "Require explicit operator decision APPROVE or ABORT.",
+          "Return approval_request, operator_decision, gate_event, continuation_status."
+        ].join("\n"),
+        badges: ["gate=required", "operator=approved", "audit=recorded"],
+        timeline: [
+          { role: "ORCHESTRATOR", text: "Raised approval request for phase transition.", ts: "00:00" },
+          { role: "OPERATOR",     text: "Reviewed risk summary and evidence packet.", ts: "00:08" },
+          { role: "OPERATOR",     text: "Decision=APPROVE with rationale attached.", ts: "00:13" },
+          { role: "ORCHESTRATOR", text: "Recorded hitl_approved and continued workflow.", ts: "00:17" }
+        ],
+        flowMap: [ "HITL GATE", "OPERATOR REVIEW", "✓ APPROVE", "PHASE · N+1" ],
+        output: {
+          approval_request: "Publish enterprise recommendation to stakeholders",
+          operator_decision: "APPROVE",
+          gate_event: "hitl_approved",
+          continuation_status: "continue"
+        }
+      }
+    ];
+
+    // ── DOM ─────────────────────────────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+    const PAD = (n) => String(n).padStart(2, '0');
+
+    // ── SVG LOADER & HIGHLIGHTER ────────────────────────────────────
+    // The pattern SVGs at common/patterns/*.svg are bespoke conceptual
+    // diagrams with proper shapes per element (rect for nodes, polygon
+    // for decision diamonds, ellipse for outcomes). We preserve them
+    // verbatim and animate IN them by:
+    //   1) fetching the SVG and injecting it inline (so we can mutate
+    //      its DOM and apply CSS to its children)
+    //   2) tagging each "node" <g> (those with a filter="url(#node-shadow)"
+    //      shadow wrapper) with a .pf-node class + data-tokens attribute
+    //      holding its uppercase text content
+    //   3) on step change, looking up the active node via the pattern's
+    //      flowMap[stepIdx] token (substring of the node's text), and
+    //      applying .pf-active (glow + pulse). Previous steps' matched
+    //      nodes get .pf-done.
+    //   4) for edges: any <path> whose endpoint sits within the active
+    //      node's bounding box and whose start sits within the previous
+    //      step's node bounding box gets .pf-edge-active (marching ants).
+
+    const svgCache = {};                  // svgFilename -> raw text
+    let currentNodes = [];                // [{el, tokens}] for current SVG
+    let currentEdges = [];                // [{el, x1, y1, x2, y2}] for current SVG
+
+    async function loadSvg(filename) {
+      if (svgCache[filename]) return svgCache[filename];
+      const res = await fetch(`../common/patterns/${filename}`, { cache: 'force-cache' });
+      if (!res.ok) throw new Error(`Failed to load ${filename}: ${res.status}`);
+      const text = await res.text();
+      svgCache[filename] = text;
+      return text;
+    }
+
+    function inlineSvg(host, svgText) {
+      host.innerHTML = svgText;
+      const svg = host.querySelector('svg');
+      if (!svg) return null;
+      // Constrain to host without distorting
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      return svg;
+    }
+
+    function annotateSvg(svg) {
+      // Nodes = top-level <g> with filter="url(#node-shadow)". These
+      // wrap the actual rect/polygon/ellipse + their text labels.
+      currentNodes = [];
+      const nodeGroups = svg.querySelectorAll('g[filter*="node-shadow"]');
+      nodeGroups.forEach((g) => {
+        g.classList.add('pf-node');
+        // Collect concatenated text content (uppercased) — that's what
+        // flowMap entries will match against.
+        const tokens = g.textContent.replace(/\s+/g, ' ').trim().toUpperCase();
+        g.setAttribute('data-tokens', tokens);
+        currentNodes.push({ el: g, tokens });
+      });
+
+      // Edges = top-level <path> elements (not marker/def paths).
+      // We tag them and lazily resolve their endpoints during highlight
+      // (because getCTM() requires the element to be laid out, which is
+      // only reliable after the SVG is in the DOM).
+      currentEdges = [];
+      const paths = svg.querySelectorAll('path');
+      paths.forEach((p) => {
+        if (p.closest('marker, defs')) return;
+        const d = p.getAttribute('d') || '';
+        const nums = (d.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+        if (nums.length < 4) return;
+        p.classList.add('pf-edge');
+        currentEdges.push({
+          el: p,
+          // Raw user-space endpoints; resolved to viewport on demand
+          ux1: nums[0], uy1: nums[1],
+          ux2: nums[nums.length - 2], uy2: nums[nums.length - 1],
+        });
+      });
+    }
+
+    // Convert raw path endpoints (user-space, from the `d` attribute)
+    // to viewport coords using the path's CTM. Run on demand because
+    // CTMs require layout.
+    function edgeEndpointsViewport(edge) {
+      const svg = edge.el.ownerSVGElement;
+      const m = edge.el.getCTM();
+      if (!svg || !m) return { x1: edge.ux1, y1: edge.uy1, x2: edge.ux2, y2: edge.uy2 };
+      const pt = svg.createSVGPoint();
+      pt.x = edge.ux1; pt.y = edge.uy1;
+      const a = pt.matrixTransform(m);
+      pt.x = edge.ux2; pt.y = edge.uy2;
+      const b = pt.matrixTransform(m);
+      return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+    }
+
+    function findNodeByToken(token) {
+      if (!token) return null;
+      const upper = token.toUpperCase();
+      // Try exact-substring match; fall back to first node whose tokens
+      // contain every word in `upper` (handles "BACKEND · A" vs token text)
+      let match = currentNodes.find((n) => n.tokens.includes(upper));
+      if (match) return match.el;
+      const words = upper.split(/\s+/).filter(Boolean);
+      match = currentNodes.find((n) => words.every((w) => n.tokens.includes(w)));
+      return match ? match.el : null;
+    }
+
+    // Node-bbox in the SVG's user coordinate system (i.e. the same
+    // coordinates that path `d` attributes use). getBBox() alone gives
+    // local coords ignoring any <g transform="translate(…)"> wrappers,
+    // so we composite with the element's CTM relative to the owning svg.
+    function bboxOf(nodeEl) {
+      try {
+        const b = nodeEl.getBBox();
+        const svg = nodeEl.ownerSVGElement;
+        if (!svg) return b;
+        // Transform from the element's local coords to the SVG root
+        const m = nodeEl.getCTM();
+        if (!m) return b;
+        const corners = [
+          { x: b.x,            y: b.y },
+          { x: b.x + b.width,  y: b.y },
+          { x: b.x,            y: b.y + b.height },
+          { x: b.x + b.width,  y: b.y + b.height },
+        ].map((p) => ({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f }));
+        const xs = corners.map((p) => p.x);
+        const ys = corners.map((p) => p.y);
+        return {
+          x: Math.min(...xs), y: Math.min(...ys),
+          width:  Math.max(...xs) - Math.min(...xs),
+          height: Math.max(...ys) - Math.min(...ys),
+        };
+      } catch (_) { return null; }
+    }
+    function pointInBox(x, y, box, slack = 6) {
+      if (!box) return false;
+      return x >= box.x - slack && x <= box.x + box.width + slack
+          && y >= box.y - slack && y <= box.y + box.height + slack;
+    }
+
+    async function loadPatternSvg(pattern) {
+      const flowCard = $('flow-card');
+      flowCard.setAttribute('data-category', pattern.category);
+      $('flow-sub').textContent = pattern.caption;
+      const host = $('flow-host');
+      host.innerHTML = '<div style="color:var(--ink-mute);font-family:JetBrains Mono,monospace;font-size:11px;letter-spacing:0.16em;">loading…</div>';
+      try {
+        const text = await loadSvg(pattern.svg);
+        const svg = inlineSvg(host, text);
+        if (!svg) throw new Error('SVG parse failed');
+        annotateSvg(svg);
+      } catch (err) {
+        host.innerHTML = `<div style="color:var(--phosphor-warn);font-family:JetBrains Mono,monospace;font-size:11px;">SVG load error: ${err.message}</div>`;
+        currentNodes = [];
+        currentEdges = [];
+      }
+    }
+
+    function highlightFlow(pattern, stepIdx) {
+      // Reset all
+      currentNodes.forEach((n) => n.el.classList.remove('pf-active', 'pf-done'));
+      currentEdges.forEach((e) => e.el.classList.remove('pf-edge-active', 'pf-edge-done'));
+
+      if (!currentNodes.length) return;
+
+      // Resolve done set (deduped) and active node for this step
+      const doneNodes = new Set();
+      for (let i = 0; i < stepIdx; i++) {
+        const tok = pattern.flowMap?.[i];
+        const node = findNodeByToken(tok);
+        if (node) doneNodes.add(node);
+      }
+      const activeNode = findNodeByToken(pattern.flowMap?.[stepIdx]);
+      const prevActiveNode = findNodeByToken(pattern.flowMap?.[stepIdx - 1]);
+
+      doneNodes.forEach((n) => n.classList.add('pf-done'));
+      if (activeNode) {
+        activeNode.classList.add('pf-active');
+        activeNode.classList.remove('pf-done');
+      }
+
+      // Edge highlight: find a path whose endpoint sits in activeNode's
+      // bbox AND whose start sits in prevActiveNode's bbox. Mark it
+      // active (marching ants).
+      const edgeBetween = (fromNode, toNode) => {
+        const aBox = bboxOf(toNode);
+        const pBox = bboxOf(fromNode);
+        if (!aBox || !pBox) return null;
+        // Slack scales with bbox size — bigger boxes need a bit more slack
+        const slack = Math.max(8, Math.min(aBox.width, aBox.height) * 0.15);
+        for (const e of currentEdges) {
+          const pts = edgeEndpointsViewport(e);
+          const startInPrev = pointInBox(pts.x1, pts.y1, pBox, slack);
+          const endInActive = pointInBox(pts.x2, pts.y2, aBox, slack);
+          const reverse = pointInBox(pts.x2, pts.y2, pBox, slack) && pointInBox(pts.x1, pts.y1, aBox, slack);
+          if ((startInPrev && endInActive) || reverse) return e;
+        }
+        return null;
+      };
+
+      if (activeNode && prevActiveNode && activeNode !== prevActiveNode) {
+        const found = edgeBetween(prevActiveNode, activeNode);
+        if (found) found.el.classList.add('pf-edge-active');
+      }
+
+      // Mark "done" edges: between consecutive done nodes
+      let lastDone = null;
+      for (let i = 0; i <= stepIdx - 1; i++) {
+        const node = findNodeByToken(pattern.flowMap?.[i]);
+        if (!node) continue;
+        if (lastDone && lastDone !== node) {
+          const found = edgeBetween(lastDone, node);
+          if (found && !found.el.classList.contains('pf-edge-active')) {
+            found.el.classList.add('pf-edge-done');
+          }
+        }
+        lastDone = node;
+      }
+    }
+
+    // ── PROMPT / EVENTS / OUTPUT ────────────────────────────────────
+    function renderPrompt(pattern) {
+      $('prompt-text').textContent = pattern.prompt;
+      const meta = $('meta-badges');
+      meta.innerHTML = '';
+      const base = [`pattern=${pattern.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, `category=${pattern.category.toLowerCase()}`];
+      [...base, ...pattern.badges].forEach((tag) => {
+        const s = document.createElement('span');
+        s.textContent = tag;
+        meta.appendChild(s);
+      });
+    }
+
+    function renderEvents(pattern, stepIdx) {
+      const list = $('events');
+      list.innerHTML = '';
+      pattern.timeline.forEach((ev, i) => {
+        const div = document.createElement('div');
+        div.className = 'ev' + (i < stepIdx ? ' done' : (i === stepIdx ? ' current' : ''));
+        div.innerHTML =
+          `<span class="ev-ts">${ev.ts}</span>` +
+          `<span class="ev-role">[${ev.role}]</span>` +
+          `<span class="ev-text">${ev.text}</span>`;
+        list.appendChild(div);
+      });
+      // Scroll current into view if log is tall enough to overflow
+      const cur = list.querySelector('.ev.current');
+      if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    function renderOutput(pattern) {
+      $('contract-output').textContent = JSON.stringify(pattern.output, null, 2);
+    }
+
+    function renderChips(pattern, stepIdx) {
+      const step = pattern.timeline[stepIdx];
+      $('chip-pat').textContent = PAD(currentPatternIdx + 1);
+      $('chip-pat-total').textContent = PATTERNS.length;
+      $('chip-cat').textContent = pattern.category;
+      $('chip-cat-wrap').setAttribute('data-cat', pattern.category);
+      $('chip-step').textContent = stepIdx + 1;
+      $('chip-step-total').textContent = pattern.timeline.length;
+      $('chip-role').textContent = step ? step.role : '—';
+      $('brand-num').textContent = PAD(currentPatternIdx + 1);
+      $('brand-name').textContent = pattern.name;
+      $('events-sub').textContent = `${pattern.timeline.length} steps · ${[...new Set(pattern.timeline.map(t => t.role))].length} roles`;
+    }
+
+    // ── STATE ───────────────────────────────────────────────────────
+    let currentPatternIdx = 0;
+    let position = 0;
+    let isPlaying = false;
+    let playTimer = null;
+    let speed = 1;
+    const BASE_FRAME_MS = 1400;
+
+    function currentPattern() { return PATTERNS[currentPatternIdx]; }
+
+    function renderAll(stepIdx) {
+      const p = currentPattern();
+      stepIdx = Math.max(0, Math.min(p.timeline.length - 1, stepIdx));
+      position = stepIdx;
+      renderChips(p, stepIdx);
+      highlightFlow(p, stepIdx);
+      renderEvents(p, stepIdx);
+      $('pos-cur').textContent = stepIdx + 1;
+      $('pos-total').textContent = p.timeline.length;
+      $('scrub').max = p.timeline.length - 1;
+      $('scrub').value = stepIdx;
+    }
+
+    async function rebuild(patternIdx) {
+      stop();
+      currentPatternIdx = ((patternIdx % PATTERNS.length) + PATTERNS.length) % PATTERNS.length;
+      const p = currentPattern();
+      $('pattern-sel').value = String(currentPatternIdx);
+      renderPrompt(p);
+      renderOutput(p);
+      await loadPatternSvg(p);
+      renderAll(0);
+    }
+
+    function go(idx)   { renderAll(idx); }
+    function next()    { if (position < currentPattern().timeline.length - 1) go(position + 1); else stop(); }
+    function prev()    { if (position > 0) go(position - 1); }
+    function reset()   { stop(); go(0); }
+
+    function play() {
+      if (isPlaying) return;
+      isPlaying = true;
+      $('btn-play').textContent = '⏸';
+      const tick = () => {
+        if (!isPlaying) return;
+        if (position >= currentPattern().timeline.length - 1) { stop(); return; }
+        next();
+        playTimer = setTimeout(tick, BASE_FRAME_MS / speed);
+      };
+      tick();
+    }
+    function stop() {
+      isPlaying = false;
+      $('btn-play').textContent = '▶';
+      clearTimeout(playTimer);
+    }
+
+    // ── BIND ────────────────────────────────────────────────────────
+    function bind() {
+      // Pattern select dropdown — populate
+      const sel = $('pattern-sel');
+      PATTERNS.forEach((p, i) => {
+        const o = document.createElement('option');
+        o.value = String(i);
+        o.textContent = `${PAD(i + 1)} · ${p.name}`;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', (e) => rebuild(Number(e.target.value)));
+
+      $('btn-prev-pattern').addEventListener('click', () => rebuild(currentPatternIdx - 1));
+      $('btn-next-pattern').addEventListener('click', () => rebuild(currentPatternIdx + 1));
+      $('btn-prev').addEventListener('click', () => { stop(); prev(); });
+      $('btn-next').addEventListener('click', () => { stop(); next(); });
+      $('btn-play').addEventListener('click', () => isPlaying ? stop() : play());
+      $('scrub').addEventListener('input', (e) => { stop(); go(parseInt(e.target.value, 10)); });
+      $('speed-sel').addEventListener('change', (e) => { speed = parseFloat(e.target.value); });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.target.matches('input, textarea, select')) return;
+        switch (e.key) {
+          case 'ArrowRight':
+          case ' ':
+            e.preventDefault(); stop(); next(); break;
+          case 'ArrowLeft':
+            e.preventDefault(); stop(); prev(); break;
+          case 'p': case 'P':
+            e.preventDefault(); isPlaying ? stop() : play(); break;
+          case 'r': case 'R':
+            e.preventDefault(); reset(); break;
+          case 'Home':
+            e.preventDefault(); stop(); go(0); break;
+          case 'End':
+            e.preventDefault(); stop(); go(currentPattern().timeline.length - 1); break;
+          case '[':
+            e.preventDefault(); rebuild(currentPatternIdx - 1); break;
+          case ']':
+            e.preventDefault(); rebuild(currentPatternIdx + 1); break;
+          case '1': speed = 0.5; $('speed-sel').value = '0.5'; break;
+          case '2': speed = 1;   $('speed-sel').value = '1';   break;
+          case '3': speed = 2;   $('speed-sel').value = '2';   break;
+          case '4': speed = 4;   $('speed-sel').value = '4';   break;
+        }
+      });
+    }
+
+    bind();
+    rebuild(0);
+  </script>
+</body>
+</html>
