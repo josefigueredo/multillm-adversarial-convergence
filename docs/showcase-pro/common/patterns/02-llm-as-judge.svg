@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 480" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+  <!-- PALETTE: panel #0d1117 · ink #e6edf3 · soft #b1bac4 · mute #7d8590 · amber #f5a524 · cyan #22d3ee · green #7ee787 · warn #ff7b72
+       LAYOUT — Producer/Candidate on left, scoring fork in middle (heuristic 40% top lane, judge 60% bottom lane), composite score on right.
+                Two non-crossing lanes guarantee no overlap regardless of label widths. -->
+  <defs>
+    <marker id="ah-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+    <marker id="ah-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+    <marker id="ah-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/></marker>
+    <marker id="ah-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+    <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Producer · Candidate (left column) -->
+  <g transform="translate(40 180)" filter="url(#node-shadow)">
+    <rect width="200" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">PRODUCER</text>
+    <text x="14" y="50" font-size="17" font-weight="600" fill="#e6edf3">Generator</text>
+    <text x="14" y="74" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">claude-cli</text>
+  </g>
+
+  <g transform="translate(290 180)" filter="url(#node-shadow)">
+    <rect width="200" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">ARTIFACT</text>
+    <text x="14" y="50" font-size="17" font-weight="600" fill="#e6edf3">Candidate</text>
+    <text x="14" y="74" font-size="11" fill="#b1bac4">output + claims</text>
+  </g>
+
+  <!-- TOP LANE — Heuristic 40% (cyan) -->
+  <g transform="translate(580 60)" filter="url(#node-shadow)">
+    <rect width="280" height="92" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">DETERMINISTIC · 40 %</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Heuristic scorer</text>
+    <text x="14" y="72" font-size="11" fill="#b1bac4">target · citations · structure</text>
+  </g>
+
+  <!-- BOTTOM LANE — Judge → LLM-as-Judge 60% (amber) -->
+  <g transform="translate(580 308)" filter="url(#node-shadow)">
+    <rect width="220" height="92" rx="6" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" letter-spacing="1.6">JUDGE · DIFFERENT FAMILY</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">codex-cli</text>
+    <text x="14" y="72" font-size="11" fill="#b1bac4">non-producer; rubric eval</text>
+  </g>
+
+  <g transform="translate(840 308)" filter="url(#node-shadow)">
+    <rect width="280" height="92" rx="6" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" letter-spacing="1.6">LLM-AS-JUDGE · 60 %</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Rubric scorer</text>
+    <text x="14" y="72" font-size="11" fill="#b1bac4">depth · accuracy · novelty</text>
+  </g>
+
+  <!-- COMPOSITE SCORE (far right, vertically centered) -->
+  <g transform="translate(1180 180)" filter="url(#node-shadow)">
+    <rect width="80" height="100" rx="50" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="40" y="22" font-family="JetBrains Mono, monospace" font-size="9" fill="#7ee787" text-anchor="middle" letter-spacing="1.2">SCORE</text>
+    <text x="40" y="56" font-size="18" font-weight="600" fill="#e6edf3" text-anchor="middle">Σ</text>
+    <text x="40" y="80" font-size="10" fill="#b1bac4" text-anchor="middle">composite</text>
+  </g>
+
+  <!-- ─── ARROWS ─── -->
+  <!-- P → C (gray) -->
+  <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 240 230 L 290 230" marker-end="url(#ah-mute)"/>
+
+  <!-- C → top heuristic lane (cyan) -->
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 490 220 C 540 220, 540 106, 580 106" marker-end="url(#ah-cyan)"/>
+  <!-- C → bottom judge lane (amber) -->
+  <path stroke="#f5a524" stroke-width="1.4" fill="none" d="M 490 240 C 540 240, 540 354, 580 354" marker-end="url(#ah-amber)"/>
+
+  <!-- top lane → S -->
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 860 106 C 1100 106, 1100 220, 1180 220" marker-end="url(#ah-cyan)"/>
+
+  <!-- judge → LLM-as-Judge -->
+  <path stroke="#f5a524" stroke-width="1.4" fill="none" d="M 800 354 L 840 354" marker-end="url(#ah-amber)"/>
+  <!-- bottom lane → S -->
+  <path stroke="#f5a524" stroke-width="1.4" fill="none" d="M 1120 354 C 1160 354, 1160 240, 1180 240" marker-end="url(#ah-amber)"/>
+
+  <!-- contract pills -->
+  <g font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+    <g transform="translate(540 156)">
+      <rect x="-30" y="-9" width="60" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+      <text y="3" fill="#22d3ee">40 %</text>
+    </g>
+    <g transform="translate(540 304)">
+      <rect x="-30" y="-9" width="60" height="16" rx="3" fill="#0d1117" stroke="#f5a524" stroke-width="0.75"/>
+      <text y="3" fill="#f5a524">60 %</text>
+    </g>
+  </g>
+
+  <!-- ─── INVARIANT FOOTER ─── -->
+  <g transform="translate(40 440)" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">
+    <line x1="0" y1="0" x2="1200" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+    <text x="0" y="20">▸ INVARIANT — judge must come from a different model family than the producer; otherwise the score colludes with the output</text>
+  </g>
+</svg>

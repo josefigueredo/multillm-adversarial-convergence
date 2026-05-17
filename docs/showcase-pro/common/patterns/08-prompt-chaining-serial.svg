@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 380" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+  <!-- PALETTE: panel #0d1117 · ink · soft · mute · amber · cyan · green · warn
+       LAYOUT — Linear pipeline. Each stage is a different specialist;
+                arrow labels carry the contract that flows between stages. -->
+  <defs>
+    <marker id="ah-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+    <marker id="ah-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+    <marker id="ah-warn"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#ff7b72"/></marker>
+    <marker id="ah-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+    <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- T -->
+  <g transform="translate(20 130)" filter="url(#node-shadow)">
+    <rect width="120" height="100" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">INPUT</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Task</text>
+    <text x="14" y="74" font-size="11" fill="#b1bac4">research request</text>
+  </g>
+
+  <!-- S1 · Research (cyan) -->
+  <g transform="translate(240 130)" filter="url(#node-shadow)">
+    <rect width="200" height="100" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">STAGE · 1 · RESEARCH</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Producer</text>
+    <text x="14" y="74" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">copilot-cli</text>
+  </g>
+
+  <!-- S2 · Critique (warn) -->
+  <g transform="translate(580 130)" filter="url(#node-shadow)">
+    <rect width="190" height="100" rx="6" fill="#0d1117" stroke="#ff7b72" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#ff7b72" letter-spacing="1.6">STAGE · 2 · CRITIQUE</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Adversary</text>
+    <text x="14" y="74" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">codex-cli</text>
+  </g>
+
+  <!-- S3 · Refine (green) -->
+  <g transform="translate(900 130)" filter="url(#node-shadow)">
+    <rect width="190" height="100" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" letter-spacing="1.6">STAGE · 3 · REFINE</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">Synthesiser</text>
+    <text x="14" y="74" font-family="JetBrains Mono, monospace" font-size="11" fill="#b1bac4">claude-cli</text>
+  </g>
+
+  <!-- O · Output -->
+  <g transform="translate(1220 130)" filter="url(#node-shadow)">
+    <rect width="40" height="100" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="20" y="50" font-size="22" font-weight="600" fill="#7ee787" text-anchor="middle">→</text>
+    <text x="20" y="74" font-family="JetBrains Mono, monospace" font-size="9" fill="#7ee787" text-anchor="middle">OUT</text>
+  </g>
+
+  <!-- ─── ARROWS with contract labels ─── -->
+  <path stroke="#7d8590" stroke-width="1.4" fill="none" d="M 140 180 L 240 180" marker-end="url(#ah-mute)"/>
+  <g transform="translate(190 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+    <rect x="-22" y="-9" width="44" height="16" rx="3" fill="#0d1117" stroke="#7d8590" stroke-width="0.75"/>
+    <text y="3" fill="#b1bac4">TASK</text>
+  </g>
+
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 440 180 L 580 180" marker-end="url(#ah-cyan)"/>
+  <g transform="translate(510 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+    <rect x="-64" y="-9" width="128" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+    <text y="3" fill="#22d3ee">CORPUS · CLAIMS</text>
+  </g>
+
+  <path stroke="#ff7b72" stroke-width="1.4" fill="none" d="M 770 180 L 900 180" marker-end="url(#ah-warn)"/>
+  <g transform="translate(835 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+    <rect x="-60" y="-9" width="120" height="16" rx="3" fill="#0d1117" stroke="#ff7b72" stroke-width="0.75"/>
+    <text y="3" fill="#ff7b72">FLAGGED ISSUES</text>
+  </g>
+
+  <path stroke="#7ee787" stroke-width="1.4" fill="none" d="M 1090 180 L 1220 180" marker-end="url(#ah-green)"/>
+  <g transform="translate(1155 168)" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+    <rect x="-32" y="-9" width="64" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
+    <text y="3" fill="#7ee787">FINAL</text>
+  </g>
+
+  <!-- ─── INVARIANT FOOTER ─── -->
+  <g transform="translate(20 320)" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">
+    <line x1="0" y1="0" x2="1240" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+    <text x="0" y="20">▸ INVARIANT — each stage receives the previous stage's full output as context; cost grows per stage, so compress between long chains</text>
+  </g>
+</svg>

@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Showcase PRO Index · Multi-LLM Adversarial Convergence</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg-deep:        #0a0c10;
+      --bg-panel:       rgba(13, 17, 23, 0.82);
+      --bg-card:        rgba(13, 17, 23, 0.65);
+      --bg-card-hover:  rgba(13, 17, 23, 0.88);
+      --ink:            #e6edf3;
+      --ink-soft:       #b1bac4;
+      --ink-mute:       #7d8590;
+      --hairline:       rgba(230, 237, 243, 0.10);
+      --hairline-2:     rgba(230, 237, 243, 0.22);
+      --phosphor:       #f5a524;
+      --phosphor-cool:  #22d3ee;
+      --phosphor-green: #7ee787;
+      --phosphor-warn:  #ff7b72;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: var(--bg-deep);
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── PERSISTENT VIDEO ───────────────────────────────── */
+    .persistent-bg {
+      position: fixed;
+      inset: 0;
+      width: 100vw; height: 100vh;
+      object-fit: cover;
+      z-index: 0;
+      pointer-events: none;
+      filter: contrast(1.05) saturate(0.9) brightness(0.75);
+    }
+
+    /* ── SCANLINE OVERLAY ───────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+        radial-gradient(circle at 100% 0%, rgba(245,165,36,0.06), transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(34,211,238,0.04), transparent 50%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────────── */
+    .shell {
+      position: relative;
+      z-index: 2;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 32px 80px;
+    }
+
+    /* ── TOPBAR ─────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 28px 0 24px;
+      border-bottom: 1px solid var(--hairline-2);
+      margin-bottom: 52px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-dot {
+      display: inline-block;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--phosphor);
+      box-shadow: 0 0 8px 2px rgba(245,165,36,0.55);
+      flex-shrink: 0;
+    }
+    .brand-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .brand-label strong {
+      color: var(--phosphor);
+      font-weight: 600;
+    }
+    /* Topbar right-side actions — same shape as the glossary page */
+    .topbar-links {
+      display: flex;
+      flex-direction: row-reverse;
+      gap: 10px;
+      align-items: center;
+      justify-content: end;
+      min-width: max-content;
+      flex-wrap: wrap;
+    }
+    .topbar-links a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 8px 13px;
+      color: var(--phosphor-cool);
+      border: 1px solid var(--hairline-2);
+      border-radius: 6px;
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      background: rgba(13, 17, 23, 0.38);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .topbar-links a:hover {
+      border-color: var(--phosphor-cool);
+      color: var(--ink);
+    }
+
+    /* ── HERO ───────────────────────────────────────────── */
+    .hero {
+      margin-bottom: 60px;
+    }
+    .hero-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--phosphor);
+      margin: 0 0 16px;
+    }
+    .hero-eyebrow::before { content: '╱╱  '; opacity: 0.6; }
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -0.030em;
+      line-height: 1.05;
+      background: linear-gradient(160deg, #ffffff 0%, var(--phosphor) 180%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0 0 16px;
+    }
+    .hero-lede {
+      font-size: 18px;
+      color: var(--ink-soft);
+      line-height: 1.6;
+      max-width: 680px;
+      margin: 0;
+    }
+
+    /* ── SECTION ────────────────────────────────────────── */
+    .section {
+      margin-bottom: 52px;
+    }
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--hairline-2);
+    }
+    .section-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--phosphor);
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      color: var(--ink-soft);
+      margin: 0;
+    }
+
+    /* ── CARD GRID ──────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .card-grid.cols-1 { grid-template-columns: 1fr; }
+    .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+    @media (max-width: 720px) {
+      .card-grid.cols-1,
+      .card-grid.cols-2,
+      .card-grid.cols-3 { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 34px; }
+    }
+
+    /* Language widget — same as the glossary page */
+    .language-widget {
+      display: inline-grid;
+      grid-template-columns: repeat(2, auto);
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 8px;
+      background: rgba(13, 17, 23, 0.42);
+    }
+    .language-widget button {
+      min-height: 30px;
+      padding: 6px 11px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.10em;
+      color: var(--ink-soft);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .language-widget button:hover { color: var(--ink); }
+    .language-widget button.active {
+      border-color: var(--phosphor);
+      color: var(--phosphor);
+      background: rgba(245, 165, 36, 0.10);
+    }
+
+    /* ── CARD ───────────────────────────────────────────── */
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--hairline-2);
+      border-radius: 8px;
+      overflow: hidden;
+      backdrop-filter: blur(18px) saturate(1.2);
+      -webkit-backdrop-filter: blur(18px) saturate(1.2);
+      transition: background 0.15s, border-color 0.15s, transform 0.12s;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+    .card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--hairline-2);
+      transform: translateY(-2px);
+    }
+    .card:hover .card-accent { opacity: 1; }
+
+    .card-accent {
+      height: 2px;
+      opacity: 0.55;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    .card-accent.amber  { background: var(--phosphor); }
+    .card-accent.cyan   { background: var(--phosphor-cool); }
+    .card-accent.green  { background: var(--phosphor-green); }
+    .card-accent.warn   { background: var(--phosphor-warn); }
+    .card-accent.mute   { background: var(--ink-mute); }
+
+    .card-body {
+      padding: 20px 22px 22px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 2px;
+      border: 1px solid;
+      font-weight: 500;
+    }
+    .card-tag.amber { color: var(--phosphor);       border-color: rgba(245,165,36,0.30);  background: rgba(245,165,36,0.07); }
+    .card-tag.cyan  { color: var(--phosphor-cool);  border-color: rgba(34,211,238,0.30);  background: rgba(34,211,238,0.07); }
+    .card-tag.green { color: var(--phosphor-green); border-color: rgba(126,231,135,0.30); background: rgba(126,231,135,0.07); }
+    .card-tag.warn  { color: var(--phosphor-warn);  border-color: rgba(255,123,114,0.30); background: rgba(255,123,114,0.07); }
+    .card-tag.mute  { color: var(--ink-mute);       border-color: rgba(125,133,144,0.30); background: rgba(125,133,144,0.06); }
+
+    .card-slides {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: var(--ink-mute);
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.010em;
+      color: var(--ink);
+      line-height: 1.2;
+      margin: 4px 0 0;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: var(--ink-soft);
+      line-height: 1.55;
+      margin: 0;
+      flex: 1;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 22px 14px;
+      border-top: 1px solid var(--hairline);
+    }
+    .card-path {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      color: var(--ink-mute);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-open {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--phosphor-cool);
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .card:hover .card-open { opacity: 1; }
+
+    /* ── FLAT LIST (legacy section) ─────────────────────── */
+    .flat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .flat-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 14px;
+      border-radius: 4px;
+      text-decoration: none;
+      color: var(--ink-soft);
+      transition: background 0.12s, color 0.12s;
+      font-size: 14px;
+    }
+    .flat-item:hover {
+      background: rgba(230,237,243,0.04);
+      color: var(--ink);
+    }
+    .flat-item .fi-path {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink-mute);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .flat-item .fi-desc {
+      font-size: 13px;
+      color: var(--ink-soft);
+      flex: 2;
+    }
+    .flat-item .fi-arrow {
+      color: var(--ink-mute);
+      opacity: 0;
+      transition: opacity 0.12s;
+      font-size: 12px;
+    }
+    .flat-item:hover .fi-arrow { opacity: 1; }
+
+    /* ── ASSETS TABLE ───────────────────────────────────── */
+    .assets-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .assets-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--hairline);
+      vertical-align: top;
+    }
+    .assets-table tr:last-child td { border-bottom: none; }
+    .assets-table td:first-child {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--phosphor);
+      white-space: nowrap;
+      padding-right: 20px;
+      width: 200px;
+    }
+    .assets-table td:last-child { color: var(--ink-soft); }
+
+    /* ── FOOTER ─────────────────────────────────────────── */
+    .page-footer {
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid var(--hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .page-footer span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--ink-mute);
+    }
+    .page-footer a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--ink-mute);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(125,133,144,0.4);
+    }
+    .page-footer a:hover { color: var(--phosphor-cool); }
+  </style>
+</head>
+<body>
+  <video class="persistent-bg" src="common/animation-veryslow.mp4" autoplay muted loop playsinline></video>
+
+  <div class="shell">
+
+    <!-- ── TOPBAR ──────────────────────────────────────────── -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span class="brand-label">◉ &nbsp;SHOWCASE · <strong>Multi-LLM Adversarial Convergence</strong></span>
+      </div>
+      <nav class="topbar-links" aria-label="Quick links">
+        <div class="language-widget" aria-label="Deck language selector">
+          <button type="button" data-language="es">Español</button>
+          <button type="button" data-language="en">English</button>
+        </div>
+        <a href="deck/deck.html" target="_blank" data-deck-link>Main Deck</a>
+        <a href="glossary/glossary.html" target="_blank">Glossary</a>
+        <a href="https://github.com/josefigueredo/multillm-adversarial-convergence" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <!-- ── HERO ────────────────────────────────────────────── -->
+    <section class="hero">
+      <p class="hero-eyebrow">Showcase Index</p>
+      <h1>Presentations, tools,<br>and reference artifacts — <em>PRO</em></h1>
+      <p class="hero-lede">Same content as the static showcase, plus the slides-template-pro synchronization layer. The presenter drives every connected viewer over WebSocket — slide changes, view switches, glossary-term jumps. Start the FastAPI control plane in <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">../../pro/</code> with <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">make dev</code> before opening these pages, otherwise they render fine but won't sync.</p>
+    </section>
+
+    <!-- ── SECTION: PRESENTATIONS ──────────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">I · Presentations</span>
+        <p class="section-title">Slide deck</p>
+      </div>
+      <div class="card-grid cols-1">
+
+        <a class="card" href="deck/deck.html" target="_blank" data-deck-link>
+          <div class="card-accent amber"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag amber">Deck</span>
+              <span class="card-slides">42 slides</span>
+              <span class="card-tag mute" data-language-tag>es / en</span>
+            </div>
+            <div class="card-title">Main Deck</div>
+            <p class="card-desc">Intro · <strong>I·Strategies</strong> (6 execution wirings) · <strong>II·Patterns</strong> (11 agentic design patterns) · <strong>III·Demo</strong> (real AWS API Gateway run) · <strong>IV·Adversarial</strong> (critic findings + outputs).</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">deck/deck.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ── SECTION: INTERACTIVE TOOLS ──────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">II · Interactive Tools</span>
+        <p class="section-title">Live data and animated demos</p>
+      </div>
+      <div class="card-grid cols-2">
+
+        <a class="card" href="widgets/dashboard-for-slide.html" target="_blank">
+          <div class="card-accent green"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag green">Dashboard</span>
+            </div>
+            <div class="card-title">Live Replay Dashboard</div>
+            <p class="card-desc">Step through every iteration of the real <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">aws_api_gateway_opus_sonnet_codex</code> run. Score sparkline, dimension grid, state machine, KEEP/DISCARD decisions, and cost block.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">widgets/dashboard-for-slide.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="widgets/shell-demo.html" target="_blank">
+          <div class="card-accent cyan"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag cyan">Demo</span>
+            </div>
+            <div class="card-title">Shell Demo</div>
+            <p class="card-desc">Standalone animated terminal playback. The same scripted-terminal component used inside the main deck, running independently as a shareable demo artifact.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">widgets/shell-demo.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ── SECTION: REFERENCE ───────────────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">III · Reference</span>
+        <p class="section-title">Concept glossary and engineering framing</p>
+      </div>
+      <div class="card-grid cols-2">
+
+        <a class="card" href="glossary/glossary.html" target="_blank">
+          <div class="card-accent amber"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag amber">Reference</span>
+              <span class="card-tag mute">es / en</span>
+            </div>
+            <div class="card-title">Concept Glossary</div>
+            <p class="card-desc">Static bilingual explanations for all key terms — adversarial convergence, evaluator-optimizer, LLM-as-judge, trust classes, atomicity, and more. Designed for mixed technical and non-technical audiences.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">glossary/glossary.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="common/HARNES.md" target="_blank">
+          <div class="card-accent mute"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag mute">Notes</span>
+            </div>
+            <div class="card-title">Harness Engineering Framing</div>
+            <p class="card-desc">Speaker prep material — OS analogy (CPU:LLM, kernel:harness), three-layer stack, and the eight responsibilities of the harness layer. Useful as an opening framing before the patterns section.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">common/HARNES.md</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ── SECTION: SHOWCASE OUTPUTS ───────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <span class="section-eyebrow">IV · Showcase Outputs</span>
+        <p class="section-title">AWS API Gateway — one corpus, three rendering profiles</p>
+      </div>
+      <div class="card-grid cols-3">
+
+        <a class="card" href="aws-api-gateway/report-default.html" target="_blank">
+          <div class="card-accent amber"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag amber">default</span>
+            </div>
+            <div class="card-title">Raw / Default</div>
+            <p class="card-desc">Exploratory synthesis — recommendations first, then dimensions, caveats, and inline references. Best for engineering discovery and internal sharing.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">aws-api-gateway/report-default.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="aws-api-gateway/report-paper.html" target="_blank">
+          <div class="card-accent cyan"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag cyan">paper</span>
+            </div>
+            <div class="card-title">Paper Style</div>
+            <p class="card-desc">Research-paper structure — abstract, methodology, discussion, and a deterministic references section built from <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#22d3ee">citations.json</code>. For stakeholder review.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">aws-api-gateway/report-paper.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+        <a class="card" href="aws-api-gateway/report-technical.html" target="_blank">
+          <div class="card-accent green"></div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-tag green">technical_doc</span>
+            </div>
+            <div class="card-title">Technical Doc</div>
+            <p class="card-desc">ADR-style format — comparison tables, upfront recommendation, disqualifiers, and open questions. Closest analog to an RFC or architecture decision record.</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-path">aws-api-gateway/report-technical.html</span>
+            <span class="card-open">Open →</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+
+    <!-- ── FOOTER ───────────────────────────────────────────── -->
+    <footer class="page-footer">
+      <span>MULTI-LLM ADVERSARIAL CONVERGENCE · SHOWCASE INDEX</span>
+      <a href="https://github.com/josefigueredo/multillm-adversarial-convergence" target="_blank" rel="noopener">github.com/josefigueredo ↗</a>
+    </footer>
+
+  </div>
+  <script src="sync/sync.js?v=0c499707" data-role="viewer"></script>
+  <script src="sync/follow-toggle.js?v=18d4046b"></script>
+  <script>
+    // Deck-language widget — same UX as the glossary page.
+    // Persists choice to localStorage and appends ?lang=<choice> to deck links.
+    (() => {
+      const STORAGE_KEY = 'deck-language';
+      const buttons = Array.from(document.querySelectorAll('.language-widget [data-language]'));
+      const deckLinks = Array.from(document.querySelectorAll('a[data-deck-link]'));
+      let lang = localStorage.getItem(STORAGE_KEY) || 'es';
+
+      function applyLang(next) {
+        lang = next;
+        try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
+        buttons.forEach(b => b.classList.toggle('active', b.dataset.language === next));
+        // Rewrite deck links with ?lang=<next>, preserving any existing hash
+        deckLinks.forEach(a => {
+          const base = a.getAttribute('href').split('?')[0].split('#')[0];
+          const hash = (a.getAttribute('href').match(/#[^?]*$/) || [''])[0];
+          a.setAttribute('href', `${base}?lang=${encodeURIComponent(next)}${hash}`);
+        });
+      }
+
+      buttons.forEach(b => b.addEventListener('click', () => applyLang(b.dataset.language)));
+      applyLang(lang);
+    })();
+  </script>
+</body>
+</html>

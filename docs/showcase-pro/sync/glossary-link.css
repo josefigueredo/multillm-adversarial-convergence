@@ -1,0 +1,21 @@
+/* Underline-style markers for inline glossary terms inside slides.
+ * Use as <span class="g-term" data-term="harness">harness</span>.
+ *
+ * Kept in its own CSS file so the deck's clean.css stays untouched.
+ */
+.g-term {
+  border-bottom: 1px dotted currentColor;
+  cursor: pointer;
+  text-underline-offset: 3px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.g-term:hover,
+.g-term:focus-visible {
+  background: rgba(245, 165, 36, 0.12);
+  color: #f5a524;
+  outline: none;
+}
+.g-term[data-active="true"] {
+  background: rgba(245, 165, 36, 0.22);
+  color: #f5a524;
+}

@@ -1,0 +1,664 @@
+/* ─────────────────────────────────────────────────────────────────
+   CRT / PHOSPHOR — pro deck system, Marp-free
+   - Fixed 1280×720 slides scaled to viewport via CSS variable --scale
+   - One <section class="slide"> per slide, only .active is shown
+   - Persistent video bg behind everything
+   - Header/footer/page indicator are now plain inline elements (no
+     Marp foreignObject / pseudo-section dance)
+   ───────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg-deep:         #0a0c10;
+  --bg-panel:        rgba(13, 17, 23, 0.78);
+  --bg-panel-soft:   rgba(13, 17, 23, 0.55);
+  --bg-panel-vbg:    rgba(10, 12, 16, 0.42);
+  --ink:             #e6edf3;
+  --ink-soft:        #b1bac4;
+  --ink-mute:        #7d8590;
+  --hairline:        rgba(230, 237, 243, 0.10);
+  --hairline-2:      rgba(230, 237, 243, 0.22);
+  --phosphor:        #f5a524;
+  --phosphor-cool:   #22d3ee;
+  --phosphor-green:  #7ee787;
+  --phosphor-warn:   #ff7b72;
+
+  --slide-w: 1280px;
+  --slide-h: 720px;
+}
+
+/* ── RESET / SHELL ───────────────────────────────────────────────── */
+/* IMPORTANT: bg-color goes on <html> only. Body must be transparent
+   so the persistent video can sit between body and document content
+   without being hidden by body's background. Negative z-index on a
+   fixed element renders behind body's background — that's the trap. */
+*, *::before, *::after { box-sizing: border-box; }
+html { margin: 0; padding: 0; height: 100%; background: var(--bg-deep); overflow: hidden; }
+body {
+  margin: 0; padding: 0; height: 100%;
+  background: transparent;
+  font-family: 'Geist', system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── PERSISTENT VIDEO BG ─────────────────────────────────────────── */
+.persistent-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+  filter: contrast(1.05) saturate(0.9) brightness(0.85);
+}
+
+/* ── DECK CONTAINER (handles scaling) ────────────────────────────── */
+.deck {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+}
+
+/* ── BASE SLIDE — fixed dimensions, scaled by JS via --scale ─────── */
+.slide {
+  display: none;
+  position: relative;
+  width: var(--slide-w);
+  height: var(--slide-h);
+  padding: 56px 72px 64px;
+  overflow: hidden;
+  font-size: 24px;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+  font-feature-settings: 'ss01', 'ss03', 'cv11';
+  transform: scale(var(--scale, 1));
+  transform-origin: center;
+
+  /* layered glass: scanlines + phosphor glow + dark panel */
+  background-color: var(--bg-panel);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.14) 0 1px, transparent 1px 3px),
+    radial-gradient(circle at 100% 0%, rgba(245,165,36,0.08), transparent 55%),
+    radial-gradient(circle at 0% 100%, rgba(34,211,238,0.05), transparent 50%);
+  backdrop-filter: blur(24px) saturate(1.35);
+  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+}
+.slide.active { display: block; }
+
+/* ── SLIDE HEADER / FOOTER / PAGE INDICATOR ─────────────────────── */
+.slide > header,
+.slide > footer {
+  position: absolute;
+  left: 32px; right: 32px;
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  opacity: 0.65;
+  padding: 18px 0;
+}
+.slide > header { top: 4px; }
+.slide > footer { bottom: 4px; left: 32px; right: 100px; }
+.slide > header::before {
+  content: '◉ ';
+  color: var(--phosphor);
+  margin-right: 6px;
+}
+.slide .page-num {
+  position: absolute;
+  bottom: 22px; right: 32px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.20em;
+  color: var(--ink-mute);
+  opacity: 0.7;
+}
+.slide.lead > header,
+.slide.lead > footer { opacity: 0.4; }
+.slide.lead .page-num,
+.slide.no-page .page-num { display: none; }
+
+/* ── TYPOGRAPHY ──────────────────────────────────────────────────── */
+.slide h1 {
+  font-size: 40px; font-weight: 600; letter-spacing: -0.022em;
+  color: var(--ink); margin: 0 0 18px; line-height: 1.08;
+}
+/* h2 = standardized slide title for every content slide.
+   The amber left-rule is the deck's "this is the title" signal —
+   pattern slides already used it; now every plain content slide
+   inherits the same dignified treatment. Lead/divider/spec override. */
+.slide h2 {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  color: var(--ink);
+  margin: 0 0 18px;
+  line-height: 1.15;
+  border-left: 2px solid var(--phosphor);
+  padding-left: 18px;
+}
+.slide h3 {
+  font-size: 18px; font-weight: 500; color: var(--ink);
+  margin: 0 0 8px;
+}
+.slide p, .slide li { color: var(--ink-soft); margin: 6px 0; }
+.slide strong { color: var(--ink); font-weight: 600; }
+.slide em { color: var(--phosphor); font-style: normal; }
+.slide a {
+  color: var(--phosphor-cool);
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(34, 211, 238, 0.4);
+}
+
+/* ── INLINE CODE ─────────────────────────────────────────────────── */
+.slide code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.86em; font-weight: 500;
+  background: rgba(245, 165, 36, 0.10);
+  color: var(--phosphor);
+  padding: 1px 7px;
+  border-radius: 3px;
+  border: 1px solid rgba(245, 165, 36, 0.22);
+}
+
+/* ── CODE BLOCKS ─────────────────────────────────────────────────── */
+.slide pre {
+  background: rgba(0, 0, 0, 0.48);
+  border: 1px solid var(--hairline-2);
+  border-left: 2px solid var(--phosphor);
+  border-radius: 6px;
+  padding: 22px 24px 18px;
+  font-size: 16px;
+  line-height: 1.55;
+  margin: 14px 0;
+  box-shadow: inset 0 0 80px rgba(0,0,0,0.4), 0 4px 20px rgba(0,0,0,0.3);
+  position: relative;
+  font-feature-settings: 'liga', 'calt';
+  overflow: auto;
+}
+.slide pre::before {
+  content: '$_';
+  position: absolute; top: 8px; right: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--phosphor);
+  opacity: 0.55;
+  letter-spacing: 0.20em;
+}
+.slide pre code {
+  background: none; border: none; padding: 0;
+  color: var(--phosphor-green);
+  font-size: inherit;
+}
+
+/* ── TABLES ──────────────────────────────────────────────────────── */
+.slide table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  margin: 14px 0;
+  border-top: 1px solid var(--hairline-2);
+}
+.slide th, .slide td { border: 0; }
+.slide th {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  color: var(--phosphor);
+  text-align: left;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--hairline-2);
+  background: transparent;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+.slide td {
+  padding: 11px 16px;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: top;
+  line-height: 1.5;
+}
+.slide tr:last-child td { border-bottom: 1px solid var(--hairline-2); }
+.slide td strong { color: var(--phosphor); font-weight: 600; }
+.slide td code {
+  background: rgba(245, 165, 36, 0.06);
+  border-color: rgba(245, 165, 36, 0.18);
+  font-size: 0.82em;
+  padding: 1px 6px;
+}
+/* Hide empty <thead> rows from `| | |` markdown */
+.slide table thead:has(th:empty:only-child) { display: none; }
+.slide table thead tr:has(> th:empty + th:empty) { display: none; }
+
+/* ── BLOCKQUOTE ──────────────────────────────────────────────────── */
+.slide blockquote {
+  border-left: 2px solid var(--phosphor-cool);
+  background: rgba(34, 211, 238, 0.05);
+  padding: 14px 22px;
+  margin: 18px 0;
+  color: var(--ink);
+  font-style: normal;
+  font-size: 0.96em;
+  border-radius: 0 4px 4px 0;
+}
+.slide blockquote p { color: var(--ink); margin: 0; }
+.slide blockquote em { color: var(--phosphor-cool); font-style: italic; }
+.slide blockquote strong { color: var(--ink); }
+
+/* ── TAG / CHIP ──────────────────────────────────────────────────── */
+.slide .tag {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(245, 165, 36, 0.08);
+  color: var(--phosphor);
+  border: 1px solid rgba(245, 165, 36, 0.30);
+  border-radius: 3px;
+  padding: 2px 9px;
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.18em; text-transform: uppercase;
+}
+
+/* ── COVER (lead) ────────────────────────────────────────────────── */
+.slide.lead {
+  background-color: rgba(10, 12, 16, 0.42);
+  padding: 72px 96px;
+}
+.slide.lead h1 {
+  font-size: 60px; font-weight: 700; letter-spacing: -0.032em;
+  line-height: 1.02;
+  background: linear-gradient(180deg, #ffffff 0%, var(--phosphor) 160%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  max-width: 78%;
+}
+.slide.lead h3 {
+  color: var(--ink-soft); font-weight: 400; font-size: 22px;
+  letter-spacing: -0.005em;
+  margin-top: 14px;
+  max-width: 70%;
+}
+.slide.lead blockquote {
+  margin-top: 28px;
+  max-width: 75%;
+}
+
+/* ── DIVIDER ────────────────────────────────────────────────────── */
+.slide.divider {
+  background-color: var(--bg-panel-vbg);
+  padding: 80px 96px;
+}
+.slide.divider h2 {
+  /* On dividers the h2 is a small mono-caps eyebrow above the
+     big h1 — explicitly reset the title styling inherited from
+     `.slide h2` (no left-rule, no padding). */
+  color: var(--phosphor);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; letter-spacing: 0.32em;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin-bottom: 18px;
+  border-left: none;
+  padding-left: 0;
+}
+.slide.divider h2::before {
+  content: '╱╱  ';
+  color: var(--phosphor);
+  opacity: 0.6;
+}
+.slide.divider h1 {
+  font-size: 64px; font-weight: 600; letter-spacing: -0.030em;
+  line-height: 1.0; max-width: 82%;
+}
+.slide.divider h3 {
+  color: var(--ink-soft); font-weight: 400; font-size: 24px;
+  margin-top: 22px; max-width: 70%;
+  letter-spacing: -0.005em;
+}
+.slide.divider p {
+  color: var(--ink-mute);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  margin-top: 22px;
+  text-transform: uppercase;
+}
+
+/* ── VIDEO-BG MODIFIER (more transparent) ───────────────────────── */
+.slide.video-bg {
+  background-color: var(--bg-panel-vbg);
+}
+
+/* ── TIGHT / TIGHTER ────────────────────────────────────────────── */
+.slide.tight  { font-size: 21px; padding: 48px 64px; }
+.slide.tight h1 { font-size: 32px; margin-bottom: 12px; }
+/* Title size stays at the standardized 30px — `.tight` only compresses
+   body content, not signposting. Drop only the margin slightly. */
+.slide.tight h2 { margin-bottom: 14px; }
+.slide.tight pre { font-size: 14px; line-height: 1.5; padding: 16px 18px; }
+.slide.tight table { font-size: 16px; }
+.slide.tight th { padding: 10px 12px 7px; }
+.slide.tight td { padding: 7px 12px; }
+.slide.tight blockquote { padding: 10px 18px; margin: 12px 0; font-size: 0.92em; }
+.slide.tight p, .slide.tight li { margin: 0.30em 0; }
+
+/* Slide 18 — strategy lattice. The single 3×3 table is the slide,
+   so it gets explicit breathing room above (below the title) and below
+   (before the closing blockquote). */
+.slide[data-slide="18"] table {
+  margin: 36px 0 28px;
+}
+.slide[data-slide="18"] td {
+  padding: 14px 16px;
+  line-height: 1.6;
+}
+
+.slide.tighter { font-size: 19px; padding: 40px 56px; }
+.slide.tighter h1 { font-size: 28px; margin-bottom: 10px; }
+/* Same logic as .tight — title size constant, only the body shrinks. */
+.slide.tighter h2 { margin-bottom: 12px; }
+.slide.tighter pre { font-size: 13px; line-height: 1.45; padding: 12px 16px; }
+.slide.tighter table { font-size: 15px; }
+.slide.tighter blockquote { padding: 8px 16px; margin: 8px 0; font-size: 0.9em; }
+.slide.tighter p, .slide.tighter li { margin: 0.20em 0; }
+
+/* ── PATTERN SLIDE ──────────────────────────────────────────────── */
+.slide.pattern { font-size: 21px; padding: 48px 64px 56px; }
+/* Pattern h2 inherits the standardized .slide h2 treatment now —
+   rule kept only to tighten margin slightly so the diagram has room. */
+.slide.pattern h2 { margin-bottom: 14px; }
+.slide.pattern blockquote {
+  background: transparent;
+  border-left: 2px solid var(--ink-mute);
+  color: var(--ink-soft);
+  font-size: 17px;
+  padding: 4px 18px;
+  margin: 4px 0 14px 0;
+}
+.slide.pattern blockquote em { color: var(--phosphor-cool); font-style: italic; }
+.slide.pattern img {
+  display: block;
+  margin: 10px auto 14px;
+  max-height: 260px;
+}
+/* `.focus` modifier — pattern slides that drop the "In this codebase" body
+   so the diagram can take the freed vertical space. Add `focus` to the
+   class list and the diagram caps at ~460px instead of 260px. */
+.slide.pattern.focus img { max-height: 460px; }
+/* New pro-themed SVGs already render in deck palette — no CSS filter
+   re-tinting needed. Just give them a soft drop shadow to lift them
+   off the glass panel. */
+.slide.pattern img[src$=".svg"] {
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45));
+}
+.slide.pattern .ref {
+  color: var(--ink-mute);
+  font-size: 12px;
+  margin-top: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.04em;
+  border-top: 1px solid var(--hairline);
+  padding-top: 12px;
+}
+.slide.pattern .ref a {
+  color: var(--ink-soft);
+  border-bottom-color: rgba(177, 186, 196, 0.35);
+}
+.slide.pattern .ref strong {
+  color: var(--phosphor);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  font-size: 0.9em;
+  margin-right: 6px;
+}
+
+/* ── RESEARCH LOOP DIAGRAM (slide 4 · patterns/00-research-loop.svg) ─ */
+/* Slide 4 has just title + diagram (no legend/body copy), so the
+   diagram gets the full remaining vertical real estate. */
+.slide img[src$="00-research-loop.svg"] {
+  display: block;
+  margin: 8px auto 14px;
+  max-width: 100%;
+  max-height: 520px;
+  filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.5));
+}
+
+/* ── SCREENSHOT IMAGES (output style slides) ────────────────────── */
+.slide img[src*="images/"] {
+  box-shadow: 0 16px 60px rgba(0,0,0,0.6), 0 0 0 1px var(--hairline-2);
+  border-radius: 4px;
+}
+
+/* ── BG-RIGHT SPLIT (slides 26–28) ──────────────────────────────── */
+.slide.split-right {
+  padding-right: calc(48% + 32px);
+}
+.slide.split-right > .bg-right {
+  position: absolute;
+  top: 0; right: 0;
+  width: 52%;
+  height: 100%;
+  margin: 0;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.5), inset 0 0 0 1px var(--hairline);
+}
+.slide.split-right > iframe.bg-right {
+  border: 0;
+  background: var(--bg-panel);
+}
+
+/* ── SPEC CARD (closer) ─────────────────────────────────────────── */
+.slide.spec {
+  background-color: var(--bg-panel-vbg);
+}
+/* Spec card title — inherits the standardized .slide h2 treatment
+   (30px ink with amber left-rule). Just tighten margin slightly so
+   the metadata table sits right under it. */
+.slide.spec h2 { margin-bottom: 16px; }
+.slide.spec h3 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--phosphor);
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+.slide.spec table {
+  border-top: 1px solid var(--hairline-2);
+  margin: 6px 0 14px;
+}
+.slide.spec table thead { display: none; }
+.slide.spec table td { padding: 9px 14px; }
+.slide.spec table td:first-child {
+  width: 130px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--phosphor);
+  padding-top: 12px;
+  white-space: nowrap;
+}
+.slide.spec table td:first-child strong {
+  color: inherit;
+  font-weight: 500;
+}
+.slide.spec table td:nth-child(2) {
+  color: var(--ink-soft);
+  font-size: 16px;
+}
+.slide.spec pre {
+  border-left-color: var(--phosphor-cool);
+  font-size: 13px;
+}
+.slide.spec pre::before { content: 'BIBTEX'; }
+
+/* ── DASHBOARD CTA (link out to live replay) ────────────────────── */
+.slide .dashboard-cta {
+  display: inline-flex; align-items: center; gap: 14px;
+  padding: 12px 22px;
+  border: 1px solid var(--phosphor-cool);
+  border-radius: 99px;
+  background: rgba(34, 211, 238, 0.06);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background 0.15s, transform 0.12s;
+  font-family: 'Geist', sans-serif;
+}
+.slide .dashboard-cta:hover {
+  background: rgba(34, 211, 238, 0.15);
+  transform: translateY(-1px);
+}
+.slide .dashboard-cta .cta-icon {
+  color: var(--phosphor-cool);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 600;
+}
+.slide .dashboard-cta .cta-label {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.slide .dashboard-cta .cta-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  color: var(--ink-mute);
+}
+
+/* ── SCRIPTED TERMINAL ──────────────────────────────────────────── */
+/* A `.terminal` element on any slide becomes a step-able shell demo.
+   Drive with ↑/↓ (step), P (autoplay), R (reset), End (jump-end). */
+.slide .terminal {
+  --term-bg: #0b0e13;
+  --term-titlebar: #161b22;
+  background: var(--term-bg);
+  border-radius: 8px;
+  box-shadow: 0 16px 50px rgba(0,0,0,0.55), 0 0 0 1px var(--hairline-2), inset 0 0 60px rgba(0,0,0,0.4);
+  overflow: hidden;
+  position: relative;
+  margin: 14px 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.slide .terminal::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+  pointer-events: none; z-index: 2;
+}
+.slide .terminal-titlebar {
+  background: var(--term-titlebar);
+  padding: 9px 12px 7px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.4);
+}
+.slide .terminal .window-controls { display: flex; gap: 7px; }
+.slide .terminal .window-controls .dot {
+  width: 11px; height: 11px; border-radius: 50%; display: inline-block;
+}
+.slide .terminal .dot-close { background: #ff5f56; }
+.slide .terminal .dot-min   { background: #ffbd2e; }
+.slide .terminal .dot-max   { background: #27c93f; }
+.slide .terminal-title {
+  flex: 1; text-align: center;
+  font-size: 11px; letter-spacing: 0.06em;
+  color: var(--ink-mute);
+}
+.slide .terminal-step {
+  font-size: 9px; letter-spacing: 0.16em; color: var(--ink-mute); opacity: 0.6;
+}
+.slide .terminal-step strong { color: var(--phosphor); font-weight: 500; }
+
+.slide .terminal-body {
+  padding: 16px 18px 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  max-height: 460px;
+  overflow-y: auto;
+}
+.slide.tight .terminal-body, .slide.tighter .terminal-body { max-height: 380px; font-size: 13px; }
+.slide .terminal-body::-webkit-scrollbar { width: 6px; }
+.slide .terminal-body::-webkit-scrollbar-thumb { background: var(--hairline-2); border-radius: 3px; }
+
+.slide .terminal .line { white-space: pre-wrap; word-break: break-word; }
+.slide .terminal .prompt-line .prompt-text { color: var(--phosphor-cool); font-weight: 500; }
+.slide .terminal .prompt-line .typed-text  { color: var(--ink); }
+.slide .terminal .prompt-line             { color: var(--phosphor-cool); }
+.slide .terminal .output-line  { color: var(--ink-soft); }
+.slide .terminal .success-line { color: var(--phosphor-green); }
+.slide .terminal .error-line   { color: var(--phosphor-warn); }
+.slide .terminal .comment-line { color: var(--ink-mute); font-style: italic; }
+.slide .terminal .heading-line { color: var(--phosphor); font-weight: 600; letter-spacing: 0.02em; margin-top: 4px; }
+
+/* override base `code` styling inside the terminal so chip-look doesn't bleed */
+.slide .terminal code {
+  background: none; border: none; color: inherit; padding: 0; font-size: inherit;
+}
+
+/* ── DECK CONTROLS (nav bar) ────────────────────────────────────── */
+.deck-controls {
+  position: fixed;
+  bottom: 16px;
+  left: 75%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 99px;
+  background: rgba(13, 17, 23, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--hairline-2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-soft);
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.deck-controls.visible,
+.deck-controls:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+.deck-controls button {
+  background: transparent;
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.deck-controls button:hover {
+  border-color: var(--phosphor);
+  color: var(--phosphor);
+}
+.deck-controls #page-indicator {
+  letter-spacing: 0.2em;
+  min-width: 60px;
+  text-align: center;
+}

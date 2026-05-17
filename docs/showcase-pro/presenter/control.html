@@ -1,0 +1,2335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Multi-LLM Adversarial Convergence · Presenter</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg-deep:        #0a0c10;
+      --bg-panel:       rgba(13, 17, 23, 0.78);
+      --bg-panel-2:     rgba(13, 17, 23, 0.55);
+      --ink:            #e6edf3;
+      --ink-soft:       #b1bac4;
+      --ink-mute:       #7d8590;
+      --hairline:       rgba(230, 237, 243, 0.10);
+      --hairline-2:     rgba(230, 237, 243, 0.22);
+      --phosphor:       #f5a524;
+      --phosphor-cool:  #22d3ee;
+      --phosphor-green: #7ee787;
+      --phosphor-warn:  #ff7b72;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: var(--bg-deep);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+        radial-gradient(circle at 100% 0%, rgba(245,165,36,0.06), transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(34,211,238,0.04), transparent 50%);
+      background-attachment: fixed;
+      color: var(--ink);
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .frame {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 40px 60px;
+      display: grid;
+      gap: 18px;
+    }
+
+    /* HEADER */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .brand::before { content: '◉ '; color: var(--phosphor); }
+    .brand strong { color: var(--phosphor); font-weight: 500; margin-left: 4px; }
+    .deck-link {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--phosphor-cool);
+      text-decoration: none;
+      border: 1px solid var(--hairline-2);
+      padding: 6px 12px;
+      border-radius: 99px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .deck-link:hover { border-color: var(--phosphor-cool); color: var(--ink); }
+
+    /* CARD */
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--hairline-2);
+      border-radius: 8px;
+      padding: 22px 28px 26px;
+      backdrop-filter: blur(20px) saturate(1.3);
+      -webkit-backdrop-filter: blur(20px) saturate(1.3);
+      display: grid;
+      gap: 20px;
+    }
+    .card-head { display: grid; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--hairline); }
+    .card-head-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .section-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--phosphor-cool);
+      padding: 3px 9px;
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      border-radius: 3px;
+    }
+    .index {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .index strong { color: var(--phosphor); font-weight: 500; }
+
+    /* SYNC STATUS PILL + DIALOG */
+    .sync-status {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--ink-mute);
+      padding: 3px 10px;
+      border: 1px solid var(--hairline);
+      border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .sync-status:hover { color: var(--ink); border-color: var(--phosphor-cool); }
+    .sync-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #ff7b72;
+      box-shadow: 0 0 6px rgba(255, 123, 114, 0.55);
+    }
+    .sync-status[data-state="on"] { color: #7ee787; border-color: rgba(126, 231, 135, 0.42); }
+    .sync-status[data-state="on"] .sync-dot {
+      background: #7ee787;
+      box-shadow: 0 0 7px rgba(126, 231, 135, 0.6);
+    }
+    .sync-dialog {
+      border: 1px solid var(--hairline);
+      background: #0d1117;
+      color: var(--ink);
+      padding: 22px 26px;
+      border-radius: 6px;
+      min-width: 420px;
+      max-width: 92vw;
+    }
+    .sync-dialog::backdrop { background: rgba(0, 0, 0, 0.62); }
+    .sync-dialog header {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--phosphor-cool);
+      margin-bottom: 12px;
+    }
+    .sync-dialog p { font-size: 12px; color: var(--ink-mute); margin: 0 0 14px; line-height: 1.55; }
+    .sync-dialog p code {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 2px;
+    }
+    .sync-dialog input {
+      width: 100%; box-sizing: border-box;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      padding: 9px 11px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--ink);
+      border: 1px solid var(--hairline);
+      border-radius: 3px;
+    }
+    .sync-dialog input:focus { outline: none; border-color: var(--phosphor-cool); }
+    .sync-source {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute);
+      margin-top: 8px;
+    }
+    .sync-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;
+    }
+    .sync-actions button {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+      padding: 7px 14px;
+      border: 1px solid var(--hairline);
+      background: transparent;
+      color: var(--ink-mute);
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .sync-actions button[type="submit"] { color: #7ee787; border-color: rgba(126, 231, 135, 0.42); }
+    .sync-actions button:hover { color: var(--ink); border-color: var(--phosphor-cool); }
+
+    /* TIMER */
+    .timer-block { display: flex; align-items: center; gap: 10px; }
+    .timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--phosphor);
+      transition: color 0.2s;
+      min-width: 84px;
+      text-align: right;
+    }
+    .timer.warning { color: var(--phosphor); animation: pulse 1.2s infinite; }
+    .timer.over    { color: var(--phosphor-warn); animation: pulse 0.8s infinite; }
+    @keyframes pulse { 50% { opacity: 0.55; } }
+    .timer-btn {
+      background: transparent;
+      border: 1px solid var(--hairline-2);
+      color: var(--ink-soft);
+      width: 36px; height: 36px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .timer-btn:hover { border-color: var(--phosphor); color: var(--phosphor); }
+    .timer-btn.running { color: var(--phosphor-green); border-color: var(--phosphor-green); }
+
+    .title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.018em;
+      color: var(--ink);
+      line-height: 1.22;
+    }
+    .progress {
+      height: 4px;
+      background: var(--hairline);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--phosphor-cool), var(--phosphor));
+      width: 0%;
+      transition: width 0.4s linear, background 0.3s;
+    }
+    .progress-bar.over { background: var(--phosphor-warn); }
+
+    /* SECTIONS WITHIN CARD */
+    .panel { display: grid; gap: 10px; }
+    .panel-header {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.20em; text-transform: uppercase;
+      color: var(--ink-mute);
+      padding-bottom: 4px;
+      border-bottom: 1px dashed var(--hairline);
+    }
+    .panel-header.beats   { color: var(--phosphor); }
+    .panel-header.hints   { color: var(--phosphor-cool); }
+    .panel-header.links   { color: var(--phosphor-green); }
+
+    /* BEATS */
+    .beats-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+    .beat {
+      display: grid;
+      grid-template-columns: 56px 22px 1fr;
+      align-items: start;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+      border: 1px solid transparent;
+      background: var(--bg-panel-2);
+    }
+    .beat:hover { background: rgba(245,165,36,0.06); }
+    .beat .t {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink-mute);
+      padding-top: 2px;
+    }
+    .beat .mark {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: var(--ink-mute);
+      text-align: center;
+      padding-top: 1px;
+    }
+    .beat .say {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      white-space: pre-wrap;
+    }
+    .beat.current {
+      border-color: var(--phosphor);
+      background: rgba(245,165,36,0.10);
+    }
+    .beat.current .mark { color: var(--phosphor); }
+    .beat.current .say  { color: var(--ink); }
+    .beat.covered .mark { color: var(--phosphor-green); }
+    .beat.covered .say  { color: var(--ink-mute); }
+    .beat.pause {
+      background: rgba(255, 123, 114, 0.06);
+      border-color: rgba(255, 123, 114, 0.22);
+    }
+    .beat.pause .mark { color: var(--phosphor-warn); }
+    .beat.pause .say  { color: var(--phosphor-warn); font-style: italic; }
+
+    /* HINTS */
+    .hints-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .hint-item {
+      padding: 6px 10px;
+      font-size: 14px;
+      color: var(--ink-soft);
+      background: rgba(34, 211, 238, 0.04);
+      border-left: 2px solid var(--phosphor-cool);
+      border-radius: 0 4px 4px 0;
+    }
+    .hints.empty .hints-list::after {
+      content: '(none — add presenter cues here)';
+      color: var(--ink-mute);
+      font-style: italic;
+      font-size: 13px;
+    }
+
+    /* LINKS */
+    .links-list {
+      list-style: none; margin: 0; padding: 0;
+      display: flex; flex-wrap: wrap; gap: 6px 10px;
+    }
+    .link-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 5px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--phosphor-green);
+      text-decoration: none;
+      border: 1px solid rgba(126, 231, 135, 0.25);
+      border-radius: 99px;
+      transition: all 0.15s;
+    }
+    .link-pill::before { content: '↗ '; opacity: 0.75; }
+    .link-pill:hover { border-color: var(--phosphor-green); background: rgba(126,231,135,0.06); color: var(--ink); }
+
+    /* CONTROLS */
+    .controls {
+      display: flex; align-items: center; gap: 14px;
+      justify-content: center;
+      padding: 12px 0 4px;
+    }
+    .controls button {
+      background: transparent;
+      border: 1px solid var(--hairline-2);
+      color: var(--ink);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .controls button:hover:not(:disabled) { border-color: var(--phosphor); color: var(--phosphor); }
+    .controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+    .indicator {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; letter-spacing: 0.18em;
+      color: var(--ink-soft);
+      min-width: 90px; text-align: center;
+    }
+    .indicator strong { color: var(--phosphor); font-weight: 600; }
+
+    /* JUMP STRIP */
+    .jump { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; padding: 6px 4px 0; }
+    .jump button {
+      width: 26px; height: 26px;
+      padding: 0;
+      background: transparent;
+      border: 1px solid var(--hairline);
+      color: var(--ink-mute);
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .jump button:hover { border-color: var(--phosphor); color: var(--phosphor); }
+    .jump button.active {
+      border-color: var(--phosphor);
+      background: rgba(245, 165, 36, 0.10);
+      color: var(--phosphor);
+    }
+    .jump button.section-start { border-left: 2px solid var(--phosphor-cool); }
+
+    /* FOOTER */
+    .kbhint {
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--ink-mute);
+      opacity: 0.55;
+      margin-top: 18px;
+    }
+    .kbhint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 3px;
+      margin: 0 2px;
+      font-size: 10px;
+    }
+
+    @media (max-width: 700px) {
+      .frame { padding: 18px 16px; }
+      .card  { padding: 18px 18px 22px; }
+      .title { font-size: 19px; }
+      .timer { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="topbar">
+      <div class="brand">PRESENTER · <strong>Multi-LLM Adversarial Convergence</strong></div>
+      <a class="deck-link" id="open-deck" href="../deck/deck.html" target="deck-window">↗ OPEN DECK</a>
+    </header>
+
+    <main class="card">
+      <div class="card-head">
+        <div class="card-head-row">
+          <span class="section-tag" id="slide-section">—</span>
+          <span class="index">SLIDE <strong id="slide-num">--</strong> / <span id="slide-total">--</span></span>
+          <button class="sync-status" id="sync-status" type="button" data-state="off"
+                  title="Click to configure SLIDES_API_KEY">
+            <span class="sync-dot"></span>
+            <span class="sync-label" id="sync-label">SYNC OFF</span>
+          </button>
+          <div class="timer-block">
+            <span class="timer" id="countdown">--:--</span>
+            <button class="timer-btn" id="timer-toggle" title="Play/Pause timer (T)">▶</button>
+          </div>
+        </div>
+        <h1 class="title" id="slide-title">—</h1>
+        <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+      </div>
+
+      <section class="panel beats">
+        <header class="panel-header beats">▸ BEATS — Spanish · click to mark covered</header>
+        <ul class="beats-list" id="beats-list"></ul>
+      </section>
+
+      <section class="panel hints" id="hints-panel">
+        <header class="panel-header hints">⚑ HINTS — presenter cues</header>
+        <ul class="hints-list" id="hints-list"></ul>
+      </section>
+
+      <section class="panel links">
+        <header class="panel-header links">→ LINKS — open in new tab</header>
+        <ul class="links-list" id="links-list"></ul>
+      </section>
+    </main>
+
+    <nav class="controls">
+      <button id="btn-prev">← PREV</button>
+      <span class="indicator"><strong id="cur">1</strong> / <span id="total">--</span></span>
+      <button id="btn-next">NEXT →</button>
+    </nav>
+
+    <div class="jump" id="jump"></div>
+
+    <div class="kbhint">
+      <kbd>←</kbd><kbd>→</kbd> slide · <kbd>T</kbd> timer · <kbd>R</kbd> reset timer · <kbd>O</kbd> deck · <kbd>1</kbd>-<kbd>9</kbd> mark beat · <kbd>Home</kbd>/<kbd>End</kbd> jump
+    </div>
+  </div>
+
+  <dialog id="sync-config" class="sync-dialog">
+    <form method="dialog" id="sync-form">
+      <header>SLIDES_API_KEY — drive remote viewers</header>
+      <p>Paste the value of <code>SLIDES_API_KEY</code> (the value you passed to <code>make dev</code>, or the Terraform <code>api_key</code> var on prod). Saved to this browser only.</p>
+      <input type="password" id="sync-key-input" placeholder="paste key…" autocomplete="off" spellcheck="false">
+      <div class="sync-source" id="sync-source">SOURCE — none</div>
+      <div class="sync-actions">
+        <button type="button" id="sync-cancel">Cancel</button>
+        <button type="button" id="sync-clear">Clear</button>
+        <button type="submit" id="sync-save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script id="notes-data" type="application/json">[
+  {
+    "n": 1,
+    "section": "INTRO",
+    "title": "Multi-LLM Adversarial Convergence Framework",
+    "duration_seconds": 20,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Demo grabado a velocidad. Los artefactos son reales: mismo config, mismos backends, mismo audit trail. Nada está mockeado ni editado a mano para que quede lindo."
+      },
+      {
+        "t": 10,
+        "say": "Idea central: un backend propone, otro distinto critica, un tercero arbitra. El ciclo se repite hasta que el score deja de mejorar."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #1 in deck",
+        "href": "../deck/deck.html#1"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 2,
+    "section": "INTRO",
+    "title": "The problem",
+    "duration_seconds": 35,
+    "beats": [
+      {
+        "t": 0,
+        "say": "El problema NO es \"los LLMs alucinan a veces\". Es estructural — un solo modelo no permite saber qué le faltó ver, qué inventó con confianza, ni si otro modelo distinto habría llegado a la misma conclusión. Punto ciego de epistemología, no de prompt engineering."
+      },
+      {
+        "t": 18,
+        "say": "\"Non-deterministic and unverifiable\" son dos problemas separados:\n• no determinístico = la salida varía entre corridas\n• no verificable = no podés auditar el razonamiento"
+      },
+      {
+        "t": 28,
+        "say": "Este framework ataca a los dos."
+      },
+      {
+        "t": 30,
+        "say": "La idea central del sistema: hacer que los modelos puntúen, critiquen y discutan entre sí."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #2 in deck",
+        "href": "../deck/deck.html#2"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 3,
+    "section": "INTRO",
+    "title": "Origin: Karpathy's autoresearch",
+    "duration_seconds": 50,
+    "beats": [
+      {
+        "t": 0,
+        "say": "El loop no lo inventamos. Karpathy lo publicó como `autoresearch` para entrenamiento de redes neuronales: modificás código → entrenás 5 min en GPU → medís loss → keep o revert. Iterás."
+      },
+      {
+        "t": 12,
+        "say": "Insight transferible: la forma del loop no es exclusiva del entrenamiento. Aplica a CUALQUIER cosa que puedas puntuar. Investigación con LLMs es una."
+      },
+      {
+        "t": 22,
+        "say": "Mapeo 1-a-1 (cada fila de la tabla):\n• GPU run → llamada a backend\n• loss → score híbrido (heurística + judge)\n• pesos de la red → corpus de conocimiento"
+      },
+      {
+        "t": 34,
+        "say": "Misma máquina, otro sustrato: weights en Karpathy, knowledge acá."
+      },
+      {
+        "t": 38,
+        "say": "Por qué heurística 40 / judge 60: el judge solo se puede gamear (un modelo aprende a escribir para el judge). La heurística es determinística y model-agnostic. Combinadas son más difíciles de explotar. (LLM-as-Judge en slide 8.)"
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #3 in deck",
+        "href": "../deck/deck.html#3"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 4,
+    "section": "INTRO",
+    "title": "The loop",
+    "duration_seconds": 50,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Critique (cyan): el crítico SIEMPRE es un backend distinto al que produjo. No es self-evaluation. Diferentes priors → diferentes blind spots. Si Claude tiene un sesgo, GPT no lo comparte (y al revés). Esa diferencia es lo que se quiere capturar."
+      },
+      {
+        "t": 16,
+        "say": "Decide (ámbar): KEEP hace crecer el corpus. DISCARD hace que el sistema reintente la misma dimensión con una hipótesis distinta. No es \"fallaste, seguís\" — es \"no convergió, probá otro ángulo\"."
+      },
+      {
+        "t": 29,
+        "say": "Compress (cyan): cada N iteraciones (default 4) el agente reescribe su propio corpus, podando lo que ya no aporta. Sin esto, los runs explotan en costo de tokens y el modelo pierde foco. Es rank-and-prune forzado."
+      },
+      {
+        "t": 43,
+        "say": "Stopping criteria — tres opciones, lo que ocurra primero:\n• Ctrl+C (intervención manual)\n• max_iterations (presupuesto)\n• target_dimensions cubiertas (objetivo)"
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #4 in deck",
+        "href": "../deck/deck.html#4"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 5,
+    "section": "STRATEGIES",
+    "title": "I · Strategies — Execution Strategies",
+    "duration_seconds": 35,
+    "beats": [],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #5 in deck",
+        "href": "../deck/deck.html#5"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 6,
+    "section": "STRATEGIES",
+    "title": "Execution Strategies — overview",
+    "duration_seconds": 35,
+    "beats": [],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #6 in deck",
+        "href": "../deck/deck.html#6"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 7,
+    "section": "STRATEGIES",
+    "title": "single — one backend, all roles",
+    "duration_seconds": 35,
+    "beats": [],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #7 in deck",
+        "href": "../deck/deck.html#7"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 8,
+    "section": "STRATEGIES",
+    "title": "ensemble — two researchers + different-family judge",
+    "duration_seconds": 35,
+    "beats": [],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #8 in deck",
+        "href": "../deck/deck.html#8"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 9,
+    "section": "STRATEGIES",
+    "title": "parallel — all backends, best score wins",
+    "duration_seconds": 35,
+    "beats": [],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #9 in deck",
+        "href": "../deck/deck.html#9"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 10,
+    "section": "STRATEGIES",
+    "title": "serial — cheap draft + precise refine",
+    "duration_seconds": 35,
+    "beats": [],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #10 in deck",
+        "href": "../deck/deck.html#10"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 11,
+    "section": "STRATEGIES",
+    "title": "specialist — route each dimension to best-fit backend",
+    "duration_seconds": 35,
+    "beats": [],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #11 in deck",
+        "href": "../deck/deck.html#11"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 12,
+    "section": "STRATEGIES",
+    "title": "adversarial — researcher · critic · arbitrator",
+    "duration_seconds": 35,
+    "beats": [],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #12 in deck",
+        "href": "../deck/deck.html#12"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 13,
+    "section": "I · PATTERNS",
+    "title": "I · PATTERNS",
+    "duration_seconds": 15,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Acá empieza la parte densa: los 11 patrones, agrupados en tres capas (Engine, Topology, Guardrails). Cada uno tiene una cita canónica."
+      },
+      {
+        "t": 8,
+        "say": "Es una taxonomía ejecutable, no una lista de buzzwords. Cada cosa que parece un truco tiene un nombre y un paper detrás."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #13 in deck",
+        "href": "../deck/deck.html#13"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 14,
+    "section": "I · PATTERNS",
+    "title": "Why these patterns matter",
+    "duration_seconds": 60,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Tres beneficios concretos de nombrar los patrones:"
+      },
+      {
+        "t": 3,
+        "say": "1. Replaceability — cuando algo tiene nombre, intercambiarlo es mecánico. Cambiar el judge de codex-cli a gemini-api: cambiás el binding del role en el config, no rediseñás nada. El patrón \"Multi-Agent Role Topology\" da exactamente esa indirección."
+      },
+      {
+        "t": 18,
+        "say": "2. Defensibility — en code review se discute \"¿esto es Evaluator-Optimizer o es Reflection?\" en vez de \"¿esto está bien?\". Conversación más corta, más precisa, menos sujeta a opinión."
+      },
+      {
+        "t": 29,
+        "say": "3. Onboarding — alguien nuevo reconoce las formas. No tiene que ingeniería-inversa cada decisión. Si vio Evaluator-Optimizer en otro proyecto, lo reconoce acá y arranca productivo más rápido."
+      },
+      {
+        "t": 40,
+        "say": "Los 11 no son toda la teoría agéntica que existe — son el subconjunto que ESTE framework efectivamente compone. Engine: 3 que hacen que una iteración tenga sentido. Topology: 5 que dicen cómo se conectan los backends. Guardrails: 3 que evitan que el sistema haga lo que no debería."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #14 in deck",
+        "href": "../deck/deck.html#14"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 15,
+    "section": "I · PATTERNS",
+    "title": "1 · Evaluator-Optimizer",
+    "duration_seconds": 45,
+    "beats": [
+      {
+        "t": 0,
+        "say": "El outer loop más simple en sistemas agénticos. Un generador produce candidatos. Un evaluador los puntúa contra un objetivo. El sistema queda con score alto y descarta (o reescribe) los demás. Corre hasta que el score se aplana o se agota un presupuesto (iteraciones, tiempo, costo)."
+      },
+      {
+        "t": 18,
+        "say": "Pieza que muchos pasan por alto: el evaluador y el generador NO tienen que ser el mismo modelo. Idealmente NO lo son (eso lo desarrolla LLM-as-Judge en el slide siguiente)."
+      },
+      {
+        "t": 30,
+        "say": "En este repo:\n• research_loop.py — dueño del ciclo\n• scorer.py — score híbrido (40% heurística determinística + 60% judge LLM, configurable)\n• Cada decisión KEEP/DISCARD queda en audit_trail.jsonl como evento estructurado"
+      },
+      {
+        "t": 43,
+        "say": "Referencia: Anthropic — Building Effective Agents."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #15 in deck",
+        "href": "../deck/deck.html#15"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 16,
+    "section": "I · PATTERNS",
+    "title": "2 · LLM-as-Judge",
+    "duration_seconds": 60,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Principio: el modelo que produce no puede puntuar bien lo que produce. Self-evaluation tiene sesgo conocido a verbosidad y confianza — el modelo se cree sus propias respuestas."
+      },
+      {
+        "t": 11,
+        "say": "Solución: un modelo separado, idealmente de otra familia, evalúa contra un rubric. Su score es UNA entrada a keep/discard, no la única."
+      },
+      {
+        "t": 20,
+        "say": "Por qué híbrido (40 heurística / 60 judge): un judge LLM puro se puede gamear — si el productor aprende a \"escribir para el judge\", el sistema colapsa. La heurística es determinística (cobertura, densidad de citas, completitud por dimensión) y no se gamea. Las dos juntas son más duras de explotar que cualquiera por separado."
+      },
+      {
+        "t": 42,
+        "say": "Multi-judge mode: si configurás varios judges, el sistema detecta desacuerdo entre ellos. Señal de dimensión ambigua o de sesgo en algún judge — útil para flagging temprano."
+      },
+      {
+        "t": 53,
+        "say": "Referencias: agentic-design.ai (mejor explicación práctica) · arXiv 2410.10934 (paper de fondo sobre judge bias)."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #16 in deck",
+        "href": "../deck/deck.html#16"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 17,
+    "section": "I · PATTERNS",
+    "title": "3 · Reflection / Self-Compression",
+    "duration_seconds": 60,
+    "beats": [
+      {
+        "t": 0,
+        "say": "La iteración naive crece el contexto monotónicamente. Cada claim que sobrevive el KEEP se agrega a la memoria de trabajo. Sin compresión, los runs explotan: el costo de tokens se va al carajo, el modelo pierde foco, la relación señal/ruido cae."
+      },
+      {
+        "t": 16,
+        "say": "La compresión es rank-and-prune forzado: el agente vuelve a leer su propio corpus y lo reescribe, quedándose solo con lo que él juzga load-bearing. No es resumir — es priorizar. Lo que se cae, se cae con registro de auditoría."
+      },
+      {
+        "t": 32,
+        "say": "No es opcional para runs largos. Sin compression_interval, una investigación de 20 iteraciones puede usar 10× los tokens que una bien comprimida, y la calidad del último claim se degrada porque el modelo está sumergido en ruido."
+      },
+      {
+        "t": 47,
+        "say": "En el repo: flag compression_interval (default 4). El audit event corpus_compressed registra los token counts antes y después."
+      },
+      {
+        "t": 54,
+        "say": "Referencia: Andrew Ng — Agentic Patterns (sección Reflection)."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #17 in deck",
+        "href": "../deck/deck.html#17"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 18,
+    "section": "I · PATTERNS",
+    "title": "4 · Orchestrator / Subagents",
+    "duration_seconds": 60,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Centralizá el control flow en un solo componente. Los backends son trabajadores con contrato angosto: reciben una tarea, devuelven un resultado, y NO tienen awareness del lifecycle más amplio. No saben en qué iteración están, qué backend corre antes/después, ni si esto va a un judge."
+      },
+      {
+        "t": 18,
+        "say": "Esa restricción los hace reemplazables, testeables, y evita que el estado cross-cutting se filtre dentro de los adaptadores de transporte. Si copilot-cli cambia su API mañana, lo único que tocás es el adapter — la lógica del loop no se entera."
+      },
+      {
+        "t": 35,
+        "say": "Regla dura: los backends NUNCA se llaman entre sí. Solo retornan al orchestrator. Si necesitás encadenar dos backends, eso es lógica del orchestrator, no del backend."
+      },
+      {
+        "t": 45,
+        "say": "orchestrator.py es el ÚNICO dueño de las transiciones de fase, los chequeos de convergencia, y los triggers de compresión. Si ves control flow en otra parte, es un bug arquitectural."
+      },
+      {
+        "t": 57,
+        "say": "Referencia: Anthropic — Building Effective Agents (formulación canónica de orchestrator-workers)."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #18 in deck",
+        "href": "../deck/deck.html#18"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 19,
+    "section": "I · PATTERNS",
+    "title": "5 · Multi-Agent Role Topology",
+    "duration_seconds": 65,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Los nombres `primary`, `judge`, `utility`, `research[]` son abstracciones que el código razona. Cada uno se bindea a un backend concreto en config time. El mismo código del orchestrator funciona si hoy `judge` es codex-cli y mañana es gemini-api. Esa indirección ES la superficie de swap."
+      },
+      {
+        "t": 18,
+        "say": "Sin este patrón, cambiar el judge significa modificar el código del orchestrator. Con él, es cambiar una línea de YAML. Diferencia enorme cuando estás iterando con qué modelo es mejor en qué rol."
+      },
+      {
+        "t": 31,
+        "say": "BackendsConfig valida que TODOS los roles necesarios estén bindeados antes de arrancar. Si te falta `judge` y la estrategia lo necesita, fallás temprano con error claro — no en medio del run cuando ya gastaste tokens."
+      },
+      {
+        "t": 46,
+        "say": "Los nombres de role aparecen en cada audit event: `role=judge backend=codex-cli`. Permite filtrar logs por rol semántico, no solo por backend técnico — útil cuando querés ver \"todo lo que hizo el critic\" sin importar qué modelo lo cumplió."
+      },
+      {
+        "t": 61,
+        "say": "Referencia: arXiv 2405.10467 (formalización académica del patrón)."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #19 in deck",
+        "href": "../deck/deck.html#19"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 20,
+    "section": "I · PATTERNS",
+    "title": "6 · Routing / Specialist Dispatch",
+    "duration_seconds": 55,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Trabajo distinto necesita priors distintos. Una pregunta de breadth (\"¿cuáles son las alternativas a X?\") se beneficia de un modelo con recall amplio. Una pregunta de precisión-crítica (\"¿esta cita realmente sostiene este claim?\") se beneficia de un modelo entrenado adversarial."
+      },
+      {
+        "t": 16,
+        "say": "El router mira la persona declarada por la dimensión y dispatcha al backend correspondiente. Si una dimensión no tiene specialist matchable, cae al primary — fail-safe en vez de fail-stop."
+      },
+      {
+        "t": 28,
+        "say": "Caso típico: en una investigación de 8 dimensiones, podés tener 2 que pidan \"broad-recall\", 4 \"precision-analyst\", y 2 \"code-reviewer\". Cada una al backend que la maneje mejor. No estás obligado a usar un solo modelo para todo."
+      },
+      {
+        "t": 43,
+        "say": "Cuándo NO usar specialist: cuando la audiencia espera una sola \"voz\" coherente en el output final. Mejor ensemble o serial con un único primary."
+      },
+      {
+        "t": 52,
+        "say": "Referencia: Anthropic — Building Effective Agents (sección routing)."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #20 in deck",
+        "href": "../deck/deck.html#20"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 21,
+    "section": "I · PATTERNS",
+    "title": "7 · Parallelization (Ensemble)",
+    "duration_seconds": 50,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Reducción de varianza por redundancia. La MISMA tarea en N backends simultáneamente. Las respuestas van a divergir en formas interesantes — y esa divergencia ES la información."
+      },
+      {
+        "t": 11,
+        "say": "Después un judge elige la más fuerte, o vote/merge las combina:\n• Investigación abierta — merge gana (combinás coverage)\n• Respuesta única — vote/judge gana (filtrás errores)"
+      },
+      {
+        "t": 22,
+        "say": "Cuándo conviene ensemble: cuando el costo de una respuesta equivocada es alto Y el presupuesto permite la redundancia. ADR que va a guiar 6 meses: gastar 3× los tokens para tener varianza más baja es una compra fácil. Idea casual: no."
+      },
+      {
+        "t": 38,
+        "say": "Implementación: ThreadPoolExecutor con paralelismo acotado. No queremos que un ensemble de 4 backends mate al rate limit de uno y haga fallar todo el run."
+      },
+      {
+        "t": 48,
+        "say": "Referencia: Anthropic — sección parallelization patterns."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #21 in deck",
+        "href": "../deck/deck.html#21"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 22,
+    "section": "I · PATTERNS",
+    "title": "8 · Prompt Chaining (Serial)",
+    "duration_seconds": 65,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Especialización por ETAPA, no por tarea. Un backend investiga, el próximo critica, el próximo refina. Cada etapa opera sobre el output de la anterior; la cadena acumula contexto."
+      },
+      {
+        "t": 11,
+        "say": "Más barato que ensemble (no son llamadas paralelas, no hay redundancia) pero más lento end-to-end (las etapas son secuenciales, no se solapan)."
+      },
+      {
+        "t": 20,
+        "say": "Cuándo serial sobre ensemble: cuando las etapas tienen especializaciones asimétricas. Investigar y criticar son habilidades distintas — querés que research-stage NO esté pensando en críticas, y critique-stage NO esté pensando en producir contenido nuevo. Separación de responsabilidades = ventaja."
+      },
+      {
+        "t": 36,
+        "say": "Cuándo NO usar serial: cuando la audiencia espera respuesta rápida. Cada etapa adiciona latencia, y un chain de 4 etapas con 30 seg cada una son 2 minutos largos."
+      },
+      {
+        "t": 47,
+        "say": "La etapa N+1 recibe el output COMPLETO de la N como contexto. Hace la cadena coherente, pero el costo crece con cada etapa. Reflection/Compression aplica con fuerza si la cadena es larga."
+      },
+      {
+        "t": 60,
+        "say": "Referencia: Anthropic — chaining (uno de los patrones más antiguos y mejor documentados)."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #22 in deck",
+        "href": "../deck/deck.html#22"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 23,
+    "section": "I · PATTERNS",
+    "title": "9 · Adversarial Critique",
+    "duration_seconds": 65,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Variante en forma de debate del serial chaining. Researcher propone claims; critic — DELIBERADAMENTE de otra familia de modelos — busca errores, citas débiles, gaps lógicos; arbitrator (otra familia distinta de nuevo) emite un veredicto."
+      },
+      {
+        "t": 14,
+        "say": "Pieza clave: \"different RLHF training produces different blind spots\". Cada modelo fue entrenado por humanos distintos con feedback distinto, así que internalizó sesgos distintos. Las debilidades de Claude son visibles para GPT, y al revés. Si los tres backends fueran del mismo proveedor, este patrón sería inútil — estarías triangulando con tres versiones del mismo blind spot."
+      },
+      {
+        "t": 37,
+        "say": "Es LA estrategia que usa el demo run. Tres roles, tres familias: claude-cli investiga, codex-cli critica, codex-cli arbitra. Vas a ver concretamente qué encontró el critic — errores factuales reales, no comentarios de estilo."
+      },
+      {
+        "t": 50,
+        "say": "El audit log registra cada flag del critic y cada decisión del arbitrator. Esa traza permite reconstruir POR QUÉ una hipótesis sobrevivió o fue descartada."
+      },
+      {
+        "t": 60,
+        "say": "Referencia: arXiv 2305.19118 (Multi-Agent Debate, formalización académica)."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #23 in deck",
+        "href": "../deck/deck.html#23"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 24,
+    "section": "I · PATTERNS",
+    "title": "10 · Tool Use + Sandboxed Execution",
+    "duration_seconds": 75,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Los agentes necesitan tools (web fetch, code execution, file write) pero cada tool ensancha la superficie de ataque. Capability registry: cada tool se declara con sus capacidades; las llamadas no clasificadas son denegadas por default."
+      },
+      {
+        "t": 14,
+        "say": "Writes a filesystem se scopean a `output/<run>/.workspace/`. Acceso de red: `web_only` (allowlist) o `none`. Cada denial es auditable."
+      },
+      {
+        "t": 21,
+        "say": "Framing para enterprise: el capability registry es el equivalente agéntico de una IAM policy. Mismo principio de least privilege, pero a nivel de tool en vez de proceso. Si la audiencia maneja AWS o cualquier nube, ese paralelismo aterriza inmediato."
+      },
+      {
+        "t": 37,
+        "say": "Write boundary: `output/<run>/.workspace/` — todo afuera es read-only para el agente. Network policy: web_only con allowlist explícita, o none. Audit events: tool_denied, write_intent, network_intent — trazabilidad completa de TODO lo que el agente intentó hacer y qué se le negó."
+      },
+      {
+        "t": 53,
+        "say": "¿Se puede saltear? No fácil. El sandbox executor intercepta a nivel de syscall lo que puede; lo que no puede se intercepta en el tool wrapper. Si un agente quiere escribir afuera del workspace, el intento queda en el audit trail antes de ser rechazado."
+      },
+      {
+        "t": 71,
+        "say": "Referencia: Anthropic — Writing Tools for Agents."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #24 in deck",
+        "href": "../deck/deck.html#24"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 25,
+    "section": "I · PATTERNS",
+    "title": "11 · Human-in-the-Loop (HITL)",
+    "duration_seconds": 70,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Algunas acciones son demasiado consecuentes para confiárselas a un agente plenamente autónomo: deploys, escrituras irreversibles, gastos grandes. HITL inserta una pausa explícita en los bordes de fase; el operador revisa los artefactos, los plan diffs, las estimaciones de costo, y aprueba o aborta."
+      },
+      {
+        "t": 17,
+        "say": "Las DOS decisiones (approve y abort) se registran. No es solo \"tuvo permiso para seguir\" — es \"Juan aprobó esto a las 14:32 con esta plan diff visible\". Auditoría completa."
+      },
+      {
+        "t": 29,
+        "say": "Caso típico: investigación que termina escribiendo un ADR — querés HITL en el borde research → synthesis. El operador chequea que las dimensiones cubiertas tienen sentido, que el corpus se ve sano, y recién ahí autoriza la generación del documento final."
+      },
+      {
+        "t": 46,
+        "say": "NO es un patrón para producción autónoma 24/7 — es para flows donde querés delegate-but-verify. Tiene latencia humana (puede pasar una hora desde que el agente termina la fase research hasta que el operador aprueba), así que diseñar el flow para que la pausa esté OK es parte del costo."
+      },
+      {
+        "t": 66,
+        "say": "Referencia: LangGraph (documentación más práctica sobre HITL)."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #25 in deck",
+        "href": "../deck/deck.html#25"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 26,
+    "section": "I · PATTERNS",
+    "title": "How they compose — the strategy lattice",
+    "duration_seconds": 70,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Los 11 patrones no son ortogonales — se layerean en tres capas:\n• Engine — qué hace que una iteración tenga sentido\n• Topology — cómo se conectan los backends\n• Guardrails — qué evita que el sistema haga macanas"
+      },
+      {
+        "t": 16,
+        "say": "Frase clave: \"a configured strategy is a tuple over the layers\". Cada configuración real del sistema es UNA elección por capa. No hay \"modo adversarial\" como botón único — adversarial es una elección de guardrail que se compone con elecciones de topology y engine."
+      },
+      {
+        "t": 34,
+        "say": "El demo: Adversarial Critique (guardrail) sobre Serial Chaining (topology) usando Evaluator-Optimizer + LLM-as-Judge (engine), con Sandbox siempre prendido. Esa tupla específica."
+      },
+      {
+        "t": 42,
+        "say": "\"¿Puedo combinar X con Y?\" — generalmente sí. Las capas son mix-and-match. Las únicas combinaciones imposibles son las que el schema de config rechaza explícitamente (ej: ensemble + serial al mismo tiempo no tiene sentido)."
+      },
+      {
+        "t": 56,
+        "say": "Insight pedagógico: cuando alguien viene con un caso nuevo, el ejercicio NO es \"¿qué framework de AI uso?\" — es \"¿qué tupla de capas compongo?\". Cambio de framing importante."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #26 in deck",
+        "href": "../deck/deck.html#26"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 27,
+    "section": "II · DEMO",
+    "title": "II · DEMO",
+    "duration_seconds": 15,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Se acaba la parte teórica, arranca el demo."
+      },
+      {
+        "t": 3,
+        "say": "LocalStack emula servicios de AWS localmente, hace falta para CI/CD, y acaba de pasar a modelo pago. La decisión de migrar es real, no inventada para el demo."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #27 in deck",
+        "href": "../deck/deck.html#27"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 28,
+    "section": "II · DEMO",
+    "title": "The config — three backends, adversarial strategy",
+    "duration_seconds": 65,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Las piezas a remarcar:"
+      },
+      {
+        "t": 2,
+        "say": "1. strategy: adversarial → la elección de guardrail vista en la strategy lattice."
+      },
+      {
+        "t": 7,
+        "say": "2. Tres backends bindeados a roles. NO son tres instancias del mismo modelo — tres FAMILIAS distintas. Eso es lo que hace que adversarial funcione (recordá: distinto RLHF = distintos blind spots)."
+      },
+      {
+        "t": 20,
+        "say": "3. claude-cli como primary_reasoner (Claude Code, calidad alta de reasoning estructurado)."
+      },
+      {
+        "t": 24,
+        "say": "4. copilot-cli como research_coder (GitHub Copilot — calidad alta de research técnico con tools)."
+      },
+      {
+        "t": 30,
+        "say": "5. codex-cli como adversary_reasoner — y CUMPLE DOS roles (judge + utility). Válido y económico — un mismo backend puede cubrir varios roles si las cargas no chocan."
+      },
+      {
+        "t": 41,
+        "say": "6. max_iterations: 10 — presupuesto duro. Si no convergió a 10, se detiene."
+      },
+      {
+        "t": 46,
+        "say": "7. allowed_tools: tools reales, no mockeados. WebSearch, WebFetch, Read, Bash, Glob, Grep — el agente realmente busca en la web y lee archivos locales."
+      },
+      {
+        "t": 56,
+        "say": "Frase de cierre: \"Critic and judge are deliberately different from the researcher\". Es el corazón del approach adversarial."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #28 in deck",
+        "href": "../deck/deck.html#28"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 29,
+    "section": "II · DEMO",
+    "title": "Dry-run first — validate without spending tokens",
+    "duration_seconds": 55,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Sin dry-run, un error de config (un backend no disponible, un role no bindeado, un tool no clasificado) se entera a mitad de la corrida cuando ya gastaste tokens. El dry-run valida TODO el wiring sin hacer una sola llamada a backend. 5 segundos de chequeo para evitar 5 minutos de pérdida."
+      },
+      {
+        "t": 21,
+        "say": "Lo que el dry-run confirma:\n• Los adapters de backend resuelven y son alcanzables (provider health)\n• La strategy es válida para la topología de roles declarada\n• El capability registry de tools está satisfecho (no hay tool no clasificado)\n• La política del sandbox es coherente (no hay write boundaries que choquen)"
+      },
+      {
+        "t": 42,
+        "say": "Si el dry-run pasa, podés correr con confianza. Si falla, el error te dice exactamente qué arreglar."
+      },
+      {
+        "t": 49,
+        "say": "Avisar: en el slide siguiente está el run real — y un link al dashboard de replay para verlo en vivo."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #29 in deck",
+        "href": "../deck/deck.html#29"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      },
+      {
+        "label": "Dashboard widget",
+        "href": "../widgets/dashboard-for-slide.html"
+      }
+    ]
+  },
+  {
+    "n": 30,
+    "section": "II · DEMO",
+    "title": "Real run — and the replay dashboard",
+    "duration_seconds": 75,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Una vez que el dry-run pasa, se corre por real. La ejecución streamea a `audit_trail.jsonl` — cada iteración: hipótesis, score, decisión KEEP/DISCARD — todo replayable."
+      },
+      {
+        "t": 10,
+        "say": "En la terminal de este slide se ve un resumen abreviado del run real: 12 iteraciones, dip en iter 07 cuando el critic flagó una cita débil, y recuperación en iter 12 con score final 85.0 sobre 11 de 13 dimensiones."
+      },
+      {
+        "t": 26,
+        "say": "El botón «Open live replay dashboard» abre `dashboard-for-slide.html` en una pestaña aparte. Es el componente standalone donde se puede hacer step-by-step (↑/↓), autoplay (P), o scrubbing por la timeline. Pensado para mostrarse en otra pantalla durante el demo — sin pelear para encajarlo dentro del slide."
+      },
+      {
+        "t": 45,
+        "say": "Qué mostrar en el dashboard:\n• La máquina de estados pulsa nodo a nodo (HYPO → EXEC → CRITIQUE → SCORE → DECIDE)\n• La curva de score sube progresivamente, baja en iter 07, salta en iter 12\n• Las dimensiones se van llenando una por una en verde\n• Cost · calls · tokens · spend acumulan en tiempo real\n• El event log de la derecha muestra cada KEEP / DISCARD / COMPRESS / SYNTH"
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #30 in deck",
+        "href": "../deck/deck.html#30"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      },
+      {
+        "label": "Dashboard widget",
+        "href": "../widgets/dashboard-for-slide.html"
+      }
+    ]
+  },
+  {
+    "n": 31,
+    "section": "III · ADVERSARIAL",
+    "title": "III · ADVERSARIAL",
+    "duration_seconds": 15,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Lo que viene son citas LITERALES del judge en una corrida real. No editadas, no parafraseadas. Evidencia concreta de que adversarial encuentra cosas reales."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #31 in deck",
+        "href": "../deck/deck.html#31"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 32,
+    "section": "III · ADVERSARIAL",
+    "title": "The critic finds real errors",
+    "duration_seconds": 75,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Iteración 001: Copilot (researcher) entregó findings sobre cobertura de AWS services en alternativas a LocalStack. Score 62. La calidad parecía razonable a primera vista — pero un judge de otra familia (GPT-5.4) la miró y encontró tres problemas duros."
+      },
+      {
+        "t": 16,
+        "say": "Las tres citas son literales del audit log:"
+      },
+      {
+        "t": 19,
+        "say": "1. \"MiniStack section appears materially stale\" — el critic identifica que los claims sobre API Gateway v1, Cognito y KMS no tienen evidencia primaria actual. NO está diciendo \"no me gusta cómo está escrito\" — está diciendo \"estos tres claims específicos no tienen fuente actual\"."
+      },
+      {
+        "t": 37,
+        "say": "2. \"Moto capabilities are mischaracterized\" — el critic dice que el modo de ejecución de Lambda y el matiz de enforcement de IAM están FÁCTICAMENTE MAL. Factualmente. Chequeable."
+      },
+      {
+        "t": 48,
+        "say": "3. \"Overconfident relative to the cited evidence\" — claims fine-grained más fuertes de lo que la evidencia sostiene. Problema de calibración."
+      },
+      {
+        "t": 56,
+        "say": "NO son comentarios de estilo. NO son \"fixame el wording\". Son desafíos factuales — modelo distinto, datos de entrenamiento distintos, captura errores distintos."
+      },
+      {
+        "t": 66,
+        "say": "El loop fuerza a la siguiente iteración a resolver esos gaps o descartar el claim. No hay \"ignorá el feedback del critic\". Es estructural."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #32 in deck",
+        "href": "../deck/deck.html#32"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 33,
+    "section": "III · ADVERSARIAL",
+    "title": "Score progression — convergence is measurable",
+    "duration_seconds": 70,
+    "beats": [
+      {
+        "t": 0,
+        "say": "La forma de la curva importa más que los números. No es lineal — sube, baja en iter 007, después salta. Esa NO-linealidad es la firma de convergencia adversarial real, no de un modelo \"haciendo lo que se le pide\"."
+      },
+      {
+        "t": 16,
+        "say": "• Iter 001-006: subida progresiva. El sistema agrega dimensiones, el score promedio crece."
+      },
+      {
+        "t": 21,
+        "say": "• Iter 007: dip a 63.5. ¿Por qué bajó? Porque el critic flagged \"migration estimates under-validated\" — los números de esfuerzo de migración no estaban sosteniendos por evidencia suficiente. El loop NO escondió eso para mantener una curva linda. Lo registró y forzó la próxima iteración a ir más profundo."
+      },
+      {
+        "t": 41,
+        "say": "• Iter 009: salto a 76.3. Esa iteración resolvió el problema — +12.8 puntos sobre la dimensión que estaba mal sostenida. Eso es convergencia real: bajaste cuando descubriste un problema, subiste cuando lo resolviste."
+      },
+      {
+        "t": 55,
+        "say": "Si la curva fuera monótona-creciente sin nunca bajar, sería SOSPECHOSO — el modelo estaría escribiéndole al judge en vez de investigando. La forma \"subida, dip, salto\" es saludable."
+      },
+      {
+        "t": 66,
+        "say": "Score = 40% heurística + 60% judge."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #33 in deck",
+        "href": "../deck/deck.html#33"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 34,
+    "section": "III · ADVERSARIAL",
+    "title": "From one corpus — three artifacts",
+    "duration_seconds": 35,
+    "beats": [
+      {
+        "t": 0,
+        "say": "El loop de investigación corre UNA vez. Lo que cambia entre artifactos es el RENDERING, no el research. Misma data, mismas citas, distinto formato de salida."
+      },
+      {
+        "t": 10,
+        "say": "Permite re-renderizar runs viejos a nuevos formatos sin volver a gastar en backend calls. El flag --synthesize saltea el loop completo y solo re-emite el reporte. 5 segundos en vez de 5 minutos."
+      },
+      {
+        "t": 24,
+        "say": "Cinco styles disponibles: default, paper, technical_doc, executive_brief, decision_memo. Vamos a ver tres en detalle. executive_brief es la versión corta de decision_memo orientada a C-level."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #34 in deck",
+        "href": "../deck/deck.html#34"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 35,
+    "section": "III · ADVERSARIAL",
+    "title": "Output: default — for internal exploration",
+    "duration_seconds": 30,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Formato más liviano. Síntesis narrativa, secciones por dimensión, tablas comparativas embebidas. Lo más cercano a una \"página de Notion bien laburada\"."
+      },
+      {
+        "t": 8,
+        "say": "Cuándo usarlo:\n• Exploración interna\n• Compartir findings dentro del equipo\n• Iteración rápida antes de decidir el formato final"
+      },
+      {
+        "t": 16,
+        "say": "Es el default por una razón — es el menos opinado, no asume audiencia."
+      },
+      {
+        "t": 22,
+        "say": "NO usarlo para: stakeholders externos, decisiones formales, documentos que se van a citar después."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #35 in deck",
+        "href": "../deck/deck.html#35"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 36,
+    "section": "III · ADVERSARIAL",
+    "title": "Output: paper — for stakeholders and external review",
+    "duration_seconds": 50,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Estructura tipo paper académico: abstract arriba, sección de methodology que documenta cómo se llegó a las conclusiones, claims con evidencia explícita, y al final una sección References generada DETERMINÍSTICAMENTE desde citations.json."
+      },
+      {
+        "t": 12,
+        "say": "\"Determinísticamente\" es la palabra clave. La bibliografía no es una sugerencia del LLM — es construida a partir del archivo estructurado de citas que el sistema mantuvo durante todo el run. Si una cita no está en citations.json, no puede aparecer en el output. Garantías sobre provenance que un LLM solo no puede dar."
+      },
+      {
+        "t": 34,
+        "say": "Cuándo usarlo:\n• Stakeholders externos\n• Reportes donde el provenance importa más que la prosa\n• Cualquier cosa que vaya a ser citada por otros documentos downstream"
+      },
+      {
+        "t": 45,
+        "say": "Audiencias técnicas-formales lo prefieren porque saben dónde buscar la evidencia."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #36 in deck",
+        "href": "../deck/deck.html#36"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 37,
+    "section": "III · ADVERSARIAL",
+    "title": "Output: technical_doc — for engineering decisions",
+    "duration_seconds": 35,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Tablas comparativas, matriz de decisión, recomendación arriba (no enterrada al final), pros/cons estructurados por alternativa."
+      },
+      {
+        "t": 6,
+        "say": "La estructura es la de un ADR (Architecture Decision Record) o un RFC con veredicto. Empieza por la conclusión — \"recomendamos X porque Y\" — y después justifica. Es la forma que tu equipo de ingeniería ya conoce."
+      },
+      {
+        "t": 21,
+        "say": "Cuándo usarlo:\n• ADRs\n• Evaluación de vendors o tools\n• Decision memos para equipos técnicos"
+      },
+      {
+        "t": 28,
+        "say": "Cualquier momento donde el reader quiere saber QUÉ HACER antes de saber por qué."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #37 in deck",
+        "href": "../deck/deck.html#37"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 38,
+    "section": "III · ADVERSARIAL",
+    "title": "Every run is fully replayable",
+    "duration_seconds": 80,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Cada archivo del output tiene un propósito auditable:"
+      },
+      {
+        "t": 3,
+        "say": "• run.log — log operacional human-readable."
+      },
+      {
+        "t": 6,
+        "say": "• audit_trail.jsonl — trail estructurado append-only. Cada paso, cada tool call, cada denial, cada decisión de policy. ESTE es el archivo forense. Si querés saber qué decidió el sistema y por qué, lo abrís con jq."
+      },
+      {
+        "t": 20,
+        "say": "• effective_config.json — snapshot completo del config NORMALIZADO al arrancar el run. No es el YAML original — es el YAML después de resolver defaults, expandir referencias, validar schema. Permite reproducir aunque cambien los defaults del código mañana."
+      },
+      {
+        "t": 35,
+        "say": "• tool_trace.json — argumentos de cada tool call y output truncado. Para debugear qué buscó el agente y qué encontró."
+      },
+      {
+        "t": 43,
+        "say": "• prompt_snapshot.json — los prompts EXACTOS enviados al arranque. Si el sistema cambia los prompts por defecto en una versión futura, este archivo permite reconstruir con los originales."
+      },
+      {
+        "t": 54,
+        "say": "• rerun.sh — NO es documentación, es ejecutable. Lo corrés y reconstruye el run idéntico. No hay \"funcionaba en mi máquina\"."
+      },
+      {
+        "t": 63,
+        "say": "• iterations/ — una carpeta por iteración con hipótesis, findings, crítica y score."
+      },
+      {
+        "t": 68,
+        "say": "• report.html — el output renderizado en el style elegido."
+      },
+      {
+        "t": 72,
+        "say": "Lo que más impresiona a auditores: rerun.sh ejecutable. Ningún sistema de research convencional lo garantiza."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #38 in deck",
+        "href": "../deck/deck.html#38"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 39,
+    "section": "III · ADVERSARIAL",
+    "title": "Trust + certainty — every claim is classified",
+    "duration_seconds": 80,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Cada claim que el sistema emite carga una clasificación de trust. Tres clases:"
+      },
+      {
+        "t": 5,
+        "say": "1. untrusted_web_content — cita de URL que viene de búsqueda web en vivo. Tratar como externa y no verificada hasta que un humano la valide. Default conservative — el sistema NO confía en una URL solo porque apareció en results."
+      },
+      {
+        "t": 21,
+        "say": "2. user_provided_source_material — archivos de input que el operador subió. El sistema confía en estos al nivel del operador. Si vos le subiste el doc, el sistema asume que vos lo verificaste."
+      },
+      {
+        "t": 34,
+        "say": "3. inferred_claim — claim sintetizado por el LLM sin cita directa. EXPLÍCITAMENTE flagged. NO se esconde como \"afirmación general\". Si el sistema infiere algo sin fuente, te lo dice."
+      },
+      {
+        "t": 46,
+        "say": "Logs estilo PRISMA (la metodología de revisiones sistemáticas de medicina, adaptada acá):\n• search_log — qué buscó, cuándo, desde qué backend\n• screening_log — qué se incluyó o excluyó del corpus, y POR QUÉ\n• certainty_tables — score de certeza first-pass por claim"
+      },
+      {
+        "t": 63,
+        "say": "Punto pedagógico: el sistema NO te dice \"esto es verdad\". Te dice \"esto es lo que encontré, esta es la fuerza de la evidencia, este es el path de auditoría\". El reader sabe qué tan fuerte es cada conclusión ANTES de actuar sobre ella. Honestidad estructural."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #39 in deck",
+        "href": "../deck/deck.html#39"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 40,
+    "section": "III · ADVERSARIAL",
+    "title": "This run",
+    "duration_seconds": 50,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Dos cosas para remarcar:"
+      },
+      {
+        "t": 2,
+        "say": "1. Cost: $0.00. NO es magia — es la elección de adapters CLI sobre adapters API. Los CLI adapters reusan tus suscripciones Claude Pro / Copilot / Codex que ya pagás como flat rate. Costo marginal por run: cero. Si el equipo ya tiene esas suscripciones, podés correr esto ilimitado sin preocuparte por costos por token."
+      },
+      {
+        "t": 24,
+        "say": "2. La caveat: para CI/CD o runs unattended, los CLI adapters no sirven (necesitan login interactivo). Para esos casos, API adapters y se cobra por token.\n• Interactivo y exploratorio — CLI\n• Automated y producción — API"
+      },
+      {
+        "t": 39,
+        "say": "Métricas del run real: 8 de 8 dimensiones cubiertas, 9 iteraciones (+ 1 compresión en iter 4), score final 76.3 / 100. Tres formatos de output generados."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #40 in deck",
+        "href": "../deck/deck.html#40"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 41,
+    "section": "WRAP",
+    "title": "What you just saw",
+    "duration_seconds": 45,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Los 6 puntos son los takeaways operacionales — recordatorios de lo que la audiencia acaba de ver."
+      },
+      {
+        "t": 7,
+        "say": "El blockquote del final aterriza el avión. La analogía con code review es DELIBERADA: el adversarial loop NO es un truco clever de AI, es el mismo principio de ingeniería que code review. Un segundo par de ojos con priors distintos atrapa bugs distintos."
+      },
+      {
+        "t": 24,
+        "say": "Esa analogía hace que la audiencia se lleve el concepto sin necesidad de recordar los 11 patrones por nombre. Si entienden code review, entienden por qué adversarial funciona."
+      },
+      {
+        "t": 36,
+        "say": "Última observación posible: los humanos hacen code review hace décadas — esto solo aplica el mismo principio a la generación de research, en vez de aplicarlo a código."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #41 in deck",
+        "href": "../deck/deck.html#41"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  },
+  {
+    "n": 42,
+    "section": "WRAP",
+    "title": "Multi-LLM Adversarial Convergence Framework",
+    "duration_seconds": 45,
+    "beats": [
+      {
+        "t": 0,
+        "say": "Tres comandos para arrancar:\n• uv sync\n• dry-run con el config propio\n• run real"
+      },
+      {
+        "t": 6,
+        "say": "El template _template.yaml está pensado para copiar y modificar — no necesitan empezar de cero. Cualquier topic entra ahí: decisión técnica propia, evaluación de tools propia, investigación propia."
+      },
+      {
+        "t": 18,
+        "say": "Referencias del footer del slide:\n• docs/research.md — cómo se usa el sistema en detalle\n• docs/design/agentic-design-patterns.md — reference doc del repo con los 11 patrones mapeados a archivos del código\n• AGENTS.md — convenciones para que un agente trabaje en este repo"
+      },
+      {
+        "t": 35,
+        "say": "\"¿Lo puedo usar para X?\" → respuesta default: \"probablemente sí, copiá el template y abrí un issue si te trabás\". La barrera de entrada está baja a propósito."
+      }
+    ],
+    "hints": [],
+    "links": [
+      {
+        "label": "Slide #42 in deck",
+        "href": "../deck/deck.html#42"
+      },
+      {
+        "label": "Glossary",
+        "href": "../glossary/glossary.html"
+      }
+    ]
+  }
+]</script>
+  <script>
+    (() => {
+      // ── Pro sync: resolve API key, expose UI to set/clear it ────────
+      // Key resolution order (highest priority first):
+      //   1. ?apiKey=… URL param  — for prod deploy links; scrubbed from URL bar after read
+      //   2. localStorage          — persisted across reloads on this browser
+      //   3. /api/runtime-config   — local dev (FastAPI inlines it)
+      //   4. UI input              — click the SYNC pill to set it manually
+      const KEY_STORAGE = 'slidesApiKey';
+      const URL_KEY_STORAGE = 'slidesControlUrl';
+      let __apiKey = null;
+      let __controlUrl = localStorage.getItem(URL_KEY_STORAGE) || '/api/control';
+      let __keySource = 'none';
+
+      function updateSyncBadge() {
+        const el = document.getElementById('sync-status');
+        const lbl = document.getElementById('sync-label');
+        const src = document.getElementById('sync-source');
+        if (!el) return;
+        if (__apiKey) {
+          el.dataset.state = 'on';
+          el.title = `Sync ON · key from ${__keySource} · click to change`;
+          if (lbl) lbl.textContent = 'SYNC ON';
+        } else {
+          el.dataset.state = 'off';
+          el.title = 'Sync OFF · click to paste SLIDES_API_KEY';
+          if (lbl) lbl.textContent = 'SYNC OFF';
+        }
+        if (src) src.textContent = `SOURCE — ${__keySource}`;
+      }
+
+      async function loadApiKey() {
+        // 1. URL param
+        const u = new URL(location.href);
+        const fromUrl = u.searchParams.get('apiKey');
+        if (fromUrl) {
+          __apiKey = fromUrl;
+          __keySource = 'url-param';
+          try { localStorage.setItem(KEY_STORAGE, fromUrl); } catch (e) {}
+          // scrub from URL bar so it's not visible / pasted accidentally
+          u.searchParams.delete('apiKey');
+          history.replaceState(null, '', u.pathname + u.search + u.hash);
+          return;
+        }
+        // 2. localStorage
+        try {
+          const stored = localStorage.getItem(KEY_STORAGE);
+          if (stored) { __apiKey = stored; __keySource = 'localStorage'; return; }
+        } catch (e) {}
+        // 3. /api/runtime-config (local FastAPI inlines it)
+        try {
+          const r = await fetch('/api/runtime-config', { cache: 'no-store' });
+          if (r.ok) {
+            const cfg = await r.json();
+            if (cfg.apiKey) {
+              __apiKey = cfg.apiKey;
+              __controlUrl = cfg.controlUrl || __controlUrl;
+              __keySource = 'runtime-config';
+              try { localStorage.setItem(URL_KEY_STORAGE, __controlUrl); } catch (e) {}
+            }
+          }
+        } catch (e) { /* fine — UI fallback */ }
+      }
+
+      async function postControl(patch) {
+        if (!__apiKey) return; // silent no-op when unconfigured
+        try {
+          const r = await fetch(__controlUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': __apiKey },
+            body: JSON.stringify(patch),
+          });
+          if (r.status === 401) {
+            console.warn('[presenter] 401 from /api/control — key is wrong, clearing');
+            __apiKey = null; __keySource = 'invalid';
+            try { localStorage.removeItem(KEY_STORAGE); } catch (e) {}
+            updateSyncBadge();
+          }
+        } catch (e) { console.warn('[presenter] postControl failed', e); }
+      }
+
+      // Wire the UI (DOM exists — this script runs at end of body)
+      const dialog = document.getElementById('sync-config');
+      const input = document.getElementById('sync-key-input');
+      document.getElementById('sync-status').addEventListener('click', () => {
+        if (input) input.value = __apiKey || '';
+        if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
+      });
+      document.getElementById('sync-form').addEventListener('submit', () => {
+        const val = (input.value || '').trim();
+        if (val) {
+          __apiKey = val;
+          __keySource = 'localStorage';
+          try { localStorage.setItem(KEY_STORAGE, val); } catch (e) {}
+        }
+        updateSyncBadge();
+      });
+      document.getElementById('sync-cancel').addEventListener('click', () => { if (dialog) dialog.close(); });
+      document.getElementById('sync-clear').addEventListener('click', () => {
+        __apiKey = null; __keySource = 'none';
+        try { localStorage.removeItem(KEY_STORAGE); } catch (e) {}
+        if (input) input.value = '';
+        updateSyncBadge();
+      });
+
+      // Boot: resolve key then refresh the badge
+      loadApiKey().then(updateSyncBadge);
+
+      const slides = JSON.parse(document.getElementById('notes-data').textContent);
+      const total = slides.length;
+      const els = {
+        section:    document.getElementById('slide-section'),
+        num:        document.getElementById('slide-num'),
+        slideTotal: document.getElementById('slide-total'),
+        title:      document.getElementById('slide-title'),
+        countdown:  document.getElementById('countdown'),
+        progress:   document.getElementById('progress-bar'),
+        timerBtn:   document.getElementById('timer-toggle'),
+        beatsList:  document.getElementById('beats-list'),
+        hintsPanel: document.getElementById('hints-panel'),
+        hintsList:  document.getElementById('hints-list'),
+        linksList:  document.getElementById('links-list'),
+        prev:       document.getElementById('btn-prev'),
+        next:       document.getElementById('btn-next'),
+        cur:        document.getElementById('cur'),
+        total:      document.getElementById('total'),
+        jump:       document.getElementById('jump'),
+      };
+      els.total.textContent = total;
+      els.slideTotal.textContent = String(total).padStart(2, '0');
+
+      // ── State ────────────────────────────────────────────────────────
+      let currentSlide = 1;
+      let elapsedSec   = 0;          // for current slide
+      let timerRunning = false;
+      let tickerId     = null;
+      const coveredBeats = new Map(); // slideNum -> Set<beatIndex>
+
+      // ── Build jump strip with section dividers ───────────────────────
+      let prevSection = null;
+      for (let i = 1; i <= total; i++) {
+        const b = document.createElement('button');
+        b.textContent = i;
+        b.dataset.slide = i;
+        b.addEventListener('click', () => go(i));
+        const sec = slides[i - 1].section;
+        if (sec && sec !== prevSection) b.classList.add('section-start');
+        prevSection = sec;
+        els.jump.appendChild(b);
+      }
+
+      // ── Time formatting (mm:ss, with leading - when over) ────────────
+      function fmtTime(sec, over = false) {
+        const a = Math.abs(sec);
+        const m = Math.floor(a / 60);
+        const s = a % 60;
+        return (over ? '+' : '') + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+      }
+
+      // ── Render full slide ─────────────────────────────────────────────
+      function renderSlide(n) {
+        const s = slides[n - 1];
+        els.section.textContent = s.section || '—';
+        els.section.style.display = s.section ? 'inline-block' : 'none';
+        els.num.textContent = String(n).padStart(2, '0');
+        els.title.textContent = s.title || '—';
+        els.cur.textContent = n;
+
+        // BEATS
+        els.beatsList.innerHTML = '';
+        const covered = coveredBeats.get(n) || new Set();
+        (s.beats || []).forEach((beat, idx) => {
+          const li = document.createElement('li');
+          li.className = 'beat';
+          li.dataset.t = beat.t || 0;
+          li.dataset.idx = idx;
+          if (beat.pause != null) li.classList.add('pause');
+          if (covered.has(idx)) li.classList.add('covered');
+
+          const tSpan = document.createElement('span');
+          tSpan.className = 't';
+          const t = beat.t || 0;
+          tSpan.textContent = '[' + Math.floor(t/60) + ':' + String(t%60).padStart(2,'0') + ']';
+
+          const mark = document.createElement('span');
+          mark.className = 'mark';
+          if (beat.pause != null) mark.textContent = '⏸';
+          else if (covered.has(idx)) mark.textContent = '✓';
+          else mark.textContent = '·';
+
+          const say = document.createElement('span');
+          say.className = 'say';
+          if (beat.pause != null) {
+            say.textContent = `PAUSE ${beat.pause}s${beat.hint ? ' — ' + beat.hint : ''}`;
+          } else {
+            say.textContent = beat.say || '';
+          }
+
+          li.append(tSpan, mark, say);
+          li.addEventListener('click', () => toggleCovered(n, idx));
+          els.beatsList.appendChild(li);
+        });
+
+        // HINTS
+        els.hintsList.innerHTML = '';
+        const hints = s.hints || [];
+        if (hints.length === 0) {
+          els.hintsPanel.classList.add('empty');
+          const li = document.createElement('li');
+          li.className = 'hint-item';
+          li.style.opacity = '0.5';
+          li.style.fontStyle = 'italic';
+          li.textContent = '(no presenter cues for this slide)';
+          els.hintsList.appendChild(li);
+        } else {
+          els.hintsPanel.classList.remove('empty');
+          hints.forEach(h => {
+            const li = document.createElement('li');
+            li.className = 'hint-item';
+            li.textContent = h;
+            els.hintsList.appendChild(li);
+          });
+        }
+
+        // LINKS
+        els.linksList.innerHTML = '';
+        (s.links || []).forEach(link => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.className = 'link-pill';
+          a.href = link.href;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = link.label;
+          li.appendChild(a);
+          els.linksList.appendChild(li);
+        });
+
+        // Jump strip active state
+        Array.from(els.jump.children).forEach((b, i) => {
+          b.classList.toggle('active', i === n - 1);
+        });
+
+        // Reset timer for new slide
+        resetTimer();
+        updateCurrentBeat();
+        updateTimerDisplay();
+
+        els.prev.disabled = n <= 1;
+        els.next.disabled = n >= total;
+        document.title = `[${n}/${total}] ${s.title || 'Presenter'}`;
+      }
+
+      // ── Beat covered toggle ───────────────────────────────────────────
+      function toggleCovered(slideN, beatIdx) {
+        if (!coveredBeats.has(slideN)) coveredBeats.set(slideN, new Set());
+        const set = coveredBeats.get(slideN);
+        if (set.has(beatIdx)) set.delete(beatIdx);
+        else set.add(beatIdx);
+        // Re-render only this beat
+        const li = els.beatsList.querySelector(`[data-idx="${beatIdx}"]`);
+        if (li) {
+          li.classList.toggle('covered', set.has(beatIdx));
+          const mark = li.querySelector('.mark');
+          const beat = slides[slideN - 1].beats[beatIdx];
+          if (beat.pause != null) mark.textContent = '⏸';
+          else if (set.has(beatIdx)) mark.textContent = '✓';
+          else mark.textContent = '·';
+        }
+      }
+
+      // ── Timer ─────────────────────────────────────────────────────────
+      function currentSlideObj() { return slides[currentSlide - 1]; }
+      function currentDuration() { return currentSlideObj().duration_seconds || 60; }
+
+      function startTimer() {
+        if (timerRunning) return;
+        timerRunning = true;
+        els.timerBtn.textContent = '⏸';
+        els.timerBtn.classList.add('running');
+        tickerId = setInterval(tick, 1000);
+      }
+      function pauseTimer() {
+        timerRunning = false;
+        els.timerBtn.textContent = '▶';
+        els.timerBtn.classList.remove('running');
+        clearInterval(tickerId);
+        tickerId = null;
+      }
+      function resetTimer() {
+        pauseTimer();
+        elapsedSec = 0;
+      }
+      function tick() {
+        elapsedSec += 1;
+        updateTimerDisplay();
+        updateCurrentBeat();
+      }
+      function updateTimerDisplay() {
+        const dur = currentDuration();
+        const remaining = dur - elapsedSec;
+        const isOver = remaining < 0;
+        els.countdown.textContent = fmtTime(remaining, isOver);
+        els.countdown.classList.toggle('warning', !isOver && remaining <= dur * 0.25);
+        els.countdown.classList.toggle('over', isOver);
+        // Progress: fills as elapsed grows; caps at 100%
+        const pct = Math.min(100, (elapsedSec / dur) * 100);
+        els.progress.style.width = pct + '%';
+        els.progress.classList.toggle('over', isOver);
+      }
+      function updateCurrentBeat() {
+        const beats = currentSlideObj().beats || [];
+        let activeIdx = -1;
+        for (let i = 0; i < beats.length; i++) {
+          if ((beats[i].t || 0) <= elapsedSec) activeIdx = i;
+          else break;
+        }
+        Array.from(els.beatsList.children).forEach((li, i) => {
+          li.classList.toggle('current', i === activeIdx && timerRunning);
+        });
+        // If timer was started, also auto-mark prior beats as covered for visual flow
+        // (operator can un-mark by clicking)
+        if (timerRunning && activeIdx >= 0) {
+          const set = coveredBeats.get(currentSlide) || new Set();
+          for (let i = 0; i < activeIdx; i++) {
+            if (!set.has(i)) {
+              set.add(i);
+              const li = els.beatsList.querySelector(`[data-idx="${i}"]`);
+              if (li) {
+                li.classList.add('covered');
+                const mark = li.querySelector('.mark');
+                const beat = beats[i];
+                mark.textContent = (beat.pause != null) ? '⏸' : '✓';
+              }
+            }
+          }
+          coveredBeats.set(currentSlide, set);
+        }
+      }
+      els.timerBtn.addEventListener('click', () => timerRunning ? pauseTimer() : startTimer());
+
+      // ── Slide navigation ──────────────────────────────────────────────
+      function go(n, broadcast = true) {
+        n = Math.max(1, Math.min(total, n));
+        if (n === currentSlide) return;
+        currentSlide = n;
+        renderSlide(n);
+        history.replaceState(null, '', '#' + n);
+        if (broadcast) {
+          postControl({ slide: n, view: 'deck' });
+          try { localStorage.setItem('deckCurrentSlide', String(n)); } catch (e) {}
+        }
+      }
+      els.prev.addEventListener('click', () => go(currentSlide - 1));
+      els.next.addEventListener('click', () => go(currentSlide + 1));
+
+      // ── Keyboard ──────────────────────────────────────────────────────
+      document.addEventListener('keydown', (e) => {
+        if (e.target.matches('input, textarea, [contenteditable]')) return;
+        switch (e.key) {
+          case 'ArrowRight': case 'PageDown': case ' ':
+            e.preventDefault(); go(currentSlide + 1); break;
+          case 'ArrowLeft': case 'PageUp':
+            e.preventDefault(); go(currentSlide - 1); break;
+          case 'Home': e.preventDefault(); go(1); break;
+          case 'End':  e.preventDefault(); go(total); break;
+          case 't': case 'T':
+            e.preventDefault();
+            timerRunning ? pauseTimer() : startTimer();
+            break;
+          case 'r': case 'R':
+            e.preventDefault();
+            resetTimer();
+            updateTimerDisplay();
+            updateCurrentBeat();
+            break;
+          case 'o': case 'O':
+            e.preventDefault();
+            window.open('../deck/deck.html', 'deck-window');
+            break;
+          default:
+            // 1-9 to toggle beat
+            if (e.key >= '1' && e.key <= '9') {
+              const idx = parseInt(e.key, 10) - 1;
+              const beats = currentSlideObj().beats || [];
+              if (idx < beats.length) {
+                e.preventDefault();
+                toggleCovered(currentSlide, idx);
+              }
+            }
+        }
+      });
+
+      // ── Cross-tab sync ────────────────────────────────────────────────
+      window.addEventListener('storage', (e) => {
+        if (e.key !== 'deckCurrentSlide' || e.newValue == null) return;
+        const n = parseInt(e.newValue, 10);
+        if (!isNaN(n) && n !== currentSlide) go(n, false);
+      });
+      window.addEventListener('hashchange', () => {
+        const m = location.hash.match(/^#(\d+)$/);
+        if (m) go(parseInt(m[1], 10));
+      });
+
+      // ── Initial slide ────────────────────────────────────────────────
+      function startSlide() {
+        const m = location.hash.match(/^#(\d+)$/);
+        if (m) return parseInt(m[1], 10);
+        const stored = localStorage.getItem('deckCurrentSlide');
+        if (stored) return parseInt(stored, 10);
+        return 1;
+      }
+      const init = startSlide();
+      currentSlide = init;
+      renderSlide(init);
+    })();
+  </script>
+</body>
+</html>

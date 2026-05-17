@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 380" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+  <!-- PALETTE: panel #0d1117 · ink · soft · mute · amber · cyan · green · warn
+       LAYOUT — horizontal timeline. Iterations are small monochrome cells; every
+                Nth cell (default 4) is a wider "compress" band that bumps the
+                next iteration to a new lane. Trailing ellipsis hints continuation. -->
+  <defs>
+    <marker id="ah-mute" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+    <marker id="ah-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+    <filter id="node-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Eyebrow row -->
+  <g transform="translate(40 60)" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">
+    <text>BLOCK · 1   ·   compression_interval = 4</text>
+  </g>
+  <g transform="translate(640 60)" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">
+    <text>BLOCK · 2   ·   re-compress at iter 8</text>
+  </g>
+
+  <!-- ─── BLOCK 1 — iter 1..4 → compress ─── -->
+  <g filter="url(#node-shadow)">
+    <!-- iter cells (gray) -->
+    <g transform="translate(40 100)">
+      <rect width="80" height="70" rx="4" fill="#0d1117" stroke="#7d8590" stroke-width="1.2"/>
+      <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.4">ITER</text>
+      <text x="40" y="50" font-size="22" font-weight="600" fill="#e6edf3" text-anchor="middle">1</text>
+    </g>
+    <g transform="translate(140 100)">
+      <rect width="80" height="70" rx="4" fill="#0d1117" stroke="#7d8590" stroke-width="1.2"/>
+      <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.4">ITER</text>
+      <text x="40" y="50" font-size="22" font-weight="600" fill="#e6edf3" text-anchor="middle">2</text>
+    </g>
+    <g transform="translate(240 100)">
+      <rect width="80" height="70" rx="4" fill="#0d1117" stroke="#7d8590" stroke-width="1.2"/>
+      <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.4">ITER</text>
+      <text x="40" y="50" font-size="22" font-weight="600" fill="#e6edf3" text-anchor="middle">3</text>
+    </g>
+    <g transform="translate(340 100)">
+      <rect width="80" height="70" rx="4" fill="#0d1117" stroke="#7d8590" stroke-width="1.2"/>
+      <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.4">ITER</text>
+      <text x="40" y="50" font-size="22" font-weight="600" fill="#e6edf3" text-anchor="middle">4</text>
+    </g>
+  </g>
+
+  <!-- COMPRESS · 1 (cyan, taller block) -->
+  <g transform="translate(450 80)" filter="url(#node-shadow)">
+    <rect width="160" height="110" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">⚙ COMPRESS</text>
+    <text x="14" y="48" font-size="14" font-weight="600" fill="#e6edf3">distill</text>
+    <text x="14" y="68" font-size="12" fill="#b1bac4">drop noise</text>
+    <text x="14" y="88" font-size="12" fill="#b1bac4">rank by merit</text>
+  </g>
+
+  <!-- ─── BLOCK 2 — iter 5..8 → compress ─── -->
+  <g filter="url(#node-shadow)">
+    <g transform="translate(640 100)">
+      <rect width="80" height="70" rx="4" fill="#0d1117" stroke="#7d8590" stroke-width="1.2"/>
+      <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.4">ITER</text>
+      <text x="40" y="50" font-size="22" font-weight="600" fill="#e6edf3" text-anchor="middle">5</text>
+    </g>
+    <g transform="translate(740 100)">
+      <rect width="80" height="70" rx="4" fill="#0d1117" stroke="#7d8590" stroke-width="1.2"/>
+      <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.4">ITER</text>
+      <text x="40" y="50" font-size="22" font-weight="600" fill="#e6edf3" text-anchor="middle">6</text>
+    </g>
+    <g transform="translate(840 100)">
+      <rect width="80" height="70" rx="4" fill="#0d1117" stroke="#7d8590" stroke-width="1.2"/>
+      <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.4">ITER</text>
+      <text x="40" y="50" font-size="22" font-weight="600" fill="#e6edf3" text-anchor="middle">7</text>
+    </g>
+    <g transform="translate(940 100)">
+      <rect width="80" height="70" rx="4" fill="#0d1117" stroke="#7d8590" stroke-width="1.2"/>
+      <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.4">ITER</text>
+      <text x="40" y="50" font-size="22" font-weight="600" fill="#e6edf3" text-anchor="middle">8</text>
+    </g>
+  </g>
+
+  <!-- COMPRESS · 2 -->
+  <g transform="translate(1050 80)" filter="url(#node-shadow)">
+    <rect width="120" height="110" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">⚙ COMPRESS</text>
+    <text x="14" y="50" font-size="14" font-weight="600" fill="#e6edf3">distill</text>
+    <text x="14" y="68" font-size="12" fill="#b1bac4">drop noise</text>
+  </g>
+
+  <!-- DOTS / ellipsis -->
+  <g transform="translate(1190 100)">
+    <text x="0" y="50" font-family="JetBrains Mono, monospace" font-size="32" fill="#7d8590" letter-spacing="2">…</text>
+  </g>
+
+  <!-- ─── ARROWS between cells (gray, simple) ─── -->
+  <g stroke="#7d8590" stroke-width="1.1" fill="none">
+    <path d="M 120 135 L 140 135" marker-end="url(#ah-mute)"/>
+    <path d="M 220 135 L 240 135" marker-end="url(#ah-mute)"/>
+    <path d="M 320 135 L 340 135" marker-end="url(#ah-mute)"/>
+    <path d="M 720 135 L 740 135" marker-end="url(#ah-mute)"/>
+    <path d="M 820 135 L 840 135" marker-end="url(#ah-mute)"/>
+    <path d="M 920 135 L 940 135" marker-end="url(#ah-mute)"/>
+  </g>
+  <!-- iter 4 → compress 1 (cyan) -->
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 420 135 L 450 135" marker-end="url(#ah-cyan)"/>
+  <!-- compress 1 → iter 5 (cyan) -->
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 610 135 L 640 135" marker-end="url(#ah-cyan)"/>
+  <!-- iter 8 → compress 2 (cyan) -->
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none" d="M 1020 135 L 1050 135" marker-end="url(#ah-cyan)"/>
+  <!-- compress 2 → ... (cyan, dotted) -->
+  <path stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="3 3" fill="none" d="M 1170 135 L 1192 135" marker-end="url(#ah-cyan)"/>
+
+  <!-- ─── INVARIANT FOOTER ─── -->
+  <g transform="translate(40 320)" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">
+    <line x1="0" y1="0" x2="1200" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+    <text x="0" y="20">▸ INVARIANT — without compression, context grows monotonically; tokens explode and signal-to-noise collapses</text>
+  </g>
+</svg>

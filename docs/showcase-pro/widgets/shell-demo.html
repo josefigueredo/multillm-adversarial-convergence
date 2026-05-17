@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shell Demo · Multi-LLM Adversarial Convergence</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg-deep:        #0a0c10;
+      --bg-panel:       rgba(13, 17, 23, 0.78);
+      --ink:            #e6edf3;
+      --ink-soft:       #b1bac4;
+      --ink-mute:       #7d8590;
+      --hairline:       rgba(230, 237, 243, 0.10);
+      --hairline-2:     rgba(230, 237, 243, 0.22);
+      --phosphor:       #f5a524;
+      --phosphor-cool:  #22d3ee;
+      --phosphor-green: #7ee787;
+      --phosphor-warn:  #ff7b72;
+
+      --term-bg:        #0b0e13;
+      --term-titlebar:  #161b22;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: var(--bg-deep);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+        radial-gradient(circle at 100% 0%, rgba(245,165,36,0.06), transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(34,211,238,0.04), transparent 50%);
+      color: var(--ink);
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .frame {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 32px;
+      display: grid;
+      gap: 24px;
+    }
+
+    /* TOPBAR */
+    .topbar {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: 24px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .brand::before { content: '◉ '; color: var(--phosphor); }
+    .brand strong { color: var(--phosphor); font-weight: 500; margin-left: 4px; }
+    .controls-hint {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.12em;
+      color: var(--ink-mute);
+    }
+    .controls-hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 3px;
+      margin: 0 2px;
+      font-size: 10px;
+      color: var(--ink);
+      background: rgba(13,17,23,0.5);
+    }
+
+    /* TERMINAL */
+    .terminal {
+      background: var(--term-bg);
+      border-radius: 10px;
+      box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.55),
+        0 0 0 1px var(--hairline-2),
+        inset 0 0 80px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+      position: relative;
+    }
+    .terminal::after {
+      /* CRT scanline overlay */
+      content: '';
+      position: absolute; inset: 0;
+      background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 3px);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .terminal-titlebar {
+      background: var(--term-titlebar);
+      padding: 11px 14px 9px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid rgba(0,0,0,0.4);
+    }
+    .window-controls { display: flex; gap: 8px; }
+    .window-controls .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot-close { background: #ff5f56; }
+    .dot-min   { background: #ffbd2e; }
+    .dot-max   { background: #27c93f; }
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--ink-mute);
+    }
+    .terminal-step {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: var(--ink-mute);
+      opacity: 0.6;
+    }
+    .terminal-step strong { color: var(--phosphor); font-weight: 500; }
+
+    .terminal-body {
+      padding: 22px 24px 28px;
+      min-height: 460px;
+      max-height: 70vh;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+    .terminal-body::-webkit-scrollbar { width: 6px; }
+    .terminal-body::-webkit-scrollbar-thumb { background: var(--hairline-2); border-radius: 3px; }
+
+    /* Output line styles by type */
+    .line { white-space: pre-wrap; word-break: break-word; }
+    .line.prompt-line {
+      color: var(--phosphor-cool);
+    }
+    .line.prompt-line .prompt-text { color: var(--phosphor-cool); font-weight: 500; }
+    .line.prompt-line .typed-text  { color: var(--ink); }
+    .line.output-line  { color: var(--ink-soft); }
+    .line.success-line { color: var(--phosphor-green); }
+    .line.error-line   { color: var(--phosphor-warn); }
+    .line.comment-line { color: var(--ink-mute); font-style: italic; }
+    .line.heading-line {
+      color: var(--phosphor);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-top: 6px;
+    }
+
+    /* Blinking cursor */
+    .cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 1em;
+      background: var(--phosphor);
+      vertical-align: text-bottom;
+      animation: blink 1.05s steps(2) infinite;
+      margin-left: 2px;
+      transform: translateY(2px);
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* TIMELINE / PROGRESS BAR */
+    .timeline {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      padding: 0 4px;
+    }
+    .timeline-cell {
+      flex: 1 1 18px; min-width: 14px; max-width: 28px;
+      height: 8px; border-radius: 2px;
+      background: var(--hairline);
+      border: 1px solid var(--hairline-2);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .timeline-cell.done {
+      background: rgba(245,165,36,0.4);
+      border-color: var(--phosphor);
+    }
+    .timeline-cell.current {
+      background: var(--phosphor);
+      box-shadow: 0 0 8px rgba(245,165,36,0.55);
+    }
+
+    /* Footer status */
+    .status {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-mute);
+      letter-spacing: 0.10em;
+      padding: 0 4px;
+    }
+    .status .pos { color: var(--ink); }
+    .status .pos strong { color: var(--phosphor); font-weight: 600; }
+    .status .mode {
+      padding: 3px 9px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .status .mode.playing { color: var(--phosphor-green); border-color: var(--phosphor-green); }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="topbar">
+      <div class="brand">SHELL DEMO · <strong>Multi-LLM Adversarial Convergence</strong></div>
+      <div class="controls-hint">
+        <kbd>↓</kbd>/<kbd>→</kbd> next  ·  <kbd>↑</kbd>/<kbd>←</kbd> back  ·  <kbd>P</kbd> play  ·  <kbd>R</kbd> reset  ·  <kbd>End</kbd> jump-end
+      </div>
+    </header>
+
+    <section class="terminal" aria-label="Demo terminal">
+      <header class="terminal-titlebar">
+        <div class="window-controls">
+          <span class="dot dot-close"></span>
+          <span class="dot dot-min"></span>
+          <span class="dot dot-max"></span>
+        </div>
+        <div class="terminal-title" id="term-title">~/research/aws-api-gateway — zsh</div>
+        <div class="terminal-step"><strong id="step-cur">0</strong> / <span id="step-total">—</span></div>
+      </header>
+      <div class="terminal-body" id="term-body"></div>
+    </section>
+
+    <div class="timeline" id="timeline" aria-hidden="true"></div>
+
+    <footer class="status">
+      <span class="pos">step <strong id="status-cur">0</strong> / <span id="status-total">—</span></span>
+      <span class="mode" id="mode">manual</span>
+    </footer>
+  </div>
+
+  <!-- ─── DEMO SCRIPT ───
+       Each step: { type, text, delay?, prompt? }
+       type:
+         prompt   — append prompt prefix (e.g. '~ $ ') in cyan; if `text` is also given it's the typed command
+         typed    — animate char-by-char (does NOT add a prompt; usually you use type:'prompt' with text)
+         output   — instant, muted color
+         success  — instant, phosphor-green
+         error    — instant, phosphor-warn
+         comment  — instant, gray italic (annotations like # this does X)
+         heading  — instant, phosphor amber, bolder (visual section break)
+         clear    — wipes the body
+       delay (ms): used by auto-play between THIS step finishing and the next starting.
+                   Defaults: typed lines = 600ms, output = 350ms, etc.
+       prompt: when type='prompt', this is the prompt prefix (default '~ $ '). -->
+  <script id="script-data" type="application/json">
+[
+  { "type": "comment", "text": "# Multi-LLM Adversarial Convergence — AWS API Gateway research run", "delay": 600 },
+  { "type": "comment", "text": "# Up/Down to step · P to autoplay", "delay": 600 },
+
+  { "type": "heading", "text": "── step 1 · validate config ─────────────────────────", "delay": 400 },
+
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli doctor config \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "--config configs/research/aws_api_gateway.yaml", "delay": 300 },
+  { "type": "output", "text": "[doctor] loading config…", "delay": 200 },
+  { "type": "output", "text": "[doctor] backend roles: research=[claude-api, codex-api]  judge=claude-api  utility=claude-api", "delay": 250 },
+  { "type": "output", "text": "[doctor] strategy: adversarial  dimensions: 10  max_iterations: 12", "delay": 200 },
+  { "type": "output", "text": "[doctor] scoring weights: coverage=0.40 quality=0.60 novelty=0.00", "delay": 200 },
+  { "type": "success", "text": "✓ config valid — no issues found", "delay": 700 },
+
+  { "type": "heading", "text": "── step 2 · dry-run (no execution, no artifacts) ────", "delay": 400 },
+
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "--config configs/research/aws_api_gateway.yaml --dry-run", "delay": 300 },
+  { "type": "output", "text": "[dry-run] resolved output dir: output/aws_api_gateway", "delay": 200 },
+  { "type": "output", "text": "[dry-run] adversarial inner loop per iteration: researcher → adversary → judge", "delay": 200 },
+  { "type": "output", "text": "[dry-run] stop when: target_dimensions_total=10 reached (max_iterations: unbounded)", "delay": 200 },
+  { "type": "output", "text": "[dry-run] prompt templates: research.md, research_critique.md, research_synthesize.md", "delay": 200 },
+  { "type": "success", "text": "✓ dry-run passed — all backends reachable", "delay": 700 },
+
+  { "type": "heading", "text": "── step 3 · live run (auto-retry wrapper) ───────────", "delay": 400 },
+
+  { "type": "prompt", "prompt": "~ $ ", "text": "./scripts/research_with_retry.sh \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "configs/research/aws_api_gateway.yaml", "delay": 300 },
+  { "type": "output", "text": "[wrapper] attempt 1/10  output: output/aws_api_gateway", "delay": 300 },
+  { "type": "comment", "text": "# each iteration explores ONE dimension; inside, all three roles fire:", "delay": 250 },
+  { "type": "comment", "text": "# researcher (claude-api) drafts → adversary (codex-api) critiques → judge (claude-api) scores", "delay": 500 },
+
+  { "type": "output", "text": "[research] Iteration 001 — REST API vs HTTP API: feature matrix, pricing, performance", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1180 tok  →  adversary: 640 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 54.1 [target=21/40 evidence=18/35 questions=10/15 length=5/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 61.3 [d=7 a=6 n=6 act=5]  novelty: 92.0  total: 58.5  → KEEP", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 002 — WebSocket API: capabilities, connection limits, scaling", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1340 tok  →  adversary: 720 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 62.8 [target=25/40 evidence=22/35 questions=11/15 length=6/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 69.7 [d=8 a=7 n=7 act=6]  novelty: 88.4  total: 66.9  → KEEP", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 003 — Authentication: IAM, Cognito, Lambda authorizers, JWT", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1510 tok  →  adversary: 880 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 71.4 [target=29/40 evidence=25/35 questions=12/15 length=7/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 76.2 [d=8 a=8 n=7 act=7]  novelty: 79.1  total: 74.3  → KEEP", "delay": 350 },
+  { "type": "output", "text": "  gap_promoted: \"WebSocket API support in API Gateway v2\"  (confidence: 0.83)", "delay": 200 },
+  { "type": "output", "text": "  gap_promoted: \"VPC link pricing at high RPS\"  (confidence: 0.76)", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 004 — Rate limiting, throttling, usage plans for multi-tenant SaaS", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1420 tok  →  adversary: 750 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 75.8 [target=30/40 evidence=27/35 questions=13/15 length=6/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 75.5 [d=8 a=8 n=7 act=7]  novelty: 71.2  total: 75.6  → KEEP", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 005 — Integration patterns: Lambda proxy, VPC Link, service integrations", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1640 tok  →  adversary: 920 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 78.7 [target=31/40 evidence=28/35 questions=13/15 length=8/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 78.0 [d=8 a=8 n=8 act=7]  novelty: 64.8  total: 78.3  → KEEP", "delay": 350 },
+  { "type": "output", "text": "  gap_promoted: \"JWT authorizer cache invalidation edge cases\"  (confidence: 0.79)", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 006 — Observability: CloudWatch, X-Ray, access logging, CloudTrail", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1480 tok  →  adversary: 830 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 80.2 [target=32/40 evidence=29/35 questions=13/15 length=8/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 79.5 [d=9 a=8 n=8 act=7]  novelty: 58.4  total: 79.8  → KEEP", "delay": 500 },
+
+  { "type": "output", "text": "[research] Iteration 007 — Cost modeling: per-request pricing, data transfer, caching", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1320 tok  →  adversary: 1110 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 77.5 [target=31/40 evidence=26/35 questions=13/15 length=9/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 75.3 [d=8 a=8 n=7 act=7]  novelty: 52.0  total: 76.2  → DISCARD", "delay": 500 },
+  { "type": "comment", "text": "  # score regressed (79.8 → 76.2) — adversary flagged 4 unsupported pricing claims", "delay": 500 },
+
+  { "type": "output", "text": "[research] Iteration 008 — Cost modeling: per-request pricing, data transfer, caching (attempt 2/3)", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1610 tok  →  adversary: 690 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 81.1 [target=33/40 evidence=29/35 questions=14/15 length=8/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 80.1 [d=9 a=8 n=8 act=8]  novelty: 49.3  total: 80.5  → KEEP", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 009 — Deployment: stages, canary releases, versioning, CI/CD", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1520 tok  →  adversary: 800 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 82.4 [target=33/40 evidence=30/35 questions=14/15 length=9/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 81.9 [d=9 a=9 n=8 act=8]  novelty: 44.1  total: 82.1  → KEEP", "delay": 350 },
+  { "type": "output", "text": "  gap_seen_again: \"VPC link pricing at high RPS\"  (×2 — convergence signal)", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 010 — Custom domains, TLS, edge-optimized vs regional endpoints", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1390 tok  →  adversary: 710 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 83.6 [target=34/40 evidence=30/35 questions=14/15 length=9/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 84.1 [d=9 a=9 n=8 act=8]  novelty: 38.7  total: 83.9  → KEEP", "delay": 400 },
+
+  { "type": "output", "text": "[research] Iteration 011 — Hard limits and quotas that constrain architecture decisions", "delay": 350 },
+  { "type": "output", "text": "  researcher: 1280 tok  →  adversary: 660 tok  →  judge scoring…", "delay": 200 },
+  { "type": "output", "text": "  Scores — coverage: 84.2 [target=34/40 evidence=31/35 questions=14/15 length=9/10]", "delay": 120 },
+  { "type": "output", "text": "           quality: 83.5 [d=9 a=9 n=8 act=8]  novelty: 33.2  total: 83.9  → KEEP", "delay": 300 },
+  { "type": "output", "text": "[research] Reached target_dimensions_total=10 with 10 explored dimensions, stopping.", "delay": 350 },
+  { "type": "output", "text": "[research] workflow_transition: merge → converged  (iteration 11, terminal)", "delay": 250 },
+  { "type": "success", "text": "✓ run complete — 10/10 dimensions explored in 11 iterations (iter 7 DISCARD, iter 8 retry)", "delay": 600 },
+
+  { "type": "heading", "text": "── step 4 · synthesize all three output styles ──────", "delay": 400 },
+
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli research \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "--config configs/research/aws_api_gateway.yaml --synthesize", "delay": 300 },
+  { "type": "output", "text": "[synthesize] rendering default  → output/aws_api_gateway/report_default.html", "delay": 200 },
+  { "type": "output", "text": "[synthesize] rendering paper    → output/aws_api_gateway/report_paper.html", "delay": 200 },
+  { "type": "output", "text": "[synthesize] rendering technical_doc → output/aws_api_gateway/report_technical_doc.html", "delay": 200 },
+  { "type": "success", "text": "✓ 3 reports written  audit_trail: output/aws_api_gateway/audit_trail.jsonl", "delay": 700 },
+
+  { "type": "heading", "text": "── step 5 · inspect the run ─────────────────────────", "delay": 400 },
+
+  { "type": "prompt", "prompt": "~ $ ", "text": "uv run python -m src.cli explain resume \\", "delay": 900 },
+  { "type": "prompt", "prompt": "      ", "text": "--output output/aws_api_gateway", "delay": 300 },
+  { "type": "output", "text": "  run                 aws_api_gateway", "delay": 100 },
+  { "type": "output", "text": "  strategy            adversarial", "delay": 80 },
+  { "type": "output", "text": "  iterations          11   (1 DISCARD, 10 KEEP)", "delay": 80 },
+  { "type": "output", "text": "  dimensions          10 / 10  (target reached)", "delay": 80 },
+  { "type": "output", "text": "  workflow_state      converged  (terminal)", "delay": 80 },
+  { "type": "output", "text": "  final iter score    83.9", "delay": 80 },
+  { "type": "output", "text": "  gaps found          7   (promoted: 3)", "delay": 80 },
+  { "type": "output", "text": "  cost est.    $0.41  (claude-api $0.27 [researcher+judge] · codex-api $0.14 [adversary])", "delay": 300 },
+  { "type": "success", "text": "✓ to rerun synthesis only: --synthesize   to resume: --resume", "delay": 800 }
+]
+  </script>
+
+  <script>
+    (() => {
+      const script = JSON.parse(document.getElementById('script-data').textContent);
+      const els = {
+        body:    document.getElementById('term-body'),
+        cur:     document.getElementById('step-cur'),
+        total:   document.getElementById('step-total'),
+        sCur:    document.getElementById('status-cur'),
+        sTotal:  document.getElementById('status-total'),
+        mode:    document.getElementById('mode'),
+        timeline:document.getElementById('timeline'),
+      };
+
+      const TYPING_MS_PER_CHAR = 28;
+      const SNAP_THRESHOLD_MS  = 60; // if last typing started <N ms ago and user re-presses, snap immediately
+
+      let position = 0;          // index of the NEXT step to render (0..script.length)
+      let lines = [];            // DOM <div class="line"> nodes corresponding to rendered steps
+      let isAnimating = false;   // currently typing
+      let snapNow = null;        // function to snap current animation to complete
+      let isPlaying = false;
+      let playTimer = null;
+
+      els.total.textContent = script.length;
+      els.sTotal.textContent = script.length;
+
+      // build timeline cells
+      script.forEach((_, i) => {
+        const c = document.createElement('span');
+        c.className = 'timeline-cell';
+        c.dataset.idx = i;
+        c.addEventListener('click', () => {
+          if (isPlaying) stopPlay();
+          jumpTo(i + 1);
+        });
+        els.timeline.appendChild(c);
+      });
+
+      function refreshIndicators() {
+        els.cur.textContent  = position;
+        els.sCur.textContent = position;
+        // timeline state
+        Array.from(els.timeline.children).forEach((c, i) => {
+          c.classList.toggle('done', i < position - 1);
+          c.classList.toggle('current', i === position - 1);
+        });
+        // mode label
+        els.mode.textContent = isPlaying ? 'playing' : 'manual';
+        els.mode.classList.toggle('playing', isPlaying);
+      }
+
+      function clearAll() {
+        els.body.innerHTML = '';
+        lines = [];
+        position = 0;
+      }
+
+      function appendLine(stepIndex) {
+        const step = script[stepIndex];
+        if (!step) return Promise.resolve();
+        if (step.type === 'clear') {
+          clearAll();
+          return Promise.resolve();
+        }
+        const div = document.createElement('div');
+        const cls = {
+          prompt:  'prompt-line',
+          typed:   'prompt-line',
+          output:  'output-line',
+          success: 'success-line',
+          error:   'error-line',
+          comment: 'comment-line',
+          heading: 'heading-line',
+        }[step.type] || 'output-line';
+        div.className = 'line ' + cls;
+
+        // For prompt type with text: render prompt then animate typing
+        if (step.type === 'prompt' && step.text != null) {
+          const pSpan = document.createElement('span');
+          pSpan.className = 'prompt-text';
+          pSpan.textContent = step.prompt || '~ $ ';
+          const tSpan = document.createElement('span');
+          tSpan.className = 'typed-text';
+          div.appendChild(pSpan);
+          div.appendChild(tSpan);
+          els.body.appendChild(div);
+          lines.push(div);
+          els.body.scrollTop = els.body.scrollHeight;
+          return animateTyping(tSpan, step.text);
+        }
+        if (step.type === 'typed') {
+          els.body.appendChild(div);
+          lines.push(div);
+          els.body.scrollTop = els.body.scrollHeight;
+          return animateTyping(div, step.text);
+        }
+        // prompt-only (no command) or any other instant type
+        if (step.type === 'prompt') {
+          const pSpan = document.createElement('span');
+          pSpan.className = 'prompt-text';
+          pSpan.textContent = step.prompt || '~ $ ';
+          div.appendChild(pSpan);
+        } else {
+          div.textContent = step.text ?? '';
+        }
+        els.body.appendChild(div);
+        lines.push(div);
+        els.body.scrollTop = els.body.scrollHeight;
+        return Promise.resolve();
+      }
+
+      function animateTyping(target, text) {
+        return new Promise((resolve) => {
+          isAnimating = true;
+          let i = 0;
+          let timer = null;
+          let resolved = false;
+          function tick() {
+            if (i < text.length) {
+              target.textContent += text.charAt(i++);
+              els.body.scrollTop = els.body.scrollHeight;
+              timer = setTimeout(tick, TYPING_MS_PER_CHAR);
+            } else {
+              done();
+            }
+          }
+          function done() {
+            if (resolved) return;
+            resolved = true;
+            clearTimeout(timer);
+            isAnimating = false;
+            snapNow = null;
+            resolve();
+          }
+          // expose snap function
+          snapNow = () => {
+            target.textContent = text;
+            els.body.scrollTop = els.body.scrollHeight;
+            done();
+          };
+          tick();
+        });
+      }
+
+      async function stepForward() {
+        if (isAnimating && snapNow) { snapNow(); return; }
+        if (position >= script.length) return;
+        await appendLine(position);
+        position++;
+        refreshIndicators();
+      }
+
+      function stepBackward() {
+        if (isPlaying) stopPlay();
+        if (isAnimating && snapNow) snapNow();
+        if (position <= 0) return;
+        // remove the last DOM line that wasn't a 'clear'
+        position--;
+        const lastDiv = lines.pop();
+        if (lastDiv && lastDiv.parentNode) lastDiv.parentNode.removeChild(lastDiv);
+        refreshIndicators();
+      }
+
+      async function jumpTo(target) {
+        if (isAnimating && snapNow) snapNow();
+        if (target < 0) target = 0;
+        if (target > script.length) target = script.length;
+        if (target === position) return;
+        if (target < position) {
+          // step back to target
+          while (position > target) stepBackward();
+        } else {
+          while (position < target) {
+            await appendLine(position);
+            position++;
+          }
+          refreshIndicators();
+        }
+      }
+
+      async function play() {
+        if (isPlaying) return;
+        isPlaying = true;
+        refreshIndicators();
+        while (isPlaying && position < script.length) {
+          const stepIdx = position;
+          await appendLine(stepIdx);
+          position++;
+          refreshIndicators();
+          const delay = script[stepIdx].delay ?? 350;
+          if (!isPlaying) break;
+          await new Promise((r) => { playTimer = setTimeout(r, delay); });
+        }
+        isPlaying = false;
+        refreshIndicators();
+      }
+
+      function stopPlay() {
+        isPlaying = false;
+        clearTimeout(playTimer);
+        if (isAnimating && snapNow) snapNow();
+        refreshIndicators();
+      }
+
+      function reset() {
+        stopPlay();
+        clearAll();
+        refreshIndicators();
+      }
+
+      // ── Keyboard ──────────────────────────────────────────────────
+      document.addEventListener('keydown', (e) => {
+        if (e.target.matches('input, textarea, [contenteditable]')) return;
+        switch (e.key) {
+          case 'ArrowDown': case 'ArrowRight': case ' ': case 'Enter':
+            e.preventDefault();
+            if (isPlaying) stopPlay();
+            stepForward();
+            break;
+          case 'ArrowUp': case 'ArrowLeft':
+            e.preventDefault();
+            stepBackward();
+            break;
+          case 'p': case 'P':
+            e.preventDefault();
+            if (isPlaying) stopPlay();
+            else play();
+            break;
+          case 'r': case 'R':
+            e.preventDefault();
+            reset();
+            break;
+          case 'Home':
+            e.preventDefault();
+            reset();
+            break;
+          case 'End':
+            e.preventDefault();
+            jumpTo(script.length);
+            break;
+        }
+      });
+
+      refreshIndicators();
+    })();
+  </script>
+  <script src="../sync/sync.js?v=0c499707" data-role="viewer"></script>
+  <script src="../sync/follow-toggle.js?v=18d4046b"></script>
+</body>
+</html>

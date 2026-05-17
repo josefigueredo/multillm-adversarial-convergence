@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 540" font-family="Geist, system-ui, sans-serif" font-size="13" fill="none">
+  <!-- PALETTE: panel #0d1117 · ink #e6edf3 · soft #b1bac4 · mute #7d8590 · amber #f5a524 · cyan #22d3ee · green #7ee787 · warn #ff7b72
+       LAYOUT — Orchestrator (top) and 4 backends (bottom row) connected
+       by ONE line per backend (no separate forward/return arrows). The
+       midpoint pill names the contract; the line is colored by the
+       backend's role so each channel reads as a labeled "lane". -->
+
+  <defs>
+    <marker id="ah-mute"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7d8590"/></marker>
+    <marker id="ah-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f5a524"/></marker>
+    <marker id="ah-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#22d3ee"/></marker>
+    <marker id="ah-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#7ee787"/></marker>
+    <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- ─── ORCHESTRATOR (top center) ─── -->
+  <g transform="translate(320 30)" filter="url(#node-shadow)">
+    <rect width="360" height="110" rx="6" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" letter-spacing="1.6">ORCHESTRATOR</text>
+    <text x="14" y="56" font-size="20" font-weight="600" fill="#e6edf3">src/orchestrator.py</text>
+    <text x="14" y="84" font-size="13" fill="#b1bac4">lifecycle · convergence · compression</text>
+  </g>
+
+  <!-- ─── 4 BACKEND NODES (bottom row at y=320) ─── -->
+  <g transform="translate(40 320)" filter="url(#node-shadow)">
+    <rect width="200" height="120" rx="6" fill="#0d1117" stroke="#7d8590" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1.6">BACKEND · A</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">research[]</text>
+    <text x="14" y="76" font-family="JetBrains Mono, monospace" font-size="12" fill="#b1bac4">copilot-cli</text>
+    <text x="14" y="102" font-size="11" fill="#7d8590">narrow contract: run(prompt)</text>
+  </g>
+
+  <g transform="translate(280 320)" filter="url(#node-shadow)">
+    <rect width="200" height="120" rx="6" fill="#0d1117" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#22d3ee" letter-spacing="1.6">BACKEND · B</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">judge</text>
+    <text x="14" y="76" font-family="JetBrains Mono, monospace" font-size="12" fill="#b1bac4">codex-cli</text>
+    <text x="14" y="102" font-size="11" fill="#7d8590">non-producer · scores claims</text>
+  </g>
+
+  <g transform="translate(520 320)" filter="url(#node-shadow)">
+    <rect width="200" height="120" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#7ee787" letter-spacing="1.6">BACKEND · C</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">primary</text>
+    <text x="14" y="76" font-family="JetBrains Mono, monospace" font-size="12" fill="#b1bac4">claude-cli</text>
+    <text x="14" y="102" font-size="11" fill="#7d8590">structured reasoning · synthesis</text>
+  </g>
+
+  <g transform="translate(760 320)" filter="url(#node-shadow)">
+    <rect width="200" height="120" rx="6" fill="#0d1117" stroke="#f5a524" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#f5a524" letter-spacing="1.6">BACKEND · D</text>
+    <text x="14" y="50" font-size="16" font-weight="600" fill="#e6edf3">utility</text>
+    <text x="14" y="76" font-family="JetBrains Mono, monospace" font-size="12" fill="#b1bac4">codex-cli</text>
+    <text x="14" y="102" font-size="11" fill="#7d8590">tool exec · sandboxed</text>
+  </g>
+
+  <!-- ─── 4 CHANNEL LINES (one per backend, colored by role) ───
+       Each starts at O's bottom edge (y=140), ends at the worker top
+       edge (y=320). The S-curve is gentle so lines stay in their own
+       horizontal lanes — no crossings. -->
+
+  <!-- A · channel · gray -->
+  <path stroke="#7d8590" stroke-width="1.4" fill="none"
+        d="M 400 140 C 400 220, 140 220, 140 320"/>
+  <!-- B · channel · cyan -->
+  <path stroke="#22d3ee" stroke-width="1.4" fill="none"
+        d="M 470 140 C 470 220, 380 220, 380 320"/>
+  <!-- C · channel · green -->
+  <path stroke="#7ee787" stroke-width="1.4" fill="none"
+        d="M 540 140 C 540 220, 620 220, 620 320"/>
+  <!-- D · channel · amber -->
+  <path stroke="#f5a524" stroke-width="1.4" fill="none"
+        d="M 610 140 C 610 220, 860 220, 860 320"/>
+
+  <!-- contract pills on each channel at midpoint (y≈230) -->
+  <g font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" text-anchor="middle">
+    <g transform="translate(265 230)">
+      <rect x="-30" y="-9" width="60" height="16" rx="3" fill="#0d1117" stroke="#7d8590" stroke-width="0.75"/>
+      <text y="3" fill="#b1bac4">RESULT</text>
+    </g>
+    <g transform="translate(425 230)">
+      <rect x="-26" y="-9" width="52" height="16" rx="3" fill="#0d1117" stroke="#22d3ee" stroke-width="0.75"/>
+      <text y="3" fill="#22d3ee">SCORE</text>
+    </g>
+    <g transform="translate(580 230)">
+      <rect x="-38" y="-9" width="76" height="16" rx="3" fill="#0d1117" stroke="#7ee787" stroke-width="0.75"/>
+      <text y="3" fill="#7ee787">SYNTHESIS</text>
+    </g>
+    <g transform="translate(740 230)">
+      <rect x="-36" y="-9" width="72" height="16" rx="3" fill="#0d1117" stroke="#f5a524" stroke-width="0.75"/>
+      <text y="3" fill="#f5a524">TOOL EXEC</text>
+    </g>
+  </g>
+
+  <!-- bidirection markers on each line: one small ▼ near worker top, one ▲ near O bottom -->
+  <g font-family="JetBrains Mono, monospace" font-size="11" text-anchor="middle">
+    <text x="140" y="318" fill="#7d8590">▼</text>
+    <text x="380" y="318" fill="#22d3ee">▼</text>
+    <text x="620" y="318" fill="#7ee787">▼</text>
+    <text x="860" y="318" fill="#f5a524">▼</text>
+    <text x="399" y="149" fill="#7d8590">▲</text>
+    <text x="470" y="149" fill="#22d3ee">▲</text>
+    <text x="540" y="149" fill="#7ee787">▲</text>
+    <text x="611" y="149" fill="#f5a524">▲</text>
+  </g>
+
+  <!-- ─── INVARIANT FOOTER ─── -->
+  <g transform="translate(40 490)" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590" letter-spacing="1">
+    <line x1="0" y1="0" x2="920" y2="0" stroke="#7d8590" stroke-opacity="0.18"/>
+    <text x="0" y="20">▸ INVARIANT — backends never call each other; lifecycle owned only by the orchestrator</text>
+  </g>
+</svg>
