@@ -55,7 +55,7 @@ window.DECK_I18N = {
     // ── slide 1 — intro ──────────────────────────────────────────
     "multi-llm-adversarial-convergence-framework": "Framework Multi-LLM de Convergencia Adversarial",
     "multi-llm-adversarial-convergence-framework-1": "Framework Multi-LLM de Convergencia Adversarial",
-    "make-competing-llms-argue-until-they-converge-on-the-best-answer": "Hacé que LLMs en competencia discutan hasta converger en la mejor respuesta",
+    "make-competing-llms-argue-until-they-converge-on-the-best-answer": "Un framework para hacer que LLMs en competencia discutan hasta converger en la mejor respuesta",
     "p.1": "<strong>Demo grabada</strong> — esto es un run real reproducido a velocidad.<br />\nTodos los artefactos mostrados son outputs reales de la ejecución.",
 
     // ── slide 2 — the problem ───────────────────────────────────
@@ -99,8 +99,8 @@ window.DECK_I18N = {
     "th.5": "Costo",
     "th.6": "Min backends",
     "td.11": "Un backend para todo",
-    "td.14": "2 backends investigan en paralelo, judge distinto",
-    "td.17": "Todos los backends independientes, gana el mejor score",
+    "td.14": "2 backends investigan en paralelo, un juez distinto",
+    "td.17": "Todos los backends independientes, gana el mejor puntaje",
     "td.20": "Backend barato draftea, uno preciso refina",
     "td.23": "Rutea cada dimensión al backend que mejor encaja",
     "td.26": "Investigación + crítica + adjudicación",

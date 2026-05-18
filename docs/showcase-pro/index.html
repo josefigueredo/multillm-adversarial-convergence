@@ -455,31 +455,31 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-dot"></span>
-        <span class="brand-label">◉ &nbsp;SHOWCASE · <strong>Multi-LLM Adversarial Convergence</strong></span>
+        <span class="brand-label" data-i18n="brand.label">◉ &nbsp;SHOWCASE · <strong>Multi-LLM Adversarial Convergence</strong></span>
       </div>
       <nav class="topbar-links" aria-label="Quick links">
         <div class="language-widget" aria-label="Deck language selector">
           <button type="button" data-language="es">Español</button>
           <button type="button" data-language="en">English</button>
         </div>
-        <a href="deck/deck.html" target="_blank" data-deck-link>Main Deck</a>
-        <a href="glossary/glossary.html" target="_blank">Glossary</a>
+        <a href="deck/deck.html" target="_blank" data-deck-link data-i18n="nav.deck">Main Deck</a>
+        <a href="glossary/glossary.html" target="_blank" data-i18n="nav.glossary">Glossary</a>
         <a href="https://github.com/josefigueredo/multillm-adversarial-convergence" target="_blank" rel="noopener">GitHub ↗</a>
       </nav>
     </header>
 
     <!-- ── HERO ────────────────────────────────────────────── -->
     <section class="hero">
-      <p class="hero-eyebrow">Showcase Index</p>
-      <h1>Presentations, tools,<br>and reference artifacts — <em>PRO</em></h1>
-      <p class="hero-lede">Same content as the static showcase, plus the slides-template-pro synchronization layer. The presenter drives every connected viewer over WebSocket — slide changes, view switches, glossary-term jumps. Start the FastAPI control plane in <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">../../pro/</code> with <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">make dev</code> before opening these pages, otherwise they render fine but won't sync.</p>
+      <p class="hero-eyebrow" data-i18n="hero.eyebrow">Showcase Index</p>
+      <h1 data-i18n="hero.title">Presentations, tools,<br>and reference artifacts — <em>PRO</em></h1>
+      <p class="hero-lede" data-i18n="hero.lede">Same content as the static showcase, plus the slides-template-pro synchronization layer. The presenter drives every connected viewer over WebSocket — slide changes, view switches, glossary-term jumps. Start the FastAPI control plane in <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">../../pro/</code> with <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">make dev</code> before opening these pages, otherwise they render fine but won't sync.</p>
     </section>
 
     <!-- ── SECTION: PRESENTATIONS ──────────────────────────── -->
     <section class="section">
       <div class="section-header">
-        <span class="section-eyebrow">I · Presentations</span>
-        <p class="section-title">Slide deck</p>
+        <span class="section-eyebrow" data-i18n="sec.1.eyebrow">I · Presentations</span>
+        <p class="section-title" data-i18n="sec.1.title">Slide deck</p>
       </div>
       <div class="card-grid cols-1">
 
@@ -487,16 +487,16 @@
           <div class="card-accent amber"></div>
           <div class="card-body">
             <div class="card-meta">
-              <span class="card-tag amber">Deck</span>
+              <span class="card-tag amber" data-i18n="card.deck.tag">Deck</span>
               <span class="card-slides">42 slides</span>
               <span class="card-tag mute" data-language-tag>es / en</span>
             </div>
-            <div class="card-title">Main Deck</div>
-            <p class="card-desc">Intro · <strong>I·Strategies</strong> (6 execution wirings) · <strong>II·Patterns</strong> (11 agentic design patterns) · <strong>III·Demo</strong> (real AWS API Gateway run) · <strong>IV·Adversarial</strong> (critic findings + outputs).</p>
+            <div class="card-title" data-i18n="card.deck.title">Main Deck</div>
+            <p class="card-desc" data-i18n="card.deck.desc">Intro · <strong>I·Strategies</strong> (6 execution wirings) · <strong>II·Patterns</strong> (11 agentic design patterns) · <strong>III·Demo</strong> (real AWS API Gateway run) · <strong>IV·Adversarial</strong> (critic findings + outputs).</p>
           </div>
           <div class="card-footer">
             <span class="card-path">deck/deck.html</span>
-            <span class="card-open">Open →</span>
+            <span class="card-open" data-i18n="open">Open →</span>
           </div>
         </a>
 
@@ -506,8 +506,8 @@
     <!-- ── SECTION: INTERACTIVE TOOLS ──────────────────────── -->
     <section class="section">
       <div class="section-header">
-        <span class="section-eyebrow">II · Interactive Tools</span>
-        <p class="section-title">Live data and animated demos</p>
+        <span class="section-eyebrow" data-i18n="sec.2.eyebrow">II · Interactive Tools</span>
+        <p class="section-title" data-i18n="sec.2.title">Live data and animated demos</p>
       </div>
       <div class="card-grid cols-2">
 
@@ -515,14 +515,14 @@
           <div class="card-accent green"></div>
           <div class="card-body">
             <div class="card-meta">
-              <span class="card-tag green">Dashboard</span>
+              <span class="card-tag green" data-i18n="card.dashboard.tag">Dashboard</span>
             </div>
-            <div class="card-title">Live Replay Dashboard</div>
-            <p class="card-desc">Step through every iteration of the real <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">aws_api_gateway_opus_sonnet_codex</code> run. Score sparkline, dimension grid, state machine, KEEP/DISCARD decisions, and cost block.</p>
+            <div class="card-title" data-i18n="card.dashboard.title">Live Replay Dashboard</div>
+            <p class="card-desc" data-i18n="card.dashboard.desc">Step through every iteration of the real <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524">aws_api_gateway_opus_sonnet_codex</code> run. Score sparkline, dimension grid, state machine, KEEP/DISCARD decisions, and cost block.</p>
           </div>
           <div class="card-footer">
             <span class="card-path">widgets/dashboard-for-slide.html</span>
-            <span class="card-open">Open →</span>
+            <span class="card-open" data-i18n="open">Open →</span>
           </div>
         </a>
 
@@ -530,14 +530,14 @@
           <div class="card-accent cyan"></div>
           <div class="card-body">
             <div class="card-meta">
-              <span class="card-tag cyan">Demo</span>
+              <span class="card-tag cyan" data-i18n="card.shell.tag">Demo</span>
             </div>
-            <div class="card-title">Shell Demo</div>
-            <p class="card-desc">Standalone animated terminal playback. The same scripted-terminal component used inside the main deck, running independently as a shareable demo artifact.</p>
+            <div class="card-title" data-i18n="card.shell.title">Shell Demo</div>
+            <p class="card-desc" data-i18n="card.shell.desc">Standalone animated terminal playback. The same scripted-terminal component used inside the main deck, running independently as a shareable demo artifact.</p>
           </div>
           <div class="card-footer">
             <span class="card-path">widgets/shell-demo.html</span>
-            <span class="card-open">Open →</span>
+            <span class="card-open" data-i18n="open">Open →</span>
           </div>
         </a>
 
@@ -547,8 +547,8 @@
     <!-- ── SECTION: REFERENCE ───────────────────────────────── -->
     <section class="section">
       <div class="section-header">
-        <span class="section-eyebrow">III · Reference</span>
-        <p class="section-title">Concept glossary and engineering framing</p>
+        <span class="section-eyebrow" data-i18n="sec.3.eyebrow">III · Reference</span>
+        <p class="section-title" data-i18n="sec.3.title">Concept glossary and engineering framing</p>
       </div>
       <div class="card-grid cols-2">
 
@@ -556,15 +556,15 @@
           <div class="card-accent amber"></div>
           <div class="card-body">
             <div class="card-meta">
-              <span class="card-tag amber">Reference</span>
+              <span class="card-tag amber" data-i18n="card.glossary.tag">Reference</span>
               <span class="card-tag mute">es / en</span>
             </div>
-            <div class="card-title">Concept Glossary</div>
-            <p class="card-desc">Static bilingual explanations for all key terms — adversarial convergence, evaluator-optimizer, LLM-as-judge, trust classes, atomicity, and more. Designed for mixed technical and non-technical audiences.</p>
+            <div class="card-title" data-i18n="card.glossary.title">Concept Glossary</div>
+            <p class="card-desc" data-i18n="card.glossary.desc">Static bilingual explanations for all key terms — adversarial convergence, evaluator-optimizer, LLM-as-judge, trust classes, atomicity, and more. Designed for mixed technical and non-technical audiences.</p>
           </div>
           <div class="card-footer">
             <span class="card-path">glossary/glossary.html</span>
-            <span class="card-open">Open →</span>
+            <span class="card-open" data-i18n="open">Open →</span>
           </div>
         </a>
 
@@ -572,14 +572,14 @@
           <div class="card-accent mute"></div>
           <div class="card-body">
             <div class="card-meta">
-              <span class="card-tag mute">Notes</span>
+              <span class="card-tag mute" data-i18n="card.harness.tag">Notes</span>
             </div>
-            <div class="card-title">Harness Engineering Framing</div>
-            <p class="card-desc">Speaker prep material — OS analogy (CPU:LLM, kernel:harness), three-layer stack, and the eight responsibilities of the harness layer. Useful as an opening framing before the patterns section.</p>
+            <div class="card-title" data-i18n="card.harness.title">Harness Engineering Framing</div>
+            <p class="card-desc" data-i18n="card.harness.desc">Speaker prep material — OS analogy (CPU:LLM, kernel:harness), three-layer stack, and the eight responsibilities of the harness layer. Useful as an opening framing before the patterns section.</p>
           </div>
           <div class="card-footer">
             <span class="card-path">common/HARNES.md</span>
-            <span class="card-open">Open →</span>
+            <span class="card-open" data-i18n="open">Open →</span>
           </div>
         </a>
 
@@ -589,8 +589,8 @@
     <!-- ── SECTION: SHOWCASE OUTPUTS ───────────────────────── -->
     <section class="section">
       <div class="section-header">
-        <span class="section-eyebrow">IV · Showcase Outputs</span>
-        <p class="section-title">AWS API Gateway — one corpus, three rendering profiles</p>
+        <span class="section-eyebrow" data-i18n="sec.4.eyebrow">IV · Showcase Outputs</span>
+        <p class="section-title" data-i18n="sec.4.title">AWS API Gateway — one corpus, three rendering profiles</p>
       </div>
       <div class="card-grid cols-3">
 
@@ -600,12 +600,12 @@
             <div class="card-meta">
               <span class="card-tag amber">default</span>
             </div>
-            <div class="card-title">Raw / Default</div>
-            <p class="card-desc">Exploratory synthesis — recommendations first, then dimensions, caveats, and inline references. Best for engineering discovery and internal sharing.</p>
+            <div class="card-title" data-i18n="card.default.title">Raw / Default</div>
+            <p class="card-desc" data-i18n="card.default.desc">Exploratory synthesis — recommendations first, then dimensions, caveats, and inline references. Best for engineering discovery and internal sharing.</p>
           </div>
           <div class="card-footer">
             <span class="card-path">aws-api-gateway/report-default.html</span>
-            <span class="card-open">Open →</span>
+            <span class="card-open" data-i18n="open">Open →</span>
           </div>
         </a>
 
@@ -615,12 +615,12 @@
             <div class="card-meta">
               <span class="card-tag cyan">paper</span>
             </div>
-            <div class="card-title">Paper Style</div>
-            <p class="card-desc">Research-paper structure — abstract, methodology, discussion, and a deterministic references section built from <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#22d3ee">citations.json</code>. For stakeholder review.</p>
+            <div class="card-title" data-i18n="card.paper.title">Paper Style</div>
+            <p class="card-desc" data-i18n="card.paper.desc">Research-paper structure — abstract, methodology, discussion, and a deterministic references section built from <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:#22d3ee">citations.json</code>. For stakeholder review.</p>
           </div>
           <div class="card-footer">
             <span class="card-path">aws-api-gateway/report-paper.html</span>
-            <span class="card-open">Open →</span>
+            <span class="card-open" data-i18n="open">Open →</span>
           </div>
         </a>
 
@@ -630,12 +630,12 @@
             <div class="card-meta">
               <span class="card-tag green">technical_doc</span>
             </div>
-            <div class="card-title">Technical Doc</div>
-            <p class="card-desc">ADR-style format — comparison tables, upfront recommendation, disqualifiers, and open questions. Closest analog to an RFC or architecture decision record.</p>
+            <div class="card-title" data-i18n="card.technical.title">Technical Doc</div>
+            <p class="card-desc" data-i18n="card.technical.desc">ADR-style format — comparison tables, upfront recommendation, disqualifiers, and open questions. Closest analog to an RFC or architecture decision record.</p>
           </div>
           <div class="card-footer">
             <span class="card-path">aws-api-gateway/report-technical.html</span>
-            <span class="card-open">Open →</span>
+            <span class="card-open" data-i18n="open">Open →</span>
           </div>
         </a>
 
@@ -645,16 +645,18 @@
 
     <!-- ── FOOTER ───────────────────────────────────────────── -->
     <footer class="page-footer">
-      <span>MULTI-LLM ADVERSARIAL CONVERGENCE · SHOWCASE INDEX</span>
+      <span data-i18n="footer.title">MULTI-LLM ADVERSARIAL CONVERGENCE · SHOWCASE INDEX</span>
       <a href="https://github.com/josefigueredo/multillm-adversarial-convergence" target="_blank" rel="noopener">github.com/josefigueredo ↗</a>
     </footer>
 
   </div>
-  <script src="sync/sync.js?v=0c499707" data-role="viewer"></script>
+  <script src="sync/sync.js?v=runtime-fallback-v2" data-role="viewer"></script>
   <script src="sync/follow-toggle.js?v=18d4046b"></script>
+  <script src="index-i18n.js"></script>
   <script>
-    // Deck-language widget — same UX as the glossary page.
-    // Persists choice to localStorage and appends ?lang=<choice> to deck links.
+    // Language widget — picks the language for both this landing page
+    // (in-place translation via window.applyIndexLang) AND the deck link
+    // hand-off (?lang=<choice>). Persists choice to localStorage.
     (() => {
       const STORAGE_KEY = 'deck-language';
       const buttons = Array.from(document.querySelectorAll('.language-widget [data-language]'));
@@ -665,12 +667,17 @@
         lang = next;
         try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
         buttons.forEach(b => b.classList.toggle('active', b.dataset.language === next));
-        // Rewrite deck links with ?lang=<next>, preserving any existing hash
+        // Translate the landing page in place — deck-link hrefs are rewritten
+        // BEFORE this runs so the original href (which carries the data-i18n
+        // for nav.deck) is still in the DOM.
         deckLinks.forEach(a => {
           const base = a.getAttribute('href').split('?')[0].split('#')[0];
           const hash = (a.getAttribute('href').match(/#[^?]*$/) || [''])[0];
           a.setAttribute('href', `${base}?lang=${encodeURIComponent(next)}${hash}`);
         });
+        if (typeof window.applyIndexLang === 'function') {
+          window.applyIndexLang(next);
+        }
       }
 
       buttons.forEach(b => b.addEventListener('click', () => applyLang(b.dataset.language)));

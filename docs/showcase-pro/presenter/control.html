@@ -487,11 +487,11 @@
     "beats": [
       {
         "t": 0,
-        "say": "Demo grabado a velocidad. Los artefactos son reales: mismo config, mismos backends, mismo audit trail. Nada está mockeado ni editado a mano para que quede lindo."
+        "say": "La idea central es tener un backend que propone, otro distinto que critica y uno tercero que arbitra. El ciclo se repite hasta que el puntaje deja de mejorar."
       },
       {
         "t": 10,
-        "say": "Idea central: un backend propone, otro distinto critica, un tercero arbitra. El ciclo se repite hasta que el score deja de mejorar."
+        "say": "Hay un disclaymer como ven ahi. Dado que tendriamos que esperar al menos 30 minutos para tener un reporte, ya realice una corrida y la voy a reproducir como demo grabado a velocidad acelerada. Los artefactos son reales: mismo config, mismos backends, mismo audit trail. Nada está mockeado ni editado a mano para que quede lindo."
       }
     ],
     "hints": [],
@@ -509,16 +509,16 @@
   {
     "n": 2,
     "section": "INTRO",
-    "title": "The problem",
+    "title": "El problema",
     "duration_seconds": 35,
     "beats": [
       {
         "t": 0,
-        "say": "El problema NO es \"los LLMs alucinan a veces\". Es estructural — un solo modelo no permite saber qué le faltó ver, qué inventó con confianza, ni si otro modelo distinto habría llegado a la misma conclusión. Punto ciego de epistemología, no de prompt engineering."
+        "say": "El problema NO es \"los LLMs alucinan a veces\". Es estructural — un solo modelo no permite saber qué le faltó ver, qué inventó con confianza, ni si otro modelo distinto habría llegado a la misma conclusión. Este es un punto ciego de epistemología, no de prompt engineering."
       },
       {
         "t": 18,
-        "say": "\"Non-deterministic and unverifiable\" son dos problemas separados:\n• no determinístico = la salida varía entre corridas\n• no verificable = no podés auditar el razonamiento"
+        "say": "\"No-determinística y no verificable\" son dos problemas separados:\n• no determinístico = la salida varía entre corridas\n• no verificable = no podés auditar el razonamiento"
       },
       {
         "t": 28,
@@ -544,28 +544,28 @@
   {
     "n": 3,
     "section": "INTRO",
-    "title": "Origin: Karpathy's autoresearch",
+    "title": "Origen: `autoresearch` de Karpathy",
     "duration_seconds": 50,
     "beats": [
       {
         "t": 0,
-        "say": "El loop no lo inventamos. Karpathy lo publicó como `autoresearch` para entrenamiento de redes neuronales: modificás código → entrenás 5 min en GPU → medís loss → keep o revert. Iterás."
+        "say": "No inventé el loop. Andrej Karpathy lo publicó como `autoresearch` para entrenamiento de redes neuronales donde modificás código → entrenás 5 min en GPU → medís la pérdida → te lo quedas o lo revertís. Todo con comandos git. Y seguís iterando."
       },
       {
         "t": 12,
-        "say": "Insight transferible: la forma del loop no es exclusiva del entrenamiento. Aplica a CUALQUIER cosa que puedas puntuar. Investigación con LLMs es una."
+        "say": "El insight es transferible: la forma del loop no es exclusiva del entrenamiento. Aplica a CUALQUIER cosa que puedas puntuar y la investigación con LLMs es una."
       },
       {
         "t": 22,
-        "say": "Mapeo 1-a-1 (cada fila de la tabla):\n• GPU run → llamada a backend\n• loss → score híbrido (heurística + judge)\n• pesos de la red → corpus de conocimiento"
+        "say": "Mapeo 1-a-1 (cada fila de la tabla):\n• GPU run → llamada a backend\n• función de pérdida → score híbrido (heurística + juicio)\n• pesos de la red → corpus de conocimiento"
       },
       {
         "t": 34,
-        "say": "Misma máquina, otro sustrato: weights en Karpathy, knowledge acá."
+        "say": "Misma máquinaria pero otro sustrato: pesos en Karpathy, y acá conocimiento."
       },
       {
         "t": 38,
-        "say": "Por qué heurística 40 / judge 60: el judge solo se puede gamear (un modelo aprende a escribir para el judge). La heurística es determinística y model-agnostic. Combinadas son más difíciles de explotar. (LLM-as-Judge en slide 8.)"
+        "say": "Por qué heurística 40 / juicio 60 ?: el juez solo se puede engañar (un modelo aprende a escribir para el juez). La heurística es determinística y agnóstica al modelo. Combinadas son más difíciles de explotar."
       }
     ],
     "hints": [],
@@ -583,24 +583,24 @@
   {
     "n": 4,
     "section": "INTRO",
-    "title": "The loop",
+    "title": "El loop",
     "duration_seconds": 50,
     "beats": [
       {
         "t": 0,
-        "say": "Critique (cyan): el crítico SIEMPRE es un backend distinto al que produjo. No es self-evaluation. Diferentes priors → diferentes blind spots. Si Claude tiene un sesgo, GPT no lo comparte (y al revés). Esa diferencia es lo que se quiere capturar."
+        "say": "Crítica (en celeste): el crítico SIEMPRE es un backend distinto al que produjo. No usamos autoevaluación. Diferentes preconceptos → diferentes puntos ciegos. Si Claude tiene un sesgo, GPT no lo comparte (y al revés). Esa diferencia es lo que quiero capturar."
       },
       {
         "t": 16,
-        "say": "Decide (ámbar): KEEP hace crecer el corpus. DISCARD hace que el sistema reintente la misma dimensión con una hipótesis distinta. No es \"fallaste, seguís\" — es \"no convergió, probá otro ángulo\"."
+        "say": "Decisor (en amarillo): KEEP hace crecer el corpus. DISCARD hace que el sistema reintente la misma dimensión con una hipótesis distinta. No es: \"fallaste, seguís\" — es: \"no convergió, probá otro ángulo\"."
       },
       {
         "t": 29,
-        "say": "Compress (cyan): cada N iteraciones (default 4) el agente reescribe su propio corpus, podando lo que ya no aporta. Sin esto, los runs explotan en costo de tokens y el modelo pierde foco. Es rank-and-prune forzado."
+        "say": "Compresión (en celeste): cada N iteraciones (por defecto 4) el agente reescribe su propio corpus, descartando lo que ya no aporta. Sin esto, las corridas subsiguientes explotarían en costo de tokens y el modelo perdería foco. Es clasificar y podar forzado."
       },
       {
         "t": 43,
-        "say": "Stopping criteria — tres opciones, lo que ocurra primero:\n• Ctrl+C (intervención manual)\n• max_iterations (presupuesto)\n• target_dimensions cubiertas (objetivo)"
+        "say": "Criterios de detención — tres opciones, lo que ocurra primero:\n• Intervención manual: Ctrl+C furioso\n• Por presupuesto\n• Objetivo alcanzado"
       }
     ],
     "hints": [],

@@ -37,14 +37,23 @@
   }
 
   async function loadRuntime() {
-    // The local dev server serves /api/runtime-config. In production, the
-    // page itself injects window.SLIDES_RUNTIME via a small inline script
-    // (or a static config.js) so we don't depend on a same-origin API.
+    // Resolution order:
+    //   1. window.SLIDES_RUNTIME (page-level inline override)
+    //   2. /api/runtime-config (FastAPI dev server inlines this)
+    //   3. /runtime-config.json (static file served from S3/CloudFront in prod)
+    // Only wsUrl is needed for viewers; the apiKey lives in localStorage and
+    // is read separately by getApiKey() — it must NEVER appear in either of
+    // the static sources (CloudFront-served HTML is public).
     if (window.SLIDES_RUNTIME) return window.SLIDES_RUNTIME;
-    try {
-      const r = await fetch("/api/runtime-config", { cache: "no-store" });
-      if (r.ok) return await r.json();
-    } catch (_) { /* fall through */ }
+    // `/runtime-config.json` works for `python3 -m http.server` from
+    // `docs/showcase-pro/` (file is at the server root). `/showcase/runtime-config.json`
+    // works for CloudFront (the showcase prefix is the deploy root in S3).
+    for (const url of ["/api/runtime-config", "/runtime-config.json", "/showcase/runtime-config.json"]) {
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (r.ok) return await r.json();
+      } catch (_) { /* try next */ }
+    }
     console.warn("[sync] no runtime config found; sync disabled");
     return null;
   }

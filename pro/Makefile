@@ -60,7 +60,10 @@ e2e-localstack: localstack-up tf-localstack-apply  ## Full local e2e: up + apply
 deploy-static:  ## Sync ../docs/showcase-pro to the S3 bucket from Terraform outputs
 	@BUCKET=$$($(TF) output -raw static_bucket 2>/dev/null); \
 	if [ -z "$$BUCKET" ]; then echo "static bucket not deployed"; exit 1; fi; \
-	aws s3 sync ../docs/showcase-pro/ s3://$$BUCKET/showcase/ --exclude "*.mp4"
+	aws s3 sync ../docs/showcase-pro/ s3://$$BUCKET/showcase/ --exclude "presenter/*" --exclude ".gitignore" --exclude "output" --exclude "output/*" --no-follow-symlinks; \
+	if [ -d ../output/aws_api_gateway_opus_sonnet_codex ]; then \
+	  aws s3 sync ../output/aws_api_gateway_opus_sonnet_codex/ s3://$$BUCKET/output/aws_api_gateway_opus_sonnet_codex/; \
+	fi
 
 clean:
 	rm -rf .pytest_cache **/__pycache__ infrastructure/terraform/build infrastructure/terraform/.terraform

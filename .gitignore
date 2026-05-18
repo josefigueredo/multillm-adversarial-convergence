@@ -16,3 +16,5 @@ build/
 logs/
 plans/
 TRANSFER_*.md
+apply.log
+tfplan.bin
