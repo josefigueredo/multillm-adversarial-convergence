@@ -620,8 +620,20 @@
     "section": "STRATEGIES",
     "title": "I · Strategies — Execution Strategies",
     "duration_seconds": 35,
-    "beats": [],
-    "hints": [],
+    "beats": [
+      {
+        "t": 0,
+        "say": "Entramos a la sección de estrategias. Vamos a ver seis formas distintas de cablear los backends en una corrida. La estrategia define la TOPOLOGÍA — quién hace qué."
+      },
+      {
+        "t": 18,
+        "say": "E'elegí tu topología antes de elegir tus patrones'. Si aplicás patrones sin entender qué topología hay debajo, los efectos son impredecibles."
+      }
+    ],
+    "hints": [
+      "topology = quién hace qué · patterns = cómo lo hace",
+      "config field: `execution.strategy`"
+    ],
     "links": [
       {
         "label": "Slide #5 in deck",
@@ -638,8 +650,24 @@
     "section": "STRATEGIES",
     "title": "Execution Strategies — overview",
     "duration_seconds": 35,
-    "beats": [],
-    "hints": [],
+    "beats": [
+      {
+        "t": 0,
+        "say": "La tabla resume las seis estrategias. Cada fila tiene sus componentes, el costo relativo y el mínimo de backends."
+      },
+      {
+        "t": 15,
+        "say": "Los costos son relativos a `single` (= 1×). Adversarial es ~1.3× porque agrega crítica más arbitraje. Parallel es N× porque corre todo en paralelo y se queda con el ganador."
+      },
+      {
+        "t": 27,
+        "say": "Las próximas seis slides son una por estrategia con sus diagramas de flujo más la invariante técnica de cada una."
+      }
+    ],
+    "hints": [
+      "single 1× · ensemble 1.5× · parallel N× · serial 1.5× · specialist 1× · adversarial 1.3×",
+      "switch entre estrategias = cambiar 1 línea de YAML"
+    ],
     "links": [
       {
         "label": "Slide #6 in deck",
@@ -654,10 +682,26 @@
   {
     "n": 7,
     "section": "STRATEGIES",
-    "title": "single — one backend, all roles",
+    "title": "single — un backend, todos los roles",
     "duration_seconds": 35,
-    "beats": [],
-    "hints": [],
+    "beats": [
+      {
+        "t": 0,
+        "say": "En Single un solo backend hace TODOS los roles: hipotetiza, investiga, juzga, evalúa, sintetiza. Es la estrategia más barata y la más simple de configurar."
+      },
+      {
+        "t": 13,
+        "say": "Casos de uso: prototipado rápido, baseline para comparar contra estrategias más caras, o cuando el modelo es lo suficientemente fuerte como para no necesitar triangulación."
+      },
+      {
+        "t": 25,
+        "say": "El trade-off obvio: cero triangulación adversarial. Si el modelo tiene un sesgo o un punto ciego, no hay nadie para detectarlo. Por eso single es punto de partida, no punto de llegada."
+      }
+    ],
+    "hints": [
+      "INVARIANT — one provider for all phases · no cross-provider independence",
+      "cost: 1× · min_backends: 1"
+    ],
     "links": [
       {
         "label": "Slide #7 in deck",
@@ -672,10 +716,26 @@
   {
     "n": 8,
     "section": "STRATEGIES",
-    "title": "ensemble — two researchers + different-family judge",
+    "title": "ensemble — dos investigadores + juez de diferente familia",
     "duration_seconds": 35,
-    "beats": [],
-    "hints": [],
+    "beats": [
+      {
+        "t": 0,
+        "say": "En Ensemble dos backends investigan la misma dimensión EN PARALELO. Un tercero, de OTRA familia, juzga cuál respuesta es mejor."
+      },
+      {
+        "t": 14,
+        "say": "Hay una regla crítica que respetar y es que el juez NO puede ser de la misma familia que los investigadores. Si todo es Claude o todo es GPT, el juez se sesga hacia su propio estilo de respuesta. Y es un sesgo de auto confirmación."
+      },
+      {
+        "t": 27,
+        "say": "Ejemplo concreto: claude-cli más codex-cli como investigadores, gemini-cli como juez. Tres familias distintas bajan varianza."
+      }
+    ],
+    "hints": [
+      "INVARIANT — judge must be a different provider family · prevents self-confirmation bias",
+      "cost: ~1.5× · min_backends: 2"
+    ],
     "links": [
       {
         "label": "Slide #8 in deck",
@@ -690,10 +750,26 @@
   {
     "n": 9,
     "section": "STRATEGIES",
-    "title": "parallel — all backends, best score wins",
+    "title": "parallel — todos los backends, el mejor puntaje gana",
     "duration_seconds": 35,
-    "beats": [],
-    "hints": [],
+    "beats": [
+      {
+        "t": 0,
+        "say": "En Parallel TODOS los backends investigan independientemente. El que tenga el mayor puntaje compuesto gana la iteración."
+      },
+      {
+        "t": 14,
+        "say": "Acá no hay consenso ni unión. El ganador se lleva todo. Es la estrategia más cara pero la que da más diversidad de soluciones por iteración."
+      },
+      {
+        "t": 26,
+        "say": "Cuándo usarla ?: cuando el presupuesto lo permite y queremos maximizar la chance de encontrar la mejor respuesta posible. Vale la pena para topics críticos donde el costo del error supera al costo de los tokens."
+      }
+    ],
+    "hints": [
+      "INVARIANT — no consensus or merge · winner takes all by composite score",
+      "cost: N× · min_backends: 2+"
+    ],
     "links": [
       {
         "label": "Slide #9 in deck",
@@ -708,10 +784,26 @@
   {
     "n": 10,
     "section": "STRATEGIES",
-    "title": "serial — cheap draft + precise refine",
+    "title": "serial — borrador barato, refinamiento preciso",
     "duration_seconds": 35,
-    "beats": [],
-    "hints": [],
+    "beats": [
+      {
+        "t": 0,
+        "say": "En Serial un backend BARATO genera un borrador amplio y un backend PRECISO refina ese borrador. Es una cascada de dos etapas."
+      },
+      {
+        "t": 14,
+        "say": "Es una estrategia de costo progresivo ya que empezás barato explorando el espacio y después gastás solo en refinar lo que se ve prometedor. Buena para topics donde no querés gastar Opus en la primera pasada."
+      },
+      {
+        "t": 26,
+        "say": "Por ejemplo: copilot borrador → codex refina. O gemini borrador → claude refina. La etapa 2 SIEMPRE recibe el output completo de la etapa 1 como contexto."
+      }
+    ],
+    "hints": [
+      "INVARIANT — stage 2 always receives stage 1 full output as context",
+      "cost: borrador barato + refinamiento preciso ≈ 1.5× total · min_backends: 2"
+    ],
     "links": [
       {
         "label": "Slide #10 in deck",
@@ -726,10 +818,26 @@
   {
     "n": 11,
     "section": "STRATEGIES",
-    "title": "specialist — route each dimension to best-fit backend",
+    "title": "specialist — canalizamos cada dimension al backend que mejor encaja",
     "duration_seconds": 35,
-    "beats": [],
-    "hints": [],
+    "beats": [
+      {
+        "t": 0,
+        "say": "En Specialist — cada DIMENSIÓN de la investigación se rutea al backend cuya 'persona' mejor encaja con la expertise requerida."
+      },
+      {
+        "t": 14,
+        "say": "Por ejemplo: dimensiones de código se las enruta a codex, dimensiones de razonamiento sistemático a claude, dimensiones de búsqueda factual a gemini."
+      },
+      {
+        "t": 27,
+        "say": "Si ninguna dimensión matchea con un especialista, caemos al primario. Es un fail-safe, no un fail-stop y la corrida sigue. Eso es importante porque el routing puede fallar silenciosamente sin que se nos muera el run."
+      }
+    ],
+    "hints": [
+      "INVARIANT — if no specialist matches, falls through to primary (fail-safe)",
+      "cost: 1× avg · min_backends: 2+"
+    ],
     "links": [
       {
         "label": "Slide #11 in deck",
@@ -744,10 +852,26 @@
   {
     "n": 12,
     "section": "STRATEGIES",
-    "title": "adversarial — researcher · critic · arbitrator",
+    "title": "adversarial — investigador · crítico · árbitro",
     "duration_seconds": 35,
-    "beats": [],
-    "hints": [],
+    "beats": [
+      {
+        "t": 0,
+        "say": "En Adversarial hay tres roles, tres familias de modelos. El investigador produce. El crítico marca debilidades. El árbitro decide. Esto es lo que le da nombre al framework."
+      },
+      {
+        "t": 14,
+        "say": "La invariante crítica es que los TRES roles deben venir de FAMILIAS DISTINTAS. Si usamos el mismo RLHF (Reinforcement Learning from Human Feedback o Aprendizaje por Refuerzo a partir de Retroalimentación Humana) perdemos la crítica independiente. Si el Investigador y el Crítico son los dos Claude, comparten puntos ciegos."
+      },
+      {
+        "t": 27,
+        "say": "El costo de más o menos 1.3× contra single es sorprendentemente barato para lo que da. Por qué ?: el crítico procesa output ya generado, no genera desde cero. El árbitro decide en pocos tokens."
+      }
+    ],
+    "hints": [
+      "INVARIANT — three roles must come from different model families · same RLHF ≠ independent critique",
+      "cost: ~1.3× · min_backends: 2"
+    ],
     "links": [
       {
         "label": "Slide #12 in deck",
@@ -767,11 +891,11 @@
     "beats": [
       {
         "t": 0,
-        "say": "Acá empieza la parte densa: los 11 patrones, agrupados en tres capas (Engine, Topology, Guardrails). Cada uno tiene una cita canónica."
+        "say": "Acá empieza la parte densa, son 11 patrones agénticos, agrupados en tres capas: Engine, Topology, Guardrails"
       },
       {
         "t": 8,
-        "say": "Es una taxonomía ejecutable, no una lista de buzzwords. Cada cosa que parece un truco tiene un nombre y un paper detrás."
+        "say": "Para sacar el humo les cuento que no es una lista de buzzwords, es una taxonomía ejecutable y cada patrón tiene un nombre y un paper detrás."
       }
     ],
     "hints": [],
@@ -789,7 +913,7 @@
   {
     "n": 14,
     "section": "I · PATTERNS",
-    "title": "Why these patterns matter",
+    "title": "Por qué estos patrones importan",
     "duration_seconds": 60,
     "beats": [
       {
@@ -798,19 +922,19 @@
       },
       {
         "t": 3,
-        "say": "1. Replaceability — cuando algo tiene nombre, intercambiarlo es mecánico. Cambiar el judge de codex-cli a gemini-api: cambiás el binding del role en el config, no rediseñás nada. El patrón \"Multi-Agent Role Topology\" da exactamente esa indirección."
+        "say": "1. Reemplazabilidad: cuando algo tiene nombre, intercambiarlo es mecánico. Cambiar el juez de codex-cli a gemini-api: cambiás el binding del role en el config, no rediseñás nada. El patrón \"Multi-Agent Role Topology\" da exactamente esa indirección."
       },
       {
         "t": 18,
-        "say": "2. Defensibility — en code review se discute \"¿esto es Evaluator-Optimizer o es Reflection?\" en vez de \"¿esto está bien?\". Conversación más corta, más precisa, menos sujeta a opinión."
+        "say": "2. Defensibilidad: en un code review se discute por ejemplo si \"¿esto es Evaluator-Optimizer o es Reflection?\" en vez de un generico: \"¿esto está bien?\". Conversación más corta, más precisa, menos sujeta a opinión."
       },
       {
         "t": 29,
-        "say": "3. Onboarding — alguien nuevo reconoce las formas. No tiene que ingeniería-inversa cada decisión. Si vio Evaluator-Optimizer en otro proyecto, lo reconoce acá y arranca productivo más rápido."
+        "say": "3. Onboarding: alguien nuevo reconoce las formas. No tiene que hacer ingeniería inversa de cada decisión. Si vio Evaluator-Optimizer en otro proyecto, lo reconoce acá y arranca productivo más rápido."
       },
       {
         "t": 40,
-        "say": "Los 11 no son toda la teoría agéntica que existe — son el subconjunto que ESTE framework efectivamente compone. Engine: 3 que hacen que una iteración tenga sentido. Topology: 5 que dicen cómo se conectan los backends. Guardrails: 3 que evitan que el sistema haga lo que no debería."
+        "say": "Los 11 no son toda la teoría agéntica que existe — son el subconjunto que ESTE framework efectivamente compone. Engine: son 3 que hacen que una iteración tenga sentido. Topology: son 5 que dicen cómo se conectan los backends. Guardrails: son 3 que evitan que el sistema haga lo que no debería."
       }
     ],
     "hints": [],

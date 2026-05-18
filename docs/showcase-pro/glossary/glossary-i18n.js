@@ -708,6 +708,14 @@ window.GLOSSARY_I18N = {
         technical: "Un límite de runtime para subprocesses, APIs, herramientas o iteraciones.",
         matters: "Evita que llamadas trabadas bloqueen todo el workflow indefinidamente.",
         project: "Las configs de research definen `timeout_seconds` por llamada a backend."
+      },
+      "Variance": {
+        term: "Varianza",
+        plain: "Cuánto puede cambiar la respuesta al mismo prompt entre corridas del mismo modelo o entre modelos distintos.",
+        business: "Dos analistas que responden la misma pregunta pueden dar respuestas distintas — esa dispersión es varianza. Sirve como señal cuando la podés medir; es peligrosa cuando no.",
+        technical: "Dispersión estadística de las salidas del modelo dado el mismo input. Viene de la temperatura de sampling, el decoding estocástico y los sesgos de entrenamiento específicos de cada familia.",
+        matters: "Alta varianza más una sola muestra = no determinístico y no auditable. No podés confiar en una respuesta si no sabés cuánto habría cambiado en otra corrida.",
+        project: "El framework convierte la varianza en triangulación productiva: ensemble corre dos backends en paralelo, parallel los compite a todos, adversarial mete un crítico de otra familia. Cada patrón usa la varianza inter-modelo como señal en vez de esconderla detrás de una sola muestra."
       }
     }
   }

@@ -31,6 +31,10 @@
       // ── section II: interactive tools ─────────────────────────────
       "sec.2.eyebrow": "II · Herramientas Interactivas",
       "sec.2.title": "Datos en vivo y demos animadas",
+      "card.simulator.tag": "Simulador",
+      "card.simulator.count": "11 patrones",
+      "card.simulator.title": "Simulador de Patrones",
+      "card.simulator.desc": "Elegí cualquiera de los 11 patrones agénticos — evaluator-optimizer, ensemble, crítica adversarial, HITL y más — y recorré una ejecución realista de un solo hilo con transiciones de rol, timeline y output del contrato.",
       "card.dashboard.tag": "Tablero",
       "card.dashboard.title": "Tablero de Replay en Vivo",
       "card.dashboard.desc": "Recorré cada iteración de la corrida real <code style=\"font-family:JetBrains Mono,monospace;font-size:0.85em;color:#f5a524\">aws_api_gateway_opus_sonnet_codex</code>. Sparkline del score, grilla de dimensiones, máquina de estados, decisiones KEEP/DISCARD y bloque de costos.",

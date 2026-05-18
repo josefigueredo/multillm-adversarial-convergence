@@ -911,5 +911,16 @@ window.GLOSSARY_TERMS = [
     matters: "Timeouts prevent stuck calls from blocking the whole workflow forever.",
     project: "Research configs set `timeout_seconds` per backend call.",
     related: ["Latency", "Failure Taxonomy", "Resume"]
+  },
+  {
+    term: "Variance",
+    aliases: ["variance", "varianza", "non-determinism", "no-determinismo", "dispersion", "dispersión", "output variance", "inter-model variance"],
+    category: "Trust",
+    plain: "How much the same prompt's answer can change across runs of the same model or across different models.",
+    business: "Two analysts answering the same question may give different answers — that spread is variance. Useful as a signal when you can measure it, dangerous when you can't.",
+    technical: "Statistical dispersion of model outputs given identical inputs. Comes from sampling temperature, stochastic decoding, and family-specific training biases.",
+    matters: "High variance plus a single sample = non-deterministic and unauditable. You can't trust one answer if you don't know how much it would have changed on another run.",
+    project: "The framework converts variance into productive triangulation: ensemble runs two backends in parallel, parallel competes all of them, adversarial layers a critic from a different family. Each pattern uses inter-model variance as a signal instead of hiding it behind a single sample.",
+    related: ["LLM", "LLM-as-Judge", "Adversarial Critique", "Evaluator-Optimizer", "Parallelization", "Trust Class"]
   }
 ];
