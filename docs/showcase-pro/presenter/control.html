@@ -617,7 +617,7 @@
   },
   {
     "n": 5,
-    "section": "STRATEGIES",
+    "section": "I · STRATEGIES",
     "title": "I · Strategies — Execution Strategies",
     "duration_seconds": 35,
     "beats": [
@@ -647,7 +647,7 @@
   },
   {
     "n": 6,
-    "section": "STRATEGIES",
+    "section": "I · STRATEGIES",
     "title": "Execution Strategies — overview",
     "duration_seconds": 35,
     "beats": [
@@ -681,7 +681,7 @@
   },
   {
     "n": 7,
-    "section": "STRATEGIES",
+    "section": "I · STRATEGIES",
     "title": "single — un backend, todos los roles",
     "duration_seconds": 35,
     "beats": [
@@ -715,7 +715,7 @@
   },
   {
     "n": 8,
-    "section": "STRATEGIES",
+    "section": "I · STRATEGIES",
     "title": "ensemble — dos investigadores + juez de diferente familia",
     "duration_seconds": 35,
     "beats": [
@@ -749,7 +749,7 @@
   },
   {
     "n": 9,
-    "section": "STRATEGIES",
+    "section": "I · STRATEGIES",
     "title": "parallel — todos los backends, el mejor puntaje gana",
     "duration_seconds": 35,
     "beats": [
@@ -783,7 +783,7 @@
   },
   {
     "n": 10,
-    "section": "STRATEGIES",
+    "section": "I · STRATEGIES",
     "title": "serial — borrador barato, refinamiento preciso",
     "duration_seconds": 35,
     "beats": [
@@ -817,7 +817,7 @@
   },
   {
     "n": 11,
-    "section": "STRATEGIES",
+    "section": "I · STRATEGIES",
     "title": "specialist — canalizamos cada dimension al backend que mejor encaja",
     "duration_seconds": 35,
     "beats": [
@@ -851,7 +851,7 @@
   },
   {
     "n": 12,
-    "section": "STRATEGIES",
+    "section": "I · STRATEGIES",
     "title": "adversarial — investigador · crítico · árbitro",
     "duration_seconds": 35,
     "beats": [
@@ -885,8 +885,8 @@
   },
   {
     "n": 13,
-    "section": "I · PATTERNS",
-    "title": "I · PATTERNS",
+    "section": "II · PATTERNS",
+    "title": "II · PATTERNS",
     "duration_seconds": 15,
     "beats": [
       {
@@ -912,7 +912,7 @@
   },
   {
     "n": 14,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "Por qué estos patrones importan",
     "duration_seconds": 60,
     "beats": [
@@ -951,17 +951,17 @@
   },
   {
     "n": 15,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "1 · Evaluator-Optimizer",
     "duration_seconds": 45,
     "beats": [
       {
         "t": 0,
-        "say": "El outer loop más simple en sistemas agénticos. Un generador produce candidatos. Un evaluador los puntúa contra un objetivo. El sistema queda con score alto y descarta (o reescribe) los demás. Corre hasta que el score se aplana o se agota un presupuesto (iteraciones, tiempo, costo)."
+        "say": "Es el outer loop más simple en sistemas agénticos donde un generador produce candidatos, un evaluador los puntúa contra un objetivo y el sistema se queda con puntaje más alto y descarta los demás. Correrá hasta que el puntaje se aplane o se agote uno de los presupuestos (iteraciones, tiempo, costo)."
       },
       {
         "t": 18,
-        "say": "Pieza que muchos pasan por alto: el evaluador y el generador NO tienen que ser el mismo modelo. Idealmente NO lo son (eso lo desarrolla LLM-as-Judge en el slide siguiente)."
+        "say": "Idealmente el evaluador y el generador deben ser de modelos diferentes."
       },
       {
         "t": 30,
@@ -986,29 +986,29 @@
   },
   {
     "n": 16,
-    "section": "I · PATTERNS",
-    "title": "2 · LLM-as-Judge",
+    "section": "II · PATTERNS",
+    "title": "2 · LLM como Juez",
     "duration_seconds": 60,
     "beats": [
       {
         "t": 0,
-        "say": "Principio: el modelo que produce no puede puntuar bien lo que produce. Self-evaluation tiene sesgo conocido a verbosidad y confianza — el modelo se cree sus propias respuestas."
+        "say": "Su principio es que el modelo que produce no puede puntuar bien lo que hizo porque cae en sesgo de autoevaluación. La autoevaluación produce verbosidad y confianza y el modelo se cree sus propias respuestas."
       },
       {
         "t": 11,
-        "say": "Solución: un modelo separado, idealmente de otra familia, evalúa contra un rubric. Su score es UNA entrada a keep/discard, no la única."
+        "say": "La solución: un modelo separado, idealmente de otra familia, evalúa contra una rúbrica. Su puntaje será UNA entrada a keep/discard."
       },
       {
         "t": 20,
-        "say": "Por qué híbrido (40 heurística / 60 judge): un judge LLM puro se puede gamear — si el productor aprende a \"escribir para el judge\", el sistema colapsa. La heurística es determinística (cobertura, densidad de citas, completitud por dimensión) y no se gamea. Las dos juntas son más duras de explotar que cualquiera por separado."
+        "say": "Ahora ustedes se preguntaran por qué elegí un esquema híbrido con 40% heurística y 60% juicio?: Un juez LLM puro se puede trampear si el productor aprende a \"escribir para el juez\", el sistema colapsa. La heurística es determinística (cobertura, densidad de citas, completitud por dimensión) y no se puede trampear igual. Las dos juntas son más duras de explotar que cualquiera por separado."
       },
       {
         "t": 42,
-        "say": "Multi-judge mode: si configurás varios judges, el sistema detecta desacuerdo entre ellos. Señal de dimensión ambigua o de sesgo en algún judge — útil para flagging temprano."
+        "say": "Modo Multi-juez: podemos configurar varios jueces y el sistema puede detecta desacuerdo entre ellos."
       },
       {
         "t": 53,
-        "say": "Referencias: agentic-design.ai (mejor explicación práctica) · arXiv 2410.10934 (paper de fondo sobre judge bias)."
+        "say": "Referencias: agentic-design.ai (mejor explicación práctica) · arXiv 2410.10934 (paper de fondo sobre sesgo de jueces)."
       }
     ],
     "hints": [],
@@ -1025,25 +1025,25 @@
   },
   {
     "n": 17,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "3 · Reflection / Self-Compression",
     "duration_seconds": 60,
     "beats": [
       {
         "t": 0,
-        "say": "La iteración naive crece el contexto monotónicamente. Cada claim que sobrevive el KEEP se agrega a la memoria de trabajo. Sin compresión, los runs explotan: el costo de tokens se va al carajo, el modelo pierde foco, la relación señal/ruido cae."
+        "say": "Cada afirmación que es catalogada como KEEP se agrega a la memoria de trabajo por eso sin la compresión las corridas consecutivas aumentan el contexto y el modelo pierde foco y la relación señal/ruido cae."
       },
       {
         "t": 16,
-        "say": "La compresión es rank-and-prune forzado: el agente vuelve a leer su propio corpus y lo reescribe, quedándose solo con lo que él juzga load-bearing. No es resumir — es priorizar. Lo que se cae, se cae con registro de auditoría."
+        "say": "En la compresión el agente vuelve a leer su propio corpus y lo reescribe, quedándose solo con lo que él considera esencial para sostener el razonamiento. No es resumir — es priorizar. Lo que se cae, se cae con registro de auditoría."
       },
       {
         "t": 32,
-        "say": "No es opcional para runs largos. Sin compression_interval, una investigación de 20 iteraciones puede usar 10× los tokens que una bien comprimida, y la calidad del último claim se degrada porque el modelo está sumergido en ruido."
+        "say": "Sin compresión, una investigación de 20 iteraciones puede usar 10 veces los tokens que una bien comprimida, y la calidad de la última afirmación se degrada porque el modelo está sumergido en ruido."
       },
       {
         "t": 47,
-        "say": "En el repo: flag compression_interval (default 4). El audit event corpus_compressed registra los token counts antes y después."
+        "say": "# En el repo: flag compression_interval (default 4). El audit event corpus_compressed registra los token counts antes y después."
       },
       {
         "t": 54,
@@ -1064,25 +1064,25 @@
   },
   {
     "n": 18,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "4 · Orchestrator / Subagents",
     "duration_seconds": 60,
     "beats": [
       {
         "t": 0,
-        "say": "Centralizá el control flow en un solo componente. Los backends son trabajadores con contrato angosto: reciben una tarea, devuelven un resultado, y NO tienen awareness del lifecycle más amplio. No saben en qué iteración están, qué backend corre antes/después, ni si esto va a un judge."
+        "say": "Centralizá el flujo de control en un solo componente. Los backends son trabajadores con contrato angosto: reciben una tarea, devuelven un resultado, y NO tienen idea del ciclo de vida completo. No saben en qué iteración están, qué backend corre antes/después, ni si lo que producen será evaluado por un juez."
       },
       {
         "t": 18,
-        "say": "Esa restricción los hace reemplazables, testeables, y evita que el estado cross-cutting se filtre dentro de los adaptadores de transporte. Si copilot-cli cambia su API mañana, lo único que tocás es el adapter — la lógica del loop no se entera."
+        "say": "Esa restricción los hace reemplazables, testeables, y evita que el estado cross-cutting se filtre dentro de los adaptadores de transporte. Si copilot-cli cambia su API mañana, lo único que tocamos es el adapter y la lógica del loop no se entera."
       },
       {
         "t": 35,
-        "say": "Regla dura: los backends NUNCA se llaman entre sí. Solo retornan al orchestrator. Si necesitás encadenar dos backends, eso es lógica del orchestrator, no del backend."
+        "say": "La regla dura es que los backends NUNCA se llaman entre sí. Solo retornan al orchestrator. Si se necesita encadenar dos backends, eso es lógica del orchestrator, no del backend."
       },
       {
         "t": 45,
-        "say": "orchestrator.py es el ÚNICO dueño de las transiciones de fase, los chequeos de convergencia, y los triggers de compresión. Si ves control flow en otra parte, es un bug arquitectural."
+        "say": "# orchestrator.py es el ÚNICO dueño de las transiciones de fase, los chequeos de convergencia, y los triggers de compresión. Si ves control flow en otra parte, es un bug arquitectural."
       },
       {
         "t": 57,
@@ -1103,25 +1103,25 @@
   },
   {
     "n": 19,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "5 · Multi-Agent Role Topology",
     "duration_seconds": 65,
     "beats": [
       {
         "t": 0,
-        "say": "Los nombres `primary`, `judge`, `utility`, `research[]` son abstracciones que el código razona. Cada uno se bindea a un backend concreto en config time. El mismo código del orchestrator funciona si hoy `judge` es codex-cli y mañana es gemini-api. Esa indirección ES la superficie de swap."
+        "say": "Los nombres `primary`, `judge`, `utility`, `research[]` son abstracciones que el código razona. Cada uno se realaciona a un backend concreto segun su configuración."
       },
       {
         "t": 18,
-        "say": "Sin este patrón, cambiar el judge significa modificar el código del orchestrator. Con él, es cambiar una línea de YAML. Diferencia enorme cuando estás iterando con qué modelo es mejor en qué rol."
+        "say": "Sin esto cambiar el juez significaria modificar el código del orchestrator. De esta manera es mas fácil iterar tambien qué modelo es mejor en qué rol."
       },
       {
         "t": 31,
-        "say": "BackendsConfig valida que TODOS los roles necesarios estén bindeados antes de arrancar. Si te falta `judge` y la estrategia lo necesita, fallás temprano con error claro — no en medio del run cuando ya gastaste tokens."
+        "say": "# BackendsConfig valida que TODOS los roles necesarios estén bindeados antes de arrancar. Si te falta `judge` y la estrategia lo necesita, fallás temprano con error claro — no en medio del run cuando ya gastaste tokens."
       },
       {
         "t": 46,
-        "say": "Los nombres de role aparecen en cada audit event: `role=judge backend=codex-cli`. Permite filtrar logs por rol semántico, no solo por backend técnico — útil cuando querés ver \"todo lo que hizo el critic\" sin importar qué modelo lo cumplió."
+        "say": "# Los nombres de role aparecen en cada audit event: `role=judge backend=codex-cli`. Permite filtrar logs por rol semántico, no solo por backend técnico — útil cuando querés ver \"todo lo que hizo el critic\" sin importar qué modelo lo cumplió."
       },
       {
         "t": 61,
@@ -1142,25 +1142,25 @@
   },
   {
     "n": 20,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "6 · Routing / Specialist Dispatch",
     "duration_seconds": 55,
     "beats": [
       {
         "t": 0,
-        "say": "Trabajo distinto necesita priors distintos. Una pregunta de breadth (\"¿cuáles son las alternativas a X?\") se beneficia de un modelo con recall amplio. Una pregunta de precisión-crítica (\"¿esta cita realmente sostiene este claim?\") se beneficia de un modelo entrenado adversarial."
+        "say": "Cada tipo de pregunta rinde mejor con un modelo distinto. Una pregunta exploratoria como \"¿cuáles son las alternativas a X?\" necesita un modelo que cubra mucho terreno. Una pregunta de verificación como \"¿esta cita realmente sostiene esta afirmación?\" necesita un modelo entrenado para criticar y desconfiar."
       },
       {
         "t": 16,
-        "say": "El router mira la persona declarada por la dimensión y dispatcha al backend correspondiente. Si una dimensión no tiene specialist matchable, cae al primary — fail-safe en vez de fail-stop."
+        "say": "El sistema mira qué rol pide cada dimensión y la rutea al backend que tenga ese rol asignado. Si ninguna dimensión coincide con un specialist configurado, cae al primary — la corrida sigue en vez de cortar."
       },
       {
         "t": 28,
-        "say": "Caso típico: en una investigación de 8 dimensiones, podés tener 2 que pidan \"broad-recall\", 4 \"precision-analyst\", y 2 \"code-reviewer\". Cada una al backend que la maneje mejor. No estás obligado a usar un solo modelo para todo."
+        "say": "Caso típico: en una investigación de 8 dimensiones podés tener 2 que pidan \"broad-recall\", 4 \"precision-analyst\" y 2 \"code-reviewer\". Cada dimensión va al backend que mejor la maneje. No estás atado a un solo modelo para toda la corrida."
       },
       {
         "t": 43,
-        "say": "Cuándo NO usar specialist: cuando la audiencia espera una sola \"voz\" coherente en el output final. Mejor ensemble o serial con un único primary."
+        "say": "Cuándo NO usar specialist: cuando la audiencia espera uniformidad en el output final. Mejor ensemble o serial con un único primary."
       },
       {
         "t": 52,
@@ -1181,25 +1181,25 @@
   },
   {
     "n": 21,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "7 · Parallelization (Ensemble)",
     "duration_seconds": 50,
     "beats": [
       {
         "t": 0,
-        "say": "Reducción de varianza por redundancia. La MISMA tarea en N backends simultáneamente. Las respuestas van a divergir en formas interesantes — y esa divergencia ES la información."
+        "say": "Reduce la varianza por redundancia. Corre la MISMA tarea en N backends simultáneamente y las respuestas van a diverger en formas interesantes y en esa divergencia encontramos la información."
       },
       {
         "t": 11,
-        "say": "Después un judge elige la más fuerte, o vote/merge las combina:\n• Investigación abierta — merge gana (combinás coverage)\n• Respuesta única — vote/judge gana (filtrás errores)"
+        "say": "Después un juez elige la más fuerte:\n• Mediante Investigación abierta donde se combinás coverage\n• o Mediante una Respuesta única que filtrás errores"
       },
       {
         "t": 22,
-        "say": "Cuándo conviene ensemble: cuando el costo de una respuesta equivocada es alto Y el presupuesto permite la redundancia. ADR que va a guiar 6 meses: gastar 3× los tokens para tener varianza más baja es una compra fácil. Idea casual: no."
+        "say": "Conviene ensemble cuando el costo de una respuesta equivocada es alto y el presupuesto permite la redundancia."
       },
       {
         "t": 38,
-        "say": "Implementación: ThreadPoolExecutor con paralelismo acotado. No queremos que un ensemble de 4 backends mate al rate limit de uno y haga fallar todo el run."
+        "say": "En la Implementación hacemos un ThreadPoolExecutor con paralelismo acotado porque no queremos que un ensemble de 4 backends mate al rate limit de uno y haga fallar todo el run."
       },
       {
         "t": 48,
@@ -1220,29 +1220,29 @@
   },
   {
     "n": 22,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "8 · Prompt Chaining (Serial)",
     "duration_seconds": 65,
     "beats": [
       {
         "t": 0,
-        "say": "Especialización por ETAPA, no por tarea. Un backend investiga, el próximo critica, el próximo refina. Cada etapa opera sobre el output de la anterior; la cadena acumula contexto."
+        "say": "Es una especialización por ETAPA, no por tarea. Un backend investiga, el próximo critica, el próximo refina y cada etapa opera sobre el output de la anterior; la cadena acumula contexto."
       },
       {
         "t": 11,
-        "say": "Más barato que ensemble (no son llamadas paralelas, no hay redundancia) pero más lento end-to-end (las etapas son secuenciales, no se solapan)."
+        "say": "Es más barato que ensemble (no son llamadas paralelas, no hay redundancia) pero más lento end-to-end (las etapas son secuenciales, no se solapan)."
       },
       {
         "t": 20,
-        "say": "Cuándo serial sobre ensemble: cuando las etapas tienen especializaciones asimétricas. Investigar y criticar son habilidades distintas — querés que research-stage NO esté pensando en críticas, y critique-stage NO esté pensando en producir contenido nuevo. Separación de responsabilidades = ventaja."
+        "say": "Conviene serial sobre ensemble cuando las etapas son habilidades distintas. Investigar y criticar no son lo mismo — queremos que el que investiga no esté pensando en críticas, y que el que critica no esté generando contenido nuevo. Cada etapa hace una sola cosa."
       },
       {
         "t": 36,
-        "say": "Cuándo NO usar serial: cuando la audiencia espera respuesta rápida. Cada etapa adiciona latencia, y un chain de 4 etapas con 30 seg cada una son 2 minutos largos."
+        "say": "No conviene serial: cuando la audiencia espera respuesta rápida. Cada etapa agrega latencia, y una cadena de 4 etapas con 30 seg cada una son 2 minutos largos."
       },
       {
         "t": 47,
-        "say": "La etapa N+1 recibe el output COMPLETO de la N como contexto. Hace la cadena coherente, pero el costo crece con cada etapa. Reflection/Compression aplica con fuerza si la cadena es larga."
+        "say": "# La etapa N+1 recibe el output COMPLETO de la N como contexto. Hace la cadena coherente, pero el costo crece con cada etapa. Reflection/Compression aplica con fuerza si la cadena es larga."
       },
       {
         "t": 60,
@@ -1263,21 +1263,21 @@
   },
   {
     "n": 23,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "9 · Adversarial Critique",
     "duration_seconds": 65,
     "beats": [
       {
         "t": 0,
-        "say": "Variante en forma de debate del serial chaining. Researcher propone claims; critic — DELIBERADAMENTE de otra familia de modelos — busca errores, citas débiles, gaps lógicos; arbitrator (otra familia distinta de nuevo) emite un veredicto."
+        "say": "Es una variante del Serial chaining en forma de debate. El investigador propone Researcher propone máximas; el crítico (DELIBERADAMENTE de otra familia de modelos) busca errores, citas débiles, gaps lógicos; el árbitro (otra familia distinta de nuevo) emite un veredicto."
       },
       {
         "t": 14,
-        "say": "Pieza clave: \"different RLHF training produces different blind spots\". Cada modelo fue entrenado por humanos distintos con feedback distinto, así que internalizó sesgos distintos. Las debilidades de Claude son visibles para GPT, y al revés. Si los tres backends fueran del mismo proveedor, este patrón sería inútil — estarías triangulando con tres versiones del mismo blind spot."
+        "say": "Ddifferent entrenamientos RLHF producen diferentes puntos ciegos. Cada modelo fue entrenado por humanos distintos con feedback distinto, así que internalizó sesgos distintos. Las debilidades de Claude son visibles para GPT, y al revés. Si los tres backends fueran del mismo proveedor, este patrón sería inútil — estarías triangulando con tres versiones del mismo punto ciego."
       },
       {
         "t": 37,
-        "say": "Es LA estrategia que usa el demo run. Tres roles, tres familias: claude-cli investiga, codex-cli critica, codex-cli arbitra. Vas a ver concretamente qué encontró el critic — errores factuales reales, no comentarios de estilo."
+        "say": "Es la estrategia que da nombre al framework porque era la mas parecida al modelo de referencia de entrenamiento de Andrej Karpathy."
       },
       {
         "t": 50,
@@ -1302,29 +1302,29 @@
   },
   {
     "n": 24,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "10 · Tool Use + Sandboxed Execution",
     "duration_seconds": 75,
     "beats": [
       {
         "t": 0,
-        "say": "Los agentes necesitan tools (web fetch, code execution, file write) pero cada tool ensancha la superficie de ataque. Capability registry: cada tool se declara con sus capacidades; las llamadas no clasificadas son denegadas por default."
+        "say": "Los agentes necesitan herramientas (leer web, ejecutar código, escribir archivos) pero cada herramienta agranda la superficie de ataque. La solución es crear un registro de capacidades y lo que no está declarado se deniega por defecto."
       },
       {
         "t": 14,
-        "say": "Writes a filesystem se scopean a `output/<run>/.workspace/`. Acceso de red: `web_only` (allowlist) o `none`. Cada denial es auditable."
+        "say": "Cuando el sandbox corre con Docker, cada herramienta arranca en su propio contenedor efímero. Las escrituras al filesystem quedan limitadas a `output/<run>/.workspace/`. La red se restringe con `web_only` (allowlist explícita) o se cierra con `none`."
       },
       {
         "t": 21,
-        "say": "Framing para enterprise: el capability registry es el equivalente agéntico de una IAM policy. Mismo principio de least privilege, pero a nivel de tool en vez de proceso. Si la audiencia maneja AWS o cualquier nube, ese paralelismo aterriza inmediato."
+        "say": "Para una audiencia empresarial: el registro de capacidades es el equivalente del IAM de AWS aplicado al agente. Mismo principio de mínimo privilegio, pero a nivel de herramienta en lugar de proceso. Si tu audiencia maneja AWS o cualquier nube, el paralelo se entiende al toque."
       },
       {
         "t": 37,
-        "say": "Write boundary: `output/<run>/.workspace/` — todo afuera es read-only para el agente. Network policy: web_only con allowlist explícita, o none. Audit events: tool_denied, write_intent, network_intent — trazabilidad completa de TODO lo que el agente intentó hacer y qué se le negó."
+        "say": "# Tres eventos de auditoría te muestran qué pasó: `tool_denied` (la herramienta no estaba autorizada), `write_intent` (intentó escribir afuera del workspace), `network_intent` (intentó acceder a una URL no allowlisted). El audit trail te dice exactamente qué intentó hacer el agente y qué se le negó."
       },
       {
         "t": 53,
-        "say": "¿Se puede saltear? No fácil. El sandbox executor intercepta a nivel de syscall lo que puede; lo que no puede se intercepta en el tool wrapper. Si un agente quiere escribir afuera del workspace, el intento queda en el audit trail antes de ser rechazado."
+        "say": "¿Se puede saltear? Difícil. Con Docker el aislamiento es del kernel — la herramienta no ve el filesystem del host ni las redes que no fueron explícitamente expuestas. Sin Docker, el sandbox executor valida cada llamada contra la policy antes de delegarla. En cualquiera de los dos modos, el intento de saltar queda en el audit trail antes de ser rechazado."
       },
       {
         "t": 71,
@@ -1345,7 +1345,7 @@
   },
   {
     "n": 25,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "11 · Human-in-the-Loop (HITL)",
     "duration_seconds": 70,
     "beats": [
@@ -1363,7 +1363,7 @@
       },
       {
         "t": 46,
-        "say": "NO es un patrón para producción autónoma 24/7 — es para flows donde querés delegate-but-verify. Tiene latencia humana (puede pasar una hora desde que el agente termina la fase research hasta que el operador aprueba), así que diseñar el flow para que la pausa esté OK es parte del costo."
+        "say": "NO es un patrón para producción autónoma 24/7 — es para flows donde querés delegar pero verificar. Tiene latencia humana (puede pasar una hora desde que el agente termina la fase research hasta que el operador aprueba), así que diseñar el flow para que la pausa esté OK es parte del costo."
       },
       {
         "t": 66,
@@ -1384,29 +1384,29 @@
   },
   {
     "n": 26,
-    "section": "I · PATTERNS",
+    "section": "II · PATTERNS",
     "title": "How they compose — the strategy lattice",
     "duration_seconds": 70,
     "beats": [
       {
         "t": 0,
-        "say": "Los 11 patrones no son ortogonales — se layerean en tres capas:\n• Engine — qué hace que una iteración tenga sentido\n• Topology — cómo se conectan los backends\n• Guardrails — qué evita que el sistema haga macanas"
+        "say": "Hasta acá presenté los 11 patrones sueltos. Aca vemos como quedarian organizados en tres capas. Los patrones no compiten entre sí: trabajan en niveles distintos del sistema."
       },
       {
         "t": 16,
-        "say": "Frase clave: \"a configured strategy is a tuple over the layers\". Cada configuración real del sistema es UNA elección por capa. No hay \"modo adversarial\" como botón único — adversarial es una elección de guardrail que se compone con elecciones de topology y engine."
+        "say": "Cualquier sistema real es siempre una tupla, nunca un patrón solo."
       },
       {
         "t": 34,
-        "say": "El demo: Adversarial Critique (guardrail) sobre Serial Chaining (topology) usando Evaluator-Optimizer + LLM-as-Judge (engine), con Sandbox siempre prendido. Esa tupla específica."
+        "say": "El demo que sigue es exactamente eso: una tupla específica corriendo end-to-end. Vamos a ver cómo las tres capas se ensamblan en una sola corrida y los outputs que produce."
       },
       {
         "t": 42,
-        "say": "\"¿Puedo combinar X con Y?\" — generalmente sí. Las capas son mix-and-match. Las únicas combinaciones imposibles son las que el schema de config rechaza explícitamente (ej: ensemble + serial al mismo tiempo no tiene sentido)."
+        "say": "Generalmente se pueden combinar todos. Las únicas combinaciones imposibles son las que no tienen sentido como ensemble y serial."
       },
       {
         "t": 56,
-        "say": "Insight pedagógico: cuando alguien viene con un caso nuevo, el ejercicio NO es \"¿qué framework de AI uso?\" — es \"¿qué tupla de capas compongo?\". Cambio de framing importante."
+        "say": "# Insight pedagógico: cuando alguien viene con un caso nuevo, el ejercicio NO es \"¿qué framework de AI uso?\" — es \"¿qué tupla de capas compongo?\". Cambio de framing importante."
       }
     ],
     "hints": [],
@@ -1423,8 +1423,8 @@
   },
   {
     "n": 27,
-    "section": "II · DEMO",
-    "title": "II · DEMO",
+    "section": "III · DEMO",
+    "title": "III · DEMO",
     "duration_seconds": 15,
     "beats": [
       {
@@ -1433,7 +1433,7 @@
       },
       {
         "t": 3,
-        "say": "LocalStack emula servicios de AWS localmente, hace falta para CI/CD, y acaba de pasar a modelo pago. La decisión de migrar es real, no inventada para el demo."
+        "say": "El topic es real: AWS API Gateway tiene tres variantes (REST API, HTTP API, WebSocket API) y elegir entre ellas no es obvio para una plataforma enterprise. La corrida que vas a ver atacó exactamente esa decisión, no es un caso inventado para mostrar el sistema."
       }
     ],
     "hints": [],
@@ -1450,7 +1450,7 @@
   },
   {
     "n": 28,
-    "section": "II · DEMO",
+    "section": "III · DEMO",
     "title": "The config — three backends, adversarial strategy",
     "duration_seconds": 65,
     "beats": [
@@ -1505,7 +1505,7 @@
   },
   {
     "n": 29,
-    "section": "II · DEMO",
+    "section": "III · DEMO",
     "title": "Dry-run first — validate without spending tokens",
     "duration_seconds": 55,
     "beats": [
@@ -1544,7 +1544,7 @@
   },
   {
     "n": 30,
-    "section": "II · DEMO",
+    "section": "III · DEMO",
     "title": "Real run — and the replay dashboard",
     "duration_seconds": 75,
     "beats": [
@@ -1583,8 +1583,8 @@
   },
   {
     "n": 31,
-    "section": "III · ADVERSARIAL",
-    "title": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
+    "title": "IV · ADVERSARIAL",
     "duration_seconds": 15,
     "beats": [
       {
@@ -1606,7 +1606,7 @@
   },
   {
     "n": 32,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "The critic finds real errors",
     "duration_seconds": 75,
     "beats": [
@@ -1653,7 +1653,7 @@
   },
   {
     "n": 33,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "Score progression — convergence is measurable",
     "duration_seconds": 70,
     "beats": [
@@ -1696,7 +1696,7 @@
   },
   {
     "n": 34,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "From one corpus — three artifacts",
     "duration_seconds": 35,
     "beats": [
@@ -1727,7 +1727,7 @@
   },
   {
     "n": 35,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "Output: default — for internal exploration",
     "duration_seconds": 30,
     "beats": [
@@ -1762,7 +1762,7 @@
   },
   {
     "n": 36,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "Output: paper — for stakeholders and external review",
     "duration_seconds": 50,
     "beats": [
@@ -1797,7 +1797,7 @@
   },
   {
     "n": 37,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "Output: technical_doc — for engineering decisions",
     "duration_seconds": 35,
     "beats": [
@@ -1832,7 +1832,7 @@
   },
   {
     "n": 38,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "Every run is fully replayable",
     "duration_seconds": 80,
     "beats": [
@@ -1891,7 +1891,7 @@
   },
   {
     "n": 39,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "Trust + certainty — every claim is classified",
     "duration_seconds": 80,
     "beats": [
@@ -1934,7 +1934,7 @@
   },
   {
     "n": 40,
-    "section": "III · ADVERSARIAL",
+    "section": "IV · ADVERSARIAL",
     "title": "This run",
     "duration_seconds": 50,
     "beats": [
